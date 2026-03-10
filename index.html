@@ -1,82 +1,47 @@
-body{
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body>
 
-background:#0f1116;
-color:white;
-font-family:Arial;
-margin:20px;
+  <h1>Finance Dashboard</h1>
 
-}
+  <div class="search">
+    <input id="tickerInput" placeholder="Ticker (AAPL, TSLA, NVDA)">
+    <button onclick="changeTicker()">Search</button>
+  </div>
 
-.grid{
+  <div class="grid">
+    <div class="chart">
+      <div id="priceChart" style="height:100%; min-height:480px;"></div>
+    </div>
 
-display:grid;
+    <div class="fundamentals">
+      <h3>Fundamentals</h3>
+      <div id="financials">Qui compariranno i dati fondamentali.</div>
+    </div>
 
-grid-template-columns:2fr 1fr;
+    <div class="news">
+      <h3>News</h3>
+      <div id="newsBox">Qui compariranno le news.</div>
+    </div>
 
-grid-template-rows:
+    <div class="analysts">
+      <h3>Analyst Ratings</h3>
+      <div id="analystBox">Qui compariranno i rating.</div>
+    </div>
 
-500px
-300px
-300px;
+    <div class="comparables">
+      <h3>Comparables</h3>
+      <div id="peers">Qui compariranno i comparables.</div>
+    </div>
+  </div>
 
-gap:20px;
-
-}
-
-.chart{
-
-grid-column:1 / span 2;
-
-background:#171b22;
-
-padding:10px;
-
-border-radius:10px;
-
-}
-
-.fundamentals{
-
-background:#171b22;
-
-padding:15px;
-
-border-radius:10px;
-
-}
-
-.news{
-
-background:#171b22;
-
-padding:15px;
-
-border-radius:10px;
-
-}
-
-.analysts{
-
-background:#171b22;
-
-padding:15px;
-
-border-radius:10px;
-
-}
-
-.comparables{
-
-background:#171b22;
-
-padding:15px;
-
-border-radius:10px;
-
-}
-
-.search{
-
-margin-bottom:20px;
-
-}
+  <script src="script.js"></script>
+</body>
+</html>
