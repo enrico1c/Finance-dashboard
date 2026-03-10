@@ -1,0 +1,32 @@
+body {
+  margin:0;
+  font-family: Arial, sans-serif;
+  background:#0f1116;
+  color:white;
+}
+
+header{
+  padding:20px;
+  background:#171b22;
+}
+
+.tabs{
+  padding:15px;
+}
+
+.tablink{
+  background:#1d2330;
+  color:white;
+  border:none;
+  padding:10px 15px;
+  cursor:pointer;
+}
+
+.tabcontent{
+  display:none;
+  padding:20px;
+}
+
+.widget-box{
+  min-height:500px;
+}
