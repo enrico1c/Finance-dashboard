@@ -1,32 +1,67 @@
-body {
-  margin:0;
-  font-family: Arial, sans-serif;
+body{
   background:#0f1116;
   color:white;
+  font-family:Arial, sans-serif;
+  margin:20px;
 }
 
-header{
-  padding:20px;
+h1{
+  margin-bottom:20px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  grid-template-rows:500px 300px 300px;
+  gap:20px;
+}
+
+.chart{
+  grid-column:1 / span 2;
   background:#171b22;
+  padding:10px;
+  border-radius:10px;
 }
 
-.tabs{
+.fundamentals{
+  background:#171b22;
   padding:15px;
+  border-radius:10px;
 }
 
-.tablink{
-  background:#1d2330;
-  color:white;
+.news{
+  background:#171b22;
+  padding:15px;
+  border-radius:10px;
+}
+
+.analysts{
+  background:#171b22;
+  padding:15px;
+  border-radius:10px;
+}
+
+.comparables{
+  background:#171b22;
+  padding:15px;
+  border-radius:10px;
+}
+
+.search{
+  margin-bottom:20px;
+}
+
+input{
+  padding:10px;
+  border-radius:8px;
   border:none;
-  padding:10px 15px;
+  width:250px;
+}
+
+button{
+  padding:10px 14px;
+  border:none;
+  border-radius:8px;
   cursor:pointer;
-}
-
-.tabcontent{
-  display:none;
-  padding:20px;
-}
-
-.widget-box{
-  min-height:500px;
+  margin-left:8px;
 }
