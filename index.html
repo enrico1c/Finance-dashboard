@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Finance Dashboard</h1>
+    <p>Dashboard finanziaria gratuita</p>
+  </header>
+
+  <nav class="tabs">
+    <button class="tablink active" onclick="openTab(event, 'market')">Market</button>
+    <button class="tablink" onclick="openTab(event, 'fundamentals')">Fundamentals</button>
+    <button class="tablink" onclick="openTab(event, 'news')">News</button>
+    <button class="tablink" onclick="openTab(event, 'comparative')">Comparative</button>
+  </nav>
+
+  <main>
+    <section id="market" class="tabcontent" style="display:block;">
+      <h2>Panoramica e Grafico</h2>
+      <p>Titolo selezionato: <span id="tickerLabel">AAPL</span></p>
+
+      <div class="search-box">
+        <input type="text" id="tickerInput" placeholder="Inserisci ticker, es. AAPL">
+        <button onclick="changeTicker()">Carica</button>
+      </div>
+
+      <div id="priceChart" class="widget-box"></div>
+    </section>
+
+    <section id="fundamentals" class="tabcontent">
+      <h2>Analisi Fondamentale</h2>
+      <div id="financials" class="card">Qui compariranno i dati fondamentali.</div>
+    </section>
+
+    <section id="news" class="tabcontent">
+      <h2>Notizie</h2>
+      <div id="newsBox" class="card">Qui compariranno le news.</div>
+    </section>
+
+    <section id="comparative" class="tabcontent">
+      <h2>Comparative</h2>
+      <div class="card">
+        Qui poi inseriremo confronto con peers, multipli e performance relative.
+      </div>
+    </section>
+  </main>
+
+  <script src="https://s3.tradingview.com/tv.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
