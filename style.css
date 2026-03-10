@@ -1,67 +1,66 @@
-body{
-  background:#0f1116;
-  color:white;
-  font-family:Arial, sans-serif;
-  margin:20px;
-}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Finance Dashboard</h1>
 
-h1{
-  margin-bottom:20px;
-}
+    <div class="search">
+      <input id="tickerInput" placeholder="Ticker (AAPL, TSLA, NVDA)" value="AAPL" />
+      <button onclick="changeTicker()">Search</button>
+    </div>
+  </div>
 
-.grid{
-display:grid;
-grid-template-columns:2fr 1fr;
-grid-template-rows:50vh 25vh 25vh;
-height:90vh;
-}
+  <div class="grid">
+    <section class="panel chart">
+      <div class="panel-head">
+        <h3>Price Chart</h3>
+      </div>
+      <div id="priceChart" class="panel-content chart-content"></div>
+    </section>
 
-.chart{
-  grid-column:1 / span 2;
-  background:#171b22;
-  padding:10px;
-  border-radius:10px;
-}
+    <section class="panel fundamentals">
+      <div class="panel-head">
+        <h3>Fundamentals</h3>
+      </div>
+      <div id="financials" class="panel-content">Loading fundamentals...</div>
+    </section>
 
-.fundamentals{
-  background:#171b22;
-  padding:15px;
-  border-radius:10px;
-}
+    <section class="panel news">
+      <div class="panel-head">
+        <h3>News</h3>
+        <div class="filters">
+          <label><input type="checkbox" class="srcFilter" value="nyt" checked> NYT</label>
+          <label><input type="checkbox" class="srcFilter" value="ft" checked> FT</label>
+          <label><input type="checkbox" class="srcFilter" value="economist" checked> Economist</label>
+        </div>
+      </div>
+      <div id="newsBox" class="panel-content">Loading news...</div>
+    </section>
 
-.news{
-  background:#171b22;
-  padding:15px;
-  border-radius:10px;
-}
+    <section class="panel analysts">
+      <div class="panel-head">
+        <h3>Notes</h3>
+      </div>
+      <div id="analystBox" class="panel-content">
+        Qui puoi aggiungere note personali, target price, watchlist o link al broker.
+      </div>
+    </section>
 
-.analysts{
-  background:#171b22;
-  padding:15px;
-  border-radius:10px;
-}
+    <section class="panel comparables">
+      <div class="panel-head">
+        <h3>Comparables</h3>
+      </div>
+      <div id="peers" class="panel-content">Loading comparables...</div>
+    </section>
+  </div>
 
-.comparables{
-  background:#171b22;
-  padding:15px;
-  border-radius:10px;
-}
-
-.search{
-  margin-bottom:20px;
-}
-
-input{
-  padding:10px;
-  border-radius:8px;
-  border:none;
-  width:250px;
-}
-
-button{
-  padding:10px 14px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-  margin-left:8px;
-}
+  <script src="script.js"></script>
+</body>
+</html>
