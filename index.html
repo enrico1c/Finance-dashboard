@@ -1,45 +1,64 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Finance Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
   <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
+  <div class="topbar">
+    <h1>Finance Dashboard</h1>
 
-  <h1>Finance Dashboard</h1>
-
-  <div class="search">
-    <input id="tickerInput" placeholder="Ticker (AAPL, TSLA, NVDA)">
-    <button onclick="changeTicker()">Search</button>
+    <div class="search">
+      <input id="tickerInput" placeholder="Ticker (AAPL, TSLA, NVDA)" value="AAPL" />
+      <button onclick="changeTicker()">Search</button>
+    </div>
   </div>
 
   <div class="grid">
-    <div class="chart">
-      <div id="priceChart" style="height:100%; min-height:480px;"></div>
-    </div>
+    <section class="panel chart">
+      <div class="panel-head">
+        <h3>Price Chart</h3>
+      </div>
+      <div id="priceChart" class="panel-content chart-content"></div>
+    </section>
 
-    <div class="fundamentals">
-      <h3>Fundamentals</h3>
-      <div id="financials">Qui compariranno i dati fondamentali.</div>
-    </div>
+    <section class="panel fundamentals">
+      <div class="panel-head">
+        <h3>Fundamentals</h3>
+      </div>
+      <div id="financials" class="panel-content">Loading fundamentals...</div>
+    </section>
 
-    <div class="news">
-      <h3>News</h3>
-      <div id="newsBox">Qui compariranno le news.</div>
-    </div>
+    <section class="panel news">
+      <div class="panel-head">
+        <h3>News</h3>
+        <div class="filters">
+          <label><input type="checkbox" class="srcFilter" value="nyt" checked> NYT</label>
+          <label><input type="checkbox" class="srcFilter" value="ft" checked> FT</label>
+          <label><input type="checkbox" class="srcFilter" value="economist" checked> Economist</label>
+        </div>
+      </div>
+      <div id="newsBox" class="panel-content">Loading news...</div>
+    </section>
 
-    <div class="analysts">
-      <h3>Analyst Ratings</h3>
-      <div id="analystBox">Qui compariranno i rating.</div>
-    </div>
+    <section class="panel analysts">
+      <div class="panel-head">
+        <h3>Notes</h3>
+      </div>
+      <div id="analystBox" class="panel-content">
+        Qui puoi aggiungere note personali, target price, watchlist o link al broker.
+      </div>
+    </section>
 
-    <div class="comparables">
-      <h3>Comparables</h3>
-      <div id="peers">Qui compariranno i comparables.</div>
-    </div>
+    <section class="panel comparables">
+      <div class="panel-head">
+        <h3>Comparables</h3>
+      </div>
+      <div id="peers" class="panel-content">Loading comparables...</div>
+    </section>
   </div>
 
   <script src="script.js"></script>
