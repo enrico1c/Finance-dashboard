@@ -1,0 +1,557 @@
+/* ══════════════════════════════════════════════════════════════════
+   FINTERM — finnhub.js
+   Finnhub.io integration layer
+   Free tier: 60 calls/min
+   Endpoints used:
+     • Company News            /news?category=general (no ticker filter on free)
+     • Stock News              /company-news?symbol=X&from=&to=
+     • Quote                   /quote?symbol=X
+     • Company Profile         /stock/profile2?symbol=X
+     • Recommendation Trends   /stock/recommendation?symbol=X
+     • Price Target            /stock/price-target?symbol=X
+     • Upgrade/Downgrade       /stock/upgrade-downgrade?symbol=X
+     • Earnings                /stock/earnings?symbol=X
+     • Insider Transactions    /stock/insider-transactions?symbol=X
+     • Institutional Ownership /institutional/ownership?symbol=X&cusip=
+     • Peers                   /stock/peers?symbol=X
+     • Market Cap              via profile2
+   ══════════════════════════════════════════════════════════════════ */
+
+const FH_BASE = "https://finnhub.io/api/v1";
+const FH_SESSION_KEY = "fh_call_count";
+
+/* ── Key ─────────────────────────────────────────────────────────── */
+function getFinnhubKey() {
+  return (window._KEYS && window._KEYS["finnhub"])
+    || localStorage.getItem("finterm_key_finnhub")
+    || "";
+}
+function fhCount() { return parseInt(sessionStorage.getItem(FH_SESSION_KEY) || "0"); }
+function fhBump()  { const n = fhCount()+1; sessionStorage.setItem(FH_SESSION_KEY,n); return n; }
+
+/* ── Core fetch with token ───────────────────────────────────────── */
+async function fhFetch(path, params = {}) {
+  const key = getFinnhubKey();
+  if (!key) return null;
+  const url = new URL(`${FH_BASE}${path}`);
+  url.searchParams.set("token", key);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+
+  const cacheKey = `fh_${url.toString()}`;
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) { try { return JSON.parse(cached); } catch(_) {} }
+
+  fhBump();
+  try {
+    const r = await fetch(url.toString());
+    if (!r.ok) return null;
+    const data = await r.json();
+    sessionStorage.setItem(cacheKey, JSON.stringify(data));
+    return data;
+  } catch(_) { return null; }
+}
+
+/* ── Date helpers ────────────────────────────────────────────────── */
+function fhDateStr(daysAgo = 0) {
+  const d = new Date(Date.now() - daysAgo * 86400000);
+  return d.toISOString().slice(0,10);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DATA FETCHERS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Quote ───────────────────────────────────────────────────────── */
+async function fhGetQuote(sym) {
+  const d = await fhFetch("/quote", { symbol: sym });
+  if (!d || d.c == null) return null;
+  return {
+    price:    d.c,
+    change:   d.d,
+    changePct: d.dp,
+    high:     d.h,
+    low:      d.l,
+    open:     d.o,
+    prevClose: d.pc,
+    timestamp: d.t,
+  };
+}
+
+/* ── Company Profile ─────────────────────────────────────────────── */
+async function fhGetProfile(sym) {
+  const d = await fhFetch("/stock/profile2", { symbol: sym });
+  if (!d || !d.name) return null;
+  return {
+    name:        d.name,
+    ticker:      d.ticker,
+    exchange:    d.exchange,
+    currency:    d.currency,
+    country:     d.country,
+    sector:      d.finnhubIndustry,
+    mktCap:      d.marketCapitalization ? d.marketCapitalization * 1e6 : null,
+    shareOut:    d.shareOutstanding ? d.shareOutstanding * 1e6 : null,
+    logo:        d.logo,
+    weburl:      d.weburl,
+    ipo:         d.ipo,
+  };
+}
+
+/* ── Analyst Recommendations ─────────────────────────────────────── */
+async function fhGetRecommendations(sym) {
+  const data = await fhFetch("/stock/recommendation", { symbol: sym });
+  if (!Array.isArray(data) || !data.length) return null;
+  // Most recent period first
+  const latest = data[0];
+  const history = data.slice(0, 6).map(r => ({
+    period:     r.period,
+    strongBuy:  r.strongBuy,
+    buy:        r.buy,
+    hold:       r.hold,
+    sell:       r.sell,
+    strongSell: r.strongSell,
+    total:      r.strongBuy + r.buy + r.hold + r.sell + r.strongSell,
+  }));
+  return {
+    latest,
+    history,
+    buy:   (latest.strongBuy || 0) + (latest.buy || 0),
+    hold:   latest.hold || 0,
+    sell:  (latest.sell || 0) + (latest.strongSell || 0),
+    total: (latest.strongBuy||0)+(latest.buy||0)+(latest.hold||0)+(latest.sell||0)+(latest.strongSell||0),
+    period: latest.period,
+  };
+}
+
+/* ── Price Target ────────────────────────────────────────────────── */
+async function fhGetPriceTarget(sym) {
+  const d = await fhFetch("/stock/price-target", { symbol: sym });
+  if (!d || !d.targetMean) return null;
+  return {
+    avg:    d.targetMean,
+    high:   d.targetHigh,
+    low:    d.targetLow,
+    median: d.targetMedian,
+    count:  d.numberOfAnalysts,
+    lastUpdated: d.lastUpdated,
+  };
+}
+
+/* ── Upgrades / Downgrades ───────────────────────────────────────── */
+async function fhGetUpgrades(sym) {
+  const data = await fhFetch("/stock/upgrade-downgrade", { symbol: sym });
+  if (!Array.isArray(data)) return null;
+  return data.slice(0, 15).map(u => ({
+    date:      u.gradeDate,
+    firm:      u.company,
+    fromGrade: u.fromGrade,
+    toGrade:   u.toGrade,
+    action:    u.action, // "up","down","main","init","reit"
+  }));
+}
+
+/* ── Earnings (quarterly) ────────────────────────────────────────── */
+async function fhGetEarnings(sym) {
+  const data = await fhFetch("/stock/earnings", { symbol: sym, limit: 8 });
+  if (!Array.isArray(data) || !data.length) return null;
+  return data.map(e => ({
+    period:    e.period,
+    epsEst:    e.estimate,
+    epsActual: e.actual,
+    surprise:  e.surprise,
+    surprisePct: e.surprisePercent,
+  }));
+}
+
+/* ── Insider Transactions ────────────────────────────────────────── */
+async function fhGetInsiders(sym) {
+  const d = await fhFetch("/stock/insider-transactions", { symbol: sym });
+  if (!d || !d.data) return null;
+  return d.data.slice(0, 25).map(t => ({
+    name:           t.name,
+    share:          t.share,
+    change:         t.change,
+    transactionDate: t.transactionDate,
+    transactionCode: t.transactionCode, // P=purchase, S=sale, A=grant
+    transactionPrice: t.transactionPrice,
+    value:          t.change && t.transactionPrice ? Math.abs(t.change * t.transactionPrice) : null,
+  }));
+}
+
+/* ── Institutional Ownership ─────────────────────────────────────── */
+async function fhGetInstitutional(sym) {
+  const d = await fhFetch("/institutional/ownership", { symbol: sym, cusip: "" });
+  if (!d || !d.ownership) return null;
+  return d.ownership.slice(0, 15).map(o => ({
+    name:         o.name,
+    pct:          o.percent,
+    shares:       o.share,
+    change:       o.change,
+    reportDate:   o.reportDate,
+  }));
+}
+
+/* ── Company News ────────────────────────────────────────────────── */
+async function fhGetNews(sym, days = 7) {
+  const from = fhDateStr(days);
+  const to   = fhDateStr(0);
+  const data = await fhFetch("/company-news", { symbol: sym, from, to });
+  if (!Array.isArray(data)) return null;
+  return data.slice(0, 30).map(a => ({
+    id:          a.id,
+    headline:    a.headline,
+    summary:     a.summary,
+    url:         a.url,
+    source:      a.source,
+    datetime:    a.datetime, // unix timestamp
+    image:       a.image,
+    category:    a.category,
+    sentiment:   null, // not provided by Finnhub free tier
+  }));
+}
+
+/* ── Peers (same sector, similar size) ──────────────────────────── */
+async function fhGetPeers(sym) {
+  const data = await fhFetch("/stock/peers", { symbol: sym });
+  if (!Array.isArray(data) || !data.length) return null;
+  return data.filter(s => s !== sym).slice(0, 12);
+}
+
+/* ── Batch quotes for peer list ──────────────────────────────────── */
+async function fhGetBatchProfiles(symbols) {
+  // Finnhub has no batch endpoint — fire in parallel (respect rate limit)
+  const results = await Promise.all(
+    symbols.map(s => Promise.all([fhGetProfile(s), fhGetQuote(s)]))
+  );
+  return symbols.map((s, i) => {
+    const [profile, quote] = results[i];
+    if (!profile) return null;
+    return {
+      ticker:    s,
+      name:      profile.name,
+      mktCap:    profile.mktCap,
+      sector:    profile.sector,
+      currency:  profile.currency,
+      price:     quote?.price,
+      change:    quote?.changePct,
+    };
+  }).filter(Boolean);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RENDER HELPERS
+   ══════════════════════════════════════════════════════════════════ */
+function fhEsc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fhFmt(n,d=2){ if(n==null||isNaN(n)) return '—'; return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fhFmtB(n){ if(!n)return'—'; const a=Math.abs(n); if(a>=1e12)return(n/1e12).toFixed(2)+'T'; if(a>=1e9)return(n/1e9).toFixed(2)+'B'; if(a>=1e6)return(n/1e6).toFixed(2)+'M'; return n.toLocaleString(); }
+function fhRow(l,v,c=''){return `<div class="metric-row ${c}"><span class="metric-label">${fhEsc(l)}</span><span class="metric-value">${v??'—'}</span></div>`;}
+function fhSec(t){return `<div class="section-head">${fhEsc(t)}</div>`;}
+function fhUnixDate(ts){ try{return new Date(ts*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch(_){return '';} }
+
+/* ── Render: Analyst ANR tab ─────────────────────────────────────── */
+function fhRenderAnalysts(sym, recs, target, upgrades, price) {
+  const anr = document.getElementById("analysts-anr");
+  if (!anr) return;
+
+  const buy  = recs?.buy  || 0;
+  const hold = recs?.hold || 0;
+  const sell = recs?.sell || 0;
+  const tot  = recs?.total || buy+hold+sell || 1;
+  const bp   = Math.round(buy/tot*100);
+  const hp   = Math.round(hold/tot*100);
+  const sp   = 100 - bp - hp;
+
+  const upside = (target?.avg && price)
+    ? ((target.avg/price - 1)*100).toFixed(1)+"%" : "—";
+  const upsideCls = (target?.avg && price)
+    ? (target.avg > price ? "metric-up" : "metric-down") : "";
+
+  // Upgrades table
+  const upgradeRows = (upgrades || []).map(u => {
+    const actionLabel = { up:"↑ Upgrade", down:"↓ Downgrade", main:"→ Maintain", init:"★ Initiate", reit:"→ Reiterate" }[u.action] || u.action;
+    const cls = u.action === "up" ? "pos" : u.action === "down" ? "neg" : "neutral";
+    return `<tr>
+      <td>${fhEsc(u.date)}</td>
+      <td>${fhEsc(u.firm)}</td>
+      <td class="${cls}">${fhEsc(actionLabel)}</td>
+      <td>${fhEsc(u.fromGrade||'—')}</td>
+      <td>${fhEsc(u.toGrade||'—')}</td>
+    </tr>`;
+  }).join("");
+
+  // Recommendation trend chart (bar per period)
+  const trendHtml = (recs?.history || []).map(r => {
+    const t = r.total || 1;
+    const bPct = Math.round(((r.strongBuy+r.buy)/t)*100);
+    const hPct = Math.round((r.hold/t)*100);
+    const sPct = 100 - bPct - hPct;
+    return `<div class="fh-trend-row">
+      <span class="fh-trend-label">${fhEsc(r.period?.slice(0,7)||'')}</span>
+      <div class="fh-trend-bar">
+        <div class="fh-tb-buy"  style="width:${bPct}%" title="Buy ${bPct}%"></div>
+        <div class="fh-tb-hold" style="width:${hPct}%" title="Hold ${hPct}%"></div>
+        <div class="fh-tb-sell" style="width:${sPct}%" title="Sell ${sPct}%"></div>
+      </div>
+      <span class="fh-trend-total">${r.total}</span>
+    </div>`;
+  }).join("");
+
+  anr.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub · ${fhEsc(recs?.period||'')} </div>
+    ${fhSec("Consensus")}
+    <div class="consensus-bar">
+      <div class="cb-seg buy"  style="width:${bp}%">${buy} Buy</div>
+      <div class="cb-seg hold" style="width:${hp}%">${hold} Hold</div>
+      <div class="cb-seg sell" style="width:${sp}%">${sell} Sell</div>
+    </div>
+    ${fhRow("Total Analysts",  tot)}
+    ${fhRow("Avg Target",      target?.avg  != null ? "$"+fhFmt(target.avg)  : "—")}
+    ${fhRow("High Target",     target?.high != null ? "$"+fhFmt(target.high) : "—")}
+    ${fhRow("Low Target",      target?.low  != null ? "$"+fhFmt(target.low)  : "—")}
+    ${price ? fhRow("Current Price", "$"+fhFmt(price)) : ""}
+    ${fhRow("Upside to Avg",   upside, upsideCls)}
+    ${trendHtml ? fhSec("Trend (last 6 months)") + `<div class="fh-trend-wrap">${trendHtml}</div>` : ""}
+    ${upgradeRows ? fhSec("Recent Upgrades / Downgrades") + `
+    <div class="fin-table-wrap"><table class="fin-table">
+      <thead><tr><th>Date</th><th>Firm</th><th>Action</th><th>From</th><th>To</th></tr></thead>
+      <tbody>${upgradeRows}</tbody>
+    </table></div>` : ""}`;
+}
+
+/* ── Render: Analyst BRC tab (research briefs from upgrades) ─────── */
+function fhRenderBRC(sym, upgrades) {
+  const brc = document.getElementById("analysts-brc");
+  if (!brc || !upgrades?.length) return;
+  brc.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub Upgrades</div>
+    ${upgrades.map(u => {
+      const cls = u.action==="up"?"pos":u.action==="down"?"neg":"neutral";
+      return `<div class="research-item">
+        <div class="research-header">
+          <span class="research-firm">${fhEsc(u.firm)}</span>
+          <span class="research-date">${fhEsc(u.date)}</span>
+        </div>
+        <div class="research-title">
+          <span class="${cls}">${fhEsc(u.action==="up"?"↑ Upgraded":u.action==="down"?"↓ Downgraded":"→ Maintained")}</span>
+          ${u.fromGrade ? ` from <em>${fhEsc(u.fromGrade)}</em>` : ""}
+          ${u.toGrade   ? ` to <strong>${fhEsc(u.toGrade)}</strong>` : ""}
+        </div>
+      </div>`;
+    }).join("")}`;
+}
+
+/* ── Render: Ownership HDS tab ───────────────────────────────────── */
+function fhRenderOwnership(sym, insiders, institutional) {
+  const hds = document.getElementById("own-hds");
+  if (!hds) return;
+
+  // Insiders table
+  const insRows = (insiders || []).map(t => {
+    const isBuy = ["P","A"].includes(t.transactionCode);
+    const isSell = ["S","D","F"].includes(t.transactionCode);
+    const cls = isBuy ? "pos" : isSell ? "neg" : "";
+    const action = isBuy ? "Buy/Grant" : isSell ? "Sale" : t.transactionCode;
+    return `<tr>
+      <td>${fhEsc(t.name||'—')}</td>
+      <td class="${cls}">${fhEsc(action)}</td>
+      <td>${t.share ? Number(t.share).toLocaleString() : "—"}</td>
+      <td>${t.change ? (t.change > 0 ? "+" : "") + Number(t.change).toLocaleString() : "—"}</td>
+      <td>${t.transactionPrice ? "$"+fhFmt(t.transactionPrice) : "—"}</td>
+      <td>${t.value ? "$"+fhFmtB(t.value) : "—"}</td>
+      <td>${fhEsc(t.transactionDate||'—')}</td>
+    </tr>`;
+  }).join("");
+
+  // Institutional table
+  const instRows = (institutional || []).map(o => {
+    const chgCls = o.change > 0 ? "pos" : o.change < 0 ? "neg" : "";
+    return `<tr>
+      <td>${fhEsc(o.name||'—')}</td>
+      <td>${o.pct != null ? fhFmt(o.pct,2)+"%" : "—"}</td>
+      <td>${o.shares ? Number(o.shares).toLocaleString() : "—"}</td>
+      <td class="${chgCls}">${o.change != null ? (o.change>0?"+":"")+Number(o.change).toLocaleString() : "—"}</td>
+      <td>${fhEsc(o.reportDate||'—')}</td>
+    </tr>`;
+  }).join("");
+
+  hds.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub Insider & Institutional Data</div>
+    ${fhSec("Insider Transactions (Recent)")}
+    ${insRows
+      ? `<div class="fin-table-wrap"><table class="fin-table">
+          <thead><tr><th>Insider</th><th>Action</th><th>Shares Held</th><th>Change</th><th>Price</th><th>Value</th><th>Date</th></tr></thead>
+          <tbody>${insRows}</tbody>
+        </table></div>`
+      : '<div class="no-data">// No insider data available</div>'}
+    ${fhSec("Institutional Holders")}
+    ${instRows
+      ? `<div class="fin-table-wrap"><table class="fin-table">
+          <thead><tr><th>Institution</th><th>% Own</th><th>Shares</th><th>QoQ Chg</th><th>Report Date</th></tr></thead>
+          <tbody>${instRows}</tbody>
+        </table></div>`
+      : '<div class="no-data">// No institutional data available</div>'}`;
+}
+
+/* ── Render: Management MGMT tab ─────────────────────────────────── */
+function fhRenderMgmt(sym, profile) {
+  const mg = document.getElementById("own-mgmt");
+  if (!mg || !profile) return;
+  // Finnhub free tier doesn't provide executives list directly
+  // Show profile info + link
+  mg.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub Profile</div>
+    ${profile.logo ? `<div style="margin-bottom:10px"><img src="${fhEsc(profile.logo)}" alt="" style="height:32px;object-fit:contain;filter:brightness(1.2)"/></div>` : ""}
+    ${fhRow("Company", fhEsc(profile.name))}
+    ${fhRow("Exchange", fhEsc(profile.exchange))}
+    ${fhRow("Country",  fhEsc(profile.country))}
+    ${fhRow("Sector",   fhEsc(profile.sector))}
+    ${fhRow("Mkt Cap",  fhFmtB(profile.mktCap))}
+    ${fhRow("IPO Date", fhEsc(profile.ipo||'—'))}
+    ${fhRow("Shares Outstanding", profile.shareOut ? Number(profile.shareOut).toLocaleString() : "—")}
+    ${profile.weburl ? `<div style="margin-top:8px"><a href="${fhEsc(profile.weburl)}" target="_blank" rel="noopener" class="geo-wm-link">Company website ↗</a></div>` : ""}
+    <div class="av-note">// Full executive list requires Finnhub Premium plan or FMP data.</div>`;
+}
+
+/* ── Render: Comparables RV tab ──────────────────────────────────── */
+function fhRenderComparables(sym, peers, peerData, mainProfile, mainQuote) {
+  const rv = document.getElementById("comp-rv");
+  if (!rv) return;
+
+  const mainMktCap = mainProfile?.mktCap || null;
+
+  // Sort peers by market cap distance to main ticker
+  const sorted = [...peerData].sort((a, b) => {
+    if (!mainMktCap) return 0;
+    return Math.abs((a.mktCap||0) - mainMktCap) - Math.abs((b.mktCap||0) - mainMktCap);
+  }).slice(0, 10);
+
+  // Include main ticker at top
+  const allRows = [
+    { ticker: sym, name: mainProfile?.name||sym, mktCap: mainMktCap,
+      price: mainQuote?.price, change: mainQuote?.changePct, sector: mainProfile?.sector,
+      isCurrent: true },
+    ...sorted.map(p => ({ ...p, isCurrent: false }))
+  ];
+
+  const rows = allRows.map(r => `<tr class="${r.isCurrent ? "current-row" : ""}">
+    <td><strong>${fhEsc(r.ticker)}</strong></td>
+    <td>${fhEsc(r.name)}</td>
+    <td>${fhFmtB(r.mktCap)}</td>
+    <td>${fhEsc(r.sector||'—')}</td>
+    <td>${r.price != null ? "$"+fhFmt(r.price) : "—"}</td>
+    <td class="${r.change > 0 ? "pos" : r.change < 0 ? "neg" : ""}">${r.change != null ? (r.change>0?"+":"")+fhFmt(r.change,2)+"%" : "—"}</td>
+  </tr>`).join("");
+
+  rv.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub Peers · ${fhEsc(mainProfile?.sector||'')} sector · 10 closest by market cap</div>
+    <div class="fin-table-wrap"><table class="fin-table rv-table">
+      <thead><tr><th>Ticker</th><th>Company</th><th>Mkt Cap</th><th>Sector</th><th>Price</th><th>Day Chg%</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="av-note">// Peers identified by Finnhub as same industry. Sorted by proximity to ${fhEsc(sym)} market cap.</div>`;
+}
+
+/* ── Render: News CN tab ─────────────────────────────────────────── */
+function fhRenderNews(sym, articles) {
+  const cn = document.getElementById("news-cn");
+  if (!cn || !articles?.length) return;
+  const sentClass = s => s === "Bullish" ? "pos" : s === "Bearish" ? "neg" : "";
+  cn.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub Company News  <span class="av-ts">${articles.length} articles</span></div>
+    <div class="news-list">
+      ${articles.map(a => `
+        <div class="news-item">
+          ${a.image ? `<div class="news-img-wrap"><img src="${fhEsc(a.image)}" alt="" loading="lazy" onerror="this.parentElement.remove()"/></div>` : ""}
+          <div class="news-headline">${fhEsc(a.headline)}</div>
+          <div class="news-meta">
+            <span>${fhEsc(a.source)}</span>
+            <span>${fhUnixDate(a.datetime)}</span>
+            ${a.category ? `<span><em>${fhEsc(a.category)}</em></span>` : ""}
+          </div>
+          ${a.summary ? `<div class="news-summary">${fhEsc(a.summary.slice(0,250))}…</div>` : ""}
+          <div class="news-actions">
+            <a href="${fhEsc(a.url)}" target="_blank" rel="noopener" class="news-read-more">Read full article ↗</a>
+          </div>
+        </div>`).join("")}
+    </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   HIGH-LEVEL LOADER
+   ══════════════════════════════════════════════════════════════════ */
+const fhLiveCache = {};
+
+async function finnhubLoadAll(rawTicker) {
+  const key = getFinnhubKey();
+  if (!key) return;
+  const sym = rawTicker.replace(/.*:/,"").toUpperCase();
+
+  showApiToast(`↻ Finnhub: loading ${sym}…`, "info");
+
+  // Fire all requests in parallel
+  const [recs, target, upgrades, earnings, insiders, institutional, news, peers, profile, quote] =
+    await Promise.all([
+      fhGetRecommendations(sym),
+      fhGetPriceTarget(sym),
+      fhGetUpgrades(sym),
+      fhGetEarnings(sym),
+      fhGetInsiders(sym),
+      fhGetInstitutional(sym),
+      fhGetNews(sym, 14),
+      fhGetPeers(sym),
+      fhGetProfile(sym),
+      fhGetQuote(sym),
+    ]);
+
+  fhLiveCache[sym] = { recs, target, upgrades, earnings, insiders, institutional, news, peers, profile, quote };
+
+  // Render analysts
+  if (recs || target || upgrades) {
+    fhRenderAnalysts(sym, recs, target, upgrades, quote?.price);
+    fhRenderBRC(sym, upgrades);
+  }
+
+  // Render ownership
+  if (insiders || institutional) fhRenderOwnership(sym, insiders, institutional);
+  if (profile) fhRenderMgmt(sym, profile);
+
+  // Render news
+  if (news?.length) fhRenderNews(sym, news);
+
+  // Render comparables — fetch peer profiles
+  if (peers?.length) {
+    showApiToast(`↻ Finnhub: loading ${peers.length} peer profiles…`, "info");
+    const peerData = await fhGetBatchProfiles(peers.slice(0, 10));
+    fhRenderComparables(sym, sym, peerData, profile, quote);
+    fhLiveCache[sym].peerData = peerData;
+  }
+
+  const loaded = [recs, target, upgrades, insiders, institutional, news, peers, profile, quote].filter(Boolean).length;
+  showApiToast(`✓ Finnhub: ${sym} — ${loaded}/9 datasets loaded`, "ok");
+}
+
+/* ── Sector search via Finnhub peers (for watchlist) ────────────── */
+async function finnhubSectorSearch(sym) {
+  const peers = await fhGetPeers(sym);
+  if (!peers?.length) return null;
+  // Get profiles + quotes for all peers
+  const all = [sym, ...peers.slice(0, 12)];
+  const data = await Promise.all(
+    all.map(async s => {
+      const [p, q] = await Promise.all([fhGetProfile(s), fhGetQuote(s)]);
+      if (!p) return null;
+      return {
+        ticker: s,
+        name: p.name,
+        mktCap: p.mktCap || 0,
+        price: q?.price || 0,
+        change: q?.changePct || 0,
+        sector: p.sector,
+        currency: p.currency,
+        pe: null, pb: null, evEbitda: null, fcfYield: null,
+        peg: null, divYield: null, epsGrowth: null,
+        desc: p.sector || "",
+      };
+    })
+  );
+  return data.filter(Boolean);
+}
