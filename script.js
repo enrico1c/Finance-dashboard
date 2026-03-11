@@ -273,29 +273,33 @@ function renderFundamentals(ticker){
           <div class="desc-block">${escapeHtml(d.description)}</div>
         ` : noData(ticker)}
       </div>`;
-    // Inject TradingView Fundamentals widget
-    if(typeof TradingView !== "undefined") {
-      try {
-        const container = document.getElementById(`tv-fund-${sym}`);
-        if(container) {
-          container.innerHTML = "";
-          new TradingView.widget({
-            "width": "100%",
-            "height": 420,
-            "symbol": tvSym,
-            "colorTheme": "dark",
-            "isTransparent": true,
-            "locale": "en",
-            "container_id": `tv-fund-${sym}`,
-          });
-          // Hide fallback if widget loads
-          setTimeout(() => {
-            const el = document.getElementById(`tv-fund-fallback-${sym}`);
-            if(el && container.children.length > 0) el.style.display = "none";
-          }, 2000);
-        }
-      } catch(e) { /* widget not available, fallback stays visible */ }
-    }
+    // Inject TradingView Fundamental Data widget (script-based embed)
+    try {
+      const container = document.getElementById(`tv-fund-${sym}`);
+      if(container) {
+        container.innerHTML = "";
+        const script = document.createElement("script");
+        script.type  = "text/javascript";
+        script.src   = "https://s3.tradingview.com/external-embedding/embed-widget-financials.js";
+        script.async = true;
+        script.innerHTML = JSON.stringify({
+          "symbol":     tvSym,
+          "colorTheme": "dark",
+          "isTransparent": true,
+          "largeChartUrl": "",
+          "displayMode": "regular",
+          "width":  "100%",
+          "height": 490,
+          "locale": "en"
+        });
+        container.appendChild(script);
+        // Hide fallback once widget renders
+        setTimeout(() => {
+          const fb = document.getElementById(`tv-fund-fallback-${sym}`);
+          if(fb && container.querySelector("iframe")) fb.style.display = "none";
+        }, 3000);
+      }
+    } catch(e) { /* fallback stays visible */ }
   }
 
   /* FA */
@@ -599,7 +603,7 @@ const topicSeedTicker = {
   telecom:"T", telecoms:"VZ",
   mining:"RIO", metals:"FCX", gold:"NEM",
   food:"MCD", beverage:"KO", staples:"PG",
-  insurance:"BRK-B", reinsurance:"MUNMun",
+  insurance:"BRK-B", reinsurance:"MUNMUn",
 };
 
 async function loadWatchlist(topic) {
@@ -644,10 +648,16 @@ async function loadWatchlist(topic) {
     return;
   }
   // Sort static data by mktCap (largest first using numeric parse)
-  const staticStocks = [...data.stocks].sort((a,b)=>{
-    const parse = s => parseFloat(String(s.mktCap).replace(/[$€£T]/gi,t=>({T:1e12,B:1e9,M:1e6}[t]||'')).replace(/,/g,''))||0;
-    return parse(b) - parse(a);
-  });
+  const parseMktCap = v => {
+    const s = String(v||"").replace(/[$€£,\s]/g,"");
+    const n = parseFloat(s);
+    if(isNaN(n)) return 0;
+    if(s.endsWith("T")||s.toUpperCase().endsWith("T")) return n*1e12;
+    if(s.endsWith("B")||s.toUpperCase().endsWith("B")) return n*1e9;
+    if(s.endsWith("M")||s.toUpperCase().endsWith("M")) return n*1e6;
+    return n;
+  };
+  const staticStocks = [...data.stocks].sort((a,b) => parseMktCap(b.mktCap) - parseMktCap(a.mktCap));
   if (lbl) lbl.textContent = `Sector: ${data.label}`;
   currentWatchlistStocks = staticStocks;
   if (cnt) cnt.textContent = `${staticStocks.length} stocks`;
@@ -681,18 +691,21 @@ function renderWatchlistRows() {
       <span>Stock</span><span>Price</span><span>Chg%</span><span>Mkt Cap</span><span>P/E</span><span>Chart</span>
     </div>
     ${sorted.map(s => {
-      const chgCls = s.change >= 0 ? "wl-pos" : "wl-neg";
-      const chgStr = (s.change >= 0 ? "+" : "") + s.change.toFixed(2) + "%";
-      const peStr  = s.pe ? s.pe.toFixed(1) : "—";
+      const chg    = s.change != null ? Number(s.change) : 0;
+      const chgCls = chg >= 0 ? "wl-pos" : "wl-neg";
+      const chgStr = (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%";
+      const peStr  = s.pe != null ? Number(s.pe).toFixed(1) : "—";
+      const priceStr = s.price != null ? "$"+fmt(Number(s.price)) : "—";
+      const mcapStr = s.mktCap != null ? String(s.mktCap) : "—";
       return `<div class="wl-row" onclick="openValuation('${escapeHtml(s.ticker)}')">
         <div class="wl-stock-info">
-          <span class="wl-ticker">${escapeHtml(s.ticker.replace(/.*:/,""))}</span>
-          <span class="wl-name">${escapeHtml(s.name)}</span>
-          <span class="wl-sector-tag">${escapeHtml(s.sector)}</span>
+          <span class="wl-ticker">${escapeHtml(String(s.ticker||"").replace(/.*:/,""))}</span>
+          <span class="wl-name">${escapeHtml(String(s.name||""))}</span>
+          <span class="wl-sector-tag">${escapeHtml(String(s.sector||""))}</span>
         </div>
-        <span class="wl-price">$${fmt(s.price)}</span>
+        <span class="wl-price">${priceStr}</span>
         <span class="wl-chg ${chgCls}">${chgStr}</span>
-        <span class="wl-mcap">${s.mktCap}</span>
+        <span class="wl-mcap">${escapeHtml(mcapStr)}</span>
         <span class="wl-pe">${peStr}</span>
         <button class="wl-chart-btn" title="Load in main chart" onclick="event.stopPropagation(); loadTickerFromWatchlist('${escapeHtml(s.ticker)}')">▶</button>
       </div>`;
@@ -1069,26 +1082,28 @@ function changeTicker(){
   if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
 }
 
-function searchTopicNews(){
+async function searchTopicNews(){
   const q=document.getElementById("topicInput")?.value.trim();
   if(!q) return;
-  const sources=[
-    {s:"Google News",    u:`https://news.google.com/search?q=${encodeURIComponent(q)}`},
-    {s:"Bloomberg",      u:`https://www.bloomberg.com/search?query=${encodeURIComponent(q)}`},
-    {s:"Reuters",        u:`https://www.reuters.com/site-search/?query=${encodeURIComponent(q)}`},
-    {s:"Financial Times",u:`https://www.ft.com/search?q=${encodeURIComponent(q)}`},
-    {s:"The Economist",  u:`https://www.economist.com/search?q=${encodeURIComponent(q)}`},
-    {s:"CNBC",           u:`https://www.cnbc.com/search/?query=${encodeURIComponent(q)}`},
-    {s:"NYT",            u:`https://www.nytimes.com/search?query=${encodeURIComponent(q)}`},
-    {s:"Ground News",    u:`https://ground.news/search?query=${encodeURIComponent(q)}`},
-  ];
-  const cn=document.getElementById("news-cn");
-  if(cn) cn.innerHTML=`<div class="news-list">${sources.map(i=>`<div class="news-item"><a href="${i.u}" target="_blank" rel="noopener noreferrer">${escapeHtml(i.s)} → ${escapeHtml(q)}</a><div class="news-meta">${escapeHtml(i.s)}</div></div>`).join("")}</div>`;
   switchTab("news","cn");
   const lbl=document.getElementById("newsModeLabel");
   if(lbl) lbl.textContent=`Topic · ${q}`;
-  // Also load sector watchlist
-  loadWatchlist(q);
+  // Show loading state in news
+  const cn=document.getElementById("news-cn");
+  if(cn) cn.innerHTML=`<div class="av-loading"><span class="av-spinner"></span>Searching news for "${escapeHtml(q)}"…</div>`;
+  // Load sector watchlist (async-safe, non-blocking)
+  loadWatchlist(q).catch(e => console.warn("loadWatchlist error:", e));
+  // Fire APITube topic news if available
+  if(typeof apitubeSearchTopic === "function") {
+    apitubeSearchTopic(q).catch(()=>{});
+  }
+  // Fallback: if cn still shows loader after 6s, clear it
+  setTimeout(() => {
+    const el = document.getElementById("news-cn");
+    if(el && el.querySelector(".av-spinner")) {
+      el.innerHTML = `<div class="no-data">// No API news returned.<br>// Configure Finnhub or APITube key in ⚙ API for live news.</div>`;
+    }
+  }, 6000);
 }
 
 /* ══════════════════════════════════════════════════════════════════
