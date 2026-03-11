@@ -1,15 +1,13 @@
 /* ══════════════════════════════════════════════════════════════════
-   FINTERM — config.js  (v3 — bulletproof, zero external deps)
+   FINTERM — config.js  (v4 — sidebar API panel)
    ══════════════════════════════════════════════════════════════════ */
 
-/* ── Local escapeHtml (config.js loads before script.js) ──────── */
 function cfgEsc(s) {
   return String(s ?? "")
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
 }
 
-/* ── Provider registry ──────────────────────────────────────────── */
 const KNOWN_PROVIDERS = [
   { id:"av",  name:"Alpha Vantage",           badge:"AV",
     desc:"Quote · Fundamentals · Earnings · Income / Balance / Cash Flow · News + Sentiment",
@@ -21,7 +19,6 @@ const KNOWN_PROVIDERS = [
     sessionKey:"fmp_call_count", limitWarn:200, limitMax:250 },
 ];
 
-/* ── Runtime key store ──────────────────────────────────────────── */
 window._KEYS = {};
 const lsId   = id => `finterm_key_${id}`;
 const getKey = id => window._KEYS[id] || localStorage.getItem(lsId(id)) || "";
@@ -29,7 +26,6 @@ const setKey = (id, v) => { localStorage.setItem(lsId(id), v); window._KEYS[id] 
 const delKey = id => { localStorage.removeItem(lsId(id)); delete window._KEYS[id]; };
 const mask   = v  => v.length > 8 ? v.slice(0,4)+"••••••"+v.slice(-4) : "••••••••";
 
-/* Backwards-compat shims for api.js / fmp.js */
 function getAvKey()  { return getKey("av");  }
 function getFmpKey() { return getKey("fmp"); }
 
@@ -40,7 +36,6 @@ function loadAllKeys() {
   });
 }
 
-/* ── Custom providers ───────────────────────────────────────────── */
 const LS_CUSTOM = "finterm_custom_providers";
 function getCustom() { try { return JSON.parse(localStorage.getItem(LS_CUSTOM)||"[]"); } catch { return []; } }
 function saveCustom(list) { localStorage.setItem(LS_CUSTOM, JSON.stringify(list)); }
@@ -72,25 +67,24 @@ function renderTopbarBadges() {
   });
 }
 
-/* Shims called by api.js / fmp.js */
 function updateApiStatus() { renderTopbarBadges(); }
 function updateFmpStatus() { renderTopbarBadges(); }
 function refreshBadges()   { renderTopbarBadges(); }
 
 /* ══════════════════════════════════════════════════════════════════
-   MODAL — open/close via style.display (no CSS class needed)
+   SIDEBAR
    ══════════════════════════════════════════════════════════════════ */
 let _focusId = null;
+let _sidebarOpen = false;
 
 function openApiConfig(focusId) {
   _focusId = focusId || null;
-  const overlay = document.getElementById("apiConfigOverlay");
-  if (!overlay) { console.error("FINTERM: #apiConfigOverlay not found"); return; }
+  const sidebar = document.getElementById("apiSidebar");
+  if (!sidebar) return;
 
-  /* Force visible — bypasses any CSS specificity issues */
-  overlay.style.display        = "flex";
-  overlay.style.opacity        = "1";
-  overlay.style.pointerEvents  = "all";
+  _sidebarOpen = true;
+  sidebar.classList.add("open");
+  document.querySelector(".api-config-btn")?.classList.add("active");
 
   renderProviderList();
   renderCustomSaved();
@@ -101,15 +95,18 @@ function openApiConfig(focusId) {
     setTimeout(() => {
       document.getElementById(`pblock-${focusId}`)?.scrollIntoView({ behavior:"smooth", block:"center" });
       document.getElementById(`kinput-${focusId}`)?.focus();
-    }, 80);
+    }, 200);
   }
 }
 
 function closeApiConfig() {
-  const overlay = document.getElementById("apiConfigOverlay");
-  if (!overlay) return;
-  overlay.style.opacity = "0";
-  setTimeout(() => { overlay.style.display = "none"; }, 200);
+  _sidebarOpen = false;
+  document.getElementById("apiSidebar")?.classList.remove("open");
+  document.querySelector(".api-config-btn")?.classList.remove("active");
+}
+
+function toggleApiSidebar() {
+  _sidebarOpen ? closeApiConfig() : openApiConfig();
 }
 
 function switchApiTab(tabId) {
@@ -147,14 +144,14 @@ function renderProviderList() {
         <span class="api-key-badge ${bCls}">${cfgEsc(bLbl)}</span>
       </div>
       ${p.desc ? `<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl
-        ? ` · <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Get free key →</a>` : ""}</div>` : ""}
+        ? ` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Get free key &rarr;</a>` : ""}</div>` : ""}
       <div class="api-key-input-row">
         <input type="password" id="kinput-${cfgEsc(p.id)}" class="api-key-field"
                placeholder="Paste API key here…" value="${cfgEsc(val)}"
                autocomplete="off" spellcheck="false"
                oninput="livePreviewKey('${cfgEsc(p.id)}')" />
         <button class="api-key-eye" title="Show/hide"
-                onclick="toggleKeyVis('kinput-${cfgEsc(p.id)}',this)">👁</button>
+                onclick="toggleKeyVis('kinput-${cfgEsc(p.id)}',this)">&#128065;</button>
         <button class="api-key-save"  onclick="saveKey('${cfgEsc(p.id)}')">Save</button>
         <button class="api-key-clear" onclick="clearKey('${cfgEsc(p.id)}')">Clear</button>
       </div>
@@ -164,7 +161,7 @@ function renderProviderList() {
         ${n>0?`<button class="api-reset-count-btn" onclick="resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')">Reset</button>`:""}
       </div>`:""}
       ${p.custom?`<button class="api-custom-del-btn" style="margin-top:6px"
-          onclick="removeCustom('${cfgEsc(p.id)}')">✕ Remove</button>`:""}
+          onclick="removeCustom('${cfgEsc(p.id)}')">&#10005; Remove</button>`:""}
     </div>
     ${i<arr.length-1?'<div class="api-modal-divider"></div>':""}`;
   }).join("");
@@ -177,10 +174,10 @@ function saveKey(id) {
   const input = document.getElementById(`kinput-${id}`);
   if (!input) return;
   const val = input.value.trim();
-  if (!val)        { setStatus(id,"⚠ Key is empty.","warn"); return; }
-  if (val.length<8){ setStatus(id,"⚠ Key seems too short.","warn"); return; }
+  if (!val)        { setStatus(id,"&#9888; Key is empty.","warn"); return; }
+  if (val.length<8){ setStatus(id,"&#9888; Key seems too short.","warn"); return; }
   setKey(id, val);
-  setStatus(id, `✓ Saved — ${mask(val)}`, "ok");
+  setStatus(id, "&#10003; Saved &mdash; " + mask(val), "ok");
   renderProviderList();
   renderTopbarBadges();
 }
@@ -206,15 +203,15 @@ function toggleKeyVis(inputId, btn) {
   const inp = document.getElementById(inputId);
   if (!inp) return;
   inp.type        = inp.type==="password" ? "text" : "password";
-  btn.textContent = inp.type==="password" ? "👁" : "🙈";
+  btn.textContent = inp.type==="password" ? "\uD83D\uDC41" : "\uD83D\uDE48";
 }
 
 function setStatus(id, msg, type) {
   const el = document.getElementById(`kstatus-${id}`);
   if (!el) return;
-  el.textContent = msg;
-  el.className   = `api-key-status status-${type}`;
-  setTimeout(()=>{ el.textContent=""; el.className="api-key-status"; }, 4000);
+  el.innerHTML = msg;
+  el.className = `api-key-status status-${type}`;
+  setTimeout(()=>{ el.innerHTML=""; el.className="api-key-status"; }, 4000);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -227,10 +224,10 @@ function addCustomProvider() {
   const desc = document.getElementById("customDesc")?.value.trim();
   const url  = document.getElementById("customUrl")?.value.trim();
 
-  if (!name){ setCustomStatus("⚠ Name required.","warn"); return; }
-  if (!id)  { setCustomStatus("⚠ Short ID required.","warn"); return; }
-  if (id.length>6){ setCustomStatus("⚠ ID must be ≤ 6 chars.","warn"); return; }
-  if (allProviders().some(p=>p.id===id)){ setCustomStatus(`⚠ ID "${id}" already exists.`,"warn"); return; }
+  if (!name){ setCustomStatus("&#9888; Name required.","warn"); return; }
+  if (!id)  { setCustomStatus("&#9888; Short ID required.","warn"); return; }
+  if (id.length>6){ setCustomStatus("&#9888; ID must be 6 chars max.","warn"); return; }
+  if (allProviders().some(p=>p.id===id)){ setCustomStatus(`&#9888; ID "${id}" already exists.`,"warn"); return; }
 
   const p = { id, name, badge:id.toUpperCase().slice(0,5),
     desc:desc||"", limit:"Varies", docsUrl:url||"",
@@ -241,8 +238,9 @@ function addCustomProvider() {
   ["customName","customId","customKey","customDesc","customUrl"]
     .forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=""; });
 
-  setCustomStatus(`✓ "${name}" added. Access via window._KEYS["${id}"]`,"ok");
+  setCustomStatus(`&#10003; "${name}" added. window._KEYS["${id}"]`,"ok");
   renderCustomSaved();
+  renderProviderList();
   renderTopbarBadges();
 }
 
@@ -268,7 +266,7 @@ function renderCustomSaved() {
         <span>${val?mask(val):"no key saved"}</span>
       </div>
       <button class="api-custom-edit-btn" onclick="openApiConfig('${cfgEsc(p.id)}')">Edit</button>
-      <button class="api-custom-del-btn"  onclick="removeCustom('${cfgEsc(p.id)}')">✕</button>
+      <button class="api-custom-del-btn"  onclick="removeCustom('${cfgEsc(p.id)}')">&#10005;</button>
     </div>`;
   }).join("");
 }
@@ -276,8 +274,8 @@ function renderCustomSaved() {
 function setCustomStatus(msg, type) {
   const el = document.getElementById("customStatus");
   if (!el) return;
-  el.textContent = msg; el.className = `api-key-status status-${type}`;
-  setTimeout(()=>{ el.textContent=""; el.className="api-key-status"; }, 5000);
+  el.innerHTML = msg; el.className = `api-key-status status-${type}`;
+  setTimeout(()=>{ el.innerHTML=""; el.className="api-key-status"; }, 5000);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -313,7 +311,7 @@ function clearAllCache() {
     .filter(k=>k.startsWith("av_")||k.startsWith("fmp_")||getCustom().some(p=>k.startsWith(p.id+"_")))
     .forEach(k=>sessionStorage.removeItem(k));
   renderSessionStats(); renderTopbarBadges();
-  if (typeof showApiToast==="function") showApiToast("✓ Session cache cleared.","ok");
+  if (typeof showApiToast==="function") showApiToast("&#10003; Session cache cleared.","ok");
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -333,7 +331,91 @@ function applyAndReload() {
     if (typeof avLoadAll==="function")  avLoadAll(ticker);
     if (typeof fmpLoadAll==="function") fmpLoadAll(ticker);
   }
-  if (typeof showApiToast==="function") showApiToast("✓ Keys applied — reloading live data…","ok");
+  if (typeof showApiToast==="function") showApiToast("&#10003; Keys applied &mdash; reloading live data&hellip;","ok");
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INJECT SIDEBAR
+   ══════════════════════════════════════════════════════════════════ */
+function injectSidebarHTML() {
+  if (document.getElementById("apiSidebar")) return;
+
+  const sidebar = document.createElement("div");
+  sidebar.id = "apiSidebar";
+  sidebar.className = "api-sidebar";
+  sidebar.innerHTML = `
+    <div class="api-sidebar-header">
+      <div class="api-sidebar-title">
+        <span>&#9881;</span>
+        <span>API Keys</span>
+      </div>
+      <button class="api-sidebar-close" onclick="closeApiConfig()" title="Close">&#10005;</button>
+    </div>
+
+    <div class="api-tab-bar">
+      <button class="api-tab active" data-tab="providers">Providers</button>
+      <button class="api-tab" data-tab="custom">+ Custom</button>
+      <button class="api-tab" data-tab="session">Session</button>
+    </div>
+
+    <div class="api-sidebar-body">
+      <div class="api-tab-pane active" id="apiTab-providers">
+        <div id="apiProviderList"></div>
+      </div>
+
+      <div class="api-tab-pane" id="apiTab-custom">
+        <div class="api-custom-intro">
+          Register any API not listed above. The key is stored in <code>localStorage</code>
+          and accessible via <code>window._KEYS["id"]</code>.
+        </div>
+        <div class="api-custom-form">
+          <div class="api-custom-row">
+            <label>Provider Name <span class="api-custom-hint">(e.g. Polygon.io)</span></label>
+            <input type="text" id="customName" class="api-key-field" placeholder="My API Provider" />
+          </div>
+          <div class="api-custom-row">
+            <label>Short ID <span class="api-custom-hint">(max 6 chars, e.g. plg)</span></label>
+            <input type="text" id="customId" class="api-key-field" placeholder="plg" maxlength="6" />
+          </div>
+          <div class="api-custom-row">
+            <label>API Key <span class="api-custom-hint">(optional)</span></label>
+            <input type="password" id="customKey" class="api-key-field" placeholder="Paste key…" autocomplete="off" />
+          </div>
+          <div class="api-custom-row">
+            <label>Description <span class="api-custom-hint">(optional)</span></label>
+            <input type="text" id="customDesc" class="api-key-field" placeholder="What this API provides…" />
+          </div>
+          <div class="api-custom-row">
+            <label>Docs URL <span class="api-custom-hint">(optional)</span></label>
+            <input type="text" id="customUrl" class="api-key-field" placeholder="https://…" />
+          </div>
+          <button class="api-custom-add-btn" onclick="addCustomProvider()">+ Add Provider</button>
+          <div class="api-key-status" id="customStatus"></div>
+        </div>
+        <div class="api-modal-divider" style="margin:16px 0 10px"></div>
+        <div class="api-custom-saved-title">Saved Custom Providers</div>
+        <div id="customSavedList"></div>
+      </div>
+
+      <div class="api-tab-pane" id="apiTab-session">
+        <div class="api-session-stats" id="apiSessionStats"></div>
+        <button class="api-clear-cache-btn" style="margin-top:12px" onclick="clearAllCache()">Clear Session Cache</button>
+      </div>
+    </div>
+
+    <div class="api-sidebar-footer">
+      <div class="api-modal-note-inline">
+        Keys saved to <code>localStorage</code> &mdash; persist across sessions.
+      </div>
+      <button class="api-modal-apply" onclick="applyAndReload()">Apply &amp; Reload</button>
+    </div>
+  `;
+
+  document.body.appendChild(sidebar);
+
+  sidebar.querySelectorAll(".api-tab").forEach(btn => {
+    btn.addEventListener("click", () => switchApiTab(btn.dataset.tab));
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -343,31 +425,14 @@ function applyAndReload() {
   loadAllKeys();
 
   function afterDom() {
-    /* Wire tab buttons */
-    document.querySelectorAll(".api-tab").forEach(btn => {
-      btn.addEventListener("click", () => switchApiTab(btn.dataset.tab));
-    });
-
-    /* Overlay backdrop click closes */
-    const overlay = document.getElementById("apiConfigOverlay");
-    if (overlay) {
-      /* Start hidden */
-      overlay.style.display     = "none";
-      overlay.style.opacity     = "0";
-      overlay.style.transition  = "opacity 0.2s";
-      overlay.addEventListener("click", e => { if (e.target===overlay) closeApiConfig(); });
-    }
-
-    /* Escape closes */
+    injectSidebarHTML();
     document.addEventListener("keydown", e => { if (e.key==="Escape") closeApiConfig(); });
-
     renderTopbarBadges();
 
-    /* First-run toast */
     if (!allProviders().some(p=>!!getKey(p.id))) {
       setTimeout(()=>{
         if (typeof showApiToast==="function")
-          showApiToast("⚙ No API keys — click the ⚙ API button to configure.","info");
+          showApiToast("&#9881; No API keys &mdash; click &#9881; API to configure.","info");
       }, 1400);
     }
   }
