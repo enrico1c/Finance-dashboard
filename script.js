@@ -359,97 +359,75 @@ function renderFundamentals(ticker){
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   RENDER: NEWS  (CN / EVTS / BRC / BI)
-   Full inline news from APIs — no external redirects
+   RENDER: NEWS  — flat live feed, no tabs
    Priority: Finnhub → EODHD → APITube → AV
+   news-feed = visible container; news-cn/evts/brc/bi = hidden legacy
    ══════════════════════════════════════════════════════════════════ */
 function renderNews(ticker){
-  const d=getTickerData(ticker);
-  const sym=ticker.replace(/.*:/,"").toUpperCase();
+  const sym = ticker.replace(/.*:/,"").toUpperCase();
+  // Show loading state in the visible feed container
+  const feed = document.getElementById("news-feed");
+  if(feed) feed.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching live news for ${escapeHtml(sym)}…</div>`;
+  // APIs (finnhub fhRenderNews, avRenderNews, eodhd) write to news-cn (hidden).
+  // A MutationObserver below mirrors content into news-feed.
+  // Also: timeout fallback if no API key is configured.
+  setTimeout(() => {
+    const f = document.getElementById("news-feed");
+    if(f && f.querySelector(".av-spinner")){
+      f.innerHTML = `<div class="no-data">// No news API key configured.<br>// Add a Finnhub or Alpha Vantage key via ⚙ API.</div>`;
+    }
+  }, 7000);
+}
 
-  // CN tab — show loading state, APIs will overwrite
-  const cn=document.getElementById("news-cn");
-  if(cn) cn.innerHTML=`<div class="av-loading"><span class="av-spinner"></span>Fetching live news for ${escapeHtml(sym)}…</div>`;
-
-  const evts=document.getElementById("news-evts");
-  if(evts){
-    if(!d){ evts.innerHTML=noData(ticker); }
-    else {
-      const tc={Earnings:"var(--accent)",Dividend:"var(--accent-green)",Conference:"var(--accent-yellow)",Shareholder:"var(--accent-orange)"};
-      evts.innerHTML=d.events.sort((a,b)=>a.date.localeCompare(b.date)).map(ev=>`
-        <div class="event-item">
-          <div class="event-date">${ev.date}</div>
-          <div class="event-body">
-            <span class="event-type" style="color:${tc[ev.type]||"var(--text-secondary)"}">${ev.type}</span>
-            <div class="event-title">${escapeHtml(ev.title)}</div>
-            <div class="event-note">${escapeHtml(ev.note)}</div>
-          </div>
-        </div>`).join("");
+/* Mirror news-cn → news-feed whenever content arrives from any API */
+(function initNewsMirror(){
+  function mirror(){
+    const src  = document.getElementById("news-cn");
+    const dest = document.getElementById("news-feed");
+    if(!src || !dest) return;
+    if(src.innerHTML && !src.querySelector(".av-spinner")){
+      dest.innerHTML = src.innerHTML;
     }
   }
-
-  const brc=document.getElementById("news-brc");
-  if(brc){
-    if(!d){ brc.innerHTML=noData(ticker); }
-    else brc.innerHTML=d.research.map(r=>`
-      <div class="research-item">
-        <div class="research-header"><span class="research-firm">${escapeHtml(r.firm)}</span><span class="research-date">${r.date}</span></div>
-        <div class="research-title">${escapeHtml(r.title)}</div>
-        <div class="research-meta">${r.pages} pages · Full report access requires institutional subscription</div>
-      </div>`).join("");
+  // Poll every 400ms for 30s after page load (APIs write async)
+  let polls = 0;
+  const iv = setInterval(()=>{
+    mirror();
+    if(++polls > 75) clearInterval(iv);
+  }, 400);
+  // Also observe mutations on news-cn
+  const obs = new MutationObserver(mirror);
+  function attachObs(){
+    const src = document.getElementById("news-cn");
+    if(src) obs.observe(src, { childList:true, subtree:true, characterData:true });
   }
-
-  const bi=document.getElementById("news-bi");
-  if(bi) bi.innerHTML=`
-    <div class="bi-note">Bloomberg Intelligence provides independent analysis by sector specialists. Full access requires a Bloomberg Terminal subscription.</div>
-    ${[
-      {date:"2025-03-05",title:"Apple's AI Integration: A $100B Opportunity in Services",topic:"Technology Sector"},
-      {date:"2025-02-18",title:"iPhone Unit Economics: Premium Pricing Holds Despite Macro Headwinds",topic:"Consumer Hardware"},
-      {date:"2025-01-30",title:"India Market Expansion: Next Growth Frontier for Apple Ecosystem",topic:"Emerging Markets"},
-    ].map(r=>`<div class="research-item"><div class="research-header"><span class="research-firm">Bloomberg Intelligence</span><span class="research-date">${r.date}</span></div><div class="research-title">${escapeHtml(r.title)}</div><div class="research-meta">BI Report · ${r.topic}</div></div>`).join("")}`;
-}
+  if(document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", attachObs);
+  else attachObs();
+}());
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER: QUOTE  (QR / MON)
+   Loading state only — filled by avRenderQuote (api.js) and
+   fhRenderQuote (finnhub.js). Static fallback removed.
    ══════════════════════════════════════════════════════════════════ */
 function renderQuote(ticker){
-  const d=getTickerData(ticker);
-
-  const qr=document.getElementById("quote-qr");
-  if(qr){
-    if(!d){ qr.innerHTML=noData(ticker); }
-    else {
-      const rows=d.trades.map(t=>`<tr class="${t.dir==="up"?"pos":"neg"}"><td>${t.time}</td><td>$${fmt(t.price)}</td><td>${Number(t.size).toLocaleString()}</td><td>${t.exch}</td></tr>`).join("");
-      qr.innerHTML=`
-        <div class="quote-grid">
-          ${mRow("Last",      "$"+fmt(d.price))}
-          ${mRow("Open",      "$"+fmt(d.open))}
-          ${mRow("High",      "$"+fmt(d.high),"metric-up")}
-          ${mRow("Low",       "$"+fmt(d.low),"metric-down")}
-          ${mRow("Prev Close","$"+fmt(d.prevClose))}
-          ${mRow("Volume",    d.volume)}
-          ${mRow("Avg Vol 30d",d.avgVolume30)}
-        </div>
-        ${sHead("Time & Sales")}
-        <div class="fin-table-wrap"><table class="fin-table ts-table"><thead><tr><th>Time</th><th>Price</th><th>Size</th><th>Exchange</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
-  }
-
-  const mon=document.getElementById("quote-mon");
-  if(mon){
-    if(!d){ mon.innerHTML=noData(ticker); }
-    else {
-      const rows=d.exchanges.map(e=>`<tr><td>${e.name}</td><td class="pos">$${fmt(e.bid)}</td><td class="neg">$${fmt(e.ask)}</td><td>${fmt(e.ask-e.bid,3)}</td><td>${e.size}</td><td>$${fmt(e.last)}</td></tr>`).join("");
-      mon.innerHTML=`
-        ${sHead("Best Bid / Ask")}
-        ${mRow("Bid",    "$"+fmt(d.bid),"metric-up")}
-        ${mRow("Ask",    "$"+fmt(d.ask),"metric-down")}
-        ${mRow("Spread", "$"+fmt(d.spread,3))}
-        ${sHead("Multi-Exchange Book")}
-        <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Exchange</th><th>Bid</th><th>Ask</th><th>Spread</th><th>Size (B×A)</th><th>Last</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
-  }
+  const sym = ticker.replace(/.*:/,"").toUpperCase();
+  const qr  = document.getElementById("quote-qr");
+  const mon = document.getElementById("quote-mon");
+  if(qr)  qr.innerHTML  = `<div class="av-loading"><span class="av-spinner"></span>Loading live quote for ${escapeHtml(sym)}…</div>`;
+  if(mon) mon.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading market data…</div>`;
+  // Actual data filled by:
+  // • avRenderQuote()  in api.js   (Alpha Vantage)
+  // • fhRenderQuote()  in finnhub.js (Finnhub — fastest, fires in parallel)
+  // Fallback timeout
+  setTimeout(()=>{
+    const q = document.getElementById("quote-qr");
+    if(q && q.querySelector(".av-spinner"))
+      q.innerHTML = `<div class="no-data">// No quote API key.<br>// Add Finnhub or Alpha Vantage key via ⚙ API.</div>`;
+  }, 8000);
 }
+
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER: ANALYSTS  (ANR / BRC)
@@ -588,7 +566,7 @@ let currentValTicker       = null;
 // Maps a topic keyword to a seed ticker for Finnhub peer search
 const topicSeedTicker = {
   ai:"NVDA", "artificial intelligence":"NVDA", llm:"MSFT", chatgpt:"MSFT",
-  energy:"XOM", oil:"XOM", gas:"CVX", renewables:"NEE", solar:"ENPH",
+  energy:"XOM", oil:"XOM", gas:"CVX", renewables:"NEE", solar:"ENPH", lng:"LNG",
   bank:"JPM", banks:"JPM", finance:"GS", financial:"BAC",
   china:"BABA", chinese:"BABA", alibaba:"BABA", tencent:"TCEHY",
   health:"JNJ", healthcare:"JNJ", pharma:"LLY", biotech:"MRNA",
@@ -601,9 +579,18 @@ const topicSeedTicker = {
   "real estate":"AMT", reit:"SPG", realestate:"PLD",
   media:"DIS", streaming:"NFLX", entertainment:"DIS",
   telecom:"T", telecoms:"VZ",
-  mining:"RIO", metals:"FCX", gold:"NEM",
-  food:"MCD", beverage:"KO", staples:"PG",
-  insurance:"BRK-B", reinsurance:"MUNMUn",
+  // Mining, metals, commodities
+  mining:"RIO", metals:"FCX", gold:"NEM", silver:"WPM", copper:"FCX",
+  coal:"BTU", thermal:"BTU", coking:"ARCH", "met coal":"ARCH",
+  iron:"RIO", steel:"NUE", aluminum:"AA", lithium:"ALB",
+  commodity:"BHP", commodities:"BHP", resources:"RIO", bhp:"BHP",
+  // Food / staples
+  food:"MCD", beverage:"KO", staples:"PG", agriculture:"ADM",
+  insurance:"BRK-B", reinsurance:"MKL",
+  // Additional sectors
+  luxury:"MC.PA", fashion:"KER.PA", watches:"CFR.SW",
+  shipping:"ZIM", logistics:"UPS", transport:"FDX",
+  gaming:"MSFT", semiconductor:"TSM", foundry:"TSM",
 };
 
 async function loadWatchlist(topic) {
@@ -612,19 +599,24 @@ async function loadWatchlist(topic) {
   const box    = document.getElementById("watchlistBox");
   const cnt    = document.getElementById("wlCount");
 
-  // Find seed ticker for this topic
-  const seedKey = Object.keys(topicSeedTicker).find(k => key.includes(k));
-  const seedTicker = seedKey ? topicSeedTicker[seedKey] : null;
-
   if (lbl) lbl.textContent = `Sector: ${topic}`;
   if (box) box.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Searching sector stocks for "${escapeHtml(topic)}"…</div>`;
 
-  // Try Finnhub peer search first if key available
-  if (seedTicker && typeof finnhubSectorSearch === "function" && getFinnhubKey()) {
+  // Find seed ticker — first try exact/substring match, then partial word match
+  let seedTicker = null;
+  let seedKey = Object.keys(topicSeedTicker).find(k => key === k || key.includes(k) || k.includes(key));
+  if (seedKey) seedTicker = topicSeedTicker[seedKey];
+
+  // If Finnhub available: try peer search on seed, OR directly on the topic as a ticker symbol
+  if (typeof finnhubSectorSearch === "function" && getFinnhubKey()) {
+    // If topic itself looks like a ticker (1-5 uppercase chars) try it directly
+    const asTickerSym = topic.replace(/.*:/,"").toUpperCase();
+    const tryDirect = !seedTicker || asTickerSym.length <= 5;
+
+    const searchSym = seedTicker || asTickerSym;
     try {
-      const stocks = await finnhubSectorSearch(seedTicker);
+      const stocks = await finnhubSectorSearch(searchSym);
       if (stocks && stocks.length) {
-        // Sort by mktCap descending (largest first)
         stocks.sort((a,b) => (b.mktCap||0) - (a.mktCap||0));
         currentWatchlistStocks = stocks.map(s => ({
           ...s,
@@ -641,13 +633,12 @@ async function loadWatchlist(topic) {
   }
 
   // Fallback: static sectorDB
-  const sector = Object.keys(topicToSector).find(k => key.includes(k));
+  const sector = Object.keys(topicToSector).find(k => key.includes(k) || k.includes(key));
   const data   = sector ? sectorDB[topicToSector[sector]] : null;
   if (!data) {
-    if (box) box.innerHTML = `<div class="no-data">// No data for "<strong>${escapeHtml(topic)}</strong>".<br>// Add a Finnhub key for live sector search, or try: AI, Energy, Banks, Healthcare, Italy.</div>`;
+    if (box) box.innerHTML = `<div class="no-data">// No data for "<strong>${escapeHtml(topic)}</strong>".<br>// Add a Finnhub key for live sector search.<br>// Try: AI, Energy, Banks, Healthcare, Coal, Mining, Italy, China…</div>`;
     return;
   }
-  // Sort static data by mktCap (largest first using numeric parse)
   const parseMktCap = v => {
     const s = String(v||"").replace(/[$€£,\s]/g,"");
     const n = parseFloat(s);
