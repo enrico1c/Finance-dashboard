@@ -196,15 +196,16 @@ async function avGetEarnings(symbol) {
   setLoading("fund-ee", false);
   if (!data) return null;
   return {
-    quarterly: (data.quarterlyEarnings || []).slice(0, 8).map(q => ({
+    // Take up to 16 quarters — most recent first (AV returns newest first)
+    quarterly: (data.quarterlyEarnings || []).slice(0, 16).map(q => ({
       quarter:       q.fiscalDateEnding,
       reportDate:    q.reportedDate,
       epsEst:        parseFloat(q.estimatedEPS) || null,
-      epsActual:     parseFloat(q.reportedEPS) || null,
-      surprise:      parseFloat(q.surprise) || null,
+      epsActual:     parseFloat(q.reportedEPS)  || null,
+      surprise:      parseFloat(q.surprise)     || null,
       surprisePct:   parseFloat(q.surprisePercentage) || null,
     })),
-    annual: (data.annualEarnings || []).slice(0, 5).map(a => ({
+    annual: (data.annualEarnings || []).slice(0, 8).map(a => ({
       year:      a.fiscalDateEnding.slice(0,4),
       epsActual: parseFloat(a.reportedEPS) || null,
     })),
