@@ -1,3 +1,8 @@
+/* ══════════════════════════════════════════════════════════════════
+   FINTERM — Finance Dashboard · script.js
+   Free-canvas drag & resize engine + universal ticker support
+   ══════════════════════════════════════════════════════════════════ */
+
 /* ─── State ─────────────────────────────────────────────────────── */
 let currentTicker        = "AAPL";
 let currentNewsMode      = "ticker";
@@ -532,6 +537,17 @@ function setupKeyboard() {
   document.getElementById("forexPairInput")?.addEventListener("keydown", e => {
     if (e.key === "Enter") changeForexPair();
   });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TOPBAR COLLAPSE
+   ══════════════════════════════════════════════════════════════════ */
+function toggleTopbar() {
+  const bar = document.getElementById("topbar");
+  const btn = document.getElementById("topbarCollapseBtn");
+  if (!bar) return;
+  bar.classList.toggle("collapsed");
+  btn.textContent = bar.classList.contains("collapsed") ? "▼" : "▲";
 }
 
 /* ══════════════════════════════════════════════════════════════════
