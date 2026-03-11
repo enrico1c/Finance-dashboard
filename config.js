@@ -180,6 +180,16 @@ function saveKey(id) {
   setStatus(id, "&#10003; Saved &mdash; " + mask(val), "ok");
   renderProviderList();
   renderTopbarBadges();
+
+  // Auto-reload live data immediately after saving a key
+  const ticker = (typeof currentTicker !== "undefined") ? currentTicker.replace(/.*:/,"").toUpperCase() : null;
+  if (!ticker) return;
+  if (id === "av"  && typeof avLoadAll  === "function") {
+    setTimeout(() => avLoadAll(ticker), 200);
+  }
+  if (id === "fmp" && typeof fmpLoadAll === "function") {
+    setTimeout(() => fmpLoadAll(ticker), 200);
+  }
 }
 
 function clearKey(id) {
@@ -326,12 +336,14 @@ function applyAndReload() {
   });
   closeApiConfig();
   renderTopbarBadges();
-  const ticker = (typeof currentTicker!=="undefined") ? currentTicker : null;
-  if (ticker) {
-    if (typeof avLoadAll==="function")  avLoadAll(ticker);
-    if (typeof fmpLoadAll==="function") fmpLoadAll(ticker);
+  const rawTicker = (typeof currentTicker!=="undefined") ? currentTicker : null;
+  const sym = rawTicker ? rawTicker.replace(/.*:/,"").toUpperCase() : null;
+  if (sym) {
+    if (typeof avLoadAll==="function")  avLoadAll(sym);
+    // fmpLoadAll is called inside avLoadAll; call it directly only if no AV key
+    else if (typeof fmpLoadAll==="function") fmpLoadAll(sym);
   }
-  if (typeof showApiToast==="function") showApiToast("&#10003; Keys applied &mdash; reloading live data&hellip;","ok");
+  if (typeof showApiToast==="function") showApiToast("&#10003; Keys applied &mdash; loading live data&hellip;","ok");
 }
 
 /* ══════════════════════════════════════════════════════════════════
