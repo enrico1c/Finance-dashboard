@@ -9,9 +9,12 @@
 /* ── ⚙️  Keys are managed via the ⚙ API button in the UI ────────── */
 /* Use the modal to paste your Alpha Vantage key — stored in localStorage. */
 
-// Runtime key: config.js sets window._AV_KEY from localStorage
+// Runtime key: config.js stores under finterm_key_av (via lsId = id => `finterm_key_${id}`)
 function getAvKey() {
-  return window._AV_KEY || localStorage.getItem("finterm_av_key") || "";
+  return (window._KEYS && window._KEYS["av"])
+    || localStorage.getItem("finterm_key_av")
+    || localStorage.getItem("finterm_av_key")   // legacy fallback
+    || "";
 }
 
 const AV_BASE   = "https://www.alphavantage.co/query";
@@ -299,10 +302,17 @@ function setLoading(elId, on) {
 async function avLoadAll(ticker) {
   const sym = ticker.replace(/.*:/, "").toUpperCase();
 
-  // Guard: require a configured key
+  // Guard: require a configured AV key — but still fire FMP if available
   if (!getAvKey()) {
-    showApiToast("⚙ Alpha Vantage key not set — click the AV badge to configure.", "warn");
+    showApiToast("⚙ Alpha Vantage key not set — click ⚙ API to configure.", "warn");
     if (typeof refreshBadges === "function") refreshBadges();
+    // Still try FMP even without AV
+    if (typeof fmpLoadAll === "function" && getFmpKey()) {
+      showApiToast(`↻ Loading FMP data for ${sym}…`, "info");
+      fmpLoadAll(sym).then(() => {
+        showApiToast(`✓ ${sym}: FMP data loaded`, "ok");
+      });
+    }
     return;
   }
 
@@ -332,12 +342,12 @@ async function avLoadAll(ticker) {
   if (overview) avRenderWACC(sym, overview);
 
   const loaded = [quote,overview,earnings,income,balance,cashflow,news].filter(Boolean).length;
-  showApiToast(`✓ ${sym}: AV ${loaded}/7 · loading FMP…`, "ok");
+  showApiToast(`✓ ${sym}: AV ${loaded}/7${getFmpKey() ? " · loading FMP…" : ""}`, "ok");
   updateApiStatus();
 
   // Fire FMP in parallel (non-blocking)
-  if (typeof fmpLoadAll === "function") {
-    fmpLoadAll(ticker).then(() => {
+  if (typeof fmpLoadAll === "function" && getFmpKey()) {
+    fmpLoadAll(sym).then(() => {
       showApiToast(`✓ ${sym}: all data loaded (AV + FMP)`, "ok");
     });
   }
