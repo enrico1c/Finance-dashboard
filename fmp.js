@@ -5,12 +5,13 @@
    Auth: ?apikey=KEY  (appended to every request)
    ══════════════════════════════════════════════════════════════════ */
 
-/* ── ⚙️  FALLBACK KEY (overridden at runtime by config.js) ─────── */
-const FMP_KEY = "YOUR_FMP_KEY_HERE";
-/* ─────────────────────────────────────────────────────────────── */
+/* ── ⚙️  Keys are managed via the ⚙ API button in the UI ────────── */
+/* Use the modal to paste your FMP key — stored in localStorage.     */
 
 // Runtime key: config.js sets window._FMP_KEY from localStorage
-function getFmpKey() { return window._FMP_KEY || FMP_KEY; }
+function getFmpKey() {
+  return window._FMP_KEY || localStorage.getItem("finterm_fmp_key") || "";
+}
 
 const FMP_BASE    = "https://financialmodelingprep.com/api";
 const FMP_CACHE_TTL = 15 * 60 * 1000;  // 15 min
@@ -254,8 +255,8 @@ async function fmpLoadAll(ticker) {
   const sym = ticker.replace(/.*:/, "").toUpperCase();
 
   // Guard: require a configured key
-  if (!getFmpKey() || getFmpKey() === "YOUR_FMP_KEY_HERE") {
-    showApiToast("⚙ FMP key not set — click FMP badge to configure.", "warn");
+  if (!getFmpKey()) {
+    showApiToast("⚙ FMP key not set — click the FMP badge to configure.", "warn");
     return;
   }
 
