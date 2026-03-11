@@ -72,29 +72,23 @@
 
     <!-- ▸ FOREX ────────────────────────────────────────────────── -->
     <section class="panel hidden" id="panel-forex" data-panel="forex">
-      <div class="panel-head">
+      <div class="panel-head panel-head-forex">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="panel-title-row">
-          <h3>▸ Forex Chart</h3>
-          <div class="mode-label" id="forexLabel">Pair: EUR/USD</div>
+        <h3>▸ Forex</h3>
+        <div class="forex-tf-inline">
+          <button class="fx-tf-btn" onclick="setForexInterval('1')">1m</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('5')">5m</button>
+          <button class="fx-tf-btn active" onclick="setForexInterval('60')">1H</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('240')">4H</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('D')">1D</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('W')">1W</button>
         </div>
         <div class="panel-actions">
-          <input id="forexPairInput" class="mini-input" placeholder="EUR/USD" value="EUR/USD" />
+          <span class="forex-pair-badge" id="forexLabel">EUR/USD</span>
+          <input id="forexPairInput" class="mini-input forex-mini" placeholder="EUR/USD" value="EUR/USD" />
           <button class="icon-btn" onclick="changeForexPair()" title="Load">↵</button>
           <button class="icon-btn close" onclick="hidePanel('forex')">✕</button>
         </div>
-      </div>
-      <div class="forex-topbar">
-        <button class="fx-tf-btn" onclick="setForexInterval('1')">1m</button>
-        <button class="fx-tf-btn" onclick="setForexInterval('5')">5m</button>
-        <button class="fx-tf-btn active" onclick="setForexInterval('60')">1H</button>
-        <button class="fx-tf-btn" onclick="setForexInterval('240')">4H</button>
-        <button class="fx-tf-btn" onclick="setForexInterval('D')">1D</button>
-        <button class="fx-tf-btn" onclick="setForexInterval('W')">1W</button>
-      </div>
-      <div class="forex-summary" id="forexSummary">
-        <div class="metric"><span>Pair</span><span>EUR/USD</span></div>
-        <div class="metric"><span>Status</span><span>Ready</span></div>
       </div>
       <div id="forexChart" class="panel-content chart-content"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
