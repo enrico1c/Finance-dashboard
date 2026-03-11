@@ -610,6 +610,8 @@ function loadWatchlist(topic) {
   const cnt = document.getElementById("wlCount");
   if (cnt) cnt.textContent = `${data.stocks.length} stocks`;
   renderWatchlistRows();
+  // Refresh with live prices from FMP
+  if (typeof fmpRefreshWatchlistPrices === "function") fmpRefreshWatchlistPrices();
 }
 
 function sortWatchlist(by) {
@@ -677,6 +679,8 @@ function loadTickerFromWatchlist(ticker) {
   updateExchangeHint();
   // Load the chart
   loadChart(sym);
+  // Fetch live data
+  if(typeof avLoadAll === "function") avLoadAll(ticker);
   // Flash the chart panel to draw attention
   const chartPanel = document.getElementById("panel-chart");
   if (chartPanel) {
@@ -1017,6 +1021,8 @@ function changeTicker(){
   updateExchangeHint();
   loadChart(resolveSymbol(raw));
   reloadAllPanels(raw);
+  // Fetch live data from Alpha Vantage
+  if(typeof avLoadAll === "function") avLoadAll(raw);
 }
 
 function searchTopicNews(){
@@ -1083,6 +1089,10 @@ window.addEventListener("load",()=>{
     loadChart(resolveSymbol(currentTicker));
     loadForexChart();
     reloadAllPanels(currentTicker);
+    // Fetch live data on startup
+    if(typeof avLoadAll === "function") avLoadAll(currentTicker);
+    if(typeof updateApiStatus  === "function") updateApiStatus();
+    if(typeof updateFmpStatus  === "function") updateFmpStatus();
   });
 });
 
