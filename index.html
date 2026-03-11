@@ -65,6 +65,7 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="notes"        checked> Notes</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked> Watchlist</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="valuation"    checked> Valuation</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked> Geo·Risk</label>
       </div>
     </div>
   </header>
@@ -341,6 +342,50 @@
       <div class="size-tooltip" id="tooltip-valuation"></div>
     </section>
 
+    <!-- ▸ GEOPOLITICAL RISK (WAR · RESOURCES) ─────────────────── -->
+    <section class="panel" id="panel-geopolitical" data-panel="geopolitical">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Geo·Risk — Wars &amp; Supply Chains</h3>
+          <div class="mode-label" id="georiskModeLabel">Live conflict monitor</div>
+        </div>
+        <div class="panel-actions">
+          <a href="https://www.worldmonitor.app/" target="_blank" rel="noopener noreferrer"
+             class="georisk-ext-btn" title="Open WorldMonitor.app in new tab">
+            &#127758; WorldMonitor
+          </a>
+          <button class="icon-btn close" onclick="hidePanel('geopolitical')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars')">WARS</button>
+        <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources')">RESOURCES</button>
+        <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes')">ROUTES</button>
+      </div>
+
+      <!-- WARS TAB -->
+      <div class="tab-pane active panel-content" data-tab="wars" id="geo-wars">
+        <div id="georisk-wars-content"></div>
+      </div>
+
+      <!-- RESOURCES TAB -->
+      <div class="tab-pane panel-content" data-tab="resources" id="geo-resources">
+        <div id="georisk-resources-content"></div>
+      </div>
+
+      <!-- ROUTES TAB -->
+      <div class="tab-pane panel-content" data-tab="routes" id="geo-routes">
+        <div id="georisk-routes-content"></div>
+      </div>
+
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-geopolitical"></div>
+    </section>
+
   </div><!-- /dashboardCanvas -->
 
   <!-- Toast notification (used by api.js) -->
@@ -353,5 +398,277 @@
 <script src="script.js"></script>
 <script src="api.js"></script>
 <script src="fmp.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   GEORISK WIDGET — Wars, Resources & Supply Chain Risk
+   ══════════════════════════════════════════════════════════════════ */
+
+const GEORISK_CONFLICTS = [
+  {
+    id:"ukraine", name:"Russia–Ukraine War", region:"Eastern Europe",
+    intensity:"HIGH", since:"Feb 2022", phase:"Active large-scale warfare",
+    casualties:"~800K+", displaced:"8M+",
+    flag:"🇺🇦", flag2:"🇷🇺",
+    summary:"Full-scale invasion. Front lines across Donetsk, Zaporizhzhia, Kherson. Drone/missile strikes on infrastructure. Black Sea corridor contested.",
+    resources:[
+      {name:"Wheat", risk:"CRITICAL", icon:"🌾", note:"Ukraine & Russia = 30% of global wheat exports. UN grain deal collapsed."},
+      {name:"Sunflower Oil", risk:"CRITICAL", icon:"🌻", note:"~80% of global supply from Ukraine + Russia. Prices remain elevated."},
+      {name:"Natural Gas (EU)", risk:"HIGH", icon:"⛽", note:"Nord Stream sabotage. EU dependency sharply reduced but LNG premiums persist."},
+      {name:"Neon Gas", risk:"HIGH", icon:"💡", note:"Ukraine produced ~70% of global neon used in chip lithography."},
+      {name:"Palladium", risk:"MEDIUM", icon:"⚗️", note:"Russia = 40% of global supply. Used in catalytic converters & electronics."},
+      {name:"Fertilizers (Potash)", risk:"HIGH", icon:"🧪", note:"Russia & Belarus = ~40% of global potash. Sanctions disrupt food supply chains."},
+      {name:"Steel", risk:"MEDIUM", icon:"🔩", note:"Ukrainian steel output collapsed. EU construction & automotive affected."},
+    ],
+    routes:["Black Sea shipping lanes","Druzhba pipeline (partial)","Trans-Siberian rail"],
+    wm_url:"https://www.worldmonitor.app/?layers=conflicts,pipelines&region=europe"
+  },
+  {
+    id:"israel-gaza", name:"Israel–Gaza / Middle East", region:"Middle East",
+    intensity:"HIGH", since:"Oct 2023", phase:"Active urban warfare + regional escalation",
+    casualties:"50K+ Gaza", displaced:"1.9M+",
+    flag:"🇮🇱", flag2:"🇵🇸",
+    summary:"Gaza ground offensive. Houthi attacks on Red Sea shipping. Hezbollah exchanges. Iran-Israel direct strikes. Regional spillover risk elevated.",
+    resources:[
+      {name:"Oil (Strait of Hormuz)", risk:"CRITICAL", icon:"🛢️", note:"20% of global oil transits Hormuz. Iran threat elevates closure risk."},
+      {name:"LNG (Red Sea / Suez)", risk:"HIGH", icon:"🔥", note:"Houthi attacks forcing vessels around Cape of Good Hope. +14 day delays."},
+      {name:"Container Shipping", risk:"HIGH", icon:"📦", note:"Suez Canal traffic down ~50%. Rerouting adds $1M+/voyage cost."},
+      {name:"Phosphates", risk:"MEDIUM", icon:"🧫", note:"Jordan & Morocco key suppliers. Regional instability affects export logistics."},
+      {name:"Copper (via Egypt)", risk:"MEDIUM", icon:"🔴", note:"Egypt transit hub for African copper. Instability risk to overland routes."},
+      {name:"Israeli Tech Exports", risk:"MEDIUM", icon:"💻", note:"Israel = major semiconductor, cyber, defense tech exporter. Wartime disruption."},
+    ],
+    routes:["Suez Canal","Red Sea (Bab-el-Mandeb)","Strait of Hormuz"],
+    wm_url:"https://www.worldmonitor.app/?layers=conflicts,vessels,pipelines&region=mena"
+  },
+  {
+    id:"myanmar", name:"Myanmar Civil War", region:"Southeast Asia",
+    intensity:"HIGH", since:"Feb 2021", phase:"Multi-front civil conflict",
+    casualties:"50K+", displaced:"3M+",
+    flag:"🇲🇲", flag2:"",
+    summary:"Military junta vs. PDFs and ethnic armed groups. Major cities under bombardment. Economy collapsed. Strategic position between China, India, Thailand.",
+    resources:[
+      {name:"Rare Earths", risk:"HIGH", icon:"🪨", note:"Myanmar = #3 global rare earth producer. Conflict disrupts mining & export via China."},
+      {name:"Jade & Gemstones", risk:"MEDIUM", icon:"💎", note:"Hpakant jade mines contested. Sanctions limit formal exports."},
+      {name:"Tin & Tungsten", risk:"MEDIUM", icon:"⚙️", note:"Key minor metals for electronics. Supply disruption affects global chains."},
+      {name:"Teak & Timber", risk:"LOW", icon:"🌲", note:"Illegal logging continues despite conflict. Sanctions complicate trade."},
+    ],
+    routes:["Mekong River corridor","China-Myanmar Economic Corridor","Irrawaddy trade axis"],
+    wm_url:"https://www.worldmonitor.app/?layers=conflicts&region=asia"
+  },
+  {
+    id:"sudan", name:"Sudan Civil War", region:"Africa",
+    intensity:"HIGH", since:"Apr 2023", phase:"SAF vs RSF — large-scale urban warfare",
+    casualties:"20K+", displaced:"10M+",
+    flag:"🇸🇩", flag2:"",
+    summary:"Sudan Armed Forces vs. Rapid Support Forces. Khartoum destroyed. Darfur facing mass atrocities. Second-largest displacement crisis on Earth.",
+    resources:[
+      {name:"Gold", risk:"HIGH", icon:"🥇", note:"Sudan = 3rd largest African gold producer. RSF controls many mines, smuggling via UAE."},
+      {name:"Gum Arabic", risk:"CRITICAL", icon:"🌿", note:"Sudan produces ~80% of global gum arabic. Used in food, pharma, cosmetics."},
+      {name:"Sesame Seeds", risk:"HIGH", icon:"🫘", note:"Major global sesame supplier. Conflict collapses farming & export capacity."},
+      {name:"Cotton", risk:"MEDIUM", icon:"🧶", note:"Nile Valley cotton production disrupted. Affects textile supply chains."},
+      {name:"Oil (transit)", risk:"MEDIUM", icon:"⛽", note:"South Sudan oil exports transit Sudan via pipeline to Port Sudan."},
+    ],
+    routes:["Port Sudan (Red Sea)","Nile River trade routes","Ethiopia-Sudan border crossings"],
+    wm_url:"https://www.worldmonitor.app/?layers=conflicts&region=africa"
+  },
+  {
+    id:"sahel", name:"Sahel Insurgency", region:"West Africa",
+    intensity:"MEDIUM", since:"2012", phase:"Multi-country jihadist insurgency",
+    casualties:"30K+ (decade)", displaced:"3M+",
+    flag:"🇲🇱", flag2:"🇧🇫",
+    summary:"Mali, Burkina Faso, Niger under jihadist pressure. Wagner Group (Africa Corps) presence. Coups destabilized Western partnerships. France expelled.",
+    resources:[
+      {name:"Uranium (Niger)", risk:"CRITICAL", icon:"☢️", note:"Niger = 7th global uranium producer. France relied on it for nuclear energy. Coup disrupts exports."},
+      {name:"Gold (Mali)", risk:"HIGH", icon:"🥇", note:"Mali = 3rd largest African gold producer. Mining companies facing security costs."},
+      {name:"Cotton (Burkina Faso)", risk:"MEDIUM", icon:"🧶", note:"West African cotton belt disrupted by displacement and insecurity."},
+      {name:"Manganese", risk:"LOW", icon:"🪩", note:"Ghana and regional manganese supply chains facing indirect disruption risk."},
+    ],
+    routes:["Trans-Saharan routes","Dakar-Niger rail corridor","Niger River trade axis"],
+    wm_url:"https://www.worldmonitor.app/?layers=conflicts&region=africa"
+  },
+  {
+    id:"taiwan", name:"Taiwan Strait Tensions", region:"East Asia",
+    intensity:"MEDIUM", since:"Ongoing", phase:"Heightened military exercises + blockade risk",
+    casualties:"0 (no active conflict)", displaced:"0",
+    flag:"🇹🇼", flag2:"🇨🇳",
+    summary:"PLA exercises simulate blockade. US arms sales escalate tensions. Xi signals reunification timeline. Risk of miscalculation elevated through 2027.",
+    resources:[
+      {name:"Semiconductors (TSMC)", risk:"CRITICAL", icon:"🔬", note:"TSMC produces ~92% of world's most advanced chips. Conflict = global tech recession."},
+      {name:"Electronics", risk:"CRITICAL", icon:"📱", note:"Taiwan supply chain underpins Apple, NVIDIA, AMD production. Zero substitution short-term."},
+      {name:"Shipping (Taiwan Strait)", risk:"HIGH", icon:"🚢", note:"Taiwan Strait = busiest shipping lane. Closure forces Cape of Good Hope rerouting."},
+      {name:"Rare Earths (China)", risk:"HIGH", icon:"🪨", note:"China controls 60%+ of rare earth processing. Conflict triggers export controls."},
+      {name:"Display Panels", risk:"MEDIUM", icon:"🖥️", note:"Taiwan + South Korea dominate global panel supply. Conflict disrupts consumer electronics."},
+    ],
+    routes:["Taiwan Strait","First Island Chain shipping","Pacific container routes"],
+    wm_url:"https://www.worldmonitor.app/?layers=conflicts,vessels&region=asia"
+  },
+];
+
+const RISK_COLOR = {
+  CRITICAL: { bg:"rgba(255,71,87,.15)", border:"rgba(255,71,87,.4)", text:"#ff4757", label:"CRITICAL" },
+  HIGH:     { bg:"rgba(255,165,0,.12)",  border:"rgba(255,165,0,.35)",  text:"#ffa500", label:"HIGH" },
+  MEDIUM:   { bg:"rgba(26,107,255,.12)", border:"rgba(26,107,255,.3)",  text:"#3d8bff", label:"MEDIUM" },
+  LOW:      { bg:"rgba(0,212,160,.1)",   border:"rgba(0,212,160,.25)",  text:"#00d4a0", label:"LOW" },
+};
+
+const INTENSITY_DOT = {
+  HIGH:   "#ff4757",
+  MEDIUM: "#ffa500",
+  LOW:    "#00d4a0",
+};
+
+function georiskEsc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ─── WARS TAB ──────────────────────────────────────────────────── */
+function renderGeoWars() {
+  const box = document.getElementById("georisk-wars-content");
+  if (!box) return;
+
+  box.innerHTML = `
+    <div class="geo-live-bar">
+      <span class="geo-live-dot"></span>
+      <span>Live conflict data — powered by WorldMonitor.app</span>
+      <a href="https://www.worldmonitor.app/" target="_blank" rel="noopener" class="geo-wm-link">Open full map ↗</a>
+    </div>
+    ${GEORISK_CONFLICTS.map(c => {
+      const icolor = INTENSITY_DOT[c.intensity] || "#7a9bb5";
+      const critCount = c.resources.filter(r=>r.risk==="CRITICAL").length;
+      const highCount = c.resources.filter(r=>r.risk==="HIGH").length;
+      return `
+      <div class="geo-conflict-card" onclick="this.classList.toggle('geo-expanded')">
+        <div class="geo-conflict-header">
+          <div class="geo-conflict-left">
+            <span class="geo-intensity-dot" style="background:${icolor};box-shadow:0 0 6px ${icolor}"></span>
+            <div>
+              <div class="geo-conflict-name">${georiskEsc(c.flag)} ${georiskEsc(c.name)}</div>
+              <div class="geo-conflict-meta">${georiskEsc(c.region)} &nbsp;·&nbsp; Since ${georiskEsc(c.since)} &nbsp;·&nbsp; ${georiskEsc(c.phase)}</div>
+            </div>
+          </div>
+          <div class="geo-conflict-right">
+            <span class="geo-badge geo-badge-intensity" style="color:${icolor};border-color:${icolor}40;background:${icolor}15">${c.intensity}</span>
+            ${critCount>0?`<span class="geo-badge geo-badge-crit">${critCount} CRITICAL</span>`:""}
+            ${highCount>0?`<span class="geo-badge geo-badge-high">${highCount} HIGH</span>`:""}
+          </div>
+        </div>
+        <div class="geo-conflict-summary">${georiskEsc(c.summary)}</div>
+        <div class="geo-conflict-stats">
+          <span>💀 ${georiskEsc(c.casualties)}</span>
+          <span>🏚 ${georiskEsc(c.displaced)} displaced</span>
+          <a href="${georiskEsc(c.wm_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="geo-wm-link-small">WorldMonitor ↗</a>
+        </div>
+        <div class="geo-resources-mini">
+          ${c.resources.slice(0,4).map(r=>{
+            const rc = RISK_COLOR[r.risk]||RISK_COLOR.LOW;
+            return `<span class="geo-res-chip" style="background:${rc.bg};border-color:${rc.border};color:${rc.text}">${r.icon} ${georiskEsc(r.name)}</span>`;
+          }).join("")}
+          ${c.resources.length>4?`<span class="geo-res-chip-more">+${c.resources.length-4} more</span>`:""}
+        </div>
+      </div>`;
+    }).join("")}`;
+}
+
+/* ─── RESOURCES TAB ─────────────────────────────────────────────── */
+function renderGeoResources() {
+  const box = document.getElementById("georisk-resources-content");
+  if (!box) return;
+
+  // Flatten all resources, deduplicate by name, pick highest risk
+  const allRes = {};
+  GEORISK_CONFLICTS.forEach(c => {
+    c.resources.forEach(r => {
+      if (!allRes[r.name] || riskLevel(r.risk) > riskLevel(allRes[r.name].risk)) {
+        allRes[r.name] = { ...r, conflicts:[c.name], conflictFlags:[c.flag] };
+      } else if (allRes[r.name]) {
+        allRes[r.name].conflicts.push(c.name);
+        allRes[r.name].conflictFlags.push(c.flag);
+      }
+    });
+  });
+
+  const riskOrder = ["CRITICAL","HIGH","MEDIUM","LOW"];
+  const sorted = Object.values(allRes).sort((a,b)=>riskLevel(b.risk)-riskLevel(a.risk));
+
+  box.innerHTML = `
+    <div class="geo-live-bar">
+      <span class="geo-live-dot"></span>
+      <span>Supply chain disruption risk by commodity</span>
+    </div>
+    <div class="geo-section-head">Critical Commodities at Risk</div>
+    ${sorted.map(r => {
+      const rc = RISK_COLOR[r.risk] || RISK_COLOR.LOW;
+      return `
+      <div class="geo-resource-row" style="border-left:3px solid ${rc.border}">
+        <div class="geo-resource-top">
+          <span class="geo-resource-icon">${r.icon}</span>
+          <div class="geo-resource-info">
+            <span class="geo-resource-name">${georiskEsc(r.name)}</span>
+            <span class="geo-resource-conflicts">${r.conflictFlags.join(" ")} ${r.conflicts.map(georiskEsc).join(", ")}</span>
+          </div>
+          <span class="geo-risk-badge" style="color:${rc.text};background:${rc.bg};border-color:${rc.border}">${r.risk}</span>
+        </div>
+        <div class="geo-resource-note">${georiskEsc(r.note)}</div>
+      </div>`;
+    }).join("")}`;
+}
+
+/* ─── ROUTES TAB ─────────────────────────────────────────────────── */
+function renderGeoRoutes() {
+  const box = document.getElementById("georisk-routes-content");
+  if (!box) return;
+
+  const routes = [
+    { name:"Red Sea / Suez Canal", icon:"🌊", risk:"HIGH",
+      note:"Houthi attacks have reduced Suez transits by ~50%. 12–15% of global trade rerouting via Cape of Good Hope, adding 10–14 days and $1M+ per voyage.",
+      conflicts:["Israel–Gaza / Middle East"], affected:["LNG","Container ships","Oil tankers"] },
+    { name:"Strait of Hormuz", icon:"🛢️", risk:"CRITICAL",
+      note:"20% of global oil and 25% of LNG passes through Hormuz. Iran controls both shores. Closure would be the largest supply shock in history.",
+      conflicts:["Israel–Gaza / Middle East"], affected:["Crude oil","LNG","Petrochemicals"] },
+    { name:"Black Sea / Bosphorus", icon:"⚓", risk:"HIGH",
+      note:"Ukrainian grain exports partially restored via UN corridor (now collapsed). Russian Black Sea Fleet attacked. Tankers still transiting Turkish straits.",
+      conflicts:["Russia–Ukraine War"], affected:["Wheat","Sunflower oil","Steel","Fertilizers"] },
+    { name:"Taiwan Strait", icon:"🚢", risk:"HIGH",
+      note:"30% of global shipping, 65% of semiconductor freight transits the strait. PLA exercises routinely simulate blockade. Zero-warning closure scenario.",
+      conflicts:["Taiwan Strait Tensions"], affected:["Semiconductors","Electronics","Consumer goods"] },
+    { name:"Trans-Saharan Routes", icon:"🏜️", risk:"MEDIUM",
+      note:"Jihadist checkpoints and coup instability disrupt overland trade between West Africa and Mediterranean. Uranium, gold, cotton exports affected.",
+      conflicts:["Sahel Insurgency"], affected:["Uranium","Gold","Cotton","Food"] },
+    { name:"Port Sudan (Red Sea)", icon:"🏴", risk:"MEDIUM",
+      note:"Sudan's only major sea port. Civil war battles for control. South Sudan oil exports transit here. Gum arabic and grain exports stalled.",
+      conflicts:["Sudan Civil War"], affected:["Oil (transit)","Gum Arabic","Gold","Sesame"] },
+  ];
+
+  box.innerHTML = `
+    <div class="geo-live-bar">
+      <span class="geo-live-dot"></span>
+      <span>Strategic chokepoints &amp; trade route disruption</span>
+    </div>
+    ${routes.map(r => {
+      const rc = RISK_COLOR[r.risk]||RISK_COLOR.LOW;
+      return `
+      <div class="geo-route-card">
+        <div class="geo-route-header">
+          <span class="geo-route-icon">${r.icon}</span>
+          <div class="geo-route-name">${georiskEsc(r.name)}</div>
+          <span class="geo-risk-badge" style="color:${rc.text};background:${rc.bg};border-color:${rc.border}">${r.risk}</span>
+        </div>
+        <div class="geo-route-note">${georiskEsc(r.note)}</div>
+        <div class="geo-route-meta">
+          <div class="geo-route-affected">
+            ${r.affected.map(a=>`<span class="geo-affected-chip">${georiskEsc(a)}</span>`).join("")}
+          </div>
+          <div class="geo-route-conflicts">${r.conflicts.map(c=>`<em>${georiskEsc(c)}</em>`).join(", ")}</div>
+        </div>
+      </div>`;
+    }).join("")}`;
+}
+
+function riskLevel(r){ return {CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[r]||0; }
+
+/* ─── INIT ──────────────────────────────────────────────────────── */
+document.addEventListener("DOMContentLoaded", () => {
+  renderGeoWars();
+  renderGeoResources();
+  renderGeoRoutes();
+});
+</script>
 </body>
 </html>
