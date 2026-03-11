@@ -27,21 +27,12 @@ function avCallCount() {
 function avIncrementCount() {
   const n = avCallCount() + 1;
   sessionStorage.setItem(SESSION_KEY, n);
-  updateApiStatus();
+  // Delegate badge refresh to config.js (which manages all dynamic badges)
+  if (typeof renderTopbarBadges === "function") renderTopbarBadges();
   return n;
 }
 function updateApiStatus() {
-  const n   = avCallCount();
-  const el  = document.getElementById("apiStatus");
-  const lbl = document.getElementById("apiCallCount");
-  if (!el) return;
-  if (lbl) lbl.textContent = `${n}/25`;
-  el.className = "api-status " + (n >= 25 ? "api-limit" : n >= 20 ? "api-warn" : "api-ok");
-  el.title = n >= 25
-    ? "Daily limit reached (25/25). Data may be stale."
-    : n >= 20
-    ? `Approaching daily limit: ${n}/25 calls used.`
-    : `Alpha Vantage: ${n}/25 daily calls used.`;
+  if (typeof renderTopbarBadges === "function") renderTopbarBadges();
 }
 
 /* ══════════════════════════════════════════════════════════════════
