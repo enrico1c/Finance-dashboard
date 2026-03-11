@@ -151,13 +151,15 @@ async function fhGetUpgrades(sym) {
 
 /* ── Earnings (quarterly) ────────────────────────────────────────── */
 async function fhGetEarnings(sym) {
-  const data = await fhFetch("/stock/earnings", { symbol: sym, limit: 8 });
+  // No limit param — Finnhub returns all available quarters (typically 4-8)
+  const data = await fhFetch("/stock/earnings", { symbol: sym });
   if (!Array.isArray(data) || !data.length) return null;
+  // Finnhub returns most recent first
   return data.map(e => ({
-    period:    e.period,
-    epsEst:    e.estimate,
-    epsActual: e.actual,
-    surprise:  e.surprise,
+    period:      e.period,
+    epsEst:      e.estimate,
+    epsActual:   e.actual,
+    surprise:    e.surprise,
     surprisePct: e.surprisePercent,
   }));
 }
@@ -247,7 +249,51 @@ function fhRow(l,v,c=''){return `<div class="metric-row ${c}"><span class="metri
 function fhSec(t){return `<div class="section-head">${fhEsc(t)}</div>`;}
 function fhUnixDate(ts){ try{return new Date(ts*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch(_){return '';} }
 
-/* ── Render: Analyst ANR tab ─────────────────────────────────────── */
+/* ── Render: Quote QR + MON tabs ─────────────────────────────────── */
+function fhRenderQuote(sym, q, profile) {
+  if (!q) return;
+  const chg    = q.change != null ? q.change : 0;
+  const chgPct = q.changePct != null ? q.changePct : 0;
+  const chgCls = chg >= 0 ? "pos" : "neg";
+  const sign   = chg >= 0 ? "+" : "";
+  const ts     = q.timestamp ? new Date(q.timestamp*1000).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : "";
+
+  const qr = document.getElementById("quote-qr");
+  if (qr) qr.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub  <span class="av-ts">${ts}</span></div>
+    <div class="quote-grid">
+      ${fhRow("Last",       `<span class="${chgCls}">$${fhFmt(q.price)}</span>`)}
+      ${fhRow("Change",     `<span class="${chgCls}">${sign}$${fhFmt(Math.abs(chg))} (${sign}${fhFmt(Math.abs(chgPct),2)}%)</span>`)}
+      ${fhRow("Open",       "$"+fhFmt(q.open))}
+      ${fhRow("High",       `<span class="metric-up">$${fhFmt(q.high)}</span>`)}
+      ${fhRow("Low",        `<span class="metric-down">$${fhFmt(q.low)}</span>`)}
+      ${fhRow("Prev Close", "$"+fhFmt(q.prevClose))}
+      ${profile?.mktCap ? fhRow("Mkt Cap", fhFmtB(profile.mktCap)) : ""}
+      ${profile?.shareOut ? fhRow("Shares Out.", Number(profile.shareOut*1e6).toLocaleString()) : ""}
+    </div>
+    <div class="av-note">// Bid/Ask requires premium data feed.<br>// Real-time tick data shown in TradingView chart.</div>`;
+
+  const mon = document.getElementById("quote-mon");
+  if (mon) mon.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub</div>
+    ${fhRow("Last Price",  `<span class="${chgCls}">$${fhFmt(q.price)}</span>`)}
+    ${fhRow("Day Change",  `<span class="${chgCls}">${sign}${fhFmt(Math.abs(chgPct),2)}%</span>`)}
+    ${fhRow("Day High",    `<span class="metric-up">$${fhFmt(q.high)}</span>`)}
+    ${fhRow("Day Low",     `<span class="metric-down">$${fhFmt(q.low)}</span>`)}
+    ${fhRow("Open",        "$"+fhFmt(q.open))}
+    ${fhRow("Prev Close",  "$"+fhFmt(q.prevClose))}
+    ${profile ? `
+      ${fhSec("Company Info")}
+      ${fhRow("Name",     fhEsc(profile.name||'—'))}
+      ${fhRow("Exchange", fhEsc(profile.exchange||'—'))}
+      ${fhRow("Sector",   fhEsc(profile.sector||'—'))}
+      ${fhRow("Country",  fhEsc(profile.country||'—'))}
+      ${fhRow("IPO",      fhEsc(profile.ipo||'—'))}
+      ${profile.weburl ? `<div style="margin-top:6px"><a href="${fhEsc(profile.weburl)}" target="_blank" rel="noopener" class="geo-wm-link">Company website ↗</a></div>` : ""}
+    ` : ""}`;
+}
+
+
 function fhRenderAnalysts(sym, recs, target, upgrades, price) {
   const anr = document.getElementById("analysts-anr");
   if (!anr) return;
@@ -450,6 +496,34 @@ function fhRenderComparables(sym, peers, peerData, mainProfile, mainQuote) {
     <div class="av-note">// Peers identified by Finnhub as same industry. Sorted by proximity to ${fhEsc(sym)} market cap.</div>`;
 }
 
+/* ── Render: Earnings ERN tab ────────────────────────────────────── */
+function fhRenderEarnings(sym, earnings) {
+  const ern = document.getElementById("fund-ern");
+  if (!ern || !earnings?.length) return;
+  const rows = earnings.map(e => {
+    const sc  = (e.surprisePct ?? 0) >= 0 ? "pos" : "neg";
+    const sp  = e.surprisePct != null ? (e.surprisePct >= 0 ? "+" : "") + Number(e.surprisePct).toFixed(2) + "%" : "—";
+    const sur = e.surprise    != null ? (e.surprise    >= 0 ? "+" : "") + "$" + fhFmt(Math.abs(e.surprise)) : "—";
+    const isEst = e.epsActual == null;
+    return `<tr class="${isEst ? 'row-estimate' : ''}">
+      <td>${fhEsc(e.period||'—')}</td>
+      <td>${isEst ? '<em style="color:var(--text-muted)">Estimate</em>' : '—'}</td>
+      <td>${e.epsEst    != null ? "$"+fhFmt(e.epsEst)    : "—"}</td>
+      <td>${e.epsActual != null ? "$"+fhFmt(e.epsActual) : "—"}</td>
+      <td class="${sc}">${sur}</td>
+      <td class="${sc}">${sp}</td>
+    </tr>`;
+  }).join("");
+  ern.innerHTML = `
+    <div class="av-live-badge">● LIVE — Finnhub  <span class="av-ts">${earnings.length} quarters</span></div>
+    ${fhSec("Quarterly EPS — Actual vs Estimate")}
+    <div class="fin-table-wrap"><table class="fin-table">
+      <thead><tr><th>Quarter</th><th>Report Date</th><th>EPS Est.</th><th>EPS Act.</th><th>Surprise $</th><th>Surprise %</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="av-note">// Data via Finnhub. Most recent quarter shown first.</div>`;
+}
+
 /* ── Render: News CN tab ─────────────────────────────────────────── */
 function fhRenderNews(sym, articles) {
   const cn = document.getElementById("news-cn");
@@ -504,11 +578,17 @@ async function finnhubLoadAll(rawTicker) {
 
   fhLiveCache[sym] = { recs, target, upgrades, earnings, insiders, institutional, news, peers, profile, quote };
 
+  // Render quote (QR + MON)
+  if (quote) fhRenderQuote(sym, quote, profile);
+
   // Render analysts
   if (recs || target || upgrades) {
     fhRenderAnalysts(sym, recs, target, upgrades, quote?.price);
     fhRenderBRC(sym, upgrades);
   }
+
+  // Render earnings (ERN tab) — Finnhub overwrites AV data with freshest available
+  if (earnings?.length) fhRenderEarnings(sym, earnings);
 
   // Render ownership
   if (insiders || institutional) fhRenderOwnership(sym, insiders, institutional);
