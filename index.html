@@ -147,7 +147,7 @@
       <div class="size-tooltip" id="tooltip-fundamentals"></div>
     </section>
 
-    <!-- ▸ NEWS (CN / EVTS / BRC / BI) ─────────────────────────── -->
+    <!-- ▸ NEWS — flat live feed, no tabs ───────────────────────── -->
     <section class="panel" id="panel-news" data-panel="news">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -159,16 +159,12 @@
           <button class="icon-btn close" onclick="hidePanel('news')">✕</button>
         </div>
       </div>
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="cn"   onclick="switchTab('news','cn')">CN</button>
-        <button class="tab-btn"        data-tab="evts" onclick="switchTab('news','evts')">EVTS</button>
-        <button class="tab-btn"        data-tab="brc"  onclick="switchTab('news','brc')">BRC</button>
-        <button class="tab-btn"        data-tab="bi"   onclick="switchTab('news','bi')">BI</button>
-      </div>
-      <div class="tab-pane active panel-content" data-tab="cn"   id="news-cn"></div>
-      <div class="tab-pane        panel-content" data-tab="evts" id="news-evts"></div>
-      <div class="tab-pane        panel-content" data-tab="brc"  id="news-brc"></div>
-      <div class="tab-pane        panel-content" data-tab="bi"   id="news-bi"></div>
+      <div class="panel-content" id="news-feed"></div>
+      <!-- legacy IDs kept invisible so API renderers don't crash -->
+      <div id="news-cn"   style="display:none"></div>
+      <div id="news-evts" style="display:none"></div>
+      <div id="news-brc"  style="display:none"></div>
+      <div id="news-bi"   style="display:none"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -176,7 +172,7 @@
       <div class="size-tooltip" id="tooltip-news"></div>
     </section>
 
-    <!-- ▸ QUOTE (QR / MON) ─────────────────────────────────────── -->
+    <!-- ▸ QUOTE — live via Finnhub/AV ─────────────────────────── -->
     <section class="panel" id="panel-quote" data-panel="quote">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -189,8 +185,12 @@
         <button class="tab-btn active" data-tab="qr"  onclick="switchTab('quote','qr')">QR</button>
         <button class="tab-btn"        data-tab="mon" onclick="switchTab('quote','mon')">MON</button>
       </div>
-      <div class="tab-pane active panel-content" data-tab="qr"  id="quote-qr"></div>
-      <div class="tab-pane        panel-content" data-tab="mon" id="quote-mon"></div>
+      <div class="tab-pane active panel-content" data-tab="qr"  id="quote-qr">
+        <div class="av-loading"><span class="av-spinner"></span>Loading quote…</div>
+      </div>
+      <div class="tab-pane        panel-content" data-tab="mon" id="quote-mon">
+        <div class="av-loading"><span class="av-spinner"></span>Loading market data…</div>
+      </div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
