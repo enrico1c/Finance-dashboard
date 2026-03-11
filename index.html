@@ -10,44 +10,37 @@
 <body>
 <div class="app-shell">
 
-  <!-- ── TOPBAR (2 rows) ─────────────────────────────────────────── -->
-  <header class="topbar">
+  <!-- ── TOPBAR ──────────────────────────────────────────────────── -->
+  <header class="topbar" id="topbar">
 
-    <!-- ROW 1: brand · live · search inputs -->
+    <!-- ROW 1: brand · live · searches -->
     <div class="topbar-row topbar-row-1">
       <div class="brand">
         <h1>FINTERM</h1>
         <span class="brand-sub">Market Intelligence</span>
       </div>
-
       <div class="topbar-divider"></div>
       <span class="live-dot">Live</span>
       <div class="topbar-divider"></div>
-
-      <!-- Ticker -->
       <div class="search-group">
         <span class="search-label">Ticker</span>
-        <input id="tickerInput"
-               placeholder="AAPL · NYSE:IBM · MIL:ENI · LSE:BP"
-               value="AAPL"
-               oninput="updateExchangeHint()" />
+        <input id="tickerInput" placeholder="AAPL · NYSE:IBM · MIL:ENI" value="AAPL" oninput="updateExchangeHint()" />
         <button onclick="changeTicker()">Run ↵</button>
       </div>
       <span class="exchange-hint" id="exchangeHint">NASDAQ</span>
-
       <div class="topbar-divider"></div>
-
-      <!-- Topic -->
       <div class="search-group">
         <span class="search-label">Topic</span>
         <input id="topicInput" placeholder="Italy · AI · China · Fed..." />
         <button onclick="searchTopicNews()">Run ↵</button>
       </div>
+      <!-- collapse button — always visible -->
+      <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse/Expand">▲</button>
     </div>
 
-    <!-- ROW 2: module toggles -->
-    <div class="topbar-row topbar-row-2">
-      <span class="checklist-title">Modules —</span>
+    <!-- ROW 2: modules (collapsible) -->
+    <div class="topbar-row topbar-row-2" id="topbarRow2">
+      <span class="checklist-title">Modules</span>
       <div class="checklist">
         <label><input type="checkbox" class="panel-toggle" data-panel="chart"        checked> Chart</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="forex"              > Forex</label>
