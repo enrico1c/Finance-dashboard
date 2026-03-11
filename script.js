@@ -22,34 +22,73 @@ function fmtB(n){
 
 /* ── Exchange DB ─────────────────────────────────────────────────── */
 const exchangeDB = {
+  // ── US NASDAQ ─────────────────────────────────────────────
   AAPL:"NASDAQ",MSFT:"NASDAQ",GOOGL:"NASDAQ",GOOG:"NASDAQ",AMZN:"NASDAQ",
   META:"NASDAQ",NVDA:"NASDAQ",TSLA:"NASDAQ",NFLX:"NASDAQ",AMD:"NASDAQ",
   INTC:"NASDAQ",QCOM:"NASDAQ",PYPL:"NASDAQ",ADBE:"NASDAQ",CSCO:"NASDAQ",
   SBUX:"NASDAQ",COST:"NASDAQ",AVGO:"NASDAQ",TXN:"NASDAQ",AMAT:"NASDAQ",
   MU:"NASDAQ",LRCX:"NASDAQ",KLAC:"NASDAQ",MRVL:"NASDAQ",ASML:"NASDAQ",
+  ORCL:"NASDAQ",PLTR:"NASDAQ",ANET:"NASDAQ",ARM:"NASDAQ",SMCI:"NASDAQ",
+  MRNA:"NASDAQ",ISRG:"NASDAQ",
+  // ── US NYSE ────────────────────────────────────────────────
   JPM:"NYSE",BAC:"NYSE",GS:"NYSE",MS:"NYSE",WMT:"NYSE",V:"NYSE",
   MA:"NYSE",XOM:"NYSE",CVX:"NYSE",KO:"NYSE",DIS:"NYSE",PFE:"NYSE",
   JNJ:"NYSE",PG:"NYSE",HD:"NYSE",UNH:"NYSE",MRK:"NYSE",IBM:"NYSE",
   GE:"NYSE",BA:"NYSE",CAT:"NYSE",AXP:"NYSE",CRM:"NYSE",NKE:"NYSE",
   T:"NYSE",VZ:"NYSE",C:"NYSE",WFC:"NYSE",F:"NYSE",GM:"NYSE",
-  SPY:"AMEX",QQQ:"NASDAQ",IWM:"AMEX",GLD:"NYSE",
+  LLY:"NYSE",COP:"NYSE",NEE:"NYSE",SLB:"NYSE",
+  BABA:"NYSE",NIO:"NYSE",TCEHY:"OTC",BIDU:"NASDAQ",PDD:"NASDAQ",
+  // ── US ETF ─────────────────────────────────────────────────
+  SPY:"AMEX",QQQ:"NASDAQ",IWM:"AMEX",GLD:"NYSE",TLT:"NASDAQ",
+  // ── CRYPTO ─────────────────────────────────────────────────
   BTC:"BITSTAMP",ETH:"BITSTAMP",
+  // ── ITALIA (Borsa Milano) ──────────────────────────────────
+  ENI:"MIL",ENEL:"MIL",ISP:"MIL",UCG:"MIL",TIT:"MIL",
+  RACE:"MIL",STM:"MIL",MB:"MIL",BPER:"MIL",SRG:"MIL",
+  A2A:"MIL",AZM:"MIL",BMPS:"MIL",CPR:"MIL",LDO:"MIL",
+  // ── GERMANIA (XETRA) ──────────────────────────────────────
+  SAP:"XETRA",BMW:"XETRA",MBG:"XETRA",SIE:"XETRA",BAYN:"XETRA",
+  ADS:"XETRA",ALV:"XETRA",DTE:"XETRA",DBK:"XETRA",VOW3:"XETRA",
+  // ── FRANCIA (Euronext Paris) ──────────────────────────────
+  MC:"EURONEXT",OR:"EURONEXT",BNP:"EURONEXT",AIR:"EURONEXT",
+  TTE:"EURONEXT",RI:"EURONEXT",CS:"EURONEXT",KER:"EURONEXT",
+  // ── UK (London Stock Exchange) ────────────────────────────
+  SHEL:"LSE",BP:"LSE",HSBA:"LSE",AZN:"LSE",ULVR:"LSE",
+  GSK:"LSE",RIO:"LSE",LLOY:"LSE",BARC:"LSE",
+  // ── SPAGNA ────────────────────────────────────────────────
+  BBVA:"BME",ITX:"BME",IBE:"BME",REP:"BME",
 };
-function resolveSymbol(raw){
-  const s=raw.trim().toUpperCase();
-  if(s.includes(":")) return s;
-  return (exchangeDB[s]||"NASDAQ")+":"+s;
+
+function resolveSymbol(raw) {
+  const s = raw.trim().toUpperCase();
+  // Already has exchange prefix (e.g. MIL:ENI, NASDAQ:AAPL) → use as-is
+  if (s.includes(":")) return s;
+  // Known ticker → prepend the correct exchange
+  if (exchangeDB[s]) return exchangeDB[s] + ":" + s;
+  // Unknown ticker → pass bare to TradingView; it will auto-resolve
+  // across all global markets via its own symbol search
+  return s;
 }
-function getExchangeLabel(raw){
-  const s=raw.trim().toUpperCase();
-  if(s.includes(":")) return s.split(":")[0];
-  return exchangeDB[s]||"AUTO";
+
+function getExchangeLabel(raw) {
+  const s = raw.trim().toUpperCase();
+  if (s.includes(":")) return s.split(":")[0];
+  return exchangeDB[s] || "AUTO";
 }
-function updateExchangeHint(){
-  const h=document.getElementById("exchangeHint");
-  if(h) h.textContent=getExchangeLabel(document.getElementById("tickerInput")?.value||"");
+
+function updateExchangeHint() {
+  const h = document.getElementById("exchangeHint");
+  if (!h) return;
+  const raw = document.getElementById("tickerInput")?.value || "";
+  const lbl = getExchangeLabel(raw);
+  h.textContent = lbl;
+  h.style.opacity = lbl === "AUTO" ? "0.5" : "1";
+  h.title = lbl === "AUTO"
+    ? "Exchange sconosciuto — TradingView auto-rileva.\nTip: usa il formato EXCHANGE:TICKER (es. MIL:ENI, XETRA:SAP, LSE:BP)"
+    : "Exchange: " + lbl;
 }
-function mapForexPairToSymbol(p){ return "FX:"+p.replace("/","").toUpperCase().trim(); }
+
+function mapForexPairToSymbol(p) { return "FX:" + p.replace("/","").toUpperCase().trim(); }
 
 /* ══════════════════════════════════════════════════════════════════
    MOCK DATA
@@ -1021,8 +1060,9 @@ function changeTicker(){
   updateExchangeHint();
   loadChart(resolveSymbol(raw));
   reloadAllPanels(raw);
-  // Fetch live data from Alpha Vantage
-  if(typeof avLoadAll === "function") avLoadAll(raw);
+  // Strip exchange prefix for API calls (e.g. "MIL:ENI" → "ENI")
+  const sym = raw.replace(/.*:/,"").toUpperCase();
+  if(typeof avLoadAll === "function") avLoadAll(sym);
 }
 
 function searchTopicNews(){
@@ -1089,8 +1129,9 @@ window.addEventListener("load",()=>{
     loadChart(resolveSymbol(currentTicker));
     loadForexChart();
     reloadAllPanels(currentTicker);
-    // Fetch live data on startup
-    if(typeof avLoadAll === "function") avLoadAll(currentTicker);
+    // Fetch live data on startup — strip exchange prefix for API calls
+    const initSym = currentTicker.replace(/.*:/,"").toUpperCase();
+    if(typeof avLoadAll === "function") avLoadAll(initSym);
     if(typeof updateApiStatus  === "function") updateApiStatus();
     if(typeof updateFmpStatus  === "function") updateFmpStatus();
   });
