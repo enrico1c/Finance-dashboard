@@ -27,6 +27,7 @@
 
         <div class="checklist">
           <label><input type="checkbox" class="panel-toggle" data-panel="chart" checked> Chart</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="forex"> Forex</label>
           <label><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked> Fundamentals</label>
           <label><input type="checkbox" class="panel-toggle" data-panel="news" checked> News</label>
           <label><input type="checkbox" class="panel-toggle" data-panel="notes" checked> Notes</label>
@@ -45,6 +46,37 @@
           </div>
         </div>
         <div id="priceChart" class="panel-content chart-content"></div>
+      </section>
+
+      <section class="panel hidden" id="panel-forex" data-panel="forex" data-size="1">
+        <div class="panel-head">
+          <div>
+            <h3>Forex Chart</h3>
+            <div class="mode-label" id="forexLabel">Pair: EUR/USD</div>
+          </div>
+          <div class="panel-actions">
+            <input id="forexPairInput" class="mini-input" placeholder="EUR/USD" value="EUR/USD" />
+            <button class="size-btn" onclick="changeForexPair()">Load</button>
+            <button class="size-btn" onclick="resizePanel('forex', -1)">−</button>
+            <button class="size-btn" onclick="resizePanel('forex', 1)">+</button>
+          </div>
+        </div>
+
+        <div class="forex-topbar">
+          <button class="fx-tf-btn" onclick="setForexInterval('1')">1m</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('5')">5m</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('60')">1H</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('240')">4H</button>
+          <button class="fx-tf-btn" onclick="setForexInterval('D')">D</button>
+        </div>
+
+        <div class="forex-summary" id="forexSummary">
+          <div class="metric"><span>Selected Pair</span><span>EUR/USD</span></div>
+          <div class="metric"><span>Status</span><span>Ready</span></div>
+          <div class="metric"><span>Mode</span><span>Forex widget active</span></div>
+        </div>
+
+        <div id="forexChart" class="panel-content chart-content"></div>
       </section>
 
       <section class="panel" id="panel-fundamentals" data-panel="fundamentals" data-size="1">
