@@ -253,29 +253,49 @@ function noData(t){ return `<div class="no-data">// No local data for <strong>${
    ══════════════════════════════════════════════════════════════════ */
 function renderFundamentals(ticker){
   const d=getTickerData(ticker);
+  const sym = ticker.replace(/.*:/,"").toUpperCase();
+  const tvSym = resolveSymbol(ticker); // TradingView format e.g. "NASDAQ:AAPL"
 
-  /* DES */
+  /* DES — inject TradingView Financials widget */
   const des=document.getElementById("fund-des");
   if(des){
-    if(!d){ des.innerHTML=noData(ticker); return; }
-    des.innerHTML=`
-      ${mRow("Company",   d.name)}
-      ${mRow("Sector",    d.sector)}
-      ${mRow("Industry",  d.industry)}
-      ${mRow("Exchange",  d.exchange)}
-      ${mRow("Founded",   d.founded)}
-      ${mRow("Employees", d.employees)}
-      ${mRow("HQ",        d.hq)}
-      ${mRow("Mkt Cap",   fmtB(d.mktCap))}
-      ${mRow("P/E",       d.pe)}
-      ${mRow("EV/EBITDA", d.evEbitda)}
-      ${mRow("P/BV",      d.pbv)}
-      ${mRow("Debt/Eq",   d.debtEq)}
-      ${mRow("Beta",      d.beta)}
-      ${mRow("52W High",  "$"+d.week52High)}
-      ${mRow("52W Low",   "$"+d.week52Low)}
-      ${mRow("Float",     d.float)}
-      <div class="desc-block">${escapeHtml(d.description)}</div>`;
+    des.innerHTML = `
+      <div class="tv-fundamental-wrap" id="tv-fund-${sym}"></div>
+      <div class="tv-fundamental-fallback" id="tv-fund-fallback-${sym}">
+        ${d ? `
+          ${mRow("Company",   d.name)}
+          ${mRow("Sector",    d.sector)}
+          ${mRow("Industry",  d.industry)}
+          ${mRow("Exchange",  d.exchange)}
+          ${mRow("Mkt Cap",   fmtB(d.mktCap))}
+          ${mRow("P/E",       d.pe)}
+          ${mRow("Beta",      d.beta)}
+          <div class="desc-block">${escapeHtml(d.description)}</div>
+        ` : noData(ticker)}
+      </div>`;
+    // Inject TradingView Fundamentals widget
+    if(typeof TradingView !== "undefined") {
+      try {
+        const container = document.getElementById(`tv-fund-${sym}`);
+        if(container) {
+          container.innerHTML = "";
+          new TradingView.widget({
+            "width": "100%",
+            "height": 420,
+            "symbol": tvSym,
+            "colorTheme": "dark",
+            "isTransparent": true,
+            "locale": "en",
+            "container_id": `tv-fund-${sym}`,
+          });
+          // Hide fallback if widget loads
+          setTimeout(() => {
+            const el = document.getElementById(`tv-fund-fallback-${sym}`);
+            if(el && container.children.length > 0) el.style.display = "none";
+          }, 2000);
+        }
+      } catch(e) { /* widget not available, fallback stays visible */ }
+    }
   }
 
   /* FA */
@@ -336,23 +356,16 @@ function renderFundamentals(ticker){
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER: NEWS  (CN / EVTS / BRC / BI)
+   Full inline news from APIs — no external redirects
+   Priority: Finnhub → EODHD → APITube → AV
    ══════════════════════════════════════════════════════════════════ */
 function renderNews(ticker){
   const d=getTickerData(ticker);
-  const q=ticker.replace(/.*:/,"");
-  const sources=[
-    {s:"Google News",    u:`https://news.google.com/search?q=${encodeURIComponent(q)}`},
-    {s:"Bloomberg",      u:`https://www.bloomberg.com/search?query=${encodeURIComponent(q)}`},
-    {s:"Reuters",        u:`https://www.reuters.com/site-search/?query=${encodeURIComponent(q)}`},
-    {s:"Financial Times",u:`https://www.ft.com/search?q=${encodeURIComponent(q)}`},
-    {s:"CNBC",           u:`https://www.cnbc.com/search/?query=${encodeURIComponent(q)}`},
-    {s:"MarketWatch",    u:`https://www.marketwatch.com/search?q=${encodeURIComponent(q)}&ts=0&tab=All`},
-    {s:"Seeking Alpha",  u:`https://seekingalpha.com/search?q=${encodeURIComponent(q)}`},
-    {s:"Ground News",    u:`https://ground.news/search?query=${encodeURIComponent(q)}`},
-  ];
+  const sym=ticker.replace(/.*:/,"").toUpperCase();
 
+  // CN tab — show loading state, APIs will overwrite
   const cn=document.getElementById("news-cn");
-  if(cn) cn.innerHTML=`<div class="news-list">${sources.map(i=>`<div class="news-item"><a href="${i.u}" target="_blank" rel="noopener noreferrer">${escapeHtml(i.s)} → ${escapeHtml(q)}</a><div class="news-meta">${escapeHtml(i.s)}</div></div>`).join("")}</div>`;
+  if(cn) cn.innerHTML=`<div class="av-loading"><span class="av-spinner"></span>Fetching live news for ${escapeHtml(sym)}…</div>`;
 
   const evts=document.getElementById("news-evts");
   if(evts){
@@ -436,104 +449,41 @@ function renderQuote(ticker){
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER: ANALYSTS  (ANR / BRC)
+   Live data: Finnhub → FMP → AV (priority cascade)
    ══════════════════════════════════════════════════════════════════ */
 function renderAnalysts(ticker){
-  const d=getTickerData(ticker);
-
-  const anr=document.getElementById("analysts-anr");
-  if(anr){
-    if(!d){ anr.innerHTML=noData(ticker); }
-    else {
-      const a=d.analysts;
-      const bp=Math.round(a.buy/a.total*100), hp=Math.round(a.hold/a.total*100), sp=100-bp-hp;
-      const rows=a.ratings.map(r=>`<tr><td>${r.firm}</td><td>${r.analyst}</td><td class="${r.rating==="Buy"?"pos":r.rating==="Sell"?"neg":"neutral"}">${r.rating}</td><td>$${fmt(r.target)}</td><td>${r.date}</td></tr>`).join("");
-      anr.innerHTML=`
-        ${sHead("Consensus")}
-        <div class="consensus-bar">
-          <div class="cb-seg buy"  style="width:${bp}%">${a.buy} Buy</div>
-          <div class="cb-seg hold" style="width:${hp}%">${a.hold} Hold</div>
-          <div class="cb-seg sell" style="width:${sp}%">${a.sell} Sell</div>
-        </div>
-        ${mRow("Avg Target",   "$"+fmt(a.avgTarget))}
-        ${mRow("High Target",  "$"+fmt(a.highTarget))}
-        ${mRow("Low Target",   "$"+fmt(a.lowTarget))}
-        ${mRow("Current Price","$"+fmt(d.price))}
-        ${mRow("Upside to Avg",fmt((a.avgTarget/d.price-1)*100,1)+"%")}
-        ${sHead("Individual Ratings")}
-        <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Firm</th><th>Analyst</th><th>Rating</th><th>Target</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
-  }
-
-  const abrc=document.getElementById("analysts-brc");
-  if(abrc){
-    if(!d){ abrc.innerHTML=noData(ticker); }
-    else abrc.innerHTML=d.research.map(r=>`
-      <div class="research-item">
-        <div class="research-header"><span class="research-firm">${escapeHtml(r.firm)}</span><span class="research-date">${r.date}</span></div>
-        <div class="research-title">${escapeHtml(r.title)}</div>
-        <div class="research-meta">${r.pages} pages</div>
-      </div>`).join("");
-  }
+  const sym = ticker.replace(/.*:/,"").toUpperCase();
+  const anr  = document.getElementById("analysts-anr");
+  const abrc = document.getElementById("analysts-brc");
+  if(anr)  anr.innerHTML  = `<div class="av-loading"><span class="av-spinner"></span>Fetching live analyst data…</div>`;
+  if(abrc) abrc.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching upgrades/downgrades…</div>`;
+  // Actual rendering done by finnhubLoadAll → fhRenderAnalysts / fhRenderBRC
+  // and by fmpLoadAll → fmpRenderAnalysts (fallback)
 }
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER: OWNERSHIP  (HDS / MGMT)
+   Live data: Finnhub insiders + institutional + FMP mgmt
    ══════════════════════════════════════════════════════════════════ */
 function renderOwnership(ticker){
-  const d=getTickerData(ticker);
-
-  const hds=document.getElementById("own-hds");
-  if(hds){
-    if(!d){ hds.innerHTML=noData(ticker); }
-    else {
-      const ir=d.holdings.institutional.map(h=>`<tr><td>${h.name}</td><td>${h.type}</td><td>${h.pct}%</td><td>${h.shares}</td><td class="${h.change.startsWith("+")?'pos':h.change.startsWith("-")?'neg':''}">${h.change}</td></tr>`).join("");
-      const ins=d.holdings.insiders.map(i=>`<tr><td>${i.name}</td><td>${i.shares}</td><td>${i.value}</td><td class="${i.action==="Buy"?'pos':i.action==="Sell"?'neg':''}">${i.action}</td><td>${i.change}</td><td>${i.date}</td></tr>`).join("");
-      hds.innerHTML=`
-        ${sHead("Institutional Holders")}
-        <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Institution</th><th>Type</th><th>% Own</th><th>Shares</th><th>QoQ Chg</th></tr></thead><tbody>${ir}</tbody></table></div>
-        ${sHead("Insider Transactions")}
-        <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Insider</th><th>Shares</th><th>Value</th><th>Action</th><th>Change</th><th>Date</th></tr></thead><tbody>${ins}</tbody></table></div>`;
-    }
-  }
-
-  const mg=document.getElementById("own-mgmt");
-  if(mg){
-    if(!d){ mg.innerHTML=noData(ticker); }
-    else mg.innerHTML=d.mgmt.map(m=>`
-      <div class="mgmt-card">
-        <div class="mgmt-avatar">${m.name.split(" ").map(w=>w[0]).join("").slice(0,2)}</div>
-        <div class="mgmt-info">
-          <div class="mgmt-name">${escapeHtml(m.name)}</div>
-          <div class="mgmt-role">${escapeHtml(m.role)}</div>
-          <div class="mgmt-meta">Since ${m.since} · Age ${m.age} · Pay: ${m.pay}</div>
-        </div>
-      </div>`).join("");
-  }
+  const hds = document.getElementById("own-hds");
+  const mg  = document.getElementById("own-mgmt");
+  if(hds) hds.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching insider & institutional data…</div>`;
+  if(mg)  mg.innerHTML  = `<div class="av-loading"><span class="av-spinner"></span>Fetching management data…</div>`;
+  // Filled by finnhubLoadAll → fhRenderOwnership + fhRenderMgmt
+  // and fmpLoadAll → fmpRenderOwnership + fmpRenderMgmt (additional detail)
 }
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER: COMPARABLES  (RV / COMP)
+   Live: Finnhub peers — 10 companies, same sector, sorted by mktcap proximity
    ══════════════════════════════════════════════════════════════════ */
 function renderComparables(ticker){
-  const d=getTickerData(ticker);
-
-  const rv=document.getElementById("comp-rv");
-  if(rv){
-    if(!d){ rv.innerHTML=noData(ticker); }
-    else {
-      const rows=d.rv.map(r=>`<tr class="${r.ticker===ticker.toUpperCase()?"current-row":""}"><td><strong>${r.ticker}</strong></td><td>${r.name}</td><td>${r.mktCap}</td><td>${r.pe}</td><td>${r.evEbitda}</td><td>${r.pbv}</td><td>${r.roe}</td><td>${r.divYield}</td><td class="${r.ytd.startsWith("+")?'pos':'neg'}">${r.ytd}</td></tr>`).join("");
-      rv.innerHTML=`${sHead("Peer Valuation Multiples")}<div class="fin-table-wrap"><table class="fin-table rv-table"><thead><tr><th>Ticker</th><th>Company</th><th>Mkt Cap</th><th>P/E</th><th>EV/EBITDA</th><th>P/BV</th><th>ROE</th><th>Div Yield</th><th>YTD</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
-  }
-
-  const comp=document.getElementById("comp-comp");
-  if(comp){
-    if(!d){ comp.innerHTML=noData(ticker); }
-    else {
-      const rows=d.comp.map(r=>`<tr><td>${r.label}</td><td class="${r.aapl.startsWith("+")?'pos':'neg'}">${r.aapl}</td><td class="${r.spy.startsWith("+")?'pos':'neg'}">${r.spy}</td><td class="${r.qqq.startsWith("+")?'pos':'neg'}">${r.qqq}</td></tr>`).join("");
-      comp.innerHTML=`${sHead("Comparative Returns")}<div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Period</th><th>${ticker.toUpperCase()}</th><th>S&P 500</th><th>QQQ</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
-  }
+  const rv   = document.getElementById("comp-rv");
+  const comp = document.getElementById("comp-comp");
+  if(rv)   rv.innerHTML   = `<div class="av-loading"><span class="av-spinner"></span>Fetching sector peers (10 closest by mkt cap)…</div>`;
+  if(comp) comp.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching comparative returns…</div>`;
+  // Filled by finnhubLoadAll → fhRenderComparables
 }
 
 function reloadAllPanels(ticker){
@@ -631,25 +581,77 @@ let currentWatchlistSort   = "name";
 let currentValTicker       = null;
 
 /* ── Watchlist renderer ─────────────────────────────────────────── */
-function loadWatchlist(topic) {
-  const key    = (topic||"").toLowerCase();
-  const sector = Object.keys(topicToSector).find(k => key.includes(k));
-  const data   = sector ? sectorDB[topicToSector[sector]] : null;
+// Maps a topic keyword to a seed ticker for Finnhub peer search
+const topicSeedTicker = {
+  ai:"NVDA", "artificial intelligence":"NVDA", llm:"MSFT", chatgpt:"MSFT",
+  energy:"XOM", oil:"XOM", gas:"CVX", renewables:"NEE", solar:"ENPH",
+  bank:"JPM", banks:"JPM", finance:"GS", financial:"BAC",
+  china:"BABA", chinese:"BABA", alibaba:"BABA", tencent:"TCEHY",
+  health:"JNJ", healthcare:"JNJ", pharma:"LLY", biotech:"MRNA",
+  italy:"ENI", italian:"ENI", milan:"ENI",
+  tech:"AAPL", technology:"MSFT", semiconductor:"NVDA", chip:"NVDA",
+  auto:"TSLA", car:"TSLA", ev:"TSLA", electric:"TSLA",
+  retail:"AMZN", ecommerce:"AMZN", consumer:"AMZN",
+  defense:"LMT", aerospace:"BA", military:"RTX",
+  crypto:"COIN", bitcoin:"MSTR", blockchain:"COIN",
+  real estate:"AMT", reit:"SPG", realestate:"PLD",
+  media:"DIS", streaming:"NFLX", entertainment:"DIS",
+  telecom:"T", telecoms:"VZ",
+  mining:"RIO", metals:"FCX", gold:"NEM",
+  food:"MCD", beverage:"KO", staples:"PG",
+  insurance:"BRK-B", reinsurance:"MUNMUn",
+};
 
-  const lbl = document.getElementById("watchlistLabel");
-  if (!data) {
-    if (lbl) lbl.textContent = `Topic: ${topic || "—"}`;
-    document.getElementById("watchlistBox").innerHTML =
-      `<div class="no-data">// No watchlist for "<strong>${escapeHtml(topic)}</strong>".<br>// Try: AI, Energy, Banks, China, Healthcare, Italy.</div>`;
-    return;
+async function loadWatchlist(topic) {
+  const key    = (topic||"").toLowerCase().trim();
+  const lbl    = document.getElementById("watchlistLabel");
+  const box    = document.getElementById("watchlistBox");
+  const cnt    = document.getElementById("wlCount");
+
+  // Find seed ticker for this topic
+  const seedKey = Object.keys(topicSeedTicker).find(k => key.includes(k));
+  const seedTicker = seedKey ? topicSeedTicker[seedKey] : null;
+
+  if (lbl) lbl.textContent = `Sector: ${topic}`;
+  if (box) box.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Searching sector stocks for "${escapeHtml(topic)}"…</div>`;
+
+  // Try Finnhub peer search first if key available
+  if (seedTicker && typeof finnhubSectorSearch === "function" && getFinnhubKey()) {
+    try {
+      const stocks = await finnhubSectorSearch(seedTicker);
+      if (stocks && stocks.length) {
+        // Sort by mktCap descending (largest first)
+        stocks.sort((a,b) => (b.mktCap||0) - (a.mktCap||0));
+        currentWatchlistStocks = stocks.map(s => ({
+          ...s,
+          mktCap: s.mktCap ? fmtB(s.mktCap) : "—",
+          pe: s.pe || null,
+        }));
+        if (lbl) lbl.textContent = `${stocks[0]?.sector || topic} · ${stocks.length} stocks`;
+        if (cnt) cnt.textContent = `${stocks.length} stocks`;
+        renderWatchlistRows();
+        if (typeof fmpRefreshWatchlistPrices === "function") fmpRefreshWatchlistPrices();
+        return;
+      }
+    } catch(e) { console.warn("Finnhub sector search failed:", e); }
   }
 
+  // Fallback: static sectorDB
+  const sector = Object.keys(topicToSector).find(k => key.includes(k));
+  const data   = sector ? sectorDB[topicToSector[sector]] : null;
+  if (!data) {
+    if (box) box.innerHTML = `<div class="no-data">// No data for "<strong>${escapeHtml(topic)}</strong>".<br>// Add a Finnhub key for live sector search, or try: AI, Energy, Banks, Healthcare, Italy.</div>`;
+    return;
+  }
+  // Sort static data by mktCap (largest first using numeric parse)
+  const staticStocks = [...data.stocks].sort((a,b)=>{
+    const parse = s => parseFloat(String(s.mktCap).replace(/[$€£T]/gi,t=>({T:1e12,B:1e9,M:1e6}[t]||'')).replace(/,/g,''))||0;
+    return parse(b) - parse(a);
+  });
   if (lbl) lbl.textContent = `Sector: ${data.label}`;
-  currentWatchlistStocks = [...data.stocks];
-  const cnt = document.getElementById("wlCount");
-  if (cnt) cnt.textContent = `${data.stocks.length} stocks`;
+  currentWatchlistStocks = staticStocks;
+  if (cnt) cnt.textContent = `${staticStocks.length} stocks`;
   renderWatchlistRows();
-  // Refresh with live prices from FMP
   if (typeof fmpRefreshWatchlistPrices === "function") fmpRefreshWatchlistPrices();
 }
 
@@ -1062,7 +1064,9 @@ function changeTicker(){
   reloadAllPanels(raw);
   // Strip exchange prefix for API calls (e.g. "MIL:ENI" → "ENI")
   const sym = raw.replace(/.*:/,"").toUpperCase();
-  if(typeof avLoadAll === "function") avLoadAll(sym);
+  // Fire all data providers — avLoadAll orchestrates AV + FMP + EODHD + APITube + Massive
+  if(typeof avLoadAll       === "function") avLoadAll(sym);
+  if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
 }
 
 function searchTopicNews(){
@@ -1131,7 +1135,8 @@ window.addEventListener("load",()=>{
     reloadAllPanels(currentTicker);
     // Fetch live data on startup — strip exchange prefix for API calls
     const initSym = currentTicker.replace(/.*:/,"").toUpperCase();
-    if(typeof avLoadAll === "function") avLoadAll(initSym);
+    if(typeof avLoadAll      === "function") avLoadAll(initSym);
+    if(typeof finnhubLoadAll === "function") finnhubLoadAll(initSym);
     if(typeof updateApiStatus  === "function") updateApiStatus();
     if(typeof updateFmpStatus  === "function") updateFmpStatus();
   });
