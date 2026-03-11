@@ -24,17 +24,11 @@ function fmpCallCount()  { return parseInt(sessionStorage.getItem(FMP_SESSION_KE
 function fmpIncrement()  {
   const n = fmpCallCount() + 1;
   sessionStorage.setItem(FMP_SESSION_KEY, n);
-  updateFmpStatus();
+  if (typeof renderTopbarBadges === "function") renderTopbarBadges();
   return n;
 }
 function updateFmpStatus() {
-  const n   = fmpCallCount();
-  const el  = document.getElementById("fmpStatus");
-  const lbl = document.getElementById("fmpCallCount");
-  if (!el) return;
-  if (lbl) lbl.textContent = `${n}`;
-  el.className = "api-status " + (n >= 280 ? "api-limit" : n >= 230 ? "api-warn" : "api-ok");
-  el.title = `FMP: ${n} calls this session`;
+  if (typeof renderTopbarBadges === "function") renderTopbarBadges();
 }
 
 /* ══════════════════════════════════════════════════════════════════
