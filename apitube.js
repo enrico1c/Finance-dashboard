@@ -242,14 +242,9 @@ async function apitubeLoadAll(rawTicker) {
   showApiToast(`✓ APITube: ${bare} news + video (${loaded}/2)`, "ok");
 }
 
-/* Override searchTopicNews to also call APITube if key is set */
-(function patchSearchTopicNews() {
-  const _orig = window.searchTopicNews;
-  window.searchTopicNews = async function() {
-    if (typeof _orig === "function") _orig();
-    const q = document.getElementById("topicInput")?.value.trim();
-    if (!q || !getApitubeKey()) return;
-    const articles = await apitubeGetTopicNews(q, 25);
-    if (articles?.length) apitubeRenderTopicNews(q, articles);
-  };
-})();
+/* APITube topic news — called directly from searchTopicNews in script.js */
+async function apitubeSearchTopic(q) {
+  if (!q || !getApitubeKey()) return;
+  const articles = await apitubeGetTopicNews(q, 25);
+  if (articles?.length) apitubeRenderTopicNews(q, articles);
+}
