@@ -507,6 +507,372 @@ function reloadAllPanels(ticker){
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   SECTOR WATCHLIST DATA
+   ══════════════════════════════════════════════════════════════════ */
+const sectorDB = {
+  ai: {
+    label:"Artificial Intelligence",
+    stocks:[
+      {ticker:"NVDA", name:"NVIDIA Corp.",        price:875.40, change:+3.21, mktCap:"$2.15T", pe:58.2, pb:28.4, evEbitda:41.2, fcfYield:2.1, peg:1.2, divYield:0.04, epsGrowth:84, sector:"Semiconductors", desc:"GPUs for AI training & inference"},
+      {ticker:"MSFT", name:"Microsoft Corp.",      price:415.20, change:+0.84, mktCap:"$3.09T", pe:35.1, pb:13.1, evEbitda:24.8, fcfYield:2.8, peg:1.8, divYield:0.71, epsGrowth:19, sector:"Cloud/AI",        desc:"Azure AI, Copilot, OpenAI stake"},
+      {ticker:"GOOGL",name:"Alphabet Inc.",        price:175.80, change:-0.42, mktCap:"$2.14T", pe:24.8, pb:7.2,  evEbitda:16.2, fcfYield:4.1, peg:1.1, divYield:0.48, epsGrowth:23, sector:"Cloud/AI",        desc:"Gemini, Google Cloud, DeepMind"},
+      {ticker:"META", name:"Meta Platforms",       price:574.60, change:+1.93, mktCap:"$1.45T", pe:28.3, pb:9.1,  evEbitda:19.4, fcfYield:3.5, peg:0.9, divYield:0.36, epsGrowth:31, sector:"Social/AI",       desc:"Llama, Ray-Ban AI, AI Ads"},
+      {ticker:"AMZN", name:"Amazon.com Inc.",      price:198.30, change:+0.67, mktCap:"$2.09T", pe:44.6, pb:10.4, evEbitda:18.9, fcfYield:2.2, peg:1.6, divYield:0.0,  epsGrowth:28, sector:"Cloud/AI",        desc:"AWS Bedrock, Alexa AI"},
+      {ticker:"ORCL", name:"Oracle Corp.",         price:142.50, change:-1.12, mktCap:"$392B",  pe:32.4, pb:99.9, evEbitda:22.1, fcfYield:3.1, peg:1.4, divYield:1.12, epsGrowth:23, sector:"Cloud/AI",        desc:"OCI AI infrastructure"},
+      {ticker:"PLTR", name:"Palantir Technologies",price:24.80,  change:+5.42, mktCap:"$53B",   pe:168,  pb:14.2, evEbitda:88.0, fcfYield:0.9, peg:4.1, divYield:0.0,  epsGrowth:41, sector:"AI Software",     desc:"AIP, Foundry, Government AI"},
+      {ticker:"ANET", name:"Arista Networks",      price:318.40, change:+2.14, mktCap:"$100B",  pe:48.2, pb:18.9, evEbitda:34.2, fcfYield:2.4, peg:1.9, divYield:0.0,  epsGrowth:25, sector:"AI Networking",   desc:"AI data center networking"},
+      {ticker:"ARM",  name:"Arm Holdings",         price:128.60, change:+4.31, mktCap:"$133B",  pe:112,  pb:22.4, evEbitda:65.0, fcfYield:0.7, peg:3.2, divYield:0.0,  epsGrowth:35, sector:"Semiconductors",  desc:"CPU IP for AI edge devices"},
+      {ticker:"SMCI", name:"Super Micro Computer", price:58.20,  change:-2.84, mktCap:"$34B",   pe:16.8, pb:3.1,  evEbitda:9.4,  fcfYield:5.8, peg:0.6, divYield:0.0,  epsGrowth:28, sector:"AI Hardware",     desc:"AI server platforms"},
+    ]
+  },
+  energy: {
+    label:"Energy",
+    stocks:[
+      {ticker:"XOM",  name:"Exxon Mobil",          price:112.40, change:+0.42, mktCap:"$448B",  pe:14.2, pb:1.9, evEbitda:7.1, fcfYield:6.2, peg:1.8, divYield:3.42, epsGrowth:8,  sector:"Oil & Gas",   desc:"Integrated supermajor"},
+      {ticker:"CVX",  name:"Chevron Corp.",         price:152.80, change:-0.18, mktCap:"$278B",  pe:13.8, pb:1.7, evEbitda:6.8, fcfYield:6.8, peg:2.1, divYield:4.21, epsGrowth:7,  sector:"Oil & Gas",   desc:"Global energy operations"},
+      {ticker:"COP",  name:"ConocoPhillips",        price:114.30, change:+1.24, mktCap:"$138B",  pe:12.4, pb:2.4, evEbitda:6.1, fcfYield:7.4, peg:1.3, divYield:2.18, epsGrowth:9,  sector:"E&P",         desc:"Independent E&P leader"},
+      {ticker:"NEE",  name:"NextEra Energy",        price:72.40,  change:+0.89, mktCap:"$148B",  pe:22.1, pb:3.1, evEbitda:14.2,fcfYield:2.1, peg:1.8, divYield:2.94, epsGrowth:12, sector:"Renewables",  desc:"World's largest wind/solar"},
+      {ticker:"SLB",  name:"SLB (Schlumberger)",    price:44.20,  change:-0.32, mktCap:"$63B",   pe:14.8, pb:2.8, evEbitda:7.8, fcfYield:5.4, peg:1.4, divYield:2.71, epsGrowth:11, sector:"Oilfield Svcs","desc":"Oilfield services leader"},
+    ]
+  },
+  banks: {
+    label:"Banking & Finance",
+    stocks:[
+      {ticker:"JPM",  name:"JPMorgan Chase",        price:215.40, change:+0.54, mktCap:"$622B",  pe:12.4, pb:2.1, evEbitda:8.2,  fcfYield:8.1, peg:1.4, divYield:2.21, epsGrowth:9,  sector:"Banks",     desc:"Largest US bank by assets"},
+      {ticker:"BAC",  name:"Bank of America",       price:38.20,  change:-0.21, mktCap:"$301B",  pe:12.8, pb:1.2, evEbitda:7.4,  fcfYield:7.4, peg:1.6, divYield:2.51, epsGrowth:8,  sector:"Banks",     desc:"Consumer & investment bank"},
+      {ticker:"GS",   name:"Goldman Sachs",         price:484.60, change:+1.42, mktCap:"$162B",  pe:14.2, pb:1.5, evEbitda:9.1,  fcfYield:6.8, peg:1.3, divYield:2.48, epsGrowth:11, sector:"Inv. Banking","desc":"Elite investment bank"},
+      {ticker:"V",    name:"Visa Inc.",             price:282.40, change:+0.38, mktCap:"$584B",  pe:30.2, pb:15.4,evEbitda:22.4, fcfYield:3.2, peg:1.8, divYield:0.74, epsGrowth:17, sector:"Payments",  desc:"Global payments network"},
+      {ticker:"MA",   name:"Mastercard Inc.",       price:472.80, change:+0.64, mktCap:"$434B",  pe:34.8, pb:56.2,evEbitda:25.4, fcfYield:2.8, peg:1.9, divYield:0.56, epsGrowth:18, sector:"Payments",  desc:"Global payments network"},
+    ]
+  },
+  china: {
+    label:"China / EM Tech",
+    stocks:[
+      {ticker:"BABA", name:"Alibaba Group",         price:82.40,  change:+2.14, mktCap:"$189B",  pe:10.2, pb:1.4, evEbitda:8.1,  fcfYield:9.2, peg:0.7, divYield:1.12, epsGrowth:15, sector:"E-Commerce", desc:"China e-commerce & cloud"},
+      {ticker:"TCEHY",name:"Tencent Holdings",      price:48.20,  change:+1.84, mktCap:"$466B",  pe:18.4, pb:3.8, evEbitda:14.2, fcfYield:4.8, peg:1.1, divYield:0.84, epsGrowth:17, sector:"Internet",   desc:"Gaming, WeChat, fintech"},
+      {ticker:"PDD",  name:"PDD Holdings",          price:128.40, change:+3.24, mktCap:"$176B",  pe:12.8, pb:4.8, evEbitda:9.4,  fcfYield:7.4, peg:0.5, divYield:0.0,  epsGrowth:26, sector:"E-Commerce", desc:"Temu, Pinduoduo"},
+      {ticker:"NIO",  name:"NIO Inc.",              price:4.82,   change:-1.84, mktCap:"$9.4B",  pe:null, pb:1.2, evEbitda:null, fcfYield:-8.4,peg:null,divYield:0.0,  epsGrowth:-22,sector:"EV",          desc:"Chinese premium EV maker"},
+      {ticker:"BIDU", name:"Baidu Inc.",            price:84.20,  change:+1.12, mktCap:"$29B",   pe:9.8,  pb:0.8, evEbitda:5.4,  fcfYield:11.2,peg:0.6, divYield:0.0,  epsGrowth:16, sector:"AI/Search",  desc:"China AI, autonomous driving"},
+    ]
+  },
+  healthcare: {
+    label:"Healthcare & Biotech",
+    stocks:[
+      {ticker:"JNJ",  name:"Johnson & Johnson",     price:158.40, change:+0.24, mktCap:"$382B",  pe:14.8, pb:4.2, evEbitda:11.4, fcfYield:5.8, peg:2.1, divYield:3.24, epsGrowth:7,  sector:"Pharma",     desc:"Diversified healthcare giant"},
+      {ticker:"LLY",  name:"Eli Lilly & Co.",       price:812.40, change:+2.84, mktCap:"$771B",  pe:58.4, pb:48.2,evEbitda:42.4, fcfYield:1.4, peg:1.2, divYield:0.68, epsGrowth:49, sector:"Pharma",     desc:"GLP-1 weight loss drugs"},
+      {ticker:"PFE",  name:"Pfizer Inc.",           price:28.40,  change:-0.84, mktCap:"$161B",  pe:24.2, pb:1.8, evEbitda:9.4,  fcfYield:4.8, peg:3.4, divYield:6.12, epsGrowth:7,  sector:"Pharma",     desc:"Post-COVID portfolio reset"},
+      {ticker:"MRNA", name:"Moderna Inc.",          price:68.40,  change:-2.14, mktCap:"$27B",   pe:null, pb:2.1, evEbitda:null, fcfYield:-4.2,peg:null,divYield:0.0,  epsGrowth:-42,sector:"Biotech",     desc:"mRNA vaccines & oncology"},
+      {ticker:"ISRG", name:"Intuitive Surgical",    price:524.80, change:+1.24, mktCap:"$183B",  pe:64.8, pb:14.2,evEbitda:44.2, fcfYield:1.8, peg:2.4, divYield:0.0,  epsGrowth:27, sector:"Med Devices", desc:"Robotic surgery leader"},
+    ]
+  },
+  italy: {
+    label:"Italian Market (MIL)",
+    stocks:[
+      {ticker:"MIL:ENI",   name:"Eni SpA",          price:14.82,  change:+0.42, mktCap:"€48B",   pe:7.4,  pb:0.9, evEbitda:4.2,  fcfYield:11.2,peg:1.1, divYield:6.84, epsGrowth:7,  sector:"Oil & Gas",   desc:"Italian energy supermajor"},
+      {ticker:"MIL:UCG",   name:"UniCredit SpA",    price:38.42,  change:+1.84, mktCap:"€48B",   pe:6.8,  pb:0.9, evEbitda:null, fcfYield:null,peg:0.7, divYield:4.12, epsGrowth:10, sector:"Banks",       desc:"Pan-European retail bank"},
+      {ticker:"MIL:ENEL",  name:"Enel SpA",         price:6.84,   change:-0.28, mktCap:"€68B",   pe:11.4, pb:1.4, evEbitda:6.8,  fcfYield:5.2, peg:1.8, divYield:6.24, epsGrowth:6,  sector:"Utilities",   desc:"European utilities leader"},
+      {ticker:"MIL:TIT",   name:"Telecom Italia",   price:0.28,   change:-1.42, mktCap:"€5.4B",  pe:null, pb:0.4, evEbitda:4.2,  fcfYield:-2.4,peg:null,divYield:0.0,  epsGrowth:-15,sector:"Telecom",      desc:"Italian telecoms turnaround"},
+      {ticker:"MIL:RACE",  name:"Ferrari NV",       price:418.40, change:+0.84, mktCap:"€76B",   pe:52.4, pb:28.4,evEbitda:32.4, fcfYield:1.8, peg:2.4, divYield:0.68, epsGrowth:22, sector:"Luxury Auto",  desc:"Prancing horse — ultra-luxury"},
+    ]
+  },
+};
+
+// Keyword → sector mapping
+const topicToSector = {
+  ai:"ai", "artificial intelligence":"ai", ml:"ai", llm:"ai", chatgpt:"ai",
+  energy:"energy", oil:"energy", gas:"energy", renewables:"energy", solar:"energy",
+  bank:"banks", banks:"banks", finance:"banks", financial:"banks",
+  china:"china", chinese:"china", alibaba:"china", tencent:"china",
+  health:"healthcare", healthcare:"healthcare", pharma:"healthcare", biotech:"healthcare",
+  italy:"italy", italian:"italy", milan:"italy", mib:"italy",
+};
+
+let currentWatchlistStocks = [];
+let currentWatchlistSort   = "name";
+let currentValTicker       = null;
+
+/* ── Watchlist renderer ─────────────────────────────────────────── */
+function loadWatchlist(topic) {
+  const key    = (topic||"").toLowerCase();
+  const sector = Object.keys(topicToSector).find(k => key.includes(k));
+  const data   = sector ? sectorDB[topicToSector[sector]] : null;
+
+  const lbl = document.getElementById("watchlistLabel");
+  if (!data) {
+    if (lbl) lbl.textContent = `Topic: ${topic || "—"}`;
+    document.getElementById("watchlistBox").innerHTML =
+      `<div class="no-data">// No watchlist for "<strong>${escapeHtml(topic)}</strong>".<br>// Try: AI, Energy, Banks, China, Healthcare, Italy.</div>`;
+    return;
+  }
+
+  if (lbl) lbl.textContent = `Sector: ${data.label}`;
+  currentWatchlistStocks = [...data.stocks];
+  const cnt = document.getElementById("wlCount");
+  if (cnt) cnt.textContent = `${data.stocks.length} stocks`;
+  renderWatchlistRows();
+}
+
+function sortWatchlist(by) {
+  currentWatchlistSort = by;
+  document.querySelectorAll(".wl-sort-btn").forEach(b =>
+    b.classList.toggle("active", b.textContent.toLowerCase() === by ||
+      (by==="mktcap" && b.textContent==="Mkt Cap") ||
+      (by==="change" && b.textContent==="Chg%")));
+  renderWatchlistRows();
+}
+
+function renderWatchlistRows() {
+  const box = document.getElementById("watchlistBox");
+  if (!box || !currentWatchlistStocks.length) return;
+
+  const sorted = [...currentWatchlistStocks].sort((a, b) => {
+    if (currentWatchlistSort === "name")    return a.name.localeCompare(b.name);
+    if (currentWatchlistSort === "price")   return b.price - a.price;
+    if (currentWatchlistSort === "change")  return b.change - a.change;
+    if (currentWatchlistSort === "mktcap")  return 0; // keep order
+    return 0;
+  });
+
+  box.innerHTML = `
+    <div class="wl-header-row">
+      <span>Stock</span><span>Price</span><span>Chg%</span><span>Mkt Cap</span><span>P/E</span><span>Chart</span>
+    </div>
+    ${sorted.map(s => {
+      const chgCls = s.change >= 0 ? "wl-pos" : "wl-neg";
+      const chgStr = (s.change >= 0 ? "+" : "") + s.change.toFixed(2) + "%";
+      const peStr  = s.pe ? s.pe.toFixed(1) : "—";
+      return `<div class="wl-row" onclick="openValuation('${escapeHtml(s.ticker)}')">
+        <div class="wl-stock-info">
+          <span class="wl-ticker">${escapeHtml(s.ticker.replace(/.*:/,""))}</span>
+          <span class="wl-name">${escapeHtml(s.name)}</span>
+          <span class="wl-sector-tag">${escapeHtml(s.sector)}</span>
+        </div>
+        <span class="wl-price">$${fmt(s.price)}</span>
+        <span class="wl-chg ${chgCls}">${chgStr}</span>
+        <span class="wl-mcap">${s.mktCap}</span>
+        <span class="wl-pe">${peStr}</span>
+        <button class="wl-chart-btn" title="Load in main chart" onclick="event.stopPropagation(); loadTickerFromWatchlist('${escapeHtml(s.ticker)}')">▶</button>
+      </div>`;
+    }).join("")}`;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   VALUATION ANALYZER
+   ══════════════════════════════════════════════════════════════════ */
+function openValuation(ticker) {
+  currentValTicker = ticker;
+  showPanel("valuation");
+  const cb = document.querySelector('.panel-toggle[data-panel="valuation"]');
+  if (cb) cb.checked = true;
+  renderValuation(ticker);
+}
+
+function loadTickerFromWatchlist(ticker) {
+  // Resolve to proper exchange prefix
+  const sym = resolveSymbol(ticker);
+  // Update the ticker input in topbar
+  const input = document.getElementById("tickerInput");
+  if (input) input.value = ticker.replace(/.*:/,"");
+  currentTicker = ticker;
+  updateExchangeHint();
+  // Load the chart
+  loadChart(sym);
+  // Flash the chart panel to draw attention
+  const chartPanel = document.getElementById("panel-chart");
+  if (chartPanel) {
+    showPanel("chart");
+    const cb = document.querySelector('.panel-toggle[data-panel="chart"]');
+    if (cb) cb.checked = true;
+    chartPanel.classList.add("chart-flash");
+    setTimeout(() => chartPanel.classList.remove("chart-flash"), 800);
+    bringToFront(chartPanel);
+  }
+}
+
+function renderValuation(ticker) {
+  if (!ticker) return;
+  const box = document.getElementById("valuationBox");
+  const lbl = document.getElementById("valuationLabel");
+  if (!box) return;
+
+  // Find in all sector DBs
+  let stock = null;
+  for (const key in sectorDB) {
+    stock = sectorDB[key].stocks.find(s => s.ticker === ticker || s.ticker.endsWith(":"+ticker));
+    if (stock) break;
+  }
+  // Fallback to main DB
+  if (!stock) {
+    const d = getTickerData(ticker);
+    if (d) {
+      stock = {ticker, name:d.name, price:d.price, pe:d.pe, pb:d.pbv,
+        evEbitda:d.evEbitda, fcfYield:d.divYield*2, peg:d.pe/20,
+        divYield:d.divYield, epsGrowth:18, desc:d.description.slice(0,80)};
+    }
+  }
+
+  if (!stock) {
+    box.innerHTML = `<div class="no-data">// No valuation data for <strong>${escapeHtml(ticker)}</strong>.</div>`;
+    return;
+  }
+
+  if (lbl) lbl.textContent = `${stock.ticker} — ${stock.name}`;
+
+  const method = document.getElementById("valMethodSelect")?.value || "all";
+
+  // ── Scoring engine ──
+  // Each metric returns { score: -1 | 0 | 1, label, value, note }
+  const scores = [];
+
+  // 1. P/E vs sector average (~20 as neutral)
+  if (stock.pe != null) {
+    const sectorAvgPE = 20;
+    const sc = stock.pe < sectorAvgPE * 0.8 ? 1 : stock.pe > sectorAvgPE * 1.4 ? -1 : 0;
+    scores.push({group:"multiples", metric:"P/E Ratio", value:stock.pe.toFixed(1),
+      benchmark:`Sector avg ~${sectorAvgPE}`, score:sc,
+      note: sc===1 ? "Trading below sector average — potentially cheap" :
+            sc===-1 ? "Premium multiple — priced for high growth" : "In line with sector average"});
+  }
+
+  // 2. P/B
+  if (stock.pb != null) {
+    const sc = stock.pb < 1 ? 1 : stock.pb > 10 ? -1 : 0;
+    scores.push({group:"multiples", metric:"P/B Ratio", value:stock.pb.toFixed(1),
+      benchmark:"Underval. < 1 · Fair 1–10 · Overval. > 10", score:sc,
+      note: sc===1 ? "P/B < 1: market prices stock below book value" :
+            sc===-1 ? "High premium to book — justify with ROE" : "Moderate book premium"});
+  }
+
+  // 3. EV/EBITDA
+  if (stock.evEbitda != null) {
+    const sc = stock.evEbitda < 8 ? 1 : stock.evEbitda > 25 ? -1 : 0;
+    scores.push({group:"multiples", metric:"EV/EBITDA", value:stock.evEbitda.toFixed(1),
+      benchmark:"Cheap < 8 · Fair 8–25 · Expensive > 25", score:sc,
+      note: sc===1 ? "Cheap enterprise value relative to earnings" :
+            sc===-1 ? "Expensive vs. EBITDA, debt included" : "Fair EV/EBITDA range"});
+  }
+
+  // 4. FCF Yield
+  if (stock.fcfYield != null) {
+    const sc = stock.fcfYield > 6 ? 1 : stock.fcfYield < 1 ? -1 : 0;
+    scores.push({group:"cashflow", metric:"FCF Yield", value:stock.fcfYield.toFixed(1)+"%",
+      benchmark:"High > 6% · Low < 1%", score:sc,
+      note: sc===1 ? "High free cash flow relative to market cap" :
+            sc===-1 ? "Low/negative FCF — growth stage or inefficient" : "Adequate cash generation"});
+  }
+
+  // 5. Dividend Yield
+  if (stock.divYield != null && stock.divYield > 0) {
+    const sc = stock.divYield > 4 ? 1 : stock.divYield === 0 ? 0 : 0;
+    scores.push({group:"cashflow", metric:"Dividend Yield", value:stock.divYield.toFixed(2)+"%",
+      benchmark:"High yield > 4% may signal undervaluation", score:sc,
+      note: stock.divYield > 4 ? "High yield — verify dividend sustainability" :
+            "Moderate or no dividend"});
+  }
+
+  // 6. PEG Ratio
+  if (stock.peg != null) {
+    const sc = stock.peg < 1 ? 1 : stock.peg > 2 ? -1 : 0;
+    scores.push({group:"growth", metric:"PEG Ratio", value:stock.peg.toFixed(2),
+      benchmark:"Underval. < 1 · Fair 1–2 · Overval. > 2", score:sc,
+      note: sc===1 ? "PEG < 1: undervalued relative to earnings growth" :
+            sc===-1 ? "PEG > 2: growth priced in or overvalued" : "Fairly valued on PEG basis"});
+  }
+
+  // 7. EPS Growth rate
+  if (stock.epsGrowth != null) {
+    const sc = stock.epsGrowth > 20 ? 1 : stock.epsGrowth < 0 ? -1 : 0;
+    scores.push({group:"growth", metric:"EPS Growth (YoY)", value:(stock.epsGrowth>0?"+":"")+stock.epsGrowth+"%",
+      benchmark:"Strong > 20% · Negative < 0", score:sc,
+      note: sc===1 ? "High earnings growth — supports premium valuation" :
+            sc===-1 ? "Earnings declining — fundamental concern" : "Moderate growth trajectory"});
+  }
+
+  // 8. DCF estimate (simplified: FCF * growth / WACC)
+  if (stock.fcfYield != null && stock.epsGrowth != null && stock.pe != null) {
+    const wacc = 9; // assumed
+    const termGrowth = 3;
+    const growthRate = Math.min(Math.max(stock.epsGrowth, 0), 40) / 100;
+    const fcfPerShare = (stock.price * (stock.fcfYield / 100));
+    const intrinsic = fcfPerShare * (1 + growthRate) / (wacc/100 - termGrowth/100);
+    const upside = ((intrinsic / stock.price) - 1) * 100;
+    const sc = upside > 15 ? 1 : upside < -15 ? -1 : 0;
+    scores.push({group:"dcf", metric:"DCF Intrinsic Value", value:"$"+fmt(intrinsic),
+      benchmark:`Current price $${fmt(stock.price)}`, score:sc,
+      note: `Implied upside/downside: ${upside>=0?"+":""}${upside.toFixed(1)}% (WACC ${wacc}%, TGR ${termGrowth}%)`});
+  }
+
+  // ── Verdict ──
+  const filtered = method === "all" ? scores : scores.filter(s => s.group === method);
+  const total    = filtered.reduce((a, s) => a + s.score, 0);
+  const maxScore = filtered.length;
+  const pct      = maxScore > 0 ? total / maxScore : 0;
+
+  let verdict, verdictClass, verdictIcon;
+  if (pct >= 0.4)       { verdict="UNDERVALUED";  verdictClass="verdict-under"; verdictIcon="▼"; }
+  else if (pct <= -0.4) { verdict="OVERVALUED";   verdictClass="verdict-over";  verdictIcon="▲"; }
+  else                  { verdict="FAIRLY VALUED"; verdictClass="verdict-fair";  verdictIcon="◆"; }
+
+  const bullCount = filtered.filter(s=>s.score===1).length;
+  const bearCount = filtered.filter(s=>s.score===-1).length;
+  const neutCount = filtered.filter(s=>s.score===0).length;
+
+  const scoreLabel = s => s===1 ? "CHEAP" : s===-1 ? "RICH" : "FAIR";
+  const scoreCls   = s => s===1 ? "val-cheap" : s===-1 ? "val-rich" : "val-fair";
+
+  box.innerHTML = `
+    <!-- Header -->
+    <div class="val-stock-header">
+      <div class="val-stock-name">
+        <span class="val-ticker">${escapeHtml(stock.ticker.replace(/.*:/,""))}</span>
+        <span class="val-full-name">${escapeHtml(stock.name)}</span>
+      </div>
+      <div class="val-price-block">
+        <span class="val-current-price">$${fmt(stock.price)}</span>
+        <span class="val-sector">${escapeHtml(stock.sector||"")}</span>
+        <button class="val-chart-link-btn" title="Load in main chart" onclick="loadTickerFromWatchlist('${escapeHtml(stock.ticker)}')">▶ View Chart</button>
+      </div>
+    </div>
+
+    <!-- Verdict -->
+    <div class="verdict-block ${verdictClass}">
+      <div class="verdict-icon">${verdictIcon}</div>
+      <div class="verdict-text">${verdict}</div>
+      <div class="verdict-sub">${bullCount} cheap · ${neutCount} fair · ${bearCount} rich · ${filtered.length} signals</div>
+    </div>
+
+    <!-- Gauge bar -->
+    <div class="val-gauge">
+      <div class="gauge-track">
+        <div class="gauge-fill" style="width:${Math.round((pct+1)/2*100)}%; background:${pct>=0.4?'var(--accent-green)':pct<=-0.4?'var(--accent-red)':'var(--accent-yellow)'}"></div>
+        <div class="gauge-center-line"></div>
+      </div>
+      <div class="gauge-labels"><span>Undervalued</span><span>Fair Value</span><span>Overvalued</span></div>
+    </div>
+
+    <!-- Metrics table -->
+    <div class="val-metrics">
+      ${filtered.map(s => `
+        <div class="val-metric-row ${scoreCls(s.score)}">
+          <div class="val-metric-left">
+            <span class="val-metric-name">${escapeHtml(s.metric)}</span>
+            <span class="val-metric-note">${escapeHtml(s.note)}</span>
+            <span class="val-benchmark">${escapeHtml(s.benchmark)}</span>
+          </div>
+          <div class="val-metric-right">
+            <span class="val-metric-value">${escapeHtml(s.value)}</span>
+            <span class="val-signal">${scoreLabel(s.score)}</span>
+          </div>
+        </div>`).join("")}
+    </div>
+
+    <div class="val-disclaimer">* Simplified model with simulated data. Not investment advice.</div>
+  `;
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════════
    LAYOUT
    ══════════════════════════════════════════════════════════════════ */
 const panelLayout={};
@@ -526,6 +892,10 @@ function computeDefaultLayout(){
   panelLayout.comparables  ={x:(col+G)*3,y:cH+G, w:col,h:bH};
   panelLayout.notes        ={x:Math.round(W*0.25),y:Math.round(H*0.15),w:Math.round(W*0.3),h:Math.round(H*0.4)};
   panelLayout.forex        ={x:Math.round(W*0.15),y:Math.round(H*0.1), w:Math.round(W*0.45),h:Math.round(H*0.55)};
+  // Watchlist + Valuation: placed at bottom-left, side by side
+  const wlW=Math.round(W*0.28), valW=Math.round(W*0.36);
+  panelLayout.watchlist    ={x:0,      y:cH+G, w:wlW,  h:bH};
+  panelLayout.valuation    ={x:wlW+G,  y:cH+G, w:valW, h:bH};
 }
 
 function applyPanelPosition(id){
@@ -630,9 +1000,7 @@ function loadForexChart(pair,interval){
     timezone:"Europe/Rome",theme:"dark",style:"1",locale:"it",toolbar_bg:"#0d1117",
     enable_publishing:false,allow_symbol_change:true,container_id:"forexChart"});
   const lbl=document.getElementById("forexLabel");
-  if(lbl) lbl.textContent=`Pair: ${pair}`;
-  const sum=document.getElementById("forexSummary");
-  if(sum) sum.innerHTML=`${mRow("Pair",pair)}${mRow("Interval",formatInterval(interval))}`;
+  if(lbl) lbl.textContent=pair;
   document.querySelectorAll(".fx-tf-btn").forEach(b=>b.classList.toggle("active",b.textContent.trim()===formatInterval(interval)));
 }
 function formatInterval(iv){return{"1":"1m","5":"5m","15":"15m","60":"1H","240":"4H","D":"1D","W":"1W"}[iv]??iv;}
@@ -669,6 +1037,8 @@ function searchTopicNews(){
   switchTab("news","cn");
   const lbl=document.getElementById("newsModeLabel");
   if(lbl) lbl.textContent=`Topic · ${q}`;
+  // Also load sector watchlist
+  loadWatchlist(q);
 }
 
 /* ══════════════════════════════════════════════════════════════════
