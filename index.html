@@ -8,57 +8,94 @@
   <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
-  <div class="topbar">
-    <h1>Finance Dashboard</h1>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="top-left">
+        <h1>Finance Dashboard</h1>
 
-    <div class="search">
-      <input id="tickerInput" placeholder="Ticker (AAPL, TSLA, NVDA)" value="AAPL" />
-      <button onclick="changeTicker()">Search</button>
-    </div>
-  </div>
+        <div class="search-row">
+          <input id="tickerInput" placeholder="Ticker (AAPL, TSLA, NVDA)" value="AAPL" />
+          <button onclick="changeTicker()">Search Ticker</button>
 
-  <div class="grid">
-    <section class="panel chart">
-      <div class="panel-head">
-        <h3>Price Chart</h3>
-      </div>
-      <div id="priceChart" class="panel-content chart-content"></div>
-    </section>
-
-    <section class="panel fundamentals">
-      <div class="panel-head">
-        <h3>Fundamentals</h3>
-      </div>
-      <div id="financials" class="panel-content">Loading fundamentals...</div>
-    </section>
-
-    <section class="panel news">
-      <div class="panel-head">
-        <h3>News</h3>
-        <div class="filters">
-          <label><input type="checkbox" class="srcFilter" value="nyt" checked> NYT</label>
-          <label><input type="checkbox" class="srcFilter" value="ft" checked> FT</label>
-          <label><input type="checkbox" class="srcFilter" value="economist" checked> Economist</label>
+          <input id="topicInput" placeholder="Paese o tema (Italy, AI, China)" />
+          <button onclick="searchTopicNews()">Search Topic News</button>
         </div>
       </div>
-      <div id="newsBox" class="panel-content">Loading news...</div>
-    </section>
 
-    <section class="panel analysts">
-      <div class="panel-head">
-        <h3>Notes</h3>
-      </div>
-      <div id="analystBox" class="panel-content">
-        Qui puoi aggiungere note personali, target price, watchlist o link al broker.
-      </div>
-    </section>
+      <div class="top-right">
+        <div class="checklist-title">Mostra/Nascondi moduli</div>
 
-    <section class="panel comparables">
-      <div class="panel-head">
-        <h3>Comparables</h3>
+        <div class="checklist">
+          <label><input type="checkbox" class="panel-toggle" data-panel="chart" checked> Chart</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked> Fundamentals</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="news" checked> News</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="notes" checked> Notes</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="comparables" checked> Comparables</label>
+        </div>
       </div>
-      <div id="peers" class="panel-content">Loading comparables...</div>
-    </section>
+    </header>
+
+    <main id="dashboardGrid" class="dashboard-grid">
+      <section class="panel" id="panel-chart" data-panel="chart" data-size="2">
+        <div class="panel-head">
+          <h3>Price Chart</h3>
+          <div class="panel-actions">
+            <button class="size-btn" onclick="resizePanel('chart', -1)">−</button>
+            <button class="size-btn" onclick="resizePanel('chart', 1)">+</button>
+          </div>
+        </div>
+        <div id="priceChart" class="panel-content chart-content"></div>
+      </section>
+
+      <section class="panel" id="panel-fundamentals" data-panel="fundamentals" data-size="1">
+        <div class="panel-head">
+          <h3>Fundamentals</h3>
+          <div class="panel-actions">
+            <button class="size-btn" onclick="resizePanel('fundamentals', -1)">−</button>
+            <button class="size-btn" onclick="resizePanel('fundamentals', 1)">+</button>
+          </div>
+        </div>
+        <div id="financials" class="panel-content"></div>
+      </section>
+
+      <section class="panel" id="panel-news" data-panel="news" data-size="1">
+        <div class="panel-head">
+          <div>
+            <h3>News Hub</h3>
+            <div id="newsModeLabel" class="mode-label">Mode: Ticker News</div>
+          </div>
+          <div class="panel-actions">
+            <button class="size-btn" onclick="resizePanel('news', -1)">−</button>
+            <button class="size-btn" onclick="resizePanel('news', 1)">+</button>
+          </div>
+        </div>
+        <div id="newsBox" class="panel-content"></div>
+      </section>
+
+      <section class="panel" id="panel-notes" data-panel="notes" data-size="1">
+        <div class="panel-head">
+          <h3>Notes</h3>
+          <div class="panel-actions">
+            <button class="size-btn" onclick="resizePanel('notes', -1)">−</button>
+            <button class="size-btn" onclick="resizePanel('notes', 1)">+</button>
+          </div>
+        </div>
+        <div class="panel-content">
+          <textarea id="notesArea" placeholder="Scrivi qui note, idee, target price, link, watchlist..."></textarea>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-comparables" data-panel="comparables" data-size="1">
+        <div class="panel-head">
+          <h3>Comparables</h3>
+          <div class="panel-actions">
+            <button class="size-btn" onclick="resizePanel('comparables', -1)">−</button>
+            <button class="size-btn" onclick="resizePanel('comparables', 1)">+</button>
+          </div>
+        </div>
+        <div id="peers" class="panel-content"></div>
+      </section>
+    </main>
   </div>
 
   <script src="script.js"></script>
