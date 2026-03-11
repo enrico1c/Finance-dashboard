@@ -6,12 +6,13 @@
    • Endpoints: QUOTE, OVERVIEW, EARNINGS, NEWS, INCOME, BALANCE, CASHFLOW
    ══════════════════════════════════════════════════════════════════ */
 
-/* ── ⚙️  FALLBACK KEY (overridden at runtime by config.js) ─────── */
-const AV_KEY = "YOUR_API_KEY_HERE";
-/* ─────────────────────────────────────────────────────────────── */
+/* ── ⚙️  Keys are managed via the ⚙ API button in the UI ────────── */
+/* Use the modal to paste your Alpha Vantage key — stored in localStorage. */
 
 // Runtime key: config.js sets window._AV_KEY from localStorage
-function getAvKey() { return window._AV_KEY || AV_KEY; }
+function getAvKey() {
+  return window._AV_KEY || localStorage.getItem("finterm_av_key") || "";
+}
 
 const AV_BASE   = "https://www.alphavantage.co/query";
 const CACHE_TTL = 15 * 60 * 1000;   // 15 minutes per symbol
@@ -308,9 +309,9 @@ async function avLoadAll(ticker) {
   const sym = ticker.replace(/.*:/, "").toUpperCase();
 
   // Guard: require a configured key
-  if (!getAvKey() || getAvKey() === "YOUR_API_KEY_HERE") {
-    showApiToast("⚙ Alpha Vantage key not set — click AV badge to configure.", "warn");
-    if (typeof openApiConfig === "function") setTimeout(openApiConfig, 600);
+  if (!getAvKey()) {
+    showApiToast("⚙ Alpha Vantage key not set — click the AV badge to configure.", "warn");
+    if (typeof refreshBadges === "function") refreshBadges();
     return;
   }
 
