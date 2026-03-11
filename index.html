@@ -30,17 +30,7 @@
         <button onclick="searchTopicNews()">Run ↵</button>
       </div>
       <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse">▲</button>
-      <!-- API Status badges — click to open config -->
-      <div class="api-status api-unconfigured" id="apiStatus" title="Alpha Vantage — click to configure" onclick="openApiConfig()">
-        <span class="api-dot"></span>
-        <span>AV</span>
-        <span id="apiCallCount">0/25</span>
-      </div>
-      <div class="api-status api-unconfigured" id="fmpStatus" title="FMP — click to configure" onclick="openApiConfig()">
-        <span class="api-dot"></span>
-        <span>FMP</span>
-        <span id="fmpCallCount">0</span>
-      </div>
+      <!-- Dynamic API badges injected here by config.js renderTopbarBadges() -->
       <button class="api-config-btn" onclick="openApiConfig()" title="API Keys">⚙ API</button>
     </div>
     <div class="topbar-row topbar-row-2" id="topbarRow2">
@@ -346,57 +336,60 @@
     <div class="api-modal-header">
       <div class="api-modal-header-left">
         <span class="api-modal-title">⚙ API Keys</span>
-        <span class="api-modal-subtitle">Keys stored locally · never shared</span>
+        <span class="api-modal-subtitle">Stored in your browser · never shared</span>
       </div>
       <button class="api-modal-close" onclick="closeApiConfig()">✕</button>
     </div>
 
-    <!-- Tab bar: Known Providers | Custom | Session -->
+    <!-- Tab bar — data-tab drives switchApiTab() in config.js -->
     <div class="api-tab-bar">
-      <button class="api-tab active" onclick="switchApiTab('providers', this)">Providers</button>
-      <button class="api-tab"        onclick="switchApiTab('custom',    this)">+ Add Custom</button>
-      <button class="api-tab"        onclick="switchApiTab('session',   this)">Session Stats</button>
+      <button class="api-tab active" data-tab="providers">Providers</button>
+      <button class="api-tab"        data-tab="custom">+ Add Custom</button>
+      <button class="api-tab"        data-tab="session">Session Stats</button>
     </div>
 
-    <!-- ── TAB: Known providers (rendered by config.js) ─────────── -->
+    <!-- ── TAB: Providers ────────────────────────────────────────── -->
     <div class="api-tab-pane active" id="apiTab-providers">
       <div id="apiProviderList"><!-- filled by renderProviderList() --></div>
     </div>
 
-    <!-- ── TAB: Add any custom provider ─────────────────────────── -->
+    <!-- ── TAB: Add custom provider ──────────────────────────────── -->
     <div class="api-tab-pane" id="apiTab-custom">
       <div class="api-custom-form">
+        <p class="api-custom-intro">
+          Store any API key here. Once saved, access it via
+          <code>window._KEYS["your-id"]</code> in your code.
+        </p>
         <div class="api-custom-row">
           <label>Provider name</label>
-          <input id="customProviderName" class="api-key-field" placeholder="e.g. Financial Times" autocomplete="off"/>
+          <input id="customName" class="api-key-field" placeholder="e.g. Financial Times" autocomplete="off"/>
         </div>
         <div class="api-custom-row">
-          <label>Short ID <span class="api-custom-hint">(used in status badge — max 5 chars)</span></label>
-          <input id="customProviderId" class="api-key-field" placeholder="e.g. FT" maxlength="5" autocomplete="off"/>
+          <label>Short ID <span class="api-custom-hint">max 6 chars · badge label</span></label>
+          <input id="customId" class="api-key-field" placeholder="e.g. FT" maxlength="6" autocomplete="off"/>
         </div>
         <div class="api-custom-row">
           <label>API Key</label>
           <div class="api-key-input-row">
-            <input type="password" id="customProviderKey" class="api-key-field"
+            <input type="password" id="customKey" class="api-key-field"
                    placeholder="Paste key here…" autocomplete="off" spellcheck="false"/>
-            <button class="api-key-eye" onclick="toggleKeyVisibility('customProviderKey',this)" title="Show/hide">👁</button>
+            <button class="api-key-eye" onclick="toggleKeyVis('customKey',this)" title="Show/hide">👁</button>
           </div>
         </div>
         <div class="api-custom-row">
-          <label>Description <span class="api-custom-hint">(optional)</span></label>
-          <input id="customProviderDesc" class="api-key-field" placeholder="e.g. News & market data" autocomplete="off"/>
+          <label>Description <span class="api-custom-hint">optional</span></label>
+          <input id="customDesc" class="api-key-field" placeholder="e.g. News &amp; market data" autocomplete="off"/>
         </div>
         <div class="api-custom-row">
-          <label>Docs URL <span class="api-custom-hint">(optional)</span></label>
-          <input id="customProviderUrl" class="api-key-field" placeholder="https://…" autocomplete="off"/>
+          <label>Docs URL <span class="api-custom-hint">optional</span></label>
+          <input id="customUrl" class="api-key-field" placeholder="https://…" autocomplete="off"/>
         </div>
         <button class="api-custom-add-btn" onclick="addCustomProvider()">+ Save Provider</button>
-        <div class="api-key-status" id="customProviderStatus"></div>
+        <div class="api-key-status" id="customStatus"></div>
       </div>
-
       <div class="api-modal-divider" style="margin:12px 0 8px"></div>
       <div class="api-custom-saved-title">Saved custom providers</div>
-      <div id="customProviderSaved"><!-- filled dynamically --></div>
+      <div id="customSavedList"><!-- filled dynamically --></div>
     </div>
 
     <!-- ── TAB: Session stats ─────────────────────────────────────── -->
@@ -406,15 +399,15 @@
         <button class="api-clear-cache-btn" onclick="clearAllCache()">🗑 Clear session cache</button>
       </div>
       <div class="api-modal-note" style="margin-top:10px">
-        Cache entries expire after 15 min. Clearing forces a fresh fetch on next ticker load.
+        Cache expires after 15 min. Clearing forces a fresh fetch on next ticker load.
       </div>
     </div>
 
     <div class="api-modal-footer">
       <div class="api-modal-note-inline">
-        🔒 Keys in <code>localStorage</code> — never leave your browser except to reach the API endpoint directly.
+        🔒 Keys in <code>localStorage</code> — only sent directly to the respective API endpoint.
       </div>
-      <button class="api-modal-apply" onclick="applyAndReload()">✓ Apply & Reload Data</button>
+      <button class="api-modal-apply"  onclick="applyAndReload()">✓ Apply & Reload</button>
       <button class="api-modal-cancel" onclick="closeApiConfig()">Close</button>
     </div>
 
