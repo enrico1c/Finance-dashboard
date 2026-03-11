@@ -76,11 +76,10 @@ body::before {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 10px 16px;
+  padding: 8px 16px 7px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 0;
   position: relative;
   overflow: visible;
   animation: slideDown .4s ease both;
@@ -91,7 +90,7 @@ body::before {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 1px;
   background: linear-gradient(90deg,transparent,var(--accent),transparent);
-  opacity: .6;
+  opacity: .6; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 @keyframes slideDown {
@@ -99,8 +98,27 @@ body::before {
   to   { opacity:1; transform:translateY(0); }
 }
 
-.top-left  { display:flex; align-items:center; gap:16px; flex:1; min-width:0; }
-.top-right { display:flex; align-items:center; gap:12px; flex-shrink:0; }
+/* Two rows inside topbar */
+.topbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.topbar-row-1 {
+  padding-bottom: 7px;
+}
+
+.topbar-row-2 {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  padding-bottom: 1px;
+}
+
+/* legacy helpers — flatten into flow */
+.top-left  { display: contents; }
+.top-right { display: contents; }
 
 .brand { display:flex; flex-direction:column; flex-shrink:0; }
 
@@ -185,7 +203,9 @@ h1 {
 .checklist-title {
   font-family:var(--font-mono); font-size:9px; font-weight:600;
   letter-spacing:.15em; text-transform:uppercase;
-  color:var(--text-muted); margin-bottom:5px;
+  color:var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .checklist { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 
