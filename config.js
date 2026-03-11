@@ -17,6 +17,18 @@ const KNOWN_PROVIDERS = [
     desc:"Analyst Ratings · Targets · Estimates · Holders · Insiders · Management · Events · Ratios",
     limit:"250 req/day (free)", docsUrl:"https://financialmodelingprep.com/developer/docs/",
     sessionKey:"fmp_call_count", limitWarn:200, limitMax:250 },
+  { id:"eodhd", name:"EODHD", badge:"EOD",
+    desc:"Quote live/EOD · Fondamentali globali (150K+ ticker) · News · Dividendi · Earnings Calendar · Screener · 70+ borse",
+    limit:"20 req/day (free) — illimitato sui piani paid", docsUrl:"https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis",
+    sessionKey:"eodhd_call_count", limitWarn:15, limitMax:20 },
+  { id:"apitube", name:"APITube", badge:"APT",
+    desc:"Financial News real-time · YouTube/Video news · Sentiment NLP · 500K+ fonti · Filtro ticker / settore / lingua",
+    limit:"Varia per piano (free tier disponibile)", docsUrl:"https://apitube.io/en-it/blog/post/how-to-get-started-with-apitube-news-api-a-step-by-step-guide",
+    sessionKey:"apitube_call_count", limitWarn:80, limitMax:100 },
+  { id:"massive", name:"Massive", badge:"MSV",
+    desc:"Alternative data · Macro indicators · Institutional flow · Economic calendar · Sentiment crowd",
+    limit:"Varia per piano", docsUrl:"https://massive.io/",
+    sessionKey:"massive_call_count", limitWarn:null, limitMax:null },
 ];
 
 window._KEYS = {};
