@@ -29,6 +29,10 @@ const KNOWN_PROVIDERS = [
     desc:"Alternative data · Macro indicators · Institutional flow · Economic calendar · Sentiment crowd",
     limit:"Varia per piano", docsUrl:"https://massive.io/",
     sessionKey:"massive_call_count", limitWarn:null, limitMax:null },
+  { id:"finnhub", name:"Finnhub", badge:"FH",
+    desc:"Quote · Analyst Consensus · Price Targets · Upgrades/Downgrades · Insider Transactions · Institutional Holders · Company News · Peers",
+    limit:"60 req/min (free)", docsUrl:"https://finnhub.io/docs/api",
+    sessionKey:"fh_call_count", limitWarn:50, limitMax:60 },
 ];
 
 window._KEYS = {};
@@ -196,12 +200,12 @@ function saveKey(id) {
   // Auto-reload live data immediately after saving a key
   const ticker = (typeof currentTicker !== "undefined") ? currentTicker.replace(/.*:/,"").toUpperCase() : null;
   if (!ticker) return;
-  if (id === "av"  && typeof avLoadAll  === "function") {
-    setTimeout(() => avLoadAll(ticker), 200);
-  }
-  if (id === "fmp" && typeof fmpLoadAll === "function") {
-    setTimeout(() => fmpLoadAll(ticker), 200);
-  }
+  if (id === "av"  && typeof avLoadAll      === "function") setTimeout(() => avLoadAll(ticker), 200);
+  if (id === "fmp" && typeof fmpLoadAll     === "function") setTimeout(() => fmpLoadAll(ticker), 200);
+  if (id === "finnhub" && typeof finnhubLoadAll === "function") setTimeout(() => finnhubLoadAll(ticker), 200);
+  if (id === "eodhd"   && typeof eodhdLoadAll   === "function") setTimeout(() => eodhdLoadAll(ticker), 200);
+  if (id === "apitube" && typeof apitubeLoadAll  === "function") setTimeout(() => apitubeLoadAll(ticker), 200);
+  if (id === "massive" && typeof massiveLoadAll  === "function") setTimeout(() => massiveLoadAll(ticker), 200);
 }
 
 function clearKey(id) {
@@ -352,8 +356,11 @@ function applyAndReload() {
   const sym = rawTicker ? rawTicker.replace(/.*:/,"").toUpperCase() : null;
   if (sym) {
     if (typeof avLoadAll==="function")  avLoadAll(sym);
-    // fmpLoadAll is called inside avLoadAll; call it directly only if no AV key
     else if (typeof fmpLoadAll==="function") fmpLoadAll(sym);
+    if (typeof finnhubLoadAll==="function") finnhubLoadAll(sym);
+    if (typeof eodhdLoadAll  ==="function") eodhdLoadAll(sym);
+    if (typeof apitubeLoadAll==="function") apitubeLoadAll(sym);
+    if (typeof massiveLoadAll==="function") massiveLoadAll(sym);
   }
   if (typeof showApiToast==="function") showApiToast("&#10003; Keys applied &mdash; loading live data&hellip;","ok");
 }
