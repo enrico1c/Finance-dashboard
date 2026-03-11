@@ -8,9 +8,12 @@
 /* ── ⚙️  Keys are managed via the ⚙ API button in the UI ────────── */
 /* Use the modal to paste your FMP key — stored in localStorage.     */
 
-// Runtime key: config.js sets window._FMP_KEY from localStorage
+// Runtime key: config.js stores under finterm_key_fmp (via lsId = id => `finterm_key_${id}`)
 function getFmpKey() {
-  return window._FMP_KEY || localStorage.getItem("finterm_fmp_key") || "";
+  return (window._KEYS && window._KEYS["fmp"])
+    || localStorage.getItem("finterm_key_fmp")
+    || localStorage.getItem("finterm_fmp_key")   // legacy fallback
+    || "";
 }
 
 const FMP_BASE    = "https://financialmodelingprep.com/api";
