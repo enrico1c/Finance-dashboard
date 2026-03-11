@@ -306,13 +306,11 @@ async function avLoadAll(ticker) {
   if (!getAvKey()) {
     showApiToast("⚙ Alpha Vantage key not set — click ⚙ API to configure.", "warn");
     if (typeof refreshBadges === "function") refreshBadges();
-    // Still try FMP even without AV
-    if (typeof fmpLoadAll === "function" && getFmpKey()) {
-      showApiToast(`↻ Loading FMP data for ${sym}…`, "info");
-      fmpLoadAll(sym).then(() => {
-        showApiToast(`✓ ${sym}: FMP data loaded`, "ok");
-      });
-    }
+    // Still try secondary providers even without AV
+    if (typeof fmpLoadAll   === "function" && getFmpKey())     fmpLoadAll(sym);
+    if (typeof eodhdLoadAll  === "function") eodhdLoadAll(sym);
+    if (typeof apitubeLoadAll === "function") apitubeLoadAll(sym);
+    if (typeof massiveLoadAll === "function") massiveLoadAll(sym);
     return;
   }
 
@@ -351,6 +349,11 @@ async function avLoadAll(ticker) {
       showApiToast(`✓ ${sym}: all data loaded (AV + FMP)`, "ok");
     });
   }
+
+  // Fire additional providers in parallel
+  if (typeof eodhdLoadAll  === "function") eodhdLoadAll(sym);
+  if (typeof apitubeLoadAll === "function") apitubeLoadAll(sym);
+  if (typeof massiveLoadAll === "function") massiveLoadAll(sym);
 }
 
 // In-memory store of live data per ticker
