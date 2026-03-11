@@ -10,15 +10,10 @@
 <body>
 <div class="app-shell">
 
-  <!-- ── TOPBAR ──────────────────────────────────────────────────── -->
+  <!-- ══ TOPBAR ══════════════════════════════════════════════════ -->
   <header class="topbar" id="topbar">
-
-    <!-- ROW 1: brand · live · searches -->
     <div class="topbar-row topbar-row-1">
-      <div class="brand">
-        <h1>FINTERM</h1>
-        <span class="brand-sub">Market Intelligence</span>
-      </div>
+      <div class="brand"><h1>FINTERM</h1><span class="brand-sub">Market Intelligence</span></div>
       <div class="topbar-divider"></div>
       <span class="live-dot">Live</span>
       <div class="topbar-divider"></div>
@@ -34,11 +29,8 @@
         <input id="topicInput" placeholder="Italy · AI · China · Fed..." />
         <button onclick="searchTopicNews()">Run ↵</button>
       </div>
-      <!-- collapse button — always visible -->
-      <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse/Expand">▲</button>
+      <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse">▲</button>
     </div>
-
-    <!-- ROW 2: modules (collapsible) -->
     <div class="topbar-row topbar-row-2" id="topbarRow2">
       <span class="checklist-title">Modules</span>
       <div class="checklist">
@@ -46,14 +38,18 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="forex"              > Forex</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked> Fundamentals</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="news"         checked> News</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="notes"        checked> Notes</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="quote"        checked> Quote</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="analysts"     checked> Analysts</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked> Ownership</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked> Comparables</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="notes"        checked> Notes</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"   checked> Watchlist</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="valuation"   checked> Valuation</label>
       </div>
     </div>
-
   </header>
 
-  <!-- ── FREE CANVAS ─────────────────────────────────────────────── -->
+  <!-- ══ FREE CANVAS ══════════════════════════════════════════════ -->
   <div id="dashboardCanvas">
     <div id="snapOverlay"></div>
 
@@ -61,21 +57,16 @@
     <section class="panel" id="panel-chart" data-panel="chart">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Price Chart</h3>
+        <h3>▸ Price Chart — GP</h3>
         <div class="panel-actions">
           <button class="icon-btn close" onclick="hidePanel('chart')" title="Close">✕</button>
         </div>
       </div>
       <div id="priceChart" class="panel-content chart-content"></div>
-      <!-- resize handles -->
-      <div class="resize-handle" data-dir="n"></div>
-      <div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div>
-      <div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div>
-      <div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div>
-      <div class="resize-handle" data-dir="se"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
       <div class="size-tooltip" id="tooltip-chart"></div>
     </section>
 
@@ -89,8 +80,8 @@
         </div>
         <div class="panel-actions">
           <input id="forexPairInput" class="mini-input" placeholder="EUR/USD" value="EUR/USD" />
-          <button class="icon-btn" onclick="changeForexPair()" title="Load pair">↵</button>
-          <button class="icon-btn close" onclick="hidePanel('forex')" title="Close">✕</button>
+          <button class="icon-btn" onclick="changeForexPair()" title="Load">↵</button>
+          <button class="icon-btn close" onclick="hidePanel('forex')">✕</button>
         </div>
       </div>
       <div class="forex-topbar">
@@ -106,39 +97,42 @@
         <div class="metric"><span>Status</span><span>Ready</span></div>
       </div>
       <div id="forexChart" class="panel-content chart-content"></div>
-      <div class="resize-handle" data-dir="n"></div>
-      <div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div>
-      <div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div>
-      <div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div>
-      <div class="resize-handle" data-dir="se"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
       <div class="size-tooltip" id="tooltip-forex"></div>
     </section>
 
-    <!-- ▸ FUNDAMENTALS ─────────────────────────────────────────── -->
+    <!-- ▸ FUNDAMENTALS (DES / FA / ERN / EE / WACC) ───────────── -->
     <section class="panel" id="panel-fundamentals" data-panel="fundamentals">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Fundamentals</h3>
         <div class="panel-actions">
-          <button class="icon-btn close" onclick="hidePanel('fundamentals')" title="Close">✕</button>
+          <button class="icon-btn close" onclick="hidePanel('fundamentals')">✕</button>
         </div>
       </div>
-      <div id="financials" class="panel-content"></div>
-      <div class="resize-handle" data-dir="n"></div>
-      <div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div>
-      <div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div>
-      <div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div>
-      <div class="resize-handle" data-dir="se"></div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="des" onclick="switchTab('fundamentals','des')">DES</button>
+        <button class="tab-btn" data-tab="fa"  onclick="switchTab('fundamentals','fa')">FA</button>
+        <button class="tab-btn" data-tab="ern" onclick="switchTab('fundamentals','ern')">ERN</button>
+        <button class="tab-btn" data-tab="ee"  onclick="switchTab('fundamentals','ee')">EE</button>
+        <button class="tab-btn" data-tab="wacc"onclick="switchTab('fundamentals','wacc')">WACC</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="des" id="fund-des"></div>
+      <div class="tab-pane        panel-content" data-tab="fa"  id="fund-fa"></div>
+      <div class="tab-pane        panel-content" data-tab="ern" id="fund-ern"></div>
+      <div class="tab-pane        panel-content" data-tab="ee"  id="fund-ee"></div>
+      <div class="tab-pane        panel-content" data-tab="wacc"id="fund-wacc"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
       <div class="size-tooltip" id="tooltip-fundamentals"></div>
     </section>
 
-    <!-- ▸ NEWS ─────────────────────────────────────────────────── -->
+    <!-- ▸ NEWS (CN / EVTS / BRC / BI) ─────────────────────────── -->
     <section class="panel" id="panel-news" data-panel="news">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -147,19 +141,112 @@
           <div id="newsModeLabel" class="mode-label">Mode: Ticker</div>
         </div>
         <div class="panel-actions">
-          <button class="icon-btn close" onclick="hidePanel('news')" title="Close">✕</button>
+          <button class="icon-btn close" onclick="hidePanel('news')">✕</button>
         </div>
       </div>
-      <div id="newsBox" class="panel-content"></div>
-      <div class="resize-handle" data-dir="n"></div>
-      <div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div>
-      <div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div>
-      <div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div>
-      <div class="resize-handle" data-dir="se"></div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="cn"   onclick="switchTab('news','cn')">CN</button>
+        <button class="tab-btn"        data-tab="evts" onclick="switchTab('news','evts')">EVTS</button>
+        <button class="tab-btn"        data-tab="brc"  onclick="switchTab('news','brc')">BRC</button>
+        <button class="tab-btn"        data-tab="bi"   onclick="switchTab('news','bi')">BI</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="cn"   id="news-cn"></div>
+      <div class="tab-pane        panel-content" data-tab="evts" id="news-evts"></div>
+      <div class="tab-pane        panel-content" data-tab="brc"  id="news-brc"></div>
+      <div class="tab-pane        panel-content" data-tab="bi"   id="news-bi"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
       <div class="size-tooltip" id="tooltip-news"></div>
+    </section>
+
+    <!-- ▸ QUOTE (QR / MON) ─────────────────────────────────────── -->
+    <section class="panel" id="panel-quote" data-panel="quote">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Quote</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('quote')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="qr"  onclick="switchTab('quote','qr')">QR</button>
+        <button class="tab-btn"        data-tab="mon" onclick="switchTab('quote','mon')">MON</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="qr"  id="quote-qr"></div>
+      <div class="tab-pane        panel-content" data-tab="mon" id="quote-mon"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-quote"></div>
+    </section>
+
+    <!-- ▸ ANALYSTS (ANR / BRC) ─────────────────────────────────── -->
+    <section class="panel" id="panel-analysts" data-panel="analysts">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Analysts</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('analysts')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="anr" onclick="switchTab('analysts','anr')">ANR</button>
+        <button class="tab-btn"        data-tab="brc" onclick="switchTab('analysts','brc')">BRC</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="anr" id="analysts-anr"></div>
+      <div class="tab-pane        panel-content" data-tab="brc" id="analysts-brc"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-analysts"></div>
+    </section>
+
+    <!-- ▸ OWNERSHIP (HDS / MGMT) ───────────────────────────────── -->
+    <section class="panel" id="panel-ownership" data-panel="ownership">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Ownership</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('ownership')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="hds"  onclick="switchTab('ownership','hds')">HDS</button>
+        <button class="tab-btn"        data-tab="mgmt" onclick="switchTab('ownership','mgmt')">MGMT</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="hds"  id="own-hds"></div>
+      <div class="tab-pane        panel-content" data-tab="mgmt" id="own-mgmt"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-ownership"></div>
+    </section>
+
+    <!-- ▸ COMPARABLES (RV / COMP) ──────────────────────────────── -->
+    <section class="panel" id="panel-comparables" data-panel="comparables">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Comparables</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('comparables')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="rv"   onclick="switchTab('comparables','rv')">RV</button>
+        <button class="tab-btn"        data-tab="comp" onclick="switchTab('comparables','comp')">COMP</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="rv"   id="comp-rv"></div>
+      <div class="tab-pane        panel-content" data-tab="comp" id="comp-comp"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-comparables"></div>
     </section>
 
     <!-- ▸ NOTES ────────────────────────────────────────────────── -->
@@ -168,47 +255,82 @@
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Notes</h3>
         <div class="panel-actions">
-          <button class="icon-btn close" onclick="hidePanel('notes')" title="Close">✕</button>
+          <button class="icon-btn close" onclick="hidePanel('notes')">✕</button>
         </div>
       </div>
       <div class="panel-content">
         <textarea id="notesArea" placeholder="// target price, watchlist, ideas, links...&#10;// e.g. AAPL — buy above 185, TP 210"></textarea>
       </div>
-      <div class="resize-handle" data-dir="n"></div>
-      <div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div>
-      <div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div>
-      <div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div>
-      <div class="resize-handle" data-dir="se"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
       <div class="size-tooltip" id="tooltip-notes"></div>
     </section>
 
-    <!-- ▸ COMPARABLES ──────────────────────────────────────────── -->
-    <section class="panel" id="panel-comparables" data-panel="comparables">
+    <!-- ▸ SECTOR WATCHLIST ─────────────────────────────────────── -->
+    <section class="panel" id="panel-watchlist" data-panel="watchlist">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Comparables</h3>
+        <div class="panel-title-row">
+          <h3>▸ Sector Watchlist</h3>
+          <div class="mode-label" id="watchlistLabel">Topic: —</div>
+        </div>
         <div class="panel-actions">
-          <button class="icon-btn close" onclick="hidePanel('comparables')" title="Close">✕</button>
+          <button class="icon-btn close" onclick="hidePanel('watchlist')">✕</button>
         </div>
       </div>
-      <div id="peers" class="panel-content"></div>
-      <div class="resize-handle" data-dir="n"></div>
-      <div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div>
-      <div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div>
-      <div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div>
-      <div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-comparables"></div>
+      <!-- sort bar -->
+      <div class="wl-sortbar">
+        <span class="wl-sort-label">Sort by:</span>
+        <button class="wl-sort-btn active" onclick="sortWatchlist('name')">Name</button>
+        <button class="wl-sort-btn" onclick="sortWatchlist('price')">Price</button>
+        <button class="wl-sort-btn" onclick="sortWatchlist('change')">Chg%</button>
+        <button class="wl-sort-btn" onclick="sortWatchlist('mktcap')">Mkt Cap</button>
+        <span class="wl-count" id="wlCount"></span>
+      </div>
+      <div id="watchlistBox" class="panel-content wl-content">
+        <div class="no-data">// Search a topic (e.g. "AI", "Energy", "Banks") to populate the watchlist.</div>
+      </div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-watchlist"></div>
+    </section>
+
+    <!-- ▸ VALUATION ANALYZER ──────────────────────────────────── -->
+    <section class="panel" id="panel-valuation" data-panel="valuation">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Valuation Analyzer</h3>
+          <div class="mode-label" id="valuationLabel">Select a stock from Watchlist</div>
+        </div>
+        <div class="panel-actions">
+          <!-- method selector -->
+          <select class="val-method-select" id="valMethodSelect" onchange="renderValuation(currentValTicker)">
+            <option value="all">All Methods</option>
+            <option value="multiples">Multiples</option>
+            <option value="cashflow">Cash Flow</option>
+            <option value="growth">Growth</option>
+            <option value="dcf">DCF</option>
+          </select>
+          <button class="icon-btn close" onclick="hidePanel('valuation')">✕</button>
+        </div>
+      </div>
+      <div id="valuationBox" class="panel-content">
+        <div class="no-data">// Click any stock in the Sector Watchlist<br>// to load its valuation analysis here.</div>
+      </div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-valuation"></div>
     </section>
 
   </div><!-- /dashboardCanvas -->
 </div><!-- /app-shell -->
-
 <script src="script.js"></script>
 </body>
 </html>
