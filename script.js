@@ -594,12 +594,12 @@ const topicSeedTicker = {
   retail:"AMZN", ecommerce:"AMZN", consumer:"AMZN",
   defense:"LMT", aerospace:"BA", military:"RTX",
   crypto:"COIN", bitcoin:"MSTR", blockchain:"COIN",
-  real estate:"AMT", reit:"SPG", realestate:"PLD",
+  "real estate":"AMT", reit:"SPG", realestate:"PLD",
   media:"DIS", streaming:"NFLX", entertainment:"DIS",
   telecom:"T", telecoms:"VZ",
   mining:"RIO", metals:"FCX", gold:"NEM",
   food:"MCD", beverage:"KO", staples:"PG",
-  insurance:"BRK-B", reinsurance:"MUNMUn",
+  insurance:"BRK-B", reinsurance:"MUNMun",
 };
 
 async function loadWatchlist(topic) {
