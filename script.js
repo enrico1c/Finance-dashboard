@@ -1,8 +1,11 @@
 let currentTicker = "AAPL";
 let currentNewsMode = "ticker";
+let currentForexPair = "EUR/USD";
+let currentForexInterval = "5";
 
 const panelState = {
   chart: { visible: true, size: 2 },
+  forex: { visible: false, size: 1 },
   fundamentals: { visible: true, size: 1 },
   news: { visible: true, size: 1 },
   notes: { visible: true, size: 1 },
@@ -22,6 +25,11 @@ function mapTickerToTradingView(ticker) {
   return `NASDAQ:${ticker}`;
 }
 
+function mapForexPairToSymbol(pair) {
+  const clean = pair.replace("/", "").toUpperCase().trim();
+  return `FX:${clean}`;
+}
+
 function setNewsModeLabel(text) {
   const label = document.getElementById("newsModeLabel");
   if (label) label.textContent = text;
@@ -29,6 +37,8 @@ function setNewsModeLabel(text) {
 
 function loadChart(symbol) {
   const chartEl = document.getElementById("priceChart");
+  if (!chartEl) return;
+
   chartEl.innerHTML = "";
 
   new TradingView.widget({
@@ -46,8 +56,59 @@ function loadChart(symbol) {
   });
 }
 
+function loadForexChart(pair = currentForexPair, interval = currentForexInterval) {
+  const container = document.getElementById("forexChart");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  new TradingView.widget({
+    autosize: true,
+    symbol: mapForexPairToSymbol(pair),
+    interval: interval,
+    timezone: "Europe/Rome",
+    theme: "dark",
+    style: "1",
+    locale: "it",
+    toolbar_bg: "#171b22",
+    enable_publishing: false,
+    allow_symbol_change: true,
+    container_id: "forexChart"
+  });
+
+  const label = document.getElementById("forexLabel");
+  if (label) label.textContent = `Pair: ${pair}`;
+
+  const summary = document.getElementById("forexSummary");
+  if (summary) {
+    summary.innerHTML = `
+      <div class="metric"><span>Selected Pair</span><span>${escapeHtml(pair)}</span></div>
+      <div class="metric"><span>Interval</span><span>${escapeHtml(interval)}</span></div>
+      <div class="metric"><span>Status</span><span>Loaded</span></div>
+    `;
+  }
+}
+
+function changeForexPair() {
+  const input = document.getElementById("forexPairInput");
+  if (!input) return;
+
+  const value = input.value.trim().toUpperCase();
+  if (!value) return;
+
+  currentForexPair = value;
+  loadForexChart(currentForexPair, currentForexInterval);
+}
+
+function setForexInterval(interval) {
+  currentForexInterval = interval;
+  loadForexChart(currentForexPair, currentForexInterval);
+}
+
 function loadFundamentals(ticker) {
   const box = document.getElementById("financials");
+  if (!box) return;
+
   box.innerHTML = `
     <div class="metric"><span>Ticker</span><span>${escapeHtml(ticker)}</span></div>
     <div class="metric"><span>Status</span><span>Interactive layout active</span></div>
@@ -107,6 +168,7 @@ function buildSearchLinks(query, mode) {
 
 function renderNews(items) {
   const box = document.getElementById("newsBox");
+  if (!box) return;
 
   if (!items.length) {
     box.innerHTML = "No links found.";
@@ -139,10 +201,13 @@ function searchTopicNews() {
   currentNewsMode = "topic";
   setNewsModeLabel(`Mode: Topic/Country News · ${query}`);
   renderNews(buildSearchLinks(query, "topic"));
+  loadComparables(currentTicker);
 }
 
 function loadComparables(ticker) {
   const box = document.getElementById("peers");
+  if (!box) return;
+
   box.innerHTML = `
     <div class="metric"><span>Main Ticker</span><span>${escapeHtml(ticker)}</span></div>
     <div class="metric"><span>News Mode</span><span>${escapeHtml(currentNewsMode)}</span></div>
@@ -168,6 +233,7 @@ function resizePanel(panelName, delta) {
 
 function applyLayout() {
   const chart = document.getElementById("panel-chart");
+  const forex = document.getElementById("panel-forex");
   const fundamentals = document.getElementById("panel-fundamentals");
   const news = document.getElementById("panel-news");
   const notes = document.getElementById("panel-notes");
@@ -175,6 +241,7 @@ function applyLayout() {
 
   const allPanels = {
     chart,
+    forex,
     fundamentals,
     news,
     notes,
@@ -199,8 +266,6 @@ function applyLayout() {
     panelState.chart.visible = true;
   }
 
-  const visibleNow = Object.keys(panelState).filter(key => panelState[key].visible);
-
   let rowCursor = 1;
 
   if (panelState.chart.visible) {
@@ -209,7 +274,9 @@ function applyLayout() {
     rowCursor += panelState.chart.size;
   }
 
-  const secondary = ["fundamentals", "news", "notes", "comparables"].filter(key => panelState[key].visible);
+  const secondary = ["forex", "fundamentals", "news", "notes", "comparables"].filter(
+    key => panelState[key].visible
+  );
 
   if (secondary.length > 0) {
     let colStart = 1;
@@ -228,7 +295,13 @@ function applyLayout() {
   }
 
   loadComparables(currentTicker);
-  setTimeout(() => loadChart(mapTickerToTradingView(currentTicker)), 50);
+
+  setTimeout(() => {
+    loadChart(mapTickerToTradingView(currentTicker));
+    if (panelState.forex.visible) {
+      loadForexChart(currentForexPair, currentForexInterval);
+    }
+  }, 80);
 }
 
 function changeTicker() {
@@ -263,6 +336,7 @@ function setupChecklist() {
 window.addEventListener("load", () => {
   setupChecklist();
   loadChart(mapTickerToTradingView(currentTicker));
+  loadForexChart(currentForexPair, currentForexInterval);
   loadFundamentals(currentTicker);
   loadTickerNews(currentTicker);
   loadComparables(currentTicker);
