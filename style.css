@@ -71,26 +71,32 @@ body::before {
 }
 
 /* ─── TOPBAR ─────────────────────────────────────────────────────── */
+/* ─── TOPBAR ─────────────────────────────────────────────────────────── */
 .topbar {
   flex: 0 0 auto;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 8px 16px 7px;
+  padding: 0 14px;
   display: flex;
   flex-direction: column;
-  gap: 0;
   position: relative;
-  overflow: visible;
   animation: slideDown .4s ease both;
   z-index: 100;
+  overflow: hidden;
+  transition: max-height .25s ease;
+  max-height: 80px; /* expanded default */
+}
+
+.topbar.collapsed {
+  max-height: 36px;
 }
 
 .topbar::before {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 1px;
   background: linear-gradient(90deg,transparent,var(--accent),transparent);
-  opacity: .6; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  opacity: .6; pointer-events: none;
 }
 
 @keyframes slideDown {
@@ -98,27 +104,49 @@ body::before {
   to   { opacity:1; transform:translateY(0); }
 }
 
-/* Two rows inside topbar */
+/* ── Rows ── */
 .topbar-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  height: 36px;           /* fixed height — no wrapping */
+  flex-shrink: 0;
+  overflow: hidden;
   width: 100%;
 }
 
 .topbar-row-1 {
-  padding-bottom: 7px;
+  /* main row always visible */
 }
 
 .topbar-row-2 {
   border-top: 1px solid var(--border);
-  padding-top: 6px;
-  padding-bottom: 1px;
+  height: 32px;
 }
 
-/* legacy helpers — flatten into flow */
+/* collapse leftovers */
 .top-left  { display: contents; }
 .top-right { display: contents; }
+
+/* ── Collapse button ── */
+.topbar-collapse-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 9px; line-height: 1;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex; align-items: center; justify-content: center;
+}
+.topbar-collapse-btn:hover {
+  border-color: var(--accent); color: var(--accent-bright);
+  background: var(--accent-glow);
+}
+.topbar.collapsed .topbar-collapse-btn { transform: rotate(180deg); }
 
 .brand { display:flex; flex-direction:column; flex-shrink:0; }
 
@@ -203,9 +231,7 @@ h1 {
 .checklist-title {
   font-family:var(--font-mono); font-size:9px; font-weight:600;
   letter-spacing:.15em; text-transform:uppercase;
-  color:var(--text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
+  color:var(--text-muted); white-space:nowrap; flex-shrink:0;
 }
 .checklist { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 
