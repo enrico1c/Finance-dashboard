@@ -1,135 +1,219 @@
-<!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Finance Dashboard</title>
+  <title>FINTERM — Finance Dashboard</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="top-left">
-        <h1>Finance Dashboard</h1>
+<div class="app-shell">
 
-        <div class="search-row">
-          <input id="tickerInput" placeholder="Ticker (AAPL, TSLA, NVDA)" value="AAPL" />
-          <button onclick="changeTicker()">Search Ticker</button>
-
-          <input id="topicInput" placeholder="Paese o tema (Italy, AI, China)" />
-          <button onclick="searchTopicNews()">Search Topic News</button>
-        </div>
+  <!-- ── TOPBAR ──────────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="top-left">
+      <div class="brand">
+        <h1>FINTERM</h1>
+        <span class="brand-sub">Market Intelligence</span>
       </div>
 
-      <div class="top-right">
-        <div class="checklist-title">Mostra/Nascondi moduli</div>
+      <div class="topbar-divider"></div>
+      <span class="live-dot">Live</span>
+      <div class="topbar-divider"></div>
 
+      <div class="search-row">
+        <!-- Ticker search: accepts AAPL, NYSE:IBM, MIL:ENI, LSE:BP, etc. -->
+        <div class="search-group">
+          <span class="search-label">Ticker</span>
+          <input id="tickerInput"
+                 placeholder="AAPL · NYSE:IBM · MIL:ENI · LSE:BP"
+                 value="AAPL"
+                 oninput="updateExchangeHint()" />
+          <button onclick="changeTicker()">Run ↵</button>
+        </div>
+        <span class="exchange-hint" id="exchangeHint">NASDAQ</span>
+
+        <div class="topbar-divider"></div>
+
+        <div class="search-group">
+          <span class="search-label">Topic</span>
+          <input id="topicInput" placeholder="Italy · AI · China · Fed..." />
+          <button onclick="searchTopicNews()">Run ↵</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="top-right">
+      <div>
+        <div class="checklist-title">Modules</div>
         <div class="checklist">
-          <label><input type="checkbox" class="panel-toggle" data-panel="chart" checked> Chart</label>
-          <label><input type="checkbox" class="panel-toggle" data-panel="forex"> Forex</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="chart"        checked> Chart</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="forex"              > Forex</label>
           <label><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked> Fundamentals</label>
-          <label><input type="checkbox" class="panel-toggle" data-panel="news" checked> News</label>
-          <label><input type="checkbox" class="panel-toggle" data-panel="notes" checked> Notes</label>
-          <label><input type="checkbox" class="panel-toggle" data-panel="comparables" checked> Comparables</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="news"         checked> News</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="notes"        checked> Notes</label>
+          <label><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked> Comparables</label>
         </div>
       </div>
-    </header>
+    </div>
+  </header>
 
-    <main id="dashboardGrid" class="dashboard-grid">
-      <section class="panel" id="panel-chart" data-panel="chart" data-size="2">
-        <div class="panel-head">
-          <h3>Price Chart</h3>
-          <div class="panel-actions">
-            <button class="size-btn" onclick="resizePanel('chart', -1)">−</button>
-            <button class="size-btn" onclick="resizePanel('chart', 1)">+</button>
-          </div>
+  <!-- ── FREE CANVAS ─────────────────────────────────────────────── -->
+  <div id="dashboardCanvas">
+    <div id="snapOverlay"></div>
+
+    <!-- ▸ PRICE CHART ─────────────────────────────────────────── -->
+    <section class="panel" id="panel-chart" data-panel="chart">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Price Chart</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('chart')" title="Close">✕</button>
         </div>
-        <div id="priceChart" class="panel-content chart-content"></div>
-      </section>
+      </div>
+      <div id="priceChart" class="panel-content chart-content"></div>
+      <!-- resize handles -->
+      <div class="resize-handle" data-dir="n"></div>
+      <div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div>
+      <div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div>
+      <div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div>
+      <div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-chart"></div>
+    </section>
 
-      <section class="panel hidden" id="panel-forex" data-panel="forex" data-size="1">
-        <div class="panel-head">
-          <div>
-            <h3>Forex Chart</h3>
-            <div class="mode-label" id="forexLabel">Pair: EUR/USD</div>
-          </div>
-          <div class="panel-actions">
-            <input id="forexPairInput" class="mini-input" placeholder="EUR/USD" value="EUR/USD" />
-            <button class="size-btn" onclick="changeForexPair()">Load</button>
-            <button class="size-btn" onclick="resizePanel('forex', -1)">−</button>
-            <button class="size-btn" onclick="resizePanel('forex', 1)">+</button>
-          </div>
+    <!-- ▸ FOREX ────────────────────────────────────────────────── -->
+    <section class="panel hidden" id="panel-forex" data-panel="forex">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Forex Chart</h3>
+          <div class="mode-label" id="forexLabel">Pair: EUR/USD</div>
         </div>
-
-        <div class="forex-topbar">
-          <button class="fx-tf-btn" onclick="setForexInterval('1')">1m</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('5')">5m</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('60')">1H</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('240')">4H</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('D')">D</button>
+        <div class="panel-actions">
+          <input id="forexPairInput" class="mini-input" placeholder="EUR/USD" value="EUR/USD" />
+          <button class="icon-btn" onclick="changeForexPair()" title="Load pair">↵</button>
+          <button class="icon-btn close" onclick="hidePanel('forex')" title="Close">✕</button>
         </div>
+      </div>
+      <div class="forex-topbar">
+        <button class="fx-tf-btn" onclick="setForexInterval('1')">1m</button>
+        <button class="fx-tf-btn" onclick="setForexInterval('5')">5m</button>
+        <button class="fx-tf-btn active" onclick="setForexInterval('60')">1H</button>
+        <button class="fx-tf-btn" onclick="setForexInterval('240')">4H</button>
+        <button class="fx-tf-btn" onclick="setForexInterval('D')">1D</button>
+        <button class="fx-tf-btn" onclick="setForexInterval('W')">1W</button>
+      </div>
+      <div class="forex-summary" id="forexSummary">
+        <div class="metric"><span>Pair</span><span>EUR/USD</span></div>
+        <div class="metric"><span>Status</span><span>Ready</span></div>
+      </div>
+      <div id="forexChart" class="panel-content chart-content"></div>
+      <div class="resize-handle" data-dir="n"></div>
+      <div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div>
+      <div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div>
+      <div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div>
+      <div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-forex"></div>
+    </section>
 
-        <div class="forex-summary" id="forexSummary">
-          <div class="metric"><span>Selected Pair</span><span>EUR/USD</span></div>
-          <div class="metric"><span>Status</span><span>Ready</span></div>
-          <div class="metric"><span>Mode</span><span>Forex widget active</span></div>
+    <!-- ▸ FUNDAMENTALS ─────────────────────────────────────────── -->
+    <section class="panel" id="panel-fundamentals" data-panel="fundamentals">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Fundamentals</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('fundamentals')" title="Close">✕</button>
         </div>
+      </div>
+      <div id="financials" class="panel-content"></div>
+      <div class="resize-handle" data-dir="n"></div>
+      <div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div>
+      <div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div>
+      <div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div>
+      <div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-fundamentals"></div>
+    </section>
 
-        <div id="forexChart" class="panel-content chart-content"></div>
-      </section>
-
-      <section class="panel" id="panel-fundamentals" data-panel="fundamentals" data-size="1">
-        <div class="panel-head">
-          <h3>Fundamentals</h3>
-          <div class="panel-actions">
-            <button class="size-btn" onclick="resizePanel('fundamentals', -1)">−</button>
-            <button class="size-btn" onclick="resizePanel('fundamentals', 1)">+</button>
-          </div>
+    <!-- ▸ NEWS ─────────────────────────────────────────────────── -->
+    <section class="panel" id="panel-news" data-panel="news">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ News Hub</h3>
+          <div id="newsModeLabel" class="mode-label">Mode: Ticker</div>
         </div>
-        <div id="financials" class="panel-content"></div>
-      </section>
-
-      <section class="panel" id="panel-news" data-panel="news" data-size="1">
-        <div class="panel-head">
-          <div>
-            <h3>News Hub</h3>
-            <div id="newsModeLabel" class="mode-label">Mode: Ticker News</div>
-          </div>
-          <div class="panel-actions">
-            <button class="size-btn" onclick="resizePanel('news', -1)">−</button>
-            <button class="size-btn" onclick="resizePanel('news', 1)">+</button>
-          </div>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('news')" title="Close">✕</button>
         </div>
-        <div id="newsBox" class="panel-content"></div>
-      </section>
+      </div>
+      <div id="newsBox" class="panel-content"></div>
+      <div class="resize-handle" data-dir="n"></div>
+      <div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div>
+      <div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div>
+      <div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div>
+      <div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-news"></div>
+    </section>
 
-      <section class="panel" id="panel-notes" data-panel="notes" data-size="1">
-        <div class="panel-head">
-          <h3>Notes</h3>
-          <div class="panel-actions">
-            <button class="size-btn" onclick="resizePanel('notes', -1)">−</button>
-            <button class="size-btn" onclick="resizePanel('notes', 1)">+</button>
-          </div>
+    <!-- ▸ NOTES ────────────────────────────────────────────────── -->
+    <section class="panel" id="panel-notes" data-panel="notes">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Notes</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('notes')" title="Close">✕</button>
         </div>
-        <div class="panel-content">
-          <textarea id="notesArea" placeholder="Scrivi qui note, idee, target price, link, watchlist..."></textarea>
-        </div>
-      </section>
+      </div>
+      <div class="panel-content">
+        <textarea id="notesArea" placeholder="// target price, watchlist, ideas, links...&#10;// e.g. AAPL — buy above 185, TP 210"></textarea>
+      </div>
+      <div class="resize-handle" data-dir="n"></div>
+      <div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div>
+      <div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div>
+      <div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div>
+      <div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-notes"></div>
+    </section>
 
-      <section class="panel" id="panel-comparables" data-panel="comparables" data-size="1">
-        <div class="panel-head">
-          <h3>Comparables</h3>
-          <div class="panel-actions">
-            <button class="size-btn" onclick="resizePanel('comparables', -1)">−</button>
-            <button class="size-btn" onclick="resizePanel('comparables', 1)">+</button>
-          </div>
+    <!-- ▸ COMPARABLES ──────────────────────────────────────────── -->
+    <section class="panel" id="panel-comparables" data-panel="comparables">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Comparables</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('comparables')" title="Close">✕</button>
         </div>
-        <div id="peers" class="panel-content"></div>
-      </section>
-    </main>
-  </div>
+      </div>
+      <div id="peers" class="panel-content"></div>
+      <div class="resize-handle" data-dir="n"></div>
+      <div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div>
+      <div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div>
+      <div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div>
+      <div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-comparables"></div>
+    </section>
 
-  <script src="script.js"></script>
+  </div><!-- /dashboardCanvas -->
+</div><!-- /app-shell -->
+
+<script src="script.js"></script>
 </body>
 </html>
