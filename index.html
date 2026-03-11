@@ -30,6 +30,18 @@
         <button onclick="searchTopicNews()">Run ↵</button>
       </div>
       <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse">▲</button>
+      <!-- API Status badges — click to open config -->
+      <div class="api-status api-unconfigured" id="apiStatus" title="Alpha Vantage — click to configure" onclick="openApiConfig()">
+        <span class="api-dot"></span>
+        <span>AV</span>
+        <span id="apiCallCount">0/25</span>
+      </div>
+      <div class="api-status api-unconfigured" id="fmpStatus" title="FMP — click to configure" onclick="openApiConfig()">
+        <span class="api-dot"></span>
+        <span>FMP</span>
+        <span id="fmpCallCount">0</span>
+      </div>
+      <button class="api-config-btn" onclick="openApiConfig()" title="API Keys">⚙ API</button>
     </div>
     <div class="topbar-row topbar-row-2" id="topbarRow2">
       <span class="checklist-title">Modules</span>
@@ -325,6 +337,96 @@
 
   </div><!-- /dashboardCanvas -->
 </div><!-- /app-shell -->
+<div id="apiToast" class="api-toast"></div>
+
+<!-- ══ API CONFIG MODAL ════════════════════════════════════════════ -->
+<div id="apiConfigOverlay" class="api-modal-overlay" onclick="closeApiConfig(event)">
+  <div class="api-modal">
+    <div class="api-modal-header">
+      <span class="api-modal-title">⚙ API Keys Configuration</span>
+      <button class="api-modal-close" onclick="closeApiConfig()">✕</button>
+    </div>
+
+    <div class="api-modal-body">
+
+      <!-- AV -->
+      <div class="api-key-block">
+        <div class="api-key-provider">
+          <span class="api-key-name">Alpha Vantage</span>
+          <span class="api-key-badge" id="avBadge">NOT SET</span>
+        </div>
+        <div class="api-key-desc">
+          Quote · Fundamentals · Earnings · Income / Balance / Cash Flow · News + Sentiment<br>
+          Free: <strong>25 calls/day</strong> · <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener">Get free key →</a>
+        </div>
+        <div class="api-key-input-row">
+          <input type="password" id="avKeyInput" class="api-key-field"
+                 placeholder="Paste your Alpha Vantage key here…"
+                 oninput="previewApiKey('av')" autocomplete="off" spellcheck="false" />
+          <button class="api-key-eye" onclick="toggleKeyVisibility('avKeyInput', this)" title="Show/hide">👁</button>
+          <button class="api-key-save" onclick="saveApiKey('av')">Save</button>
+          <button class="api-key-clear" onclick="clearApiKey('av')">Clear</button>
+        </div>
+        <div class="api-key-status" id="avKeyStatus"></div>
+      </div>
+
+      <div class="api-modal-divider"></div>
+
+      <!-- FMP -->
+      <div class="api-key-block">
+        <div class="api-key-provider">
+          <span class="api-key-name">Financial Modeling Prep</span>
+          <span class="api-key-badge" id="fmpBadge">NOT SET</span>
+        </div>
+        <div class="api-key-desc">
+          Analyst Ratings · Price Targets · Forward Estimates · Institutional Holders · Insider Transactions · Management · Earnings Calendar · Live Ratios · Watchlist Prices<br>
+          Free: <strong>250 calls/day</strong> · <a href="https://financialmodelingprep.com/developer/docs/" target="_blank" rel="noopener">Get free key →</a>
+        </div>
+        <div class="api-key-input-row">
+          <input type="password" id="fmpKeyInput" class="api-key-field"
+                 placeholder="Paste your FMP key here…"
+                 oninput="previewApiKey('fmp')" autocomplete="off" spellcheck="false" />
+          <button class="api-key-eye" onclick="toggleKeyVisibility('fmpKeyInput', this)" title="Show/hide">👁</button>
+          <button class="api-key-save" onclick="saveApiKey('fmp')">Save</button>
+          <button class="api-key-clear" onclick="clearApiKey('fmp')">Clear</button>
+        </div>
+        <div class="api-key-status" id="fmpKeyStatus"></div>
+      </div>
+
+      <div class="api-modal-divider"></div>
+
+      <!-- Session stats -->
+      <div class="api-session-stats">
+        <div class="api-stat-row">
+          <span>AV calls this session</span>
+          <span id="modalAvCount">0 / 25</span>
+        </div>
+        <div class="api-stat-row">
+          <span>FMP calls this session</span>
+          <span id="modalFmpCount">0</span>
+        </div>
+        <div class="api-stat-row">
+          <span>Cache entries (sessionStorage)</span>
+          <span id="modalCacheCount">—</span>
+        </div>
+        <button class="api-clear-cache-btn" onclick="clearAllCache()">🗑 Clear session cache</button>
+      </div>
+
+      <div class="api-modal-note">
+        Keys are stored in <code>localStorage</code> (local browser only, never sent anywhere except the respective API).
+      </div>
+    </div><!-- /body -->
+
+    <div class="api-modal-footer">
+      <button class="api-modal-apply" onclick="applyAndReload()">✓ Apply & Reload Data</button>
+      <button class="api-modal-cancel" onclick="closeApiConfig()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="fmp.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
