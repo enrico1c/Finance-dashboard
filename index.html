@@ -17,21 +17,39 @@
       <div class="topbar-divider"></div>
       <span class="live-dot">Live</span>
       <div class="topbar-divider"></div>
+
+      <!-- ── Ticker search — no datalist, no NASDAQ autocomplete ── -->
       <div class="search-group">
         <span class="search-label">Ticker</span>
-        <input id="tickerInput" placeholder="AAPL · NYSE:IBM · MIL:ENI" value="AAPL" oninput="updateExchangeHint()" />
+        <input id="tickerInput"
+               type="text"
+               placeholder="AAPL · MIL:ENI · XETRA:SAP"
+               value="AAPL"
+               autocomplete="off"
+               autocorrect="off"
+               spellcheck="false"
+               style="text-transform:uppercase"
+               oninput="this.value=this.value.toUpperCase();updateExchangeHint()"
+               onkeydown="if(event.key==='Enter')changeTicker()" />
         <button onclick="changeTicker()">Run ↵</button>
       </div>
       <span class="exchange-hint" id="exchangeHint">NASDAQ</span>
       <div class="topbar-divider"></div>
+
+      <!-- ── Topic search ───────────────────────────────────────── -->
       <div class="search-group">
         <span class="search-label">Topic</span>
-        <input id="topicInput" placeholder="Italy · AI · China · Fed..." />
+        <input id="topicInput" placeholder="Italy · AI · China · Fed..."
+               onkeydown="if(event.key==='Enter')searchTopicNews()" />
         <button onclick="searchTopicNews()">Run ↵</button>
       </div>
+
+      <div class="topbar-divider"></div>
+
+      <!-- ── API sidebar toggle button ─────────────────────────── -->
+      <button class="api-config-btn" onclick="toggleApiSidebar()" title="Configure API Keys">⚙ API</button>
+
       <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse">▲</button>
-      <!-- Dynamic API badges injected here by config.js renderTopbarBadges() -->
-      <button class="api-config-btn" onclick="openApiConfig()" title="API Keys">⚙ API</button>
     </div>
     <div class="topbar-row topbar-row-2" id="topbarRow2">
       <span class="checklist-title">Modules</span>
@@ -45,8 +63,8 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked> Ownership</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked> Comparables</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="notes"        checked> Notes</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"   checked> Watchlist</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="valuation"   checked> Valuation</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked> Watchlist</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="valuation"    checked> Valuation</label>
       </div>
     </div>
   </header>
@@ -110,17 +128,17 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="des" onclick="switchTab('fundamentals','des')">DES</button>
-        <button class="tab-btn" data-tab="fa"  onclick="switchTab('fundamentals','fa')">FA</button>
-        <button class="tab-btn" data-tab="ern" onclick="switchTab('fundamentals','ern')">ERN</button>
-        <button class="tab-btn" data-tab="ee"  onclick="switchTab('fundamentals','ee')">EE</button>
-        <button class="tab-btn" data-tab="wacc"onclick="switchTab('fundamentals','wacc')">WACC</button>
+        <button class="tab-btn active" data-tab="des"  onclick="switchTab('fundamentals','des')">DES</button>
+        <button class="tab-btn"        data-tab="fa"   onclick="switchTab('fundamentals','fa')">FA</button>
+        <button class="tab-btn"        data-tab="ern"  onclick="switchTab('fundamentals','ern')">ERN</button>
+        <button class="tab-btn"        data-tab="ee"   onclick="switchTab('fundamentals','ee')">EE</button>
+        <button class="tab-btn"        data-tab="wacc" onclick="switchTab('fundamentals','wacc')">WACC</button>
       </div>
-      <div class="tab-pane active panel-content" data-tab="des" id="fund-des"></div>
-      <div class="tab-pane        panel-content" data-tab="fa"  id="fund-fa"></div>
-      <div class="tab-pane        panel-content" data-tab="ern" id="fund-ern"></div>
-      <div class="tab-pane        panel-content" data-tab="ee"  id="fund-ee"></div>
-      <div class="tab-pane        panel-content" data-tab="wacc"id="fund-wacc"></div>
+      <div class="tab-pane active panel-content" data-tab="des"  id="fund-des"></div>
+      <div class="tab-pane        panel-content" data-tab="fa"   id="fund-fa"></div>
+      <div class="tab-pane        panel-content" data-tab="ern"  id="fund-ern"></div>
+      <div class="tab-pane        panel-content" data-tab="ee"   id="fund-ee"></div>
+      <div class="tab-pane        panel-content" data-tab="wacc" id="fund-wacc"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -276,7 +294,6 @@
           <button class="icon-btn close" onclick="hidePanel('watchlist')">✕</button>
         </div>
       </div>
-      <!-- sort bar -->
       <div class="wl-sortbar">
         <span class="wl-sort-label">Sort by:</span>
         <button class="wl-sort-btn active" onclick="sortWatchlist('name')">Name</button>
@@ -304,7 +321,6 @@
           <div class="mode-label" id="valuationLabel">Select a stock from Watchlist</div>
         </div>
         <div class="panel-actions">
-          <!-- method selector -->
           <select class="val-method-select" id="valMethodSelect" onchange="renderValuation(currentValTicker)">
             <option value="all">All Methods</option>
             <option value="multiples">Multiples</option>
@@ -326,97 +342,16 @@
     </section>
 
   </div><!-- /dashboardCanvas -->
+
+  <!-- Toast notification (used by api.js) -->
+  <div id="apiToast" class="api-toast"></div>
+
 </div><!-- /app-shell -->
-<div id="apiToast" class="api-toast"></div>
 
-<!-- ══ API CONFIG MODAL — dynamic, extensible ══════════════════════ -->
-<div id="apiConfigOverlay" class="api-modal-overlay">
-  <div class="api-modal">
-
-    <div class="api-modal-header">
-      <div class="api-modal-header-left">
-        <span class="api-modal-title">⚙ API Keys</span>
-        <span class="api-modal-subtitle">Stored in your browser · never shared</span>
-      </div>
-      <button class="api-modal-close" onclick="closeApiConfig()">✕</button>
-    </div>
-
-    <!-- Tab bar — data-tab drives switchApiTab() in config.js -->
-    <div class="api-tab-bar">
-      <button class="api-tab active" data-tab="providers">Providers</button>
-      <button class="api-tab"        data-tab="custom">+ Add Custom</button>
-      <button class="api-tab"        data-tab="session">Session Stats</button>
-    </div>
-
-    <!-- ── TAB: Providers ────────────────────────────────────────── -->
-    <div class="api-tab-pane active" id="apiTab-providers">
-      <div id="apiProviderList"><!-- filled by renderProviderList() --></div>
-    </div>
-
-    <!-- ── TAB: Add custom provider ──────────────────────────────── -->
-    <div class="api-tab-pane" id="apiTab-custom">
-      <div class="api-custom-form">
-        <p class="api-custom-intro">
-          Store any API key here. Once saved, access it via
-          <code>window._KEYS["your-id"]</code> in your code.
-        </p>
-        <div class="api-custom-row">
-          <label>Provider name</label>
-          <input id="customName" class="api-key-field" placeholder="e.g. Financial Times" autocomplete="off"/>
-        </div>
-        <div class="api-custom-row">
-          <label>Short ID <span class="api-custom-hint">max 6 chars · badge label</span></label>
-          <input id="customId" class="api-key-field" placeholder="e.g. FT" maxlength="6" autocomplete="off"/>
-        </div>
-        <div class="api-custom-row">
-          <label>API Key</label>
-          <div class="api-key-input-row">
-            <input type="password" id="customKey" class="api-key-field"
-                   placeholder="Paste key here…" autocomplete="off" spellcheck="false"/>
-            <button class="api-key-eye" onclick="toggleKeyVis('customKey',this)" title="Show/hide">👁</button>
-          </div>
-        </div>
-        <div class="api-custom-row">
-          <label>Description <span class="api-custom-hint">optional</span></label>
-          <input id="customDesc" class="api-key-field" placeholder="e.g. News &amp; market data" autocomplete="off"/>
-        </div>
-        <div class="api-custom-row">
-          <label>Docs URL <span class="api-custom-hint">optional</span></label>
-          <input id="customUrl" class="api-key-field" placeholder="https://…" autocomplete="off"/>
-        </div>
-        <button class="api-custom-add-btn" onclick="addCustomProvider()">+ Save Provider</button>
-        <div class="api-key-status" id="customStatus"></div>
-      </div>
-      <div class="api-modal-divider" style="margin:12px 0 8px"></div>
-      <div class="api-custom-saved-title">Saved custom providers</div>
-      <div id="customSavedList"><!-- filled dynamically --></div>
-    </div>
-
-    <!-- ── TAB: Session stats ─────────────────────────────────────── -->
-    <div class="api-tab-pane" id="apiTab-session">
-      <div id="apiSessionStats"><!-- filled by renderSessionStats() --></div>
-      <div style="margin-top:10px">
-        <button class="api-clear-cache-btn" onclick="clearAllCache()">🗑 Clear session cache</button>
-      </div>
-      <div class="api-modal-note" style="margin-top:10px">
-        Cache expires after 15 min. Clearing forces a fresh fetch on next ticker load.
-      </div>
-    </div>
-
-    <div class="api-modal-footer">
-      <div class="api-modal-note-inline">
-        🔒 Keys in <code>localStorage</code> — only sent directly to the respective API endpoint.
-      </div>
-      <button class="api-modal-apply"  onclick="applyAndReload()">✓ Apply & Reload</button>
-      <button class="api-modal-cancel" onclick="closeApiConfig()">Close</button>
-    </div>
-
-  </div>
-</div>
-
+<!-- Scripts — config.js must load before api.js/fmp.js, after script.js -->
 <script src="config.js"></script>
+<script src="script.js"></script>
 <script src="api.js"></script>
 <script src="fmp.js"></script>
-<script src="script.js"></script>
 </body>
 </html>
