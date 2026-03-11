@@ -1764,3 +1764,31 @@ textarea::placeholder { color:var(--text-muted); }
   transition: all .15s;
 }
 .api-modal-cancel:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+/* ── API badge pill (replaces api-key-badge-icon) ────────────────── */
+.api-badge-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; padding: 2px 6px;
+  background: var(--accent-glow);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 800;
+  letter-spacing: .08em; color: var(--accent-bright);
+  flex-shrink: 0;
+}
+
+/* ── Custom provider form intro text ─────────────────────────────── */
+.api-custom-intro {
+  font-size: 11px; color: var(--text-secondary);
+  line-height: 1.6; margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.api-custom-intro code {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--accent-bright);
+  background: rgba(26,107,255,.12);
+  padding: 1px 4px; border-radius: 3px;
+}
