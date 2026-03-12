@@ -553,36 +553,24 @@ function avRenderFA(sym, income, balance, cashflow) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   RENDER: NEWS  (CN tab — real articles)
+   RENDER: NEWS  (delegates to renderNewsFeed in script.js)
    ══════════════════════════════════════════════════════════════════ */
 function avRenderNews(sym, articles) {
-  const cn = document.getElementById("news-cn");
-  if (!cn || !articles.length) return;
-
-  const sentColor = s =>
-    s === "Bullish" || s === "Somewhat-Bullish" ? "var(--accent-green)" :
-    s === "Bearish" || s === "Somewhat-Bearish" ? "var(--accent-red)"   :
-    "var(--text-muted)";
-
-  cn.innerHTML = `
-    <div class="av-live-badge">● LIVE NEWS  <span class="av-ts">${articles.length} articles</span></div>
-    <div class="news-list">
-      ${articles.map(a => {
-        const dt = a.publishedAt
-          ? a.publishedAt.slice(0,4)+"-"+a.publishedAt.slice(4,6)+"-"+a.publishedAt.slice(6,8)
-            +" "+a.publishedAt.slice(9,11)+":"+a.publishedAt.slice(11,13)
-          : "";
-        return `<div class="news-item av-news-item">
-          <a href="${a.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(a.title)}</a>
-          <div class="news-meta-row">
-            <span class="news-meta">${escapeHtml(a.source)}</span>
-            <span class="news-dt">${dt}</span>
-            ${a.sentiment ? `<span class="news-sentiment" style="color:${sentColor(a.sentiment)}">${a.sentiment}</span>` : ""}
-          </div>
-          ${a.summary ? `<div class="news-summary">${escapeHtml(a.summary.slice(0,160))}…</div>` : ""}
-        </div>`;
-      }).join("")}
-    </div>`;
+  if (!articles?.length) return;
+  // Normalise AV article shape to match niCard expectations
+  const normalised = articles.map(a => ({
+    headline:    a.title,
+    source:      a.source,
+    datetime:    a.publishedAt,   // AV format "20250312T143000"
+    sentiment:   a.sentiment,
+    category:    null,
+    summary:     a.summary,
+    url:         a.url,
+    image:       a.banner,
+  }));
+  if (typeof renderNewsFeed === "function") {
+    renderNewsFeed(sym, normalised, "av");
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
