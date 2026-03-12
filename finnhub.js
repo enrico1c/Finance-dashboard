@@ -526,27 +526,10 @@ function fhRenderEarnings(sym, earnings) {
 
 /* ── Render: News CN tab ─────────────────────────────────────────── */
 function fhRenderNews(sym, articles) {
-  const cn = document.getElementById("news-cn");
-  if (!cn || !articles?.length) return;
-  const sentClass = s => s === "Bullish" ? "pos" : s === "Bearish" ? "neg" : "";
-  cn.innerHTML = `
-    <div class="av-live-badge">● LIVE — Finnhub Company News  <span class="av-ts">${articles.length} articles</span></div>
-    <div class="news-list">
-      ${articles.map(a => `
-        <div class="news-item">
-          ${a.image ? `<div class="news-img-wrap"><img src="${fhEsc(a.image)}" alt="" loading="lazy" onerror="this.parentElement.remove()"/></div>` : ""}
-          <div class="news-headline">${fhEsc(a.headline)}</div>
-          <div class="news-meta">
-            <span>${fhEsc(a.source)}</span>
-            <span>${fhUnixDate(a.datetime)}</span>
-            ${a.category ? `<span><em>${fhEsc(a.category)}</em></span>` : ""}
-          </div>
-          ${a.summary ? `<div class="news-summary">${fhEsc(a.summary.slice(0,250))}…</div>` : ""}
-          <div class="news-actions">
-            <a href="${fhEsc(a.url)}" target="_blank" rel="noopener" class="news-read-more">Read full article ↗</a>
-          </div>
-        </div>`).join("")}
-    </div>`;
+  if (!articles?.length) return;
+  if (typeof renderNewsFeed === "function") {
+    renderNewsFeed(sym, articles, "fh");
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
