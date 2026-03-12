@@ -458,29 +458,199 @@ h1 {
 .metric-down span:last-child { color:var(--accent-red); }
 
 /* ─── NEWS ───────────────────────────────────────────────────────── */
-.news-list { display:flex; flex-direction:column; gap:6px; }
+/* ══════════════════════════════════════════════════════════════════
+   NEWS CARDS — compact template, expand on click
+   ══════════════════════════════════════════════════════════════════ */
+.news-list { display:flex; flex-direction:column; gap:4px; }
 
+/* ── Card shell ───────────────────────────────────────────────────── */
 .news-item {
-  background:var(--bg-surface); border:1px solid var(--border);
-  border-left:2px solid var(--accent); border-radius:var(--radius-md);
-  padding:8px 10px; transition:all var(--transition);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color var(--transition), background var(--transition);
+  cursor: pointer;
 }
-.news-item:hover {
-  border-left-color:var(--accent-bright); background:var(--bg-hover);
-  transform:translateX(2px);
+.news-item:hover          { border-color: var(--border-bright); background: var(--bg-hover); }
+.news-item.ni-open        { border-color: var(--accent); }
+
+/* ── Collapsed row (always visible) ──────────────────────────────── */
+.ni-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 6px;
+  padding: 7px 10px;
 }
-.news-item a {
-  font-family:var(--font-sans); font-size:12px; font-weight:500;
-  color:var(--text-primary); text-decoration:none; display:block;
-  line-height:1.35; transition:color var(--transition);
+.ni-left  { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ni-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+
+/* Headline */
+.ni-headline {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.35;
+  /* clamp to 2 lines when collapsed */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.news-item a:hover { color:var(--accent-bright); }
+.ni-open .ni-headline {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+/* Meta row: source · date */
+.ni-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Sentiment badge */
+.ni-sent {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.ni-sent-bull { color: var(--accent-green); border-color: rgba(0,200,100,.3); background: rgba(0,200,100,.08); }
+.ni-sent-bear { color: #ff4757; border-color: rgba(255,71,87,.3); background: rgba(255,71,87,.08); }
+.ni-sent-neut { color: var(--text-muted); border-color: var(--border); }
+
+/* Expand chevron */
+.ni-chevron {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  transition: transform .2s;
+  user-select: none;
+}
+.ni-open .ni-chevron { transform: rotate(180deg); color: var(--accent); }
+
+/* ── Expanded drawer ──────────────────────────────────────────────── */
+.ni-drawer {
+  display: none;
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 0;
+}
+.ni-open .ni-drawer { display: block; }
+
+.ni-summary {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 8px 0 10px;
+}
+.ni-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  transition: all var(--transition);
+}
+.ni-link:hover { background: var(--accent-glow); color: var(--accent-bright); border-color: var(--accent-bright); }
+
+/* Legacy selectors (eodhd/apitube still write these) */
 .news-meta {
   margin-top:3px; font-family:var(--font-mono); font-size:9px;
   font-weight:600; letter-spacing:.1em; text-transform:uppercase;
   color:var(--accent);
 }
 .news-summary { margin-top:3px; font-size:11px; color:var(--text-muted); line-height:1.4; }
+
+/* ── Thumbnail ────────────────────────────────────────────────────── */
+.ni-thumb {
+  width: 54px; height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  align-self: center;
+}
+.ni-thumb img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+/* when thumb present, ni-row needs flex not grid */
+.ni-row.has-thumb {
+  display: flex; align-items: center; gap: 8px;
+}
+.ni-row.has-thumb .ni-left { flex: 1; min-width: 0; }
+
+/* ── Meta sub-elements ────────────────────────────────────────────── */
+.ni-source { color: var(--accent); font-weight: 700; }
+.ni-dot    { color: var(--text-muted); margin: 0 2px; }
+.ni-time   { color: var(--text-muted); }
+.ni-cat {
+  display: inline-block;
+  margin-left: 4px;
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 1px 5px; border-radius: 2px;
+  color: var(--accent-yellow, #ffa500);
+  border: 1px solid rgba(255,165,0,.25);
+  background: rgba(255,165,0,.06);
+}
+
+/* ── Provider badge in feed header ───────────────────────────────── */
+.ni-feed-badge { display: flex; align-items: center; gap: 6px; }
+.ni-prov-tag {
+  font-family: var(--font-mono); font-size: 8px; font-weight: 800;
+  letter-spacing: .08em; padding: 1px 6px; border-radius: 3px; border: 1px solid;
+}
+.ni-badge-fh  { color: var(--accent); border-color: rgba(26,107,255,.4); background: rgba(26,107,255,.08); }
+.ni-badge-av  { color: #ffa500; border-color: rgba(255,165,0,.4); background: rgba(255,165,0,.08); }
+.ni-badge-eod { color: var(--accent-green); border-color: rgba(0,200,100,.3); background: rgba(0,200,100,.06); }
+
+/* ── Source links (no-API-key shortcuts) ─────────────────────────── */
+.ni-sources-wrap {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+.ni-sources-label {
+  font-family: var(--font-mono); font-size: 9px; color: var(--text-muted);
+  letter-spacing: .06em; margin-bottom: 6px;
+}
+.ni-sources-list {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.ni-src-btn {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.ni-src-btn:hover {
+  color: var(--accent-bright);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
 
 /* ─── TEXTAREA ───────────────────────────────────────────────────── */
 textarea {
