@@ -20,6 +20,13 @@ function fmtB(n){
   return "$"+Math.abs(n).toFixed(0);
 }
 
+/* ── News card toggle (shared by all news renderers) ─────────────── */
+function niToggle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("ni-open");
+}
+
 /* ── Exchange DB ─────────────────────────────────────────────────── */
 const exchangeDB = {
   // ── US NASDAQ ─────────────────────────────────────────────
@@ -359,52 +366,150 @@ function renderFundamentals(ticker){
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   RENDER: NEWS  — flat live feed, no tabs
-   Priority: Finnhub → EODHD → APITube → AV
-   news-feed = visible container; news-cn/evts/brc/bi = hidden legacy
+   NEWS HELPERS  — shared by all API renderers
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Relative time: "2h ago", "3d ago" */
+function niRelTime(ts) {
+  // ts = ISO string "20250312T1430..." OR unix seconds (number) OR "YYYY-MM-DD"
+  let ms;
+  if (typeof ts === "number") {
+    ms = ts > 1e10 ? ts : ts * 1000; // unix ms vs unix s
+  } else if (typeof ts === "string") {
+    if (/^\d{8}T/.test(ts)) {
+      // AV format: "20250312T143000"
+      const s = ts.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2}).*/, "$1-$2-$3T$4:$5:00Z");
+      ms = Date.parse(s);
+    } else {
+      ms = Date.parse(ts);
+    }
+  }
+  if (!ms || isNaN(ms)) return "";
+  const diff = Date.now() - ms;
+  if (diff < 3600000)  return Math.floor(diff/60000)  + "m ago";
+  if (diff < 86400000) return Math.floor(diff/3600000) + "h ago";
+  if (diff < 604800000)return Math.floor(diff/86400000)+ "d ago";
+  return new Date(ms).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
+}
+
+/* Build a single news card HTML */
+function niCard(id, {headline, source, ts, sentiment, category, summary, url, image}) {
+  const timeStr = niRelTime(ts);
+  const sentCls = sentiment === "Bullish" || sentiment === "Somewhat-Bullish" ? "ni-sent-bull"
+                : sentiment === "Bearish" || sentiment === "Somewhat-Bearish" ? "ni-sent-bear"
+                : "";
+  const sentLbl = sentiment ? sentiment.replace("Somewhat-","~") : "";
+
+  const imgHtml = image
+    ? `<div class="ni-thumb"><img src="${escapeHtml(image)}" alt="" loading="lazy" onerror="this.closest('.ni-thumb').remove()"/></div>`
+    : "";
+  const catHtml = category
+    ? `<span class="ni-cat">${escapeHtml(category)}</span>`
+    : "";
+  const sentHtml = sentCls
+    ? `<span class="ni-sent ${sentCls}">${escapeHtml(sentLbl)}</span>`
+    : "";
+
+  return `<div class="news-item" id="${id}" onclick="niToggle('${id}')">
+    <div class="ni-row${image ? ' has-thumb' : ''}">
+      ${imgHtml}
+      <div class="ni-left">
+        <div class="ni-headline">${escapeHtml(headline||"")}</div>
+        <div class="ni-meta">
+          <span class="ni-source">${escapeHtml(source||"")}</span>
+          ${timeStr ? `<span class="ni-dot">·</span><span class="ni-time">${timeStr}</span>` : ""}
+          ${catHtml}
+        </div>
+      </div>
+      <div class="ni-right">
+        ${sentHtml}
+        <span class="ni-chevron">▼</span>
+      </div>
+    </div>
+    <div class="ni-drawer">
+      ${summary ? `<p class="ni-summary">${escapeHtml(summary.slice(0,400))}${summary.length>400?"…":""}</p>` : ""}
+      <a href="${escapeHtml(url||"#")}" target="_blank" rel="noopener noreferrer"
+         class="ni-link" onclick="event.stopPropagation()">Read full article ↗</a>
+    </div>
+  </div>`;
+}
+
+/* Quick-search links to sources that don't need an API key */
+function niSourceLinks(sym) {
+  const q = encodeURIComponent(sym);
+  const sources = [
+    { name:"Reuters",        url:`https://www.reuters.com/site-search/?query=${q}` },
+    { name:"Bloomberg",      url:`https://www.bloomberg.com/search?query=${q}` },
+    { name:"FT",             url:`https://www.ft.com/search?q=${q}` },
+    { name:"WSJ",            url:`https://www.wsj.com/search?query=${q}` },
+    { name:"CNBC",           url:`https://www.cnbc.com/search/?query=${q}` },
+    { name:"SeekingAlpha",   url:`https://seekingalpha.com/search#q=${q}&tab=news` },
+    { name:"MarketWatch",    url:`https://www.marketwatch.com/search?q=${q}&ts=0&tab=All%20News` },
+    { name:"Yahoo Finance",  url:`https://finance.yahoo.com/quote/${q}/news/` },
+    { name:"Google News",    url:`https://news.google.com/search?q=${q}` },
+    { name:"The Economist",  url:`https://www.economist.com/search?q=${q}` },
+  ];
+  return `<div class="ni-sources-wrap">
+    <div class="ni-sources-label">// Search without API key</div>
+    <div class="ni-sources-list">
+      ${sources.map(s => `<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn">${escapeHtml(s.name)}</a>`).join("")}
+    </div>
+  </div>`;
+}
+
+/* Central render function — ALL API providers call this */
+function renderNewsFeed(sym, articles, provider) {
+  const feed = document.getElementById("news-feed");
+  if (!feed) return;
+  if (!articles || !articles.length) return;
+
+  const badgeCls = provider === "fh" ? "ni-badge-fh" : provider === "av" ? "ni-badge-av" : "ni-badge-eod";
+  const badgeLbl = provider === "fh" ? "Finnhub" : provider === "av" ? "Alpha Vantage" : provider.toUpperCase();
+
+  const cards = articles.map((a, i) => niCard(`ni-${provider}-${i}`, {
+    headline:  a.headline || a.title,
+    source:    a.source,
+    ts:        a.datetime || a.publishedAt || a.date,
+    sentiment: a.sentiment,
+    category:  a.category,
+    summary:   a.summary,
+    url:       a.url,
+    image:     a.image || a.banner,
+  })).join("");
+
+  feed.innerHTML = `
+    <div class="av-live-badge ni-feed-badge">
+      ● LIVE <span class="ni-prov-tag ${badgeCls}">${badgeLbl}</span>
+      <span class="av-ts">${articles.length} articles</span>
+    </div>
+    <div class="news-list">${cards}</div>
+    ${niSourceLinks(sym)}`;
+
+  // Also update hidden news-cn so legacy code doesn't break
+  const cn = document.getElementById("news-cn");
+  if (cn) cn.innerHTML = feed.innerHTML;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RENDER: NEWS — loading state + fallback sources
    ══════════════════════════════════════════════════════════════════ */
 function renderNews(ticker){
   const sym = ticker.replace(/.*:/,"").toUpperCase();
-  // Show loading state in the visible feed container
   const feed = document.getElementById("news-feed");
-  if(feed) feed.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching live news for ${escapeHtml(sym)}…</div>`;
-  // APIs (finnhub fhRenderNews, avRenderNews, eodhd) write to news-cn (hidden).
-  // A MutationObserver below mirrors content into news-feed.
-  // Also: timeout fallback if no API key is configured.
-  setTimeout(() => {
-    const f = document.getElementById("news-feed");
-    if(f && f.querySelector(".av-spinner")){
-      f.innerHTML = `<div class="no-data">// No news API key configured.<br>// Add a Finnhub or Alpha Vantage key via ⚙ API.</div>`;
-    }
-  }, 7000);
-}
+  if (feed) feed.innerHTML =
+    `<div class="av-loading"><span class="av-spinner"></span>Fetching live news for ${escapeHtml(sym)}…</div>
+     ${niSourceLinks(sym)}`;
 
-/* Mirror news-cn → news-feed whenever content arrives from any API */
-(function initNewsMirror(){
-  function mirror(){
-    const src  = document.getElementById("news-cn");
-    const dest = document.getElementById("news-feed");
-    if(!src || !dest) return;
-    if(src.innerHTML && !src.querySelector(".av-spinner")){
-      dest.innerHTML = src.innerHTML;
+  // Fallback: if no API delivers news within 8s, show only source links
+  setTimeout(()=>{
+    const f = document.getElementById("news-feed");
+    if (f && f.querySelector(".av-spinner")) {
+      f.innerHTML =
+        `<div class="no-data" style="margin-bottom:10px">// No news API key configured.<br>// Add Finnhub or Alpha Vantage via ⚙ API for live articles.</div>
+         ${niSourceLinks(sym)}`;
     }
-  }
-  // Poll every 400ms for 30s after page load (APIs write async)
-  let polls = 0;
-  const iv = setInterval(()=>{
-    mirror();
-    if(++polls > 75) clearInterval(iv);
-  }, 400);
-  // Also observe mutations on news-cn
-  const obs = new MutationObserver(mirror);
-  function attachObs(){
-    const src = document.getElementById("news-cn");
-    if(src) obs.observe(src, { childList:true, subtree:true, characterData:true });
-  }
-  if(document.readyState === "loading")
-    document.addEventListener("DOMContentLoaded", attachObs);
-  else attachObs();
-}());
+  }, 8000);
+}
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER: QUOTE  (QR / MON)
