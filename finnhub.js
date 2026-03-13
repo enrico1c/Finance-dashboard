@@ -618,3 +618,100 @@ async function finnhubSectorSearch(sym) {
   );
   return data.filter(Boolean);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   ECONOMIC CALENDAR  → Macro·Intel ECON tab (secondary section)
+   Endpoint: GET /calendar/economic
+   Returns: events with impact H/M/L, actual/estimate/prev
+   ══════════════════════════════════════════════════════════════════ */
+const FH_ECON_CACHE = { data: null, ts: 0, TTL: 30 * 60 * 1000 };
+
+async function fhFetchEconCalendar() {
+  if (FH_ECON_CACHE.data && Date.now() - FH_ECON_CACHE.ts < FH_ECON_CACHE.TTL) {
+    return FH_ECON_CACHE.data;
+  }
+  const from = fhDateStr(0);          // today
+  const to   = fhDateStr(-14);        // +14 days forward (negative = future)
+  // Finnhub date helper uses daysAgo — we need a forward date
+  const d = new Date(); d.setDate(d.getDate() + 14);
+  const toDate = d.toISOString().slice(0,10);
+  const data = await fhFetch('/calendar/economic', { from, to: toDate });
+  const events = (data?.economicCalendar || []);
+  FH_ECON_CACHE.data = events;
+  FH_ECON_CACHE.ts   = Date.now();
+  return events;
+}
+
+async function fhRenderEconCalendar(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const key = getFinnhubKey();
+  if (!key) {
+    el.insertAdjacentHTML('beforeend',
+      `<div class="fred-section-head" style="margin-top:14px">📅 Economic Calendar</div>
+       <div class="no-data">// Finnhub key required.<br>
+       <a href="#" onclick="openApiConfig('finnhub');return false" style="color:var(--accent)">Add key →</a></div>`);
+    return;
+  }
+  el.insertAdjacentHTML('beforeend',
+    `<div class="fred-section-head" style="margin-top:14px" id="econ-cal-head">📅 Economic Calendar <span class="av-spinner" style="display:inline-block;width:10px;height:10px"></span></div>
+     <div id="econ-cal-body"></div>`);
+  try {
+    const events = await fhFetchEconCalendar();
+    const now = Date.now();
+    // Show next 14 days, high+medium impact, grouped by date
+    const filtered = events
+      .filter(e => e.impact === 'high' || e.impact === 'medium')
+      .sort((a,b) => a.time > b.time ? 1 : -1);
+
+    if (!filtered.length) {
+      document.getElementById('econ-cal-body').innerHTML = '<div class="no-data">No high-impact events in next 14 days.</div>';
+      document.getElementById('econ-cal-head').innerHTML = '📅 Economic Calendar';
+      return;
+    }
+
+    // Group by date
+    const byDate = {};
+    for (const e of filtered) {
+      const d = (e.time || '').slice(0,10);
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(e);
+    }
+
+    let html = '';
+    const impactColor = { high:'#ff4d4d', medium:'#ffaa00', low:'var(--text-dim)' };
+    const impactIcon  = { high:'🔴', medium:'🟡', low:'⚪' };
+
+    for (const [date, evts] of Object.entries(byDate)) {
+      const label = (() => {
+        const d = new Date(date + 'T12:00:00Z');
+        return d.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' });
+      })();
+      html += `<div class="fh-econ-date-head">${label}</div>`;
+      for (const e of evts) {
+        const actual  = e.actual  != null ? `<b style="color:var(--accent)">${fhEsc(String(e.actual))}${e.unit||''}</b>` : '—';
+        const est     = e.estimate != null ? `${fhEsc(String(e.estimate))}${e.unit||''}` : '—';
+        const prev    = e.prev    != null ? `${fhEsc(String(e.prev))}${e.unit||''}`    : '—';
+        const beat    = e.actual != null && e.estimate != null
+          ? (parseFloat(e.actual) > parseFloat(e.estimate) ? '<span style="color:#4caf50">BEAT</span>'
+            : parseFloat(e.actual) < parseFloat(e.estimate) ? '<span style="color:#ff4d4d">MISS</span>' : '')
+          : '';
+        html += `<div class="fh-econ-row">
+          <span class="fh-econ-impact" title="${e.impact}" style="color:${impactColor[e.impact]||'inherit'}">${impactIcon[e.impact]||'⚪'}</span>
+          <span class="fh-econ-country">${fhEsc(e.country||'')}</span>
+          <span class="fh-econ-event">${fhEsc(e.event||'')} ${beat}</span>
+          <span class="fh-econ-actual">${actual}</span>
+          <span class="fh-econ-est">est ${est}</span>
+          <span class="fh-econ-prev">prev ${prev}</span>
+        </div>`;
+      }
+    }
+
+    document.getElementById('econ-cal-body').innerHTML = html;
+    document.getElementById('econ-cal-head').innerHTML = `📅 Economic Calendar · ${filtered.length} events`;
+  } catch(err) {
+    const b = document.getElementById('econ-cal-body');
+    if (b) b.innerHTML = `<div class="no-data">// Calendar error: ${fhEsc(err.message)}</div>`;
+    document.getElementById('econ-cal-head').innerHTML = '📅 Economic Calendar';
+  }
+}
