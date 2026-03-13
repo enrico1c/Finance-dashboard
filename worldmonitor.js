@@ -811,3 +811,701 @@ function wmInitAll() {
 }
 
 document.addEventListener('DOMContentLoaded', wmInitAll);
+
+/* ══════════════════════════════════════════════════════════════════
+   INTEL FEED PANEL
+   Breaking alerts: riskScores delta, insights, unrest, iran events,
+   cyberThreats — styled like WorldMonitor Intelligence Findings
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── State ──────────────────────────────────────────────────────── */
+let wmIntelAlerts       = [];       // master list, newest first
+let wmIntelSeenIds      = new Set();
+let wmIntelPopupEnabled = false;
+let wmIntelBreaking     = true;
+let wmIntelFilter       = 'all';
+
+/* ── Map resource/event keyword → finterm topic ────────────────── */
+const WM_RESOURCE_TOPIC = {
+  // Energy
+  'oil':'oil', 'crude':'oil', 'wti':'oil', 'brent':'oil',
+  'lng':'lng', 'natural gas':'gas', 'gas':'gas',
+  'petroleum':'oil', 'energy':'energy', 'pipeline':'energy',
+  // Metals & mining
+  'gold':'gold', 'silver':'silver', 'copper':'copper', 'iron':'iron',
+  'steel':'steel', 'aluminum':'aluminum', 'lithium':'lithium',
+  'cobalt':'mining', 'uranium':'mining', 'rare earths':'mining',
+  'palladium':'metals', 'titanium':'metals', 'nickel':'metals',
+  'tin':'metals', 'tungsten':'metals',
+  // Agriculture
+  'wheat':'agriculture', 'grain':'agriculture', 'corn':'agriculture',
+  'soy':'agriculture', 'cotton':'agriculture', 'sesame':'agriculture',
+  'fertilizer':'agriculture', 'potash':'agriculture',
+  // Shipping & logistics
+  'shipping':'shipping', 'container':'shipping', 'suez':'shipping',
+  'hormuz':'oil', 'chokepoint':'shipping', 'red sea':'shipping',
+  'taiwan strait':'semiconductor', 'black sea':'grain',
+  // Tech & semiconductors
+  'semiconductor':'semiconductor', 'chip':'semiconductor', 'tsmc':'semiconductor',
+  'tech':'tech', 'technology':'tech',
+  // Defense & conflict
+  'defense':'defense', 'military':'defense', 'war':'defense',
+  'conflict':'defense', 'sanctions':'defense',
+  // Finance & macro
+  'dollar':'finance', 'fed':'finance', 'inflation':'finance',
+  'gdp':'finance', 'macro':'finance',
+  // Countries → sectors
+  'ukraine':'energy', 'russia':'energy', 'iran':'oil',
+  'china':'tech', 'taiwan':'semiconductor',
+  'iran instability':'oil', 'lebanon':'defense', 'iraq':'oil',
+};
+
+function wmResourceToTopic(label) {
+  const lc = label.toLowerCase();
+  for (const [kw, topic] of Object.entries(WM_RESOURCE_TOPIC)) {
+    if (lc.includes(kw)) return topic;
+  }
+  return lc.split(/[\s/,]+/)[0]; // fallback: first word
+}
+
+/* ── Build alert objects from bootstrap data ───────────────────── */
+function wmBuildIntelAlerts(d) {
+  const now  = Date.now();
+  const list = [];
+
+  // 1. Insights (highest priority)
+  const insights = d.insights?.insights || d.insights?.items || d.insights?.data || d.insights || [];
+  (Array.isArray(insights) ? insights : []).forEach((s, i) => {
+    const sev = s.severity || s.importance || s.level || s.priority || 'medium';
+    const id  = `insight-${s.id || s.timestamp || i}`;
+    list.push({
+      id, type:'insight', icon:'🧠',
+      severity: sev,
+      title: s.title || s.headline || s.summary || 'Intelligence signal',
+      subtitle: s.body || s.description || '',
+      detail: s.recommendation || s.action || '',
+      ts: s.timestamp || s.publishedAt || s.date || now,
+      ticker: s.ticker || s.symbol || s.asset || null,
+      tags:   s.tags || [],
+      resource: s.title || '',
+    });
+  });
+
+  // 2. Iran events (always high priority)
+  const irans = d.iranEvents?.events || d.iranEvents?.data || d.iranEvents || [];
+  (Array.isArray(irans) ? irans : []).forEach((e, i) => {
+    const id = `iran-${e.id || e.timestamp || i}`;
+    list.push({
+      id, type:'iran', icon:'🇮🇷',
+      severity: e.severity || e.level || 'high',
+      title: e.title || e.description || e.event || 'Iran event',
+      subtitle: e.location ? `📍 ${e.location}` : '',
+      detail: e.note || '',
+      ts: e.timestamp || e.date || now,
+      ticker: null,
+      resource: e.title || '',
+    });
+  });
+
+  // 3. Unrest events
+  const unrest = d.unrestEvents?.events || d.unrestEvents?.data || d.unrestEvents || [];
+  (Array.isArray(unrest) ? unrest : []).slice(0, 8).forEach((u, i) => {
+    const id = `unrest-${u.id || u.timestamp || i}`;
+    list.push({
+      id, type:'unrest', icon:'✊',
+      severity: u.severity || u.level || 'medium',
+      title: `"${u.country || u.location || u.topic || 'Unrest'}" Trending`,
+      subtitle: u.description || u.title || '',
+      detail: u.note || '',
+      ts: u.timestamp || u.eventDate || now,
+      ticker: null,
+      resource: u.country || '',
+    });
+  });
+
+  // 4. Risk score spikes (score > 60 = high, > 80 = critical)
+  const riskRaw = d.riskScores?.scores || d.riskScores?.data || d.riskScores || {};
+  const riskArr = Array.isArray(riskRaw) ? riskRaw :
+    Object.entries(riskRaw).map(([k, v]) => typeof v === 'object' ? { country: k, ...v } : { country: k, score: v });
+  riskArr.filter(r => (r.score ?? 0) >= 60).sort((a, b) => b.score - a.score).slice(0, 6).forEach((r, i) => {
+    const id  = `risk-${r.country || i}`;
+    const pct = Math.round(r.score ?? 0);
+    const sev = pct >= 80 ? 'critical' : 'high';
+    list.push({
+      id, type:'risk', icon:'🌡',
+      severity: sev,
+      title: `${r.country || r.code || 'Country'} Instability ${sev === 'critical' ? 'Critical' : 'Rising'}`,
+      subtitle: `Instability index ${pct}/100. ${r.driver || r.cause || r.note || ''}`,
+      detail: r.summary || '',
+      ts: r.updatedAt || now,
+      ticker: null,
+      resource: r.country || '',
+    });
+  });
+
+  // 5. Weather alerts
+  const wx = d.weatherAlerts?.alerts || d.weatherAlerts?.data || d.weatherAlerts || [];
+  (Array.isArray(wx) ? wx : []).filter(a => {
+    const sev = (a.severity || '').toLowerCase();
+    return ['extreme','severe','high','critical'].includes(sev);
+  }).slice(0, 5).forEach((a, i) => {
+    const id = `wx-${a.id || a.timestamp || i}`;
+    list.push({
+      id, type:'weather', icon:'🌪',
+      severity: a.severity || 'high',
+      title: a.headline || a.event || a.title || 'Severe Weather Alert',
+      subtitle: a.area || a.regions?.join(', ') || a.country || '',
+      detail: a.instruction || a.description || '',
+      ts: a.timestamp || a.onset || now,
+      ticker: null,
+      resource: a.event || 'weather',
+    });
+  });
+
+  // 6. Cyber threats
+  const cyber = d.cyberThreats?.threats || d.cyberThreats?.data || d.cyberThreats || [];
+  (Array.isArray(cyber) ? cyber : []).slice(0, 4).forEach((c, i) => {
+    const id = `cyber-${c.id || c.timestamp || i}`;
+    list.push({
+      id, type:'cyber', icon:'💻',
+      severity: c.severity || c.level || 'medium',
+      title: c.title || c.name || c.type || 'Cyber threat',
+      subtitle: c.target || c.sector || c.description || '',
+      detail: c.indicator || c.cve || '',
+      ts: c.timestamp || c.detectedAt || now,
+      ticker: null,
+      resource: c.sector || 'cyber',
+    });
+  });
+
+  // Sort: critical first, then by time
+  const sevOrd = { critical: 4, extreme: 4, high: 3, elevated: 3, medium: 2, low: 1 };
+  list.sort((a, b) => {
+    const sd = (sevOrd[b.severity?.toLowerCase()] || 1) - (sevOrd[a.severity?.toLowerCase()] || 1);
+    if (sd !== 0) return sd;
+    const at = a.ts > 1e12 ? a.ts : a.ts * 1000;
+    const bt = b.ts > 1e12 ? b.ts : b.ts * 1000;
+    return bt - at;
+  });
+
+  return list;
+}
+
+/* ── Render the intel feed ──────────────────────────────────────── */
+function wmRenderIntelFeed() {
+  const el = document.getElementById('intel-feed-list');
+  if (!el) return;
+
+  const filtered = wmIntelFilter === 'all' ? wmIntelAlerts :
+    wmIntelAlerts.filter(a => a.type === wmIntelFilter);
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="wm-intel-empty">No alerts in this category</div>`;
+    return;
+  }
+
+  const critCount = wmIntelAlerts.filter(a =>
+    ['critical','extreme'].includes(a.severity?.toLowerCase())).length;
+
+  const badge = document.getElementById('intel-feed-badge');
+  if (badge) {
+    badge.textContent = critCount > 0 ? `${critCount} CRITICAL` : `${wmIntelAlerts.length} ALERTS`;
+    badge.style.background = critCount > 0 ? '#ff4757' : '#ffa500';
+  }
+
+  el.innerHTML = filtered.map(alert => {
+    const col  = wmSeverityColor(alert.severity);
+    const time = wmRelTime(alert.ts);
+    const sevLabel = (alert.severity || 'INFO').toUpperCase();
+    const topic = wmResourceToTopic(alert.resource || alert.title || '');
+
+    return `<div class="wm-intel-card" data-id="${wmEsc(alert.id)}"
+        style="border-left:3px solid ${col.border}"
+        onclick="wmIntelCardClick(event, ${JSON.stringify(alert).replace(/"/g, '&quot;')})">
+      <div class="wm-ic-header">
+        <span class="wm-ic-icon">${alert.icon}</span>
+        <div class="wm-ic-title">${wmEsc(alert.title)}</div>
+        <span class="wm-ic-badge" style="background:${col.bg};color:${col.text};border-color:${col.border}">${sevLabel}</span>
+      </div>
+      ${alert.subtitle ? `<div class="wm-ic-sub">${wmEsc(alert.subtitle)}</div>` : ''}
+      ${alert.detail ? `<div class="wm-ic-detail">${wmEsc(alert.detail.slice(0, 120))}${alert.detail.length > 120 ? '…' : ''}</div>` : ''}
+      <div class="wm-ic-footer">
+        <span class="wm-ic-time">${time}</span>
+        ${alert.ticker ? `<span class="wm-ic-ticker" onclick="event.stopPropagation();wmResourceLink('${wmEsc(alert.ticker)}','${wmEsc(topic)}')">${wmEsc(alert.ticker)}</span>` : ''}
+        <span class="wm-ic-link" onclick="event.stopPropagation();wmResourceLink('${wmEsc(alert.resource || alert.title || '')}','${wmEsc(topic)}')">→ News &amp; Watchlist</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Popup toast for new breaking alerts
+  if (wmIntelBreaking && wmIntelPopupEnabled) {
+    const newOnes = filtered.filter(a => !wmIntelSeenIds.has(a.id) &&
+      ['critical','extreme','high'].includes(a.severity?.toLowerCase()));
+    newOnes.forEach(a => {
+      wmIntelSeenIds.add(a.id);
+      wmIntelToast(a);
+    });
+  }
+  filtered.forEach(a => wmIntelSeenIds.add(a.id));
+}
+
+/* ── Load & refresh intel data ──────────────────────────────────── */
+async function wmIntelLoad() {
+  const el = document.getElementById('intel-feed-list');
+  if (el && !wmIntelAlerts.length) el.innerHTML = wmSpinner('Scanning intelligence feeds…');
+
+  try {
+    const keys = ['insights', 'iranEvents', 'unrestEvents', 'riskScores', 'weatherAlerts', 'cyberThreats'];
+    const d = await wmBootstrap(keys);
+    wmIntelAlerts = wmBuildIntelAlerts(d);
+    wmRenderIntelFeed();
+  } catch(e) {
+    const el2 = document.getElementById('intel-feed-list');
+    if (el2) el2.innerHTML = wmError(e.message);
+  }
+}
+
+/* ── Toast notification ─────────────────────────────────────────── */
+function wmIntelToast(alert) {
+  const col = wmSeverityColor(alert.severity);
+  const t = document.createElement('div');
+  t.className = 'wm-toast';
+  t.style.cssText = `border-left:3px solid ${col.border};`;
+  t.innerHTML = `<div class="wm-toast-head">
+    <span>${alert.icon}</span>
+    <span class="wm-toast-sev" style="color:${col.text}">${(alert.severity||'').toUpperCase()}</span>
+    <span class="wm-toast-close" onclick="this.parentElement.parentElement.remove()">✕</span>
+  </div>
+  <div class="wm-toast-title">${wmEsc(alert.title)}</div>`;
+  document.body.appendChild(t);
+  setTimeout(() => { t.classList.add('wm-toast-fade'); setTimeout(() => t.remove(), 500); }, 5000);
+}
+
+/* ── Intel panel filter ─────────────────────────────────────────── */
+function wmIntelSetFilter(f) {
+  wmIntelFilter = f;
+  document.querySelectorAll('#panel-intel .wm-intel-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.type === f));
+  wmRenderIntelFeed();
+}
+
+/* ── Intel panel init ───────────────────────────────────────────── */
+function wmIntelInit() {
+  const panel = document.getElementById('panel-intel');
+  if (!panel) return;
+  if (typeof initDrag   === 'function') initDrag(panel);
+  if (typeof initResize === 'function') initResize(panel);
+  if (typeof bringToFront === 'function') bringToFront(panel);
+  wmIntelLoad();
+  // Refresh every 90s
+  setInterval(wmIntelLoad, 90_000);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESOURCE LINK — click on any resource/chokepoint/mineral
+   Opens a side drawer with news + sector watchlist
+   ══════════════════════════════════════════════════════════════════ */
+
+function wmIntelCardClick(event, alert) {
+  // If click was on a specific button, handled by that button
+  if (event.target.closest('.wm-ic-link, .wm-ic-ticker')) return;
+  wmResourceLink(alert.resource || alert.title, wmResourceToTopic(alert.resource || alert.title));
+}
+
+function wmResourceLink(resourceLabel, topic) {
+  // Open the resource drawer
+  wmResourceDrawerOpen(resourceLabel, topic);
+}
+
+/* ── Resource Drawer ────────────────────────────────────────────── */
+function wmResourceDrawerOpen(resourceLabel, topic) {
+  let drawer = document.getElementById('wm-resource-drawer');
+  if (!drawer) {
+    drawer = document.createElement('div');
+    drawer.id = 'wm-resource-drawer';
+    drawer.innerHTML = `
+      <div class="wm-drawer-header">
+        <div class="wm-drawer-title-wrap">
+          <span id="wm-drawer-icon">⚡</span>
+          <span id="wm-drawer-title">Resource</span>
+        </div>
+        <div class="wm-drawer-actions">
+          <button class="wm-drawer-act-btn" id="wm-drawer-news-btn" onclick="wmDrawerGoNews()">📰 Open in News</button>
+          <button class="wm-drawer-act-btn" id="wm-drawer-wl-btn" onclick="wmDrawerGoWatchlist()">📊 Load Watchlist</button>
+          <button class="wm-drawer-close" onclick="wmResourceDrawerClose()">✕</button>
+        </div>
+      </div>
+      <div class="wm-drawer-tabs">
+        <button class="wm-drawer-tab active" data-tab="news"  onclick="wmDrawerTab('news')">📰 News</button>
+        <button class="wm-drawer-tab"        data-tab="stocks" onclick="wmDrawerTab('stocks')">📊 Stocks</button>
+        <button class="wm-drawer-tab"        data-tab="context" onclick="wmDrawerTab('context')">🌐 Context</button>
+      </div>
+      <div class="wm-drawer-body" id="wm-drawer-news-pane"></div>
+      <div class="wm-drawer-body hidden" id="wm-drawer-stocks-pane"></div>
+      <div class="wm-drawer-body hidden" id="wm-drawer-context-pane"></div>
+    `;
+    document.body.appendChild(drawer);
+    // Click outside to close
+    document.addEventListener('click', (e) => {
+      if (drawer && !drawer.contains(e.target) &&
+          !e.target.closest('[onclick*="wmResourceLink"],[onclick*="wmIntelCard"],[class*="wm-ic-"],[class*="wm-choke"],[class*="wm-min-"],[class*="wm-signal-"],[class*="wm-alert-"]'))
+        wmResourceDrawerClose();
+    }, { capture: true });
+  }
+
+  // Store current resource/topic
+  drawer.dataset.resource = resourceLabel;
+  drawer.dataset.topic = topic;
+
+  // Update header
+  const icon = document.getElementById('wm-drawer-icon');
+  const title = document.getElementById('wm-drawer-title');
+  if (icon) icon.textContent = wmResourceIcon(resourceLabel);
+  if (title) title.textContent = resourceLabel;
+
+  // Show drawer
+  drawer.classList.add('open');
+  document.getElementById('wm-drawer-news-btn').dataset.topic = topic;
+  document.getElementById('wm-drawer-wl-btn').dataset.topic = topic;
+
+  // Load news tab immediately
+  wmDrawerTab('news');
+  wmDrawerLoadNews(resourceLabel, topic);
+  wmDrawerLoadStocks(resourceLabel, topic);
+  wmDrawerLoadContext(resourceLabel, topic);
+}
+
+function wmResourceDrawerClose() {
+  const d = document.getElementById('wm-resource-drawer');
+  if (d) d.classList.remove('open');
+}
+
+function wmDrawerTab(tab) {
+  document.querySelectorAll('.wm-drawer-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('wm-drawer-news-pane').classList.toggle('hidden', tab !== 'news');
+  document.getElementById('wm-drawer-stocks-pane').classList.toggle('hidden', tab !== 'stocks');
+  document.getElementById('wm-drawer-context-pane').classList.toggle('hidden', tab !== 'context');
+}
+
+/* NEWS pane: fetch from WM insights filtered by resource keyword */
+async function wmDrawerLoadNews(resourceLabel, topic) {
+  const el = document.getElementById('wm-drawer-news-pane');
+  if (!el) return;
+  el.innerHTML = wmSpinner(`Fetching news for "${resourceLabel}"…`);
+
+  try {
+    const d = await wmBootstrap(['insights']);
+    const all = d.insights?.insights || d.insights?.items || d.insights?.data || d.insights || [];
+    const kw  = resourceLabel.toLowerCase();
+
+    // Filter insights relevant to this resource
+    const relevant = (Array.isArray(all) ? all : []).filter(a => {
+      const txt = `${a.title||''} ${a.body||''} ${a.description||''} ${(a.tags||[]).join(' ')}`.toLowerCase();
+      return txt.includes(kw) || txt.includes(topic.toLowerCase());
+    });
+
+    // Show matched insights first, then all insights as fallback
+    const toShow = relevant.length ? relevant : (Array.isArray(all) ? all.slice(0, 10) : []);
+
+    if (!toShow.length) {
+      el.innerHTML = `<div class="wm-drawer-hint">
+        No matching intelligence signals. 
+        <a href="#" onclick="wmDrawerGoNews();return false;">Open news panel to search "${wmEsc(resourceLabel)}"</a>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="wm-drawer-news-head">${relevant.length ? `${relevant.length} signals matching` : 'Latest signals'} — <em>${wmEsc(resourceLabel)}</em></div>` +
+      toShow.slice(0, 12).map(s => {
+        const sev = s.severity || s.importance || s.level || 'medium';
+        const col = wmSeverityColor(sev);
+        const ticker = s.ticker || s.symbol;
+        return `<div class="wm-drawer-news-item" style="border-left:2px solid ${col.border}">
+          <div class="wm-drawer-news-title">${wmEsc(s.title || s.headline || '')}</div>
+          <div class="wm-drawer-news-meta">
+            ${wmRelTime(s.timestamp || s.date) || ''}
+            ${ticker ? `<span class="wm-ic-ticker" style="margin-left:6px;cursor:pointer"
+              onclick="wmResourceDrawerClose();setTimeout(()=>{ if(typeof loadTickerFromWatchlist==='function')loadTickerFromWatchlist('${wmEsc(ticker)}');},100)">${wmEsc(ticker)}</span>` : ''}
+            ${wmBadge(sev.toUpperCase(), sev)}
+          </div>
+          ${s.body || s.description ? `<div class="wm-drawer-news-body">${wmEsc((s.body||s.description).slice(0,160))}…</div>` : ''}
+        </div>`;
+      }).join('');
+  } catch(e) {
+    el.innerHTML = wmError(e.message);
+  }
+}
+
+/* STOCKS pane: trigger sector watchlist in main panel */
+async function wmDrawerLoadStocks(resourceLabel, topic) {
+  const el = document.getElementById('wm-drawer-stocks-pane');
+  if (!el) return;
+  el.innerHTML = wmSpinner(`Loading sector stocks for "${topic}"…`);
+
+  // Use FINTERM's own watchlist function to populate the watchlist panel
+  const seedTickers = WM_TOPIC_TICKERS[topic] || WM_TOPIC_TICKERS[resourceLabel.toLowerCase()] || [];
+
+  el.innerHTML = `<div class="wm-drawer-stocks-head">
+    <span>Sector: <strong>${wmEsc(topic)}</strong></span>
+    <button class="wm-drawer-act-btn" onclick="wmDrawerGoWatchlist()">→ Load in Watchlist panel</button>
+  </div>` +
+    (seedTickers.length ? seedTickers.map(t => `
+    <div class="wm-drawer-stock-row" onclick="wmResourceDrawerClose();setTimeout(()=>{ if(typeof loadTickerFromWatchlist==='function')loadTickerFromWatchlist('${wmEsc(t)}');},100)">
+      <span class="wm-drawer-stock-ticker">${wmEsc(t)}</span>
+      <span class="wm-drawer-stock-hint">Load chart & data →</span>
+    </div>`).join('')
+    : `<div class="wm-drawer-hint">
+        <a href="#" onclick="wmDrawerGoWatchlist();return false;">Load "${wmEsc(topic)}" in the Watchlist panel →</a>
+       </div>`);
+}
+
+/* CONTEXT pane: supply chain + risk data for this resource */
+async function wmDrawerLoadContext(resourceLabel, topic) {
+  const el = document.getElementById('wm-drawer-context-pane');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading supply chain context…');
+
+  try {
+    const d = await wmBootstrap(['chokepoints', 'minerals', 'riskScores', 'shippingRates']);
+    const kw = resourceLabel.toLowerCase();
+    let html = '';
+
+    // Related chokepoints
+    const chokes = d.chokepoints?.chokepoints || d.chokepoints?.data || d.chokepoints || [];
+    const relChokes = (Array.isArray(chokes) ? chokes : []).filter(c =>
+      (c.affectedCommodities||[]).some(x => x.toLowerCase().includes(kw)) ||
+      (c.name||'').toLowerCase().includes(kw) ||
+      (c.note||'').toLowerCase().includes(kw)
+    );
+    if (relChokes.length) {
+      html += `<div class="wm-ctx-section">🌊 Related Chokepoints</div>` +
+        relChokes.map(c => {
+          const col = wmSeverityColor(c.riskLevel || c.risk || 'medium');
+          return `<div class="wm-ctx-item" style="border-left:2px solid ${col.border}">
+            <span class="wm-ctx-name">${wmEsc(c.name||'')}</span>
+            ${wmBadge((c.riskLevel||c.risk||'').toUpperCase(), c.riskLevel||c.risk)}
+            ${c.note ? `<div class="wm-ctx-note">${wmEsc(c.note.slice(0,120))}</div>` : ''}
+          </div>`;
+        }).join('');
+    }
+
+    // Related minerals
+    const mins = d.minerals?.minerals || d.minerals?.data || d.minerals || [];
+    const relMins = (Array.isArray(mins) ? mins : []).filter(m =>
+      (m.name||m.mineral||'').toLowerCase().includes(kw) ||
+      (m.primaryUse||'').toLowerCase().includes(kw)
+    );
+    if (relMins.length) {
+      html += `<div class="wm-ctx-section">⛏️ Related Minerals</div>` +
+        relMins.map(m => {
+          const col = wmSeverityColor(m.supplyRisk || m.risk || 'medium');
+          return `<div class="wm-ctx-item" style="border-left:2px solid ${col.border}">
+            <span class="wm-ctx-name">${wmEsc(m.name || m.mineral || '')}</span>
+            ${wmBadge((m.supplyRisk||m.risk||'').toUpperCase(), m.supplyRisk||m.risk)}
+            ${m.conflictExposure ? `<div class="wm-ctx-note">⚠ ${wmEsc(m.conflictExposure)}</div>` : ''}
+          </div>`;
+        }).join('');
+    }
+
+    // Risk scores for related countries
+    const riskRaw = d.riskScores?.scores || d.riskScores?.data || d.riskScores || {};
+    const riskArr = Array.isArray(riskRaw) ? riskRaw :
+      Object.entries(riskRaw).map(([k,v]) => typeof v==='object' ? {country:k,...v} : {country:k,score:v});
+    const relRisk = riskArr.filter(r =>
+      (r.country||r.code||'').toLowerCase().includes(kw) || kw.includes((r.country||r.code||'').toLowerCase())
+    ).slice(0, 5);
+    if (relRisk.length) {
+      html += `<div class="wm-ctx-section">🌡 Country Risk</div>` +
+        relRisk.map(r => {
+          const pct = Math.round(r.score ?? 0);
+          const sev = pct >= 75 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low';
+          const col = wmSeverityColor(sev);
+          return `<div class="wm-ctx-item wm-ctx-risk">
+            <span class="wm-ctx-name">${wmEsc(r.country||r.code||'')}</span>
+            <div class="wm-ctx-risk-bar"><div style="width:${pct}%;background:${col.text}"></div></div>
+            <span style="color:${col.text};font-weight:700;font-family:monospace">${pct}</span>
+          </div>`;
+        }).join('');
+    }
+
+    if (!html) {
+      html = `<div class="wm-drawer-hint">No specific supply chain data for "${wmEsc(resourceLabel)}".<br>
+        Try searching a broader term.</div>`;
+    }
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError(e.message);
+  }
+}
+
+/* ── Navigate to main panels ────────────────────────────────────── */
+function wmDrawerGoNews() {
+  const drawer = document.getElementById('wm-resource-drawer');
+  const topic  = drawer?.dataset.topic || drawer?.dataset.resource || '';
+  wmResourceDrawerClose();
+  // Put topic in the topic input and trigger news search
+  const ti = document.getElementById('topicInput');
+  if (ti) { ti.value = topic; }
+  if (typeof searchTopicNews === 'function') {
+    setTimeout(() => searchTopicNews(), 100);
+  } else {
+    // fallback: trigger Enter on topicInput
+    ti?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  }
+  if (typeof showPanel === 'function') showPanel('news');
+}
+
+function wmDrawerGoWatchlist() {
+  const drawer = document.getElementById('wm-resource-drawer');
+  const topic  = drawer?.dataset.topic || drawer?.dataset.resource || '';
+  wmResourceDrawerClose();
+  const ti = document.getElementById('topicInput');
+  if (ti) { ti.value = topic; }
+  if (typeof loadWatchlist === 'function') {
+    setTimeout(() => loadWatchlist(topic), 100);
+  }
+  if (typeof showPanel === 'function') {
+    showPanel('watchlist');
+    showPanel('news');
+  }
+}
+
+/* ── Resource icon helper ───────────────────────────────────────── */
+function wmResourceIcon(label) {
+  const lc = label.toLowerCase();
+  if (lc.includes('oil') || lc.includes('crude') || lc.includes('petroleum')) return '🛢️';
+  if (lc.includes('gas') || lc.includes('lng'))  return '⛽';
+  if (lc.includes('gold'))  return '🥇';
+  if (lc.includes('silver')) return '🪙';
+  if (lc.includes('copper')) return '🔴';
+  if (lc.includes('iron') || lc.includes('steel')) return '🔩';
+  if (lc.includes('lithium') || lc.includes('cobalt') || lc.includes('rare')) return '🔋';
+  if (lc.includes('chip') || lc.includes('semi')) return '🔬';
+  if (lc.includes('wheat') || lc.includes('grain') || lc.includes('corn')) return '🌾';
+  if (lc.includes('ship') || lc.includes('suez') || lc.includes('hormuz')) return '🚢';
+  if (lc.includes('iran')) return '🇮🇷';
+  if (lc.includes('ukraine') || lc.includes('russia')) return '⚔️';
+  if (lc.includes('taiwan')) return '🇹🇼';
+  if (lc.includes('weather') || lc.includes('storm')) return '🌪';
+  if (lc.includes('quake') || lc.includes('seismic')) return '🏔';
+  if (lc.includes('fire') || lc.includes('wildfire')) return '🔥';
+  if (lc.includes('cyber')) return '💻';
+  return '⚡';
+}
+
+/* ── Resource→tickers map (extends topicSeedTicker) ────────────── */
+const WM_TOPIC_TICKERS = {
+  oil:       ['XOM','CVX','COP','OXY','BP','SHEL'],
+  energy:    ['XOM','CVX','LNG','NEE','ENPH','SLB'],
+  gas:       ['LNG','CVX','XOM','RRC','EQT'],
+  gold:      ['NEM','GOLD','AEM','AGI','WPM'],
+  silver:    ['WPM','AG','HL','PAN'],
+  copper:    ['FCX','SCCO','TECK','HBM'],
+  iron:      ['RIO','BHP','VALE','MT'],
+  steel:     ['NUE','STLD','X','CLF','MT'],
+  aluminum:  ['AA','CENX','KALU','RIO'],
+  lithium:   ['ALB','SQM','LTHM','PLL','LAC'],
+  mining:    ['RIO','BHP','VALE','FCX','NEM','AA'],
+  metals:    ['FCX','AA','NEM','RIO','BHP'],
+  shipping:  ['ZIM','MATX','DAC','GSL','MPC'],
+  semiconductor: ['NVDA','TSM','ASML','INTC','AMD','QCOM'],
+  tech:      ['AAPL','MSFT','NVDA','GOOGL','META'],
+  defense:   ['LMT','RTX','NOC','GD','BA'],
+  agriculture: ['ADM','BG','MOS','NTR','CF'],
+  uranium:   ['CCJ','NXE','DNN','URG'],
+  coal:      ['BTU','ARCH','CEIX','AMR'],
+  finance:   ['JPM','GS','BAC','MS','C'],
+  macro:     ['SPY','TLT','GLD','DX-Y.NYB'],
+  cyber:     ['CRWD','PANW','ZS','S','FTNT'],
+};
+
+/* ── Patch existing resource/chokepoint renders to add click ────── */
+function wmAddResourceClicks() {
+  // Geo·Risk RESOURCES tab rows
+  document.querySelectorAll('.geo-resource-row').forEach(row => {
+    const name = row.querySelector('.geo-resource-name')?.textContent || '';
+    if (name && !row.dataset.wmLinked) {
+      row.dataset.wmLinked = '1';
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', (e) => {
+        if (!e.target.closest('a')) {
+          wmResourceLink(name, wmResourceToTopic(name));
+        }
+      });
+    }
+  });
+
+  // Geo·Risk ROUTES tab cards
+  document.querySelectorAll('.geo-route-card').forEach(card => {
+    const name = card.querySelector('.geo-route-name')?.textContent || '';
+    if (name && !card.dataset.wmLinked) {
+      card.dataset.wmLinked = '1';
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', (e) => {
+        if (!e.target.closest('a')) wmResourceLink(name, wmResourceToTopic(name));
+      });
+    }
+  });
+
+  // Geo·Risk WARS tab resource chips
+  document.querySelectorAll('.geo-res-chip').forEach(chip => {
+    const name = chip.textContent.replace(/^[^\w]+/, '').trim();
+    if (name && !chip.dataset.wmLinked) {
+      chip.dataset.wmLinked = '1';
+      chip.style.cursor = 'pointer';
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        wmResourceLink(name, wmResourceToTopic(name));
+      });
+    }
+  });
+
+  // Supply chain chokepoint cards
+  document.querySelectorAll('.wm-choke-card').forEach(card => {
+    if (!card.dataset.wmLinked) {
+      const name = card.querySelector('.wm-choke-name')?.textContent || '';
+      card.dataset.wmLinked = '1';
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', (e) => {
+        if (!e.target.closest('.wm-badge')) wmResourceLink(name, wmResourceToTopic(name));
+      });
+    }
+  });
+
+  // Mineral rows
+  document.querySelectorAll('.wm-min-row').forEach(row => {
+    if (!row.dataset.wmLinked) {
+      const name = row.querySelector('.wm-min-name')?.textContent || '';
+      row.dataset.wmLinked = '1';
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', (e) => {
+        if (!e.target.closest('.wm-badge')) wmResourceLink(name, wmResourceToTopic(name));
+      });
+    }
+  });
+
+  // Alert rows
+  document.querySelectorAll('.wm-alert-row').forEach(row => {
+    if (!row.dataset.wmLinked) {
+      const title = row.querySelector('.wm-alert-title')?.textContent || '';
+      const cat   = row.querySelector('.wm-alert-cat')?.textContent || '';
+      row.dataset.wmLinked = '1';
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => wmResourceLink(title, wmResourceToTopic(cat || title)));
+    }
+  });
+}
+
+/* Run click patch after renders complete */
+const _wmClickObserver = new MutationObserver(() => wmAddResourceClicks());
+document.addEventListener('DOMContentLoaded', () => {
+  _wmClickObserver.observe(document.body, { childList: true, subtree: true });
+});
+
+/* ── Extend wmInitAll ────────────────────────────────────────────── */
+const _wmOrigInit = typeof wmInitAll === 'function' ? wmInitAll : null;
+function wmInitAll() {
+  if (_wmOrigInit) _wmOrigInit();
+  wmIntelInit();
+}
