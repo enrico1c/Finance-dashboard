@@ -3227,3 +3227,34 @@ textarea::placeholder { color:var(--text-muted); }
   background: rgba(0,212,160,.12);
   border-color: var(--accent);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   SUPABASE CACHE INDICATORS
+   ══════════════════════════════════════════════════════════════════ */
+.sb-cache-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px 10px;
+  background: rgba(0,212,160,.05);
+  border-bottom: 1px solid rgba(0,212,160,.15);
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.sb-cache-bar strong { color: var(--text); }
+.sb-cache-note {
+  font-size: 9px;
+  opacity: .7;
+}
+.sb-cache-tag {
+  font-size: 10px;
+  margin-left: auto;
+  opacity: .6;
+}
+.sb-cached {
+  opacity: .88;
+  border-left: 2px solid rgba(0,212,160,.25) !important;
+}
