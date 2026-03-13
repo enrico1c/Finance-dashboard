@@ -404,6 +404,7 @@ function injectSidebarHTML() {
       <button class="api-tab active" data-tab="providers">Providers</button>
       <button class="api-tab" data-tab="custom">+ Custom</button>
       <button class="api-tab" data-tab="session">Session</button>
+      <button class="api-tab" data-tab="cache" onclick="if(typeof sbcRenderStats===\'function\')sbcRenderStats()">💾 Cache</button>
     </div>
 
     <div class="api-sidebar-body">
@@ -448,6 +449,16 @@ function injectSidebarHTML() {
       <div class="api-tab-pane" id="apiTab-session">
         <div class="api-session-stats" id="apiSessionStats"></div>
         <button class="api-clear-cache-btn" style="margin-top:12px" onclick="clearAllCache()">Clear Session Cache</button>
+      </div>
+
+      <div class="api-tab-pane" id="apiTab-cache">
+        <div id="sbc-manager">
+          <div class="sbc-header">
+            <span class="sbc-title">API Cache (Supabase ft_cache)</span>
+            <span id="sbc-status-dot" class="sbc-status-dot">● Connecting…</span>
+          </div>
+          <div id="sbc-status" class="sbc-status-bar">Loading stats…</div>
+        </div>
       </div>
     </div>
 
