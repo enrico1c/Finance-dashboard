@@ -83,13 +83,17 @@ body::before {
   position: relative;
   animation: slideDown .4s ease both;
   z-index: 100;
-  overflow: hidden;
+  overflow: visible;   /* allow tray dropdown to escape */
   transition: max-height .25s ease;
   max-height: 80px; /* expanded default */
 }
 
 .topbar.collapsed {
   max-height: 36px;
+}
+/* When collapsed, hide the second row but keep tray accessible */
+.topbar.collapsed #topbarRow2 {
+  display: none;
 }
 
 .topbar::before {
@@ -2817,3 +2821,157 @@ textarea::placeholder { color:var(--text-muted); }
 #georisk-wars-content     .geo-res-chip    { cursor: pointer; }
 #georisk-resources-content .geo-resource-row { cursor: pointer; }
 #georisk-routes-content   .geo-route-card  { cursor: pointer; }
+
+/* ══════════════════════════════════════════════════════════════════
+   MODULE TRAY — expand/collapse panel selector
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Compact row: ⊞ button ─────────────────────────────────────── */
+.modules-expand-btn {
+  margin-left: 6px;
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.modules-expand-btn:hover,
+.modules-expand-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow, rgba(0,212,160,.07));
+}
+
+/* ── Tray dropdown ──────────────────────────────────────────────── */
+.modules-tray {
+  position: absolute;
+  top: 100%;   /* flush below the header */
+  left: 0; right: 0;
+  z-index: 7000;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .28s cubic-bezier(.4,0,.2,1),
+              opacity     .22s ease,
+              box-shadow  .22s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+.modules-tray.open {
+  max-height: 420px;
+  opacity: 1;
+  pointer-events: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,.55);
+}
+
+.modules-tray-inner {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  overflow-y: auto;
+  max-height: 420px;
+}
+
+/* ── Tray header ────────────────────────────────────────────────── */
+.modules-tray-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-input);
+  font-size: 10px; color: var(--text-muted);
+  font-family: var(--font-mono); letter-spacing: .06em;
+  position: sticky; top: 0; z-index: 1;
+  flex-shrink: 0;
+}
+.modules-tray-actions {
+  display: flex; gap: 5px;
+}
+.modules-tray-btn {
+  padding: 3px 9px; font-size: 9px; font-weight: 700; letter-spacing: .3px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 3px; cursor: pointer;
+  transition: all .15s;
+}
+.modules-tray-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent-glow, rgba(0,212,160,.07));
+}
+.modules-tray-close {
+  border-color: rgba(255,71,87,.3); color: #ff4757;
+}
+.modules-tray-close:hover {
+  background: rgba(255,71,87,.1); border-color: #ff4757;
+}
+
+/* ── Tray grid ──────────────────────────────────────────────────── */
+.modules-tray-grid {
+  display: flex; flex-wrap: wrap;
+  gap: 5px; padding: 10px 14px 14px;
+  align-items: flex-start;
+}
+
+.modules-tray-section {
+  width: 100%;
+  font-size: 8px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-muted);
+  padding: 6px 0 2px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.modules-tray-section:first-child {
+  border-top: none; padding-top: 0;
+}
+
+/* ── Each module item card ──────────────────────────────────────── */
+.modules-tray-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 5px; padding: 9px 10px;
+  min-width: 68px;
+  background: var(--bg-surface, var(--bg-input));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+  position: relative;
+}
+.modules-tray-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow, rgba(0,212,160,.07));
+}
+.modules-tray-item:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(0,212,160,.1);
+}
+
+.modules-tray-item input[type="checkbox"] {
+  position: absolute; top: 5px; left: 5px;
+  appearance: none; width: 9px; height: 9px;
+  border: 1px solid var(--text-muted); border-radius: 2px;
+  background: transparent; cursor: pointer;
+  transition: all .15s;
+}
+.modules-tray-item input[type="checkbox"]:checked {
+  background: var(--accent); border-color: var(--accent);
+}
+.modules-tray-item input[type="checkbox"]:checked::after {
+  content: '✓'; position: absolute; top: -1px; left: 0px;
+  font-size: 7px; color: #000; font-weight: 700;
+}
+
+.mti-icon { font-size: 18px; line-height: 1; }
+.mti-label {
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-secondary);
+  font-family: var(--font-mono); text-align: center;
+  white-space: nowrap;
+}
+.modules-tray-item:has(input:checked) .mti-label {
+  color: var(--accent);
+}
