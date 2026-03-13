@@ -3786,3 +3786,813 @@ textarea::placeholder { color:var(--text-muted); }
 /* shared pos/neg */
 .wm-pos { color: #4caf50; }
 .wm-neg { color: #f44336; }
+
+/* ══════════════════════════════════════════════════════════════════
+   TECHNICAL INDICATORS  (fund-tech tab)
+   ══════════════════════════════════════════════════════════════════ */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  padding: 8px 0;
+}
+.tech-card {
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.tech-card-hd {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--muted, #6e7681);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.tech-card-val {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fg, #e6edf3);
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+.tech-card-sig {
+  font-size: 11px;
+  color: var(--muted, #6e7681);
+  margin-bottom: 6px;
+}
+.tech-card-note {
+  font-size: 10px;
+  color: var(--muted, #6e7681);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.tech-sig-buy     { color: #3fb950 !important; }
+.tech-sig-sell    { color: #f85149 !important; }
+.tech-sig-neutral { color: #d29922 !important; }
+
+/* ══════════════════════════════════════════════════════════════════
+   SHORT INTEREST
+   ══════════════════════════════════════════════════════════════════ */
+.short-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+.short-kpi {
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.short-kpi-lbl {
+  font-size: 10px;
+  color: var(--muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.short-kpi-val {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg, #e6edf3);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   REVENUE SEGMENTATION
+   ══════════════════════════════════════════════════════════════════ */
+.seg-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin: 10px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.seg-date {
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--muted, #6e7681);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.seg-bars { display: flex; flex-direction: column; gap: 5px; }
+.seg-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 42px 52px;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+.seg-label {
+  color: var(--fg, #e6edf3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seg-bar-wrap {
+  background: rgba(255,255,255,.06);
+  border-radius: 3px;
+  height: 6px;
+  overflow: hidden;
+}
+.seg-bar { height: 6px; border-radius: 3px; transition: width .5s ease; }
+.seg-pct { color: var(--muted, #6e7681); text-align: right; font-size: 10px; }
+.seg-val { color: var(--fg, #e6edf3); text-align: right; }
+
+/* ══════════════════════════════════════════════════════════════════
+   EARNINGS TRANSCRIPTS
+   ══════════════════════════════════════════════════════════════════ */
+.trans-list { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.trans-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 5px;
+  font-size: 12px;
+}
+.trans-label { font-weight: 600; color: var(--fg, #e6edf3); min-width: 55px; }
+.trans-date  { color: var(--muted, #6e7681); flex: 1; }
+.trans-load-btn {
+  background: transparent;
+  border: 0.5px solid var(--border, #2a2f3a);
+  color: var(--link, #58a6ff);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.trans-load-btn:hover { background: rgba(88,166,255,.1); }
+.trans-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.trans-title { font-weight: 600; font-size: 13px; color: var(--fg, #e6edf3); }
+.trans-meta  { font-size: 11px; color: var(--muted, #6e7681); }
+.trans-body  {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--fg, #e6edf3);
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 5px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   USGS EARTHQUAKES
+   ══════════════════════════════════════════════════════════════════ */
+.usgs-stats {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--muted, #6e7681);
+  margin: 6px 0 8px;
+  flex-wrap: wrap;
+}
+.usgs-stats strong { color: var(--fg, #e6edf3); }
+.usgs-list { display: flex; flex-direction: column; gap: 4px; }
+.usgs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+}
+.usgs-mag {
+  min-width: 38px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 5px;
+  border-radius: 4px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.usgs-info  { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.usgs-loc   { font-size: 12px; color: var(--fg, #e6edf3); line-height: 1.3; }
+.usgs-meta  { font-size: 10px; color: var(--muted, #6e7681); }
+.usgs-link  { font-size: 11px; color: var(--link, #58a6ff); text-decoration: none; flex-shrink: 0; }
+.usgs-link:hover { text-decoration: underline; }
+.usgs-tsunami { color: #4a9eff; font-size: 10px; font-weight: 600; }
+.usgs-alert {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.usgs-alert-green  { background: #1a4a1a; color: #3fb950; }
+.usgs-alert-yellow { background: #4a3a00; color: #d29922; }
+.usgs-alert-orange { background: #4a2a00; color: #f0883e; }
+.usgs-alert-red    { background: #4a0f0f; color: #f85149; }
+
+/* ══════════════════════════════════════════════════════════════════
+   OPEN-METEO SUPPLY WEATHER
+   ══════════════════════════════════════════════════════════════════ */
+.meteo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  padding: 8px 0;
+}
+.meteo-card {
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.meteo-card.meteo-extreme {
+  border-color: #f85149;
+  background: rgba(248,81,73,.06);
+}
+.meteo-name  { font-size: 10px; font-weight: 600; color: var(--muted, #6e7681); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.meteo-icon  { font-size: 22px; line-height: 1; margin: 4px 0; }
+.meteo-cond  { font-size: 12px; color: var(--fg, #e6edf3); margin-bottom: 6px; }
+.meteo-vals  { display: flex; flex-direction: column; gap: 2px; }
+.meteo-vals span { font-size: 11px; color: var(--muted, #6e7681); }
+.meteo-warn  { font-size: 10px; color: #f85149; font-weight: 600; margin-top: 5px; }
+.meteo-error { opacity: .5; }
+
+/* ══════════════════════════════════════════════════════════════════
+   NOAA ALERTS
+   ══════════════════════════════════════════════════════════════════ */
+.noaa-count {
+  font-size: 11px;
+  color: var(--muted, #6e7681);
+  margin: 6px 0 8px;
+}
+.noaa-alert-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  margin-bottom: 4px;
+}
+.noaa-sev {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #000;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.noaa-info  { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.noaa-event { font-size: 12px; font-weight: 600; color: var(--fg, #e6edf3); }
+.noaa-area  { font-size: 11px; color: var(--muted, #6e7681); }
+.noaa-meta  { font-size: 10px; color: var(--muted, #6e7681); }
+
+/* ══════════════════════════════════════════════════════════════════
+   NASA EONET
+   ══════════════════════════════════════════════════════════════════ */
+.eonet-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.eonet-cat-pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 0.5px solid;
+  background: transparent;
+}
+.eonet-cat-pill strong { font-size: 11px; }
+.eonet-list { display: flex; flex-direction: column; gap: 4px; }
+.eonet-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+}
+.eonet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.eonet-info  { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.eonet-title { font-size: 12px; color: var(--fg, #e6edf3); }
+.eonet-meta  { font-size: 10px; color: var(--muted, #6e7681); }
+
+/* ══════════════════════════════════════════════════════════════════
+   OPEN EXCHANGE RATES
+   ══════════════════════════════════════════════════════════════════ */
+.oer-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.oer-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 5px;
+  padding: 5px 10px;
+  min-width: 62px;
+}
+.oer-ccy  { font-size: 10px; font-weight: 600; color: var(--muted, #6e7681); letter-spacing: .04em; }
+.oer-rate { font-size: 12px; font-weight: 600; color: var(--fg, #e6edf3); }
+
+.oer-hist-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.oer-hist-pair { font-size: 13px; font-weight: 600; color: var(--fg, #e6edf3); }
+.oer-hist-rate { font-size: 18px; font-weight: 600; color: var(--fg, #e6edf3); }
+.oer-hist-dates {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted, #6e7681);
+}
+.oer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.oer-list-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.oer-list-row:hover { background: rgba(255,255,255,.04); }
+
+/* ══════════════════════════════════════════════════════════════════
+   AIR QUALITY
+   ══════════════════════════════════════════════════════════════════ */
+.aq-summary {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 6px 0 8px;
+}
+.aq-grid { display: flex; flex-direction: column; gap: 4px; }
+.aq-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 0.5px solid var(--border, #2a2f3a);
+}
+.aq-row:last-child { border-bottom: none; }
+.aq-row span:first-child { color: var(--muted, #6e7681); }
+.aq-row span:last-child  { color: var(--fg, #e6edf3); font-weight: 500; }
+
+/* ══════════════════════════════════════════════════════════════════
+   SEC LINK (insider filings)
+   ══════════════════════════════════════════════════════════════════ */
+.sec-link {
+  font-size: 11px;
+  color: var(--link, #58a6ff);
+  text-decoration: none;
+}
+.sec-link:hover { text-decoration: underline; }
+
+/* Insider transactions positive/negative already covered by .pos/.neg */
+
+
+/* ══════════════════════════════════════════════════════════════════
+   FEMA — OpenFEMA Disaster Declarations
+   ══════════════════════════════════════════════════════════════════ */
+.fema-header {
+  font-size: 11px;
+  color: var(--muted, #6e7681);
+  margin-bottom: 8px;
+}
+.fema-list { display: flex; flex-direction: column; gap: 5px; }
+.fema-row {
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 4px;
+  padding: 7px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.fema-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg, #e6edf3);
+  line-height: 1.3;
+}
+.fema-meta {
+  font-size: 11px;
+  color: var(--muted, #6e7681);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fema-state {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f0a500;
+  letter-spacing: .5px;
+}
+.fema-programs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.fema-prog-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(88,166,255,.12);
+  color: var(--link, #58a6ff);
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   IPO CALENDAR — Macro Intel panel
+   ══════════════════════════════════════════════════════════════════ */
+.ipo-header {
+  font-size: 11px;
+  color: var(--muted, #6e7681);
+  margin-bottom: 8px;
+}
+.ipo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.ipo-table th {
+  text-align: left;
+  color: var(--muted, #6e7681);
+  font-weight: 600;
+  padding: 3px 6px 5px;
+  border-bottom: 1px solid var(--border, #2a2f3a);
+  font-size: 10px;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+.ipo-table td {
+  padding: 5px 6px;
+  border-bottom: 0.5px solid rgba(255,255,255,.05);
+  color: var(--fg, #e6edf3);
+  vertical-align: top;
+}
+.ipo-table tr:last-child td { border-bottom: none; }
+.ipo-table tr:hover td { background: rgba(255,255,255,.03); }
+.ipo-sym {
+  font-weight: 700;
+  color: var(--link, #58a6ff);
+  font-size: 12px;
+}
+.ipo-company {
+  font-size: 11px;
+  color: var(--fg, #e6edf3);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ipo-date { color: var(--muted, #6e7681); font-size: 11px; }
+.ipo-exch { color: #f0a500; font-size: 10px; font-weight: 600; }
+.ipo-price { color: #3fb950; font-size: 11px; }
+.ipo-shares { color: var(--muted, #6e7681); font-size: 10px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   OER CURRENCY CONVERTER
+   ══════════════════════════════════════════════════════════════════ */
+.oer-converter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 5px;
+  padding: 8px 10px;
+}
+.oer-convert-input {
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--border, #2a2f3a);
+  color: var(--fg, #e6edf3);
+  font-size: 12px;
+  padding: 4px 7px;
+  border-radius: 4px;
+  width: 70px;
+}
+.oer-convert-select {
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--border, #2a2f3a);
+  color: var(--fg, #e6edf3);
+  font-size: 12px;
+  padding: 4px 7px;
+  border-radius: 4px;
+}
+.oer-convert-btn {
+  background: var(--link, #58a6ff);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.oer-convert-btn:hover { opacity: .85; }
+.oer-convert-result {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3fb950;
+  margin-left: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ALERT FEED — WM filter bar (hidden when NOAA/EONET tab active)
+   ══════════════════════════════════════════════════════════════════ */
+#alert-wm-filters { transition: max-height .2s ease, opacity .2s ease; }
+#alert-wm-filters.hidden {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Tab pane inside alert feed panel */
+#panel-alert .tab-pane { display: none; }
+#panel-alert .tab-pane.active { display: block; }
+
+/* ══════════════════════════════════════════════════════════════════
+   NOAA Active Alerts  (extended — more detail rows)
+   ══════════════════════════════════════════════════════════════════ */
+.noaa-alert-desc {
+  font-size: 11px;
+  color: var(--muted, #6e7681);
+  margin-top: 3px;
+  line-height: 1.4;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.noaa-sev-extreme  { background: rgba(210,42,42,.22); border-color: rgba(210,42,42,.5); }
+.noaa-sev-severe   { background: rgba(224,120,0,.18); border-color: rgba(224,120,0,.45); }
+.noaa-sev-moderate { background: rgba(240,165,0,.14); border-color: rgba(240,165,0,.4); }
+
+/* ══════════════════════════════════════════════════════════════════
+   METEO / SUPPLY WEATHER — extended
+   ══════════════════════════════════════════════════════════════════ */
+.meteo-wind { font-size: 10px; color: var(--muted, #6e7681); margin-top: 2px; }
+.meteo-precip { font-size: 10px; color: #58a6ff; }
+.meteo-aqi { font-size: 10px; color: #f0a500; }
+
+/* ══════════════════════════════════════════════════════════════════
+   FORM 4 — Insider trading (SEC EDGAR / Finnhub fallback)
+   ══════════════════════════════════════════════════════════════════ */
+.form4-header { font-size: 11px; color: var(--muted, #6e7681); margin-bottom: 8px; }
+.form4-list { display: flex; flex-direction: column; gap: 5px; }
+.form4-row {
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border, #2a2f3a);
+  border-radius: 4px;
+  padding: 7px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.form4-row:hover { background: rgba(255,255,255,.055); }
+.form4-name { font-size: 12px; font-weight: 600; color: var(--fg, #e6edf3); }
+.form4-meta { font-size: 11px; color: var(--muted, #6e7681); display: flex; gap: 10px; flex-wrap: wrap; }
+.form4-buy  { color: #3fb950; font-weight: 700; }
+.form4-sell { color: #f85149; font-weight: 700; }
+.form4-value { color: var(--fg, #e6edf3); font-size: 12px; font-weight: 500; }
+
+/* ══════════════════════════════════════════════════════════════════
+   EARNINGS TRANSCRIPTS — extended styles
+   ══════════════════════════════════════════════════════════════════ */
+.trans-body {
+  font-size: 11px;
+  color: var(--fg, #e6edf3);
+  line-height: 1.6;
+  margin-top: 8px;
+  white-space: pre-wrap;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 8px;
+  background: rgba(255,255,255,.025);
+  border-radius: 4px;
+  border: 1px solid var(--border, #2a2f3a);
+}
+.trans-body::-webkit-scrollbar { width: 4px; }
+.trans-body::-webkit-scrollbar-track { background: transparent; }
+.trans-body::-webkit-scrollbar-thumb { background: var(--border, #2a2f3a); border-radius: 2px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   TECHNICAL INDICATORS — sparklines & signals (extended)
+   ══════════════════════════════════════════════════════════════════ */
+.tech-card-chart { margin: 4px 0 2px; display: block; }
+.tech-sig-warning { background: rgba(240,165,0,.15); color: #f0a500; }
+
+/* ══════════════════════════════════════════════════════════════════
+   REVENUE SEGMENTATION — extended bar detail
+   ══════════════════════════════════════════════════════════════════ */
+.seg-geo-label { font-size: 10px; color: #58a6ff; font-weight: 600; letter-spacing: .3px; }
+.seg-prod-label { font-size: 10px; color: #3fb950; font-weight: 600; letter-spacing: .3px; }
+.seg-bar.geo { background: linear-gradient(90deg, #58a6ff44, #58a6ff88); }
+.seg-bar.prod { background: linear-gradient(90deg, #3fb95044, #3fb95088); }
+
+/* ══════════════════════════════════════════════════════════════════
+   YAHOO FINANCE COMPONENTS
+   ══════════════════════════════════════════════════════════════════ */
+.yf-no-key {
+  padding: 16px;
+  color: var(--muted, #6e7681);
+  font-size: 12px;
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 6px;
+  background: var(--panel-bg, #0d1117);
+  margin: 8px 0;
+}
+.yf-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted, #6e7681);
+  padding: 12px 0;
+}
+
+/* Quote hero */
+.yf-quote-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0 12px;
+  border-bottom: 0.5px solid var(--border, #2a2f3a);
+  margin-bottom: 10px;
+}
+.yf-quote-name  { font-size: 11px; color: var(--muted, #6e7681); }
+.yf-quote-price { font-size: 28px; font-weight: 700; color: var(--fg, #e6edf3); line-height: 1.1; }
+.yf-quote-chg   { font-size: 13px; font-weight: 600; }
+.yf-quote-exch  { font-size: 10px; color: var(--muted, #6e7681); margin-top: 2px; }
+
+/* KPI grid */
+.yf-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 6px;
+}
+.yf-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel-bg, #0d1117);
+  border: 0.5px solid var(--border, #2a2f3a);
+  border-radius: 5px;
+  padding: 6px 9px;
+}
+.yf-kpi-lbl { font-size: 10px; color: var(--muted, #6e7681); text-transform: uppercase; letter-spacing: .04em; }
+.yf-kpi-val { font-size: 13px; font-weight: 600; color: var(--fg, #e6edf3); }
+
+/* Financials table */
+.yf-fin-table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+.yf-fin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.yf-fin-table th {
+  background: rgba(255,255,255,.04);
+  color: var(--muted, #6e7681);
+  font-weight: 600;
+  padding: 5px 8px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 0.5px solid var(--border, #2a2f3a);
+}
+.yf-fin-table th:first-child { text-align: left; }
+.yf-fin-table td {
+  padding: 5px 8px;
+  border-bottom: 0.5px solid rgba(255,255,255,.05);
+  text-align: right;
+  color: var(--fg, #e6edf3);
+}
+.yf-fin-table tr:hover td { background: rgba(255,255,255,.03); }
+.yf-fin-label { text-align: left !important; color: var(--muted, #6e7681) !important; font-size: 11px; }
+
+/* Options chain */
+.yf-opts-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.yf-opts-sym  { font-size: 14px; font-weight: 700; color: var(--fg, #e6edf3); }
+.yf-opts-exp  { font-size: 11px; color: var(--muted, #6e7681); }
+.yf-opts-toggle { display: flex; gap: 4px; margin-left: auto; }
+.yf-opts-btn {
+  background: transparent;
+  border: 0.5px solid var(--border, #2a2f3a);
+  color: var(--muted, #6e7681);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.yf-opts-btn.active,
+.yf-opts-btn:hover {
+  background: rgba(88,166,255,.12);
+  color: var(--link, #58a6ff);
+  border-color: var(--link, #58a6ff);
+}
+.yf-opts-body { overflow-x: auto; }
+.yf-opts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.yf-opts-table th {
+  background: rgba(255,255,255,.04);
+  color: var(--muted, #6e7681);
+  padding: 4px 7px;
+  text-align: right;
+  border-bottom: 0.5px solid var(--border, #2a2f3a);
+  font-size: 10px;
+}
+.yf-opts-table td { padding: 4px 7px; text-align: right; border-bottom: 0.5px solid rgba(255,255,255,.04); color: var(--fg, #e6edf3); }
+.yf-opts-table tr.yf-itm td { background: rgba(63,185,80,.06); }
+.yf-strike { font-weight: 700 !important; }
+.yf-opts-empty { font-size: 12px; color: var(--muted, #6e7681); padding: 12px 0; }
+
+/* Holders */
+.yf-holders-title { font-size: 11px; font-weight: 600; color: var(--muted, #6e7681); text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 6px; }
+.yf-hold-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.yf-hold-table th { background: rgba(255,255,255,.04); color: var(--muted, #6e7681); padding: 4px 8px; text-align: right; border-bottom: 0.5px solid var(--border, #2a2f3a); font-size: 10px; }
+.yf-hold-table th:first-child { text-align: left; }
+.yf-hold-table td { padding: 4px 8px; border-bottom: 0.5px solid rgba(255,255,255,.04); text-align: right; color: var(--fg, #e6edf3); }
+.yf-hold-table tr:hover td { background: rgba(255,255,255,.03); }
+.yf-hold-name { text-align: left !important; font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Trending */
+.yf-trend-grid { display: flex; flex-direction: column; gap: 3px; }
+.yf-trend-row {
+  display: grid;
+  grid-template-columns: 55px 1fr 60px 55px;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  align-items: center;
+  transition: background .12s;
+  border: 0.5px solid transparent;
+}
+.yf-trend-row:hover { background: rgba(255,255,255,.04); border-color: var(--border, #2a2f3a); }
+.yf-trend-sym   { font-size: 12px; font-weight: 700; color: var(--link, #58a6ff); }
+.yf-trend-name  { font-size: 11px; color: var(--muted, #6e7681); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yf-trend-price { font-size: 12px; color: var(--fg, #e6edf3); text-align: right; font-weight: 600; }
+.yf-trend-chg   { font-size: 11px; text-align: right; font-weight: 600; }
+
+/* History */
+.yf-hist-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.yf-hist-sym    { font-size: 14px; font-weight: 700; color: var(--fg, #e6edf3); }
+.yf-hist-period { font-size: 11px; color: var(--muted, #6e7681); }
+.yf-hist-ret    { font-size: 13px; font-weight: 600; margin-left: auto; }
+.yf-hist-chart  { width: 100%; height: 50px; display: block; margin: 4px 0; }
+.yf-hist-range  { font-size: 11px; color: var(--muted, #6e7681); }
