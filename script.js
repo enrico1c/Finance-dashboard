@@ -1050,18 +1050,46 @@ function computeDefaultLayout(){
   const wlW=Math.round(W*0.28), valW=Math.round(W*0.36);
   panelLayout.watchlist    ={x:0,      y:cH+G, w:wlW,  h:bH};
   panelLayout.valuation    ={x:wlW+G,  y:cH+G, w:valW, h:bH};
+
+  // Geo/Supply/Alert/Macro/Intel: stacked on the right side, below the main row
+  const geoW=Math.round(W*0.38), geoH=Math.round(H*0.48);
+  const sideCol=Math.round(W*0.32);
+  panelLayout.geopolitical ={x:W-geoW,              y:0,           w:geoW, h:geoH};
+  panelLayout.supply       ={x:W-geoW,              y:geoH+G,      w:geoW, h:H-geoH-G};
+  panelLayout.alert        ={x:W-geoW-sideCol-G,    y:0,           w:sideCol, h:Math.round(H*0.45)};
+  panelLayout.macro        ={x:W-geoW-sideCol-G,    y:Math.round(H*0.45)+G, w:sideCol, h:H-Math.round(H*0.45)-G};
+  panelLayout.intel        ={x:0,                   y:cH+G,        w:Math.round(W*0.42), h:bH};
 }
 
 function applyPanelPosition(id){
   const el=document.getElementById(`panel-${id}`); if(!el) return;
   const l=panelLayout[id]; if(!l) return;
-  Object.assign(el.style,{left:l.x+"px",top:l.y+"px",width:l.w+"px",height:l.h+"px"});
+  const minY=getTopbarGuard();
+  const safeY=Math.max(minY, l.y);
+  Object.assign(el.style,{left:l.x+"px",top:safeY+"px",width:l.w+"px",height:l.h+"px"});
 }
 function initLayout(){ computeDefaultLayout(); Object.keys(panelLayout).forEach(applyPanelPosition); }
 
 /* ══════════════════════════════════════════════════════════════════
    DRAG
    ══════════════════════════════════════════════════════════════════ */
+
+/* Returns the minimum Y (in canvas-relative px) a panel may occupy.
+   Reads the live topbar height so it works whether the bar is
+   expanded, collapsed, or toggled at runtime.                        */
+function getTopbarGuard() {
+  const topbar = document.getElementById('topbar');
+  const canvas  = document.getElementById('dashboardCanvas');
+  if (!topbar || !canvas) return 0;
+  const tRect = topbar.getBoundingClientRect();
+  const cRect  = canvas.getBoundingClientRect();
+  // How far the bottom of the topbar is below the top of the canvas.
+  // Positive means the topbar overlaps into canvas space (shouldn't happen
+  // in the flex layout), negative means it's fully above — both cases
+  // clamp to 0 so we never push panels down unnecessarily.
+  return Math.max(0, tRect.bottom - cRect.top + 4); // 4 px breathing room
+}
+
 const SNAP=8; let dragState=null;
 function initDrag(panel){
   panel.querySelector(".panel-head")?.addEventListener("mousedown",e=>{
@@ -1077,10 +1105,11 @@ function initDrag(panel){
 document.addEventListener("mousemove",e=>{
   if(!dragState) return;
   const c=document.getElementById("dashboardCanvas").getBoundingClientRect();
+  const minY=getTopbarGuard();
   let x=Math.round((dragState.startPanelX+e.clientX-dragState.startMouseX)/SNAP)*SNAP;
   let y=Math.round((dragState.startPanelY+e.clientY-dragState.startMouseY)/SNAP)*SNAP;
   x=Math.max(0,Math.min(x,c.width-dragState.panel.offsetWidth));
-  y=Math.max(0,Math.min(y,c.height-dragState.panel.offsetHeight));
+  y=Math.max(minY,Math.min(y,c.height-dragState.panel.offsetHeight));
   dragState.panel.style.left=x+"px"; dragState.panel.style.top=y+"px";
   const pid=dragState.panel.dataset.panel;
   if(panelLayout[pid]){panelLayout[pid].x=x;panelLayout[pid].y=y;}
@@ -1110,13 +1139,17 @@ function initResize(panel){
 document.addEventListener("mousemove",e=>{
   if(!resizeState) return;
   const s=resizeState,dx=e.clientX-s.mouseX,dy=e.clientY-s.mouseY;
+  const minY=getTopbarGuard();
   let x=s.startX,y=s.startY,w=s.startW,h=s.startH;
   if(s.dir.includes("e"))w=Math.max(MIN_W,s.startW+dx);
   if(s.dir.includes("s"))h=Math.max(MIN_H,s.startH+dy);
   if(s.dir.includes("w")){w=Math.max(MIN_W,s.startW-dx);x=s.startX+s.startW-w;}
   if(s.dir.includes("n")){h=Math.max(MIN_H,s.startH-dy);y=s.startY+s.startH-h;}
   w=Math.round(w/SNAP)*SNAP;h=Math.round(h/SNAP)*SNAP;
-  x=Math.max(0,Math.round(x/SNAP)*SNAP);y=Math.max(0,Math.round(y/SNAP)*SNAP);
+  x=Math.max(0,Math.round(x/SNAP)*SNAP);
+  y=Math.max(minY,Math.round(y/SNAP)*SNAP);
+  // If clamped at top, shrink height accordingly so bottom doesn't move
+  if(s.dir.includes("n") && y===minY) h=Math.max(MIN_H,(s.startY+s.startH)-minY);
   Object.assign(s.panel.style,{left:x+"px",top:y+"px",width:w+"px",height:h+"px"});
   const pid=s.panel.dataset.panel;
   const tt=document.getElementById(`tooltip-${pid}`);
@@ -1327,10 +1360,11 @@ window.addEventListener("load",()=>{
 });
 
 window.addEventListener("resize",()=>{
+  const canvas=document.getElementById("dashboardCanvas");
+  const minY=getTopbarGuard();
   document.querySelectorAll(".panel:not(.hidden)").forEach(panel=>{
-    const canvas=document.getElementById("dashboardCanvas");
     let x=Math.max(0,Math.min(parseInt(panel.style.left)||0,canvas.clientWidth-panel.offsetWidth));
-    let y=Math.max(0,Math.min(parseInt(panel.style.top)||0,canvas.clientHeight-panel.offsetHeight));
+    let y=Math.max(minY,Math.min(parseInt(panel.style.top)||0,canvas.clientHeight-panel.offsetHeight));
     panel.style.left=x+"px"; panel.style.top=y+"px";
   });
 });
