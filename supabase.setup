@@ -1,0 +1,40 @@
+-- ══════════════════════════════════════════════════════════════════
+-- FINTERM — Supabase table setup
+-- Run this once in the Supabase SQL Editor:
+-- https://supabase.com/dashboard/project/zvvsdxzdywagtsgndbqd/sql
+-- ══════════════════════════════════════════════════════════════════
+
+-- Drop if re-creating (optional)
+-- DROP TABLE IF EXISTS public.ft_events;
+
+CREATE TABLE IF NOT EXISTS public.ft_events (
+  id        TEXT        PRIMARY KEY,            -- content hash (dedup key)
+  type      TEXT        NOT NULL DEFAULT 'intel', -- news|intel|quake|unrest|weather|iran|risk|cyber|natural|supply
+  ticker    TEXT,                               -- e.g. AAPL, TSM
+  topic     TEXT,                               -- e.g. oil, semiconductor
+  ts        BIGINT      NOT NULL DEFAULT 0,     -- unix seconds
+  sev       TEXT        NOT NULL DEFAULT 'low', -- critical|high|medium|low
+  title     TEXT        NOT NULL DEFAULT '',    -- max 200 chars
+  body      TEXT,                               -- max 280 chars (compressed)
+  url       TEXT,                               -- source URL max 300 chars
+  src       TEXT,                               -- source name max 60 chars
+  country   TEXT,                               -- ISO 2-4 char code
+  saved_at  BIGINT      NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW())::BIGINT
+);
+
+-- Indexes for fast filtered reads
+CREATE INDEX IF NOT EXISTS ft_events_type_ts   ON public.ft_events (type, ts DESC);
+CREATE INDEX IF NOT EXISTS ft_events_ticker_ts ON public.ft_events (ticker, ts DESC);
+CREATE INDEX IF NOT EXISTS ft_events_sev_ts    ON public.ft_events (sev, ts DESC);
+CREATE INDEX IF NOT EXISTS ft_events_saved_at  ON public.ft_events (saved_at DESC);
+
+-- Enable anon read + write (no auth needed from browser)
+ALTER TABLE public.ft_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "allow_anon_read"   ON public.ft_events FOR SELECT USING (true);
+CREATE POLICY "allow_anon_insert" ON public.ft_events FOR INSERT WITH CHECK (true);
+CREATE POLICY "allow_anon_upsert" ON public.ft_events FOR UPDATE USING (true);
+CREATE POLICY "allow_anon_delete" ON public.ft_events FOR DELETE USING (true);
+
+-- Verify
+SELECT 'ft_events table ready ✓' AS status, COUNT(*) AS rows FROM public.ft_events;
