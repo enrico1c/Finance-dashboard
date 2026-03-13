@@ -1230,6 +1230,32 @@ function setupChecklist(){
 
 /* ── Module tray expand/collapse ────────────────────────────────── */
 let _modulesTrayOpen = false;
+
+/* ── Module row expand / collapse ───────────────────────────────── */
+let _modulesRowExpanded = false;
+
+function toggleModulesRow() {
+  _modulesRowExpanded = !_modulesRowExpanded;
+  const row   = document.getElementById('topbarRow2');
+  const tab   = document.getElementById('modulesSideTab');
+  const arrow = document.getElementById('mstArrow');
+  if (!row) return;
+
+  if (_modulesRowExpanded) {
+    row.classList.remove('compact');
+    row.classList.add('expanded');
+    if (tab)   tab.classList.add('expanded');
+    if (arrow) arrow.textContent = '▲';
+    if (tab)   tab.title = 'Collapse module bar';
+  } else {
+    row.classList.add('compact');
+    row.classList.remove('expanded');
+    if (tab)   tab.classList.remove('expanded');
+    if (arrow) arrow.textContent = '▼';
+    if (tab)   tab.title = 'Expand module bar';
+  }
+}
+
 function toggleModulesTray() {
   _modulesTrayOpen = !_modulesTrayOpen;
   const tray = document.getElementById('modulesTray');
