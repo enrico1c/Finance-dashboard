@@ -1218,7 +1218,54 @@ function showPanel(id){
 }
 function setupChecklist(){
   document.querySelectorAll(".panel-toggle").forEach(cb=>{
-    cb.addEventListener("change",function(){this.checked?showPanel(this.dataset.panel):hidePanel(this.dataset.panel);});
+    cb.addEventListener("change",function(){
+      const panel = this.dataset.panel;
+      // Sync all checkboxes with same data-panel (compact bar + tray)
+      document.querySelectorAll(`.panel-toggle[data-panel="${panel}"]`)
+        .forEach(el => { if(el !== this) el.checked = this.checked; });
+      this.checked ? showPanel(panel) : hidePanel(panel);
+    });
+  });
+}
+
+/* ── Module tray expand/collapse ────────────────────────────────── */
+let _modulesTrayOpen = false;
+function toggleModulesTray() {
+  _modulesTrayOpen = !_modulesTrayOpen;
+  const tray = document.getElementById('modulesTray');
+  const btn  = document.getElementById('modulesExpandBtn');
+  if (!tray) return;
+  tray.classList.toggle('open', _modulesTrayOpen);
+  if (btn) {
+    btn.textContent    = _modulesTrayOpen ? '⊟' : '⊞';
+    btn.title          = _modulesTrayOpen ? 'Collapse module selector' : 'Expand module selector';
+    btn.classList.toggle('active', _modulesTrayOpen);
+  }
+  // Close tray when clicking outside
+  if (_modulesTrayOpen) {
+    setTimeout(() => {
+      document.addEventListener('click', _closeTrayOnOutside, { capture: true, once: true });
+    }, 50);
+  }
+}
+function _closeTrayOnOutside(e) {
+  const tray = document.getElementById('modulesTray');
+  const btn  = document.getElementById('modulesExpandBtn');
+  if (tray && !tray.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+    _modulesTrayOpen = true; // will be toggled to false
+    toggleModulesTray();
+  } else if (_modulesTrayOpen) {
+    // still open, re-attach
+    document.addEventListener('click', _closeTrayOnOutside, { capture: true, once: true });
+  }
+}
+
+function modulesSelectAll(on) {
+  document.querySelectorAll('.panel-toggle').forEach(cb => {
+    if (cb.checked !== on) {
+      cb.checked = on;
+      on ? showPanel(cb.dataset.panel) : hidePanel(cb.dataset.panel);
+    }
   });
 }
 function toggleTopbar(){
