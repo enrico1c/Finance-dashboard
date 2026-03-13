@@ -69,6 +69,7 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="supply"       checked> Supply·Chain</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="alert"        checked> Alert·Feed</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="intel"        checked> Intel·Feed</label>
       </div>
     </div>
   </header>
@@ -399,6 +400,43 @@
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
       <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
       <div class="size-tooltip" id="tooltip-geopolitical"></div>
+    </section>
+
+    <!-- ▸ INTEL FEED — Breaking Intelligence Alerts ─────────────── -->
+    <section class="panel" id="panel-intel" data-panel="intel">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Intel·Feed — Intelligence Findings</h3>
+          <span id="intel-feed-badge" class="intel-badge">0 ALERTS</span>
+        </div>
+        <div class="panel-actions">
+          <label class="wm-toggle-wrap" title="Pop up new alerts">
+            <span>🔔 Popup</span>
+            <div class="wm-toggle" onclick="wmIntelPopupEnabled=!wmIntelPopupEnabled;this.classList.toggle('on')"></div>
+          </label>
+          <label class="wm-toggle-wrap" title="Breaking alerts">
+            <span>🚨 Breaking</span>
+            <div class="wm-toggle on" onclick="wmIntelBreaking=!wmIntelBreaking;this.classList.toggle('on')"></div>
+          </label>
+          <button class="icon-btn close" onclick="hidePanel('intel')">✕</button>
+        </div>
+      </div>
+      <div class="wm-intel-tabs">
+        <button class="wm-intel-tab active" data-type="all"     onclick="wmIntelSetFilter('all')">ALL</button>
+        <button class="wm-intel-tab"        data-type="insight" onclick="wmIntelSetFilter('insight')">🧠 SIGNALS</button>
+        <button class="wm-intel-tab"        data-type="risk"    onclick="wmIntelSetFilter('risk')">🌡 RISK</button>
+        <button class="wm-intel-tab"        data-type="iran"    onclick="wmIntelSetFilter('iran')">🇮🇷 IRAN</button>
+        <button class="wm-intel-tab"        data-type="unrest"  onclick="wmIntelSetFilter('unrest')">✊ UNREST</button>
+        <button class="wm-intel-tab"        data-type="weather" onclick="wmIntelSetFilter('weather')">🌪 WEATHER</button>
+        <button class="wm-intel-tab"        data-type="cyber"   onclick="wmIntelSetFilter('cyber')">💻 CYBER</button>
+      </div>
+      <div class="panel-content" id="intel-feed-list"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-intel"></div>
     </section>
 
   </div><!-- /dashboardCanvas -->
