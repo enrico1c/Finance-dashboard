@@ -66,6 +66,9 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked> Watchlist</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="valuation"    checked> Valuation</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked> Geo·Risk</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="supply"       checked> Supply·Chain</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="alert"        checked> Alert·Feed</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
       </div>
     </div>
   </header>
@@ -362,6 +365,9 @@
         <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars')">WARS</button>
         <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources')">RESOURCES</button>
         <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes')">ROUTES</button>
+        <button class="tab-btn"        data-tab="intel"     onclick="switchTab('geopolitical','intel');wmGeoIntel()">INTEL</button>
+        <button class="tab-btn"        data-tab="signals"   onclick="switchTab('geopolitical','signals');wmGeoSignals()">SIGNALS</button>
+        <button class="tab-btn"        data-tab="quakes"    onclick="switchTab('geopolitical','quakes');wmGeoQuakes()">QUAKES</button>
       </div>
 
       <!-- WARS TAB -->
@@ -379,6 +385,15 @@
         <div id="georisk-routes-content"></div>
       </div>
 
+      <!-- INTEL TAB (WorldMonitor live) -->
+      <div class="tab-pane panel-content" data-tab="intel" id="geo-intel"></div>
+
+      <!-- SIGNALS TAB (WorldMonitor insights) -->
+      <div class="tab-pane panel-content" data-tab="signals" id="geo-signals"></div>
+
+      <!-- QUAKES TAB (earthquakes + natural events) -->
+      <div class="tab-pane panel-content" data-tab="quakes" id="geo-quakes"></div>
+
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -387,6 +402,93 @@
     </section>
 
   </div><!-- /dashboardCanvas -->
+
+    <!-- ▸ SUPPLY CHAIN INTELLIGENCE ────────────────────────────── -->
+    <section class="panel" id="panel-supply" data-panel="supply">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Supply·Chain — Chokepoints &amp; Minerals</h3>
+          <div class="mode-label" id="supplyModeLabel">WorldMonitor live data</div>
+        </div>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('supply')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="choke"   onclick="switchTab('supply','choke')">CHOKE</button>
+        <button class="tab-btn"        data-tab="ship"    onclick="switchTab('supply','ship')">SHIPPING</button>
+        <button class="tab-btn"        data-tab="minerals" onclick="switchTab('supply','minerals')">MINERALS</button>
+        <button class="tab-btn"        data-tab="flights" onclick="switchTab('supply','flights')">FLIGHTS</button>
+        <button class="tab-btn"        data-tab="energy"  onclick="switchTab('supply','energy')">ENERGY</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="choke"    id="supply-choke"></div>
+      <div class="tab-pane        panel-content" data-tab="ship"     id="supply-ship"></div>
+      <div class="tab-pane        panel-content" data-tab="minerals" id="supply-minerals"></div>
+      <div class="tab-pane        panel-content" data-tab="flights"  id="supply-flights"></div>
+      <div class="tab-pane        panel-content" data-tab="energy"   id="supply-energy"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-supply"></div>
+    </section>
+
+    <!-- ▸ GLOBAL ALERT FEED ─────────────────────────────────────── -->
+    <section class="panel" id="panel-alert" data-panel="alert">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Alert·Feed — Global Events</h3>
+          <div class="mode-label">Weather · Quakes · Unrest · Fires</div>
+        </div>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('alert')">✕</button>
+        </div>
+      </div>
+      <div class="wm-filter-bar">
+        <button class="wm-filter-btn active" data-filter="all"     onclick="wmAlertLoad('all')">ALL</button>
+        <button class="wm-filter-btn"        data-filter="weather" onclick="wmAlertLoad('weather')">🌪 WEATHER</button>
+        <button class="wm-filter-btn"        data-filter="quake"   onclick="wmAlertLoad('quake')">🏔 QUAKES</button>
+        <button class="wm-filter-btn"        data-filter="unrest"  onclick="wmAlertLoad('unrest')">✊ UNREST</button>
+        <button class="wm-filter-btn"        data-filter="fire"    onclick="wmAlertLoad('fire')">🔥 FIRES</button>
+      </div>
+      <div class="panel-content" id="alert-feed"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-alert"></div>
+    </section>
+
+    <!-- ▸ MACRO INTELLIGENCE ───────────────────────────────────── -->
+    <section class="panel" id="panel-macro" data-panel="macro">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Macro·Intel — Signals &amp; Risk</h3>
+          <div class="mode-label">Commodities · Risk · Predictions</div>
+        </div>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('macro')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="signals" onclick="switchTab('macro','signals')">SIGNALS</button>
+        <button class="tab-btn"        data-tab="comm"    onclick="switchTab('macro','comm')">COMMODITIES</button>
+        <button class="tab-btn"        data-tab="risk"    onclick="switchTab('macro','risk')">RISK</button>
+        <button class="tab-btn"        data-tab="pred"    onclick="switchTab('macro','pred')">PREDICTIONS</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="signals" id="macro-signals"></div>
+      <div class="tab-pane        panel-content" data-tab="comm"    id="macro-comm"></div>
+      <div class="tab-pane        panel-content" data-tab="risk"    id="macro-risk"></div>
+      <div class="tab-pane        panel-content" data-tab="pred"    id="macro-pred"></div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-macro"></div>
+    </section>
 
   <!-- Toast notification (used by api.js) -->
   <div id="apiToast" class="api-toast"></div>
@@ -402,6 +504,7 @@
 <script src="eodhd.js"></script>
 <script src="apitube.js"></script>
 <script src="massive.js"></script>
+<script src="worldmonitor.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
    GEORISK WIDGET — Wars, Resources & Supply Chain Risk
