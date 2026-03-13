@@ -3497,3 +3497,292 @@ textarea::placeholder { color:var(--text-muted); }
   white-space: nowrap;
 }
 .ss-toast strong { color: var(--accent); }
+
+/* ══════════════════════════════════════════════════════════════════
+   NEW SOURCES — FRED · Finnhub Econ Calendar · FMP DIV/FILINGS
+   CoinGecko · Frankfurter · WM GPS/MilOps/OREF/Telegram/ETF/Sectors
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── FRED Yield Curve ────────────────────────────────────────────── */
+.fred-section-head {
+  font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--accent); padding: 8px 10px 4px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.fred-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+.fred-badge-ok   { background: rgba(76,175,80,.25); color: #4caf50; }
+.fred-badge-warn { background: rgba(255,77,77,.25);  color: #ff4d4d; }
+.fred-date { font-size: 10px; color: var(--text-dim); font-weight: 400; margin-left: auto; }
+.fred-yield-svg  { width: 100%; height: auto; display: block; padding: 4px 8px; }
+.fred-yield-grid {
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 8px;
+}
+.fred-yield-cell {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--bg-row); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 8px; min-width: 44px;
+}
+.fred-y-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; }
+.fred-y-val   { font-size: 12px; font-weight: 700; color: var(--text); }
+
+.fred-spread-list { padding: 4px 8px; }
+.fred-spread-row  {
+  display: grid; grid-template-columns: 120px 1fr 60px;
+  align-items: center; gap: 8px;
+  padding: 5px 0; border-bottom: 1px solid var(--border);
+}
+.fred-spread-label { font-size: 11px; font-weight: 600; color: var(--text); }
+.fred-spread-note  { font-size: 10px; color: var(--text-dim); }
+.fred-spread-val   { font-size: 12px; font-weight: 700; text-align: right; }
+.fred-pos  { color: #4caf50; }
+.fred-neg  { color: #f44336; }
+.fred-ok   { color: var(--accent); }
+.fred-warn { color: #ffaa00; }
+
+/* FRED Macro cards */
+.fred-macro-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px; padding: 8px;
+}
+.fred-macro-card {
+  background: var(--bg-row); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; display: flex; align-items: flex-start; gap: 6px; cursor: default;
+  transition: border-color .2s;
+}
+.fred-macro-card:hover { border-color: var(--accent); }
+.fred-mc-icon   { font-size: 20px; flex-shrink: 0; }
+.fred-mc-body   { min-width: 0; }
+.fred-mc-label  { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .3px; }
+.fred-mc-val    { font-size: 16px; font-weight: 700; color: var(--text); }
+.fred-mc-chg    { font-size: 10px; font-weight: 600; }
+.fred-mc-date   { font-size: 9px; color: var(--text-dim); }
+
+/* Sparklines */
+.fred-spark-row  { display: flex; gap: 12px; padding: 6px 10px; }
+.fred-spark-cell { flex: 1; }
+.fred-spark-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; }
+.fred-spark-svg  { width: 100%; height: 36px; display: block; }
+.fred-spark-val  { font-size: 11px; font-weight: 700; color: var(--accent); }
+
+/* ── Finnhub Economic Calendar ───────────────────────────────────── */
+.fh-econ-date-head {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--accent); padding: 5px 10px 2px; background: var(--bg-row);
+  border-bottom: 1px solid var(--border);
+}
+.fh-econ-row {
+  display: grid;
+  grid-template-columns: 18px 32px 1fr 64px 64px 64px;
+  align-items: center; gap: 6px;
+  padding: 4px 10px; border-bottom: 1px solid var(--border);
+  font-size: 11px; color: var(--text);
+}
+.fh-econ-row:hover { background: var(--bg-row); }
+.fh-econ-impact  { font-size: 10px; }
+.fh-econ-country { font-size: 10px; color: var(--text-dim); font-weight: 600; }
+.fh-econ-event   { font-size: 11px; }
+.fh-econ-actual  { font-size: 11px; text-align: right; }
+.fh-econ-est, .fh-econ-prev { font-size: 10px; color: var(--text-dim); text-align: right; }
+
+/* ── FMP Dividends ───────────────────────────────────────────────── */
+.div-summary-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.div-sum-cell {
+  flex: 1; min-width: 90px; background: var(--bg-row);
+  border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px;
+}
+.div-sum-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; display: block; }
+.div-sum-val   { font-size: 13px; font-weight: 700; color: var(--text); }
+
+.div-table-wrap { overflow-x: auto; padding: 0 8px 8px; }
+.div-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.div-table th {
+  text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text-dim); padding: 4px 6px; border-bottom: 1px solid var(--border);
+}
+.div-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); color: var(--text); }
+.div-table tr:hover td { background: var(--bg-row); }
+
+/* ── SEC EDGAR Filings ───────────────────────────────────────────── */
+.sec-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--bg-row);
+}
+.sec-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  background: rgba(68,136,255,.2); color: var(--accent); padding: 2px 6px; border-radius: 3px;
+}
+.sec-note { font-size: 10px; color: var(--text-dim); }
+.sec-filing-list  { padding: 0 8px 4px; }
+.sec-filing-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+}
+.sec-form-badge {
+  font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px;
+  background: var(--bg-row); color: var(--accent); border: 1px solid var(--accent); white-space: nowrap;
+}
+.sec-entity { font-size: 11px; flex: 1; min-width: 80px; }
+.sec-filed  { font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+.sec-period { font-size: 10px; color: var(--text-dim); }
+.sec-link   { font-size: 10px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.sec-link:hover { text-decoration: underline; }
+.sec-all-link {
+  font-size: 11px; color: var(--accent); text-decoration: none;
+  padding: 4px 12px; border: 1px solid var(--accent); border-radius: 4px;
+}
+.sec-all-link:hover { background: rgba(68,136,255,.1); }
+
+/* ── CoinGecko Crypto ────────────────────────────────────────────── */
+.cg-global-bar {
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 8px;
+  border-bottom: 1px solid var(--border); background: var(--bg-row);
+}
+.cg-glob-cell { flex: 1; min-width: 80px; text-align: center; }
+.cg-glob-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; display: block; }
+.cg-glob-val   { font-size: 12px; font-weight: 700; }
+
+.cg-coin-list { overflow: auto; }
+.cg-coin-row {
+  display: grid;
+  grid-template-columns: 24px 20px 100px 40px 80px 60px 60px 70px 1fr;
+  align-items: center; gap: 4px;
+  padding: 4px 8px; border-bottom: 1px solid var(--border);
+  font-size: 11px; transition: background .1s;
+}
+.cg-coin-row:hover { background: var(--bg-row); }
+.cg-coin-rank  { color: var(--text-dim); font-size: 9px; text-align: right; }
+.cg-coin-img   { width: 18px; height: 18px; border-radius: 50%; }
+.cg-coin-name  { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cg-coin-sym   { color: var(--text-dim); font-size: 9px; }
+.cg-coin-price { font-weight: 700; text-align: right; }
+.cg-coin-chg, .cg-coin-chg7 { font-size: 10px; text-align: right; }
+.cg-coin-mc    { font-size: 10px; color: var(--text-dim); text-align: right; }
+.cg-bar-wrap   { height: 4px; background: var(--border); border-radius: 2px; }
+.cg-vol-bar    { height: 100%; background: var(--accent); border-radius: 2px; opacity: .6; }
+
+/* ── Frankfurter FX ──────────────────────────────────────────────── */
+.fkt-rates-strip {
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px;
+  border-top: 1px solid var(--border); background: var(--bg-row); min-height: 28px;
+}
+.fkt-rate-chip {
+  display: flex; gap: 4px; align-items: center;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 3px; padding: 2px 6px; font-size: 10px;
+}
+.fkt-ccy  { color: var(--text-dim); font-size: 9px; text-transform: uppercase; }
+.fkt-rate { font-weight: 700; color: var(--text); }
+.fkt-history-strip { padding: 0 8px 6px; border-top: 1px solid var(--border); }
+.fkt-hist-label {
+  font-size: 10px; color: var(--text-dim); padding: 4px 0 2px; display: flex; align-items: center; gap: 6px;
+}
+.fkt-hist-prices {
+  display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); padding-top: 2px;
+}
+.fkt-err { font-size: 10px; color: var(--text-dim); padding: 6px; }
+
+/* ── WM GPS Jamming ─────────────────────────────────────────────── */
+.wm-gps-list { overflow: auto; }
+.wm-gps-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+  padding: 5px 10px; border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.wm-gps-row:hover { background: var(--bg-row); }
+.wm-gps-sev    { font-size: 10px; }
+.wm-gps-region { font-weight: 600; }
+.wm-gps-desc   { color: var(--text-dim); font-size: 10px; flex: 1; }
+.wm-gps-date   { font-size: 9px; color: var(--text-dim); margin-left: auto; }
+
+/* ── WM Military Ops ────────────────────────────────────────────── */
+.wm-milops-list { overflow: auto; }
+.wm-milops-type-head {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--accent); padding: 5px 10px 2px; background: var(--bg-row);
+  border-bottom: 1px solid var(--border);
+}
+.wm-milops-row {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 4px 10px; border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.wm-milops-row:hover { background: var(--bg-row); }
+.wm-milops-cs     { font-weight: 700; min-width: 80px; color: var(--accent); }
+.wm-milops-region { color: var(--text-dim); }
+.wm-milops-note   { font-size: 10px; color: var(--text-dim); }
+
+/* ── WM OREF Alerts ─────────────────────────────────────────────── */
+.wm-oref-clear {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 140px; color: var(--text);
+}
+.wm-oref-list { overflow: auto; }
+.wm-oref-row  {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  animation: wm-oref-flash .5s ease 3;
+}
+@keyframes wm-oref-flash {
+  0%,100% { background: transparent; }
+  50%      { background: rgba(255,34,34,.15); }
+}
+.wm-oref-icon { font-size: 18px; flex-shrink: 0; }
+.wm-oref-zone  { font-size: 13px; font-weight: 700; color: #ff4d4d; }
+.wm-oref-meta  { font-size: 10px; color: var(--text-dim); }
+.wm-oref-instr { font-size: 10px; color: var(--text); margin-top: 2px; }
+
+/* ── WM Telegram Feed ───────────────────────────────────────────── */
+.wm-tg-list { overflow: auto; }
+.wm-tg-row  {
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.wm-tg-row:hover { background: var(--bg-row); }
+.wm-tg-head    { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.wm-tg-channel { font-size: 10px; font-weight: 700; color: var(--accent); }
+.wm-tg-lang    { font-size: 9px; background: var(--bg-row); padding: 1px 4px; border-radius: 2px; color: var(--text-dim); }
+.wm-tg-ts      { font-size: 9px; color: var(--text-dim); margin-left: auto; }
+.wm-tg-text    { font-size: 11px; color: var(--text); line-height: 1.4; }
+.wm-tg-tags    { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+
+/* ── WM ETF Flows ───────────────────────────────────────────────── */
+.wm-flows-list { overflow: auto; }
+.wm-flows-row  {
+  display: grid; grid-template-columns: 60px 1fr 80px 50px;
+  align-items: center; gap: 8px;
+  padding: 5px 10px; border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.wm-flows-row:hover { background: var(--bg-row); }
+.wm-flows-ticker { font-weight: 700; color: var(--accent); }
+.wm-flows-name   { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-flows-flow   { font-weight: 700; text-align: right; }
+.wm-flows-period { font-size: 9px; color: var(--text-dim); text-align: right; }
+
+/* ── WM Sector Heatmap ──────────────────────────────────────────── */
+.wm-sector-heatmap {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 3px; padding: 8px;
+}
+.wm-sector-cell {
+  border-radius: 4px; padding: 6px 8px; cursor: pointer;
+  transition: opacity .2s, transform .2s; text-align: center;
+}
+.wm-sector-cell:hover { opacity: .85; transform: scale(1.03); }
+.wm-sector-name { font-size: 9px; color: #fff; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.wm-sector-chg  { font-size: 13px; font-weight: 800; color: #fff; }
+.wm-sector-etf  { font-size: 8px; color: rgba(255,255,255,.7); }
+
+.wm-sector-list { padding: 0 8px 8px; }
+.wm-sector-row  {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.wm-sector-row-name { flex: 1; font-weight: 600; }
+.wm-sector-row-chg  { font-weight: 700; min-width: 56px; text-align: right; }
+.wm-sector-leader   { font-size: 10px; color: var(--accent); }
+.wm-sector-vol      { font-size: 9px; color: var(--text-dim); }
+
+/* shared pos/neg */
+.wm-pos { color: #4caf50; }
+.wm-neg { color: #f44336; }
