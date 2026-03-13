@@ -23,6 +23,18 @@
    Indexes: (type, ts DESC), (ticker, ts DESC), (sev, ts DESC)
    TTL: 30 days for news, 90 days for intel/risk
    Max rows kept: 5000 total (pruned on write)
+
+   table: ft_cache  (managed by sbcache.js)
+     cache_key   text  PK   — hash(provider|endpoint|symbol|params)
+     provider    text       — fmp|fh|av|fred|oer
+     symbol      text       — ticker (uppercase)
+     endpoint    text       — API path
+     data        jsonb      — full response payload
+     fetched_at  bigint     — unix seconds
+     ttl_secs    int        — seconds valid
+     expires_at  bigint     — fetched_at + ttl_secs
+     hit_count   int        — read counter
+     call_saved  int        — always 0 (reserved)
    ══════════════════════════════════════════════════════════════════ */
 
 const SB_URL  = 'https://zvvsdxzdywagtsgndbqd.supabase.co';
