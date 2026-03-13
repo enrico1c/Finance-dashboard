@@ -1189,6 +1189,12 @@ function loadForexChart(pair,interval){
   const lbl=document.getElementById("forexLabel");
   if(lbl) lbl.textContent=pair;
   document.querySelectorAll(".fx-tf-btn").forEach(b=>b.classList.toggle("active",b.textContent.trim()===formatInterval(interval)));
+  // Update Frankfurter ECB rates + 90-day history for this pair
+  if(typeof frankfurterLoadRates === "function") frankfurterLoadRates();
+  if(typeof frankfurterHistory   === "function") {
+    const parts = pair.replace(/[^A-Z/]/g,"").split("/");
+    if(parts.length===2) frankfurterHistory(parts[0], parts[1], 90);
+  }
 }
 function formatInterval(iv){return{"1":"1m","5":"5m","15":"15m","60":"1H","240":"4H","D":"1D","W":"1W"}[iv]??iv;}
 function changeForexPair(){const v=document.getElementById("forexPairInput")?.value.trim().toUpperCase();if(v)loadForexChart(v,currentForexInterval);}
@@ -1209,6 +1215,15 @@ function changeTicker(){
   // Fire all data providers — avLoadAll orchestrates AV + FMP + EODHD + APITube + Massive
   if(typeof avLoadAll       === "function") avLoadAll(sym);
   if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
+  // Reset lazy-loaded tabs so they reload on next visit
+  const divEl = document.getElementById("fund-div");
+  const filEl = document.getElementById("fund-filings");
+  if(divEl) { divEl.innerHTML = ""; divEl.dataset.loaded = ""; }
+  if(filEl) { filEl.innerHTML = ""; filEl.dataset.loaded = ""; }
+  // If DIV or FILINGS tab is currently active, load immediately
+  const activeFundTab = document.querySelector("#panel-fundamentals .tab-btn.active");
+  if(activeFundTab?.dataset.tab === "div"     && typeof fmpLoadDividends  === "function") fmpLoadDividends(sym);
+  if(activeFundTab?.dataset.tab === "filings" && typeof fmpLoadSecFilings === "function") fmpLoadSecFilings(sym);
 }
 
 async function searchTopicNews(){
