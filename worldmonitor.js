@@ -1509,3 +1509,379 @@ function wmInitAll() {
   if (_wmOrigInit) _wmOrigInit();
   wmIntelInit();
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   WM TICKER ENRICHMENT
+   Connects WorldMonitor live data to all 7 main panels:
+   News · Quote · Analysts · Ownership · Comparables · Watchlist · Valuation
+   Called automatically whenever a ticker is loaded anywhere in FINTERM.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Ticker → geopolitical/supply context map ───────────────────── */
+const WM_TICKER_CONTEXT = {
+  /* Energy */
+  XOM:  { topic:'oil',      country:'US',  risk:'medium', tags:['oil','energy','pipeline'] },
+  CVX:  { topic:'oil',      country:'US',  risk:'medium', tags:['oil','lng','energy'] },
+  COP:  { topic:'oil',      country:'US',  risk:'low',    tags:['oil','shale'] },
+  BP:   { topic:'oil',      country:'GB',  risk:'medium', tags:['oil','energy','russia'] },
+  SHEL: { topic:'oil',      country:'GB',  risk:'medium', tags:['lng','oil','energy'] },
+  LNG:  { topic:'lng',      country:'US',  risk:'low',    tags:['lng','gas','shipping'] },
+  SLB:  { topic:'oil',      country:'US',  risk:'medium', tags:['oil','oilfield','sanctions'] },
+  /* Metals & Mining */
+  FCX:  { topic:'copper',   country:'US',  risk:'medium', tags:['copper','mining','chile'] },
+  NEM:  { topic:'gold',     country:'US',  risk:'low',    tags:['gold','mining'] },
+  GOLD: { topic:'gold',     country:'CA',  risk:'low',    tags:['gold','mining'] },
+  RIO:  { topic:'iron',     country:'GB',  risk:'medium', tags:['iron','mining','china'] },
+  BHP:  { topic:'mining',   country:'AU',  risk:'medium', tags:['iron','copper','mining'] },
+  VALE: { topic:'iron',     country:'BR',  risk:'high',   tags:['iron','mining','brazil'] },
+  AA:   { topic:'aluminum', country:'US',  risk:'low',    tags:['aluminum','smelting'] },
+  ALB:  { topic:'lithium',  country:'US',  risk:'medium', tags:['lithium','battery','chile'] },
+  /* Semiconductors */
+  NVDA: { topic:'semiconductor', country:'US', risk:'medium', tags:['chip','taiwan','ai','sanctions'] },
+  TSM:  { topic:'semiconductor', country:'TW', risk:'high',   tags:['taiwan','chip','china','foundry'] },
+  ASML: { topic:'semiconductor', country:'NL', risk:'medium', tags:['euv','chip','sanctions','china'] },
+  INTC: { topic:'semiconductor', country:'US', risk:'low',    tags:['chip','foundry','us'] },
+  AMD:  { topic:'semiconductor', country:'US', risk:'medium', tags:['chip','ai','china'] },
+  QCOM: { topic:'semiconductor', country:'US', risk:'medium', tags:['chip','china','5g'] },
+  /* Defense */
+  LMT:  { topic:'defense',  country:'US',  risk:'low',    tags:['defense','military','ukraine','nato'] },
+  RTX:  { topic:'defense',  country:'US',  risk:'low',    tags:['defense','missiles','ukraine'] },
+  NOC:  { topic:'defense',  country:'US',  risk:'low',    tags:['defense','aerospace','military'] },
+  GD:   { topic:'defense',  country:'US',  risk:'low',    tags:['defense','navy','armor'] },
+  BA:   { topic:'aerospace', country:'US', risk:'medium', tags:['aerospace','defense','supply-chain'] },
+  /* Shipping & Logistics */
+  ZIM:  { topic:'shipping', country:'IL',  risk:'high',   tags:['shipping','red-sea','suez','israel'] },
+  MATX: { topic:'shipping', country:'US',  risk:'low',    tags:['shipping','container'] },
+  /* Energy grid / transition */
+  NEE:  { topic:'energy',   country:'US',  risk:'low',    tags:['solar','wind','grid'] },
+  ENPH: { topic:'energy',   country:'US',  risk:'low',    tags:['solar','battery','energy'] },
+  /* Agri */
+  ADM:  { topic:'agriculture', country:'US', risk:'medium', tags:['grain','ukraine','food','fertilizer'] },
+  MOS:  { topic:'agriculture', country:'US', risk:'high',   tags:['potash','fertilizer','russia','ukraine'] },
+  NTR:  { topic:'agriculture', country:'CA', risk:'medium', tags:['potash','fertilizer','sanctions'] },
+  /* Finance / macro */
+  JPM:  { topic:'finance',  country:'US',  risk:'low',    tags:['sanctions','russia','iran','macro'] },
+  GS:   { topic:'finance',  country:'US',  risk:'low',    tags:['sanctions','macro','bonds'] },
+  /* Cyber */
+  CRWD: { topic:'cyber',    country:'US',  risk:'low',    tags:['cyber','threat','nation-state'] },
+  PANW: { topic:'cyber',    country:'US',  risk:'low',    tags:['cyber','threat','firewall'] },
+};
+
+/* ── Risk score palette ─────────────────────────────────────────── */
+function wmScoreColor(score) {
+  if (score >= 75) return { text:'#ff4757', bg:'rgba(255,71,87,.1)',  border:'rgba(255,71,87,.3)' };
+  if (score >= 50) return { text:'#ffa500', bg:'rgba(255,165,0,.08)', border:'rgba(255,165,0,.25)' };
+  if (score >= 25) return { text:'#f7c948', bg:'rgba(247,201,72,.08)',border:'rgba(247,201,72,.2)' };
+  return { text:'#00d4a0', bg:'rgba(0,212,160,.07)', border:'rgba(0,212,160,.2)' };
+}
+
+/* ── Main enrichment entry point ────────────────────────────────── */
+async function wmEnrichTicker(ticker) {
+  if (!ticker) return;
+  const sym = ticker.replace(/.*:/,'').toUpperCase();
+  const ctx = WM_TICKER_CONTEXT[sym] || null;
+  const topic = ctx?.topic || wmResourceToTopic(sym);
+  const tags  = ctx?.tags  || [sym.toLowerCase(), topic];
+
+  try {
+    /* Fetch relevant bootstrap keys in one batch */
+    const keys = ['insights','riskScores','weatherAlerts','cyberThreats',
+                  'iranEvents','unrestEvents','chokepoints'];
+    const d = await wmBootstrap(keys);
+
+    /* Build relevance filter */
+    const isRelevant = (text='') => {
+      const lc = text.toLowerCase();
+      return tags.some(t => lc.includes(t)) || lc.includes(sym.toLowerCase());
+    };
+
+    /* ── Gather matching signals ───────────────────────────────── */
+    const insights = (d.insights?.insights || d.insights?.items || d.insights?.data || d.insights || []);
+    const matchedSignals = (Array.isArray(insights) ? insights : [])
+      .filter(s => isRelevant(`${s.title||''} ${s.body||''} ${(s.tags||[]).join(' ')}`))
+      .slice(0, 4);
+
+    /* ── Country risk ──────────────────────────────────────────── */
+    let countryRisk = null;
+    if (ctx?.country) {
+      const riskRaw = d.riskScores?.scores || d.riskScores?.data || d.riskScores || {};
+      const riskArr = Array.isArray(riskRaw) ? riskRaw :
+        Object.entries(riskRaw).map(([k,v]) => typeof v==='object' ? {country:k,...v} : {country:k,score:v});
+      countryRisk = riskArr.find(r =>
+        (r.country||r.code||'').toUpperCase() === ctx.country ||
+        (r.country||'').toLowerCase().includes(ctx.country.toLowerCase())
+      );
+    }
+
+    /* ── Active supply alerts matching this ticker ─────────────── */
+    const chokes = (d.chokepoints?.chokepoints || d.chokepoints?.data || d.chokepoints || []);
+    const matchedChokes = (Array.isArray(chokes) ? chokes : [])
+      .filter(c => (c.affectedCommodities||[]).some(x => isRelevant(x)) || isRelevant(c.name||''))
+      .slice(0, 2);
+
+    /* ── Unrest / Iran events matching ─────────────────────────── */
+    const iranEvts = (d.iranEvents?.events || d.iranEvents?.data || d.iranEvents || []);
+    const unrestEvts = (d.unrestEvents?.events || d.unrestEvents?.data || d.unrestEvents || []);
+    const geoPressures = [
+      ...(Array.isArray(iranEvts) ? iranEvts : []),
+      ...(Array.isArray(unrestEvts) ? unrestEvts : [])
+    ].filter(e => isRelevant(`${e.title||''} ${e.description||''} ${e.location||''}`)).slice(0,3);
+
+    /* ── Cyber threats matching ─────────────────────────────────── */
+    const cyber = (d.cyberThreats?.threats || d.cyberThreats?.data || d.cyberThreats || []);
+    const matchedCyber = (Array.isArray(cyber) ? cyber : [])
+      .filter(c => isRelevant(`${c.title||''} ${c.target||''} ${c.sector||''}`))
+      .slice(0,2);
+
+    /* ── Render banners into each panel ─────────────────────────── */
+    const hasData = matchedSignals.length || countryRisk || matchedChokes.length ||
+                    geoPressures.length || matchedCyber.length;
+
+    if (!hasData) return; // nothing to show for this ticker
+
+    wmInjectNewsEnrichment(sym, topic, matchedSignals, countryRisk, geoPressures);
+    wmInjectQuoteEnrichment(sym, topic, countryRisk, matchedChokes, matchedSignals);
+    wmInjectAnalystsEnrichment(sym, topic, matchedSignals, geoPressures);
+    wmInjectOwnershipEnrichment(sym, topic, countryRisk, geoPressures);
+    wmInjectComparablesEnrichment(sym, topic, matchedSignals, matchedChokes);
+    wmInjectWatchlistEnrichment(sym, topic, matchedSignals, countryRisk);
+    wmInjectValuationEnrichment(sym, topic, countryRisk, matchedChokes, geoPressures, matchedCyber);
+
+  } catch(e) {
+    console.warn('[WM] enrichTicker error:', e.message);
+  }
+}
+
+/* ── Shared banner builder ──────────────────────────────────────── */
+function wmBanner(items, panelId, bannerId) {
+  if (!items.length) return;
+  const existing = document.getElementById(bannerId);
+  if (existing) existing.remove();
+
+  const banner = document.createElement('div');
+  banner.id = bannerId;
+  banner.className = 'wm-enrich-banner';
+  banner.innerHTML = `
+    <div class="wm-enrich-head">
+      <span class="wm-enrich-logo">🌐 WorldMonitor</span>
+      <span class="wm-enrich-count">${items.length} geo signal${items.length>1?'s':''}</span>
+      <button class="wm-enrich-close" onclick="document.getElementById('${bannerId}').remove()">✕</button>
+    </div>
+    <div class="wm-enrich-items">
+      ${items.map(item => `
+        <div class="wm-enrich-item" style="border-left:2px solid ${item.col?.border||'var(--border)'}">
+          <span class="wm-enrich-icon">${item.icon||'⚡'}</span>
+          <div class="wm-enrich-body">
+            <div class="wm-enrich-title">${wmEsc(item.title)}</div>
+            ${item.sub ? `<div class="wm-enrich-sub">${wmEsc(item.sub)}</div>` : ''}
+          </div>
+          ${item.action ? `<button class="wm-enrich-act" onclick="${item.action}">${item.actionLabel||'→'}</button>` : ''}
+        </div>`).join('')}
+    </div>`;
+
+  /* Inject just before panel-content / news-feed / watchlistBox */
+  const panel = document.getElementById(`panel-${panelId}`);
+  if (!panel) return;
+  const target = panel.querySelector('.panel-content, #news-feed, #watchlistBox');
+  if (target) panel.insertBefore(banner, target);
+  else panel.appendChild(banner);
+}
+
+/* ══ Per-panel injectors ══════════════════════════════════════════ */
+
+function wmInjectNewsEnrichment(sym, topic, signals, risk, geoEvents) {
+  const items = [];
+  if (risk) {
+    const c = wmScoreColor(risk.score||0);
+    items.push({ icon:'🌡', title:`${risk.country||ctx?.country||''} risk: ${Math.round(risk.score||0)}/100`,
+      sub: risk.driver||risk.cause||'', col:c,
+      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Risk Feed' });
+  }
+  signals.forEach(s => {
+    const c = wmSeverityColor(s.severity||'medium');
+    items.push({ icon:'🧠', title: s.title||s.headline||'Signal',
+      sub: (s.body||s.description||'').slice(0,80), col:c,
+      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Intel' });
+  });
+  geoEvents.slice(0,1).forEach(e => {
+    const c = wmSeverityColor(e.severity||'medium');
+    items.push({ icon:'✊', title: e.title||e.description||'Event', sub: e.location||'', col:c,
+      action:`wmIntelSetFilter('unrest');showPanel('intel')`, actionLabel:'→ Unrest' });
+  });
+  wmBanner(items, 'news', `wm-banner-news-${sym}`);
+}
+
+function wmInjectQuoteEnrichment(sym, topic, risk, chokes, signals) {
+  const items = [];
+  if (risk && (risk.score||0) >= 40) {
+    const c = wmScoreColor(risk.score||0);
+    items.push({ icon:'🌡', title:`${risk.country||''} Country Risk: ${Math.round(risk.score||0)}/100`,
+      sub: risk.driver||'Political/economic risk indicator', col:c,
+      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Details' });
+  }
+  chokes.forEach(ch => {
+    const c = wmSeverityColor(ch.riskLevel||ch.risk||'medium');
+    items.push({ icon:'🌊', title:`Chokepoint: ${ch.name||''}`,
+      sub:`${(ch.affectedCommodities||[]).join(', ')}`, col:c,
+      action:`switchTab('supply','choke');showPanel('supply')`, actionLabel:'→ Supply' });
+  });
+  signals.slice(0,1).forEach(s => {
+    const c = wmSeverityColor(s.severity||'medium');
+    items.push({ icon:'🧠', title:s.title||'', sub:(s.body||'').slice(0,70), col:c });
+  });
+  wmBanner(items, 'quote', `wm-banner-quote-${sym}`);
+}
+
+function wmInjectAnalystsEnrichment(sym, topic, signals, geoEvents) {
+  const items = [];
+  signals.forEach(s => {
+    const c = wmSeverityColor(s.severity||'medium');
+    items.push({ icon:'🧠', title:s.title||'',
+      sub:(s.recommendation||s.body||'').slice(0,90), col:c,
+      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Signal' });
+  });
+  geoEvents.forEach(e => {
+    const c = wmSeverityColor(e.severity||'medium');
+    items.push({ icon:'⚠', title:e.title||e.description||'Geo event',
+      sub:e.location||'', col:c });
+  });
+  wmBanner(items, 'analysts', `wm-banner-analysts-${sym}`);
+}
+
+function wmInjectOwnershipEnrichment(sym, topic, risk, geoEvents) {
+  const items = [];
+  if (risk) {
+    const c = wmScoreColor(risk.score||0);
+    items.push({ icon:'🌍', title:`Domicile risk — ${risk.country||''}`,
+      sub:`Country instability index: ${Math.round(risk.score||0)}/100. May affect insider activity & disclosure.`,
+      col:c, action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Risk Feed' });
+  }
+  geoEvents.forEach(e => {
+    items.push({ icon:'✊', title:e.title||e.description||'', sub:e.location||'',
+      col:wmSeverityColor(e.severity||'medium') });
+  });
+  wmBanner(items, 'ownership', `wm-banner-own-${sym}`);
+}
+
+function wmInjectComparablesEnrichment(sym, topic, signals, chokes) {
+  const items = [];
+  signals.forEach(s => {
+    const c = wmSeverityColor(s.severity||'medium');
+    items.push({ icon:'🧠', title:s.title||'', sub:(s.body||'').slice(0,80), col:c,
+      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Feed' });
+  });
+  chokes.forEach(ch => {
+    const c = wmSeverityColor(ch.riskLevel||ch.risk||'medium');
+    items.push({ icon:'⛓', title:`Supply constraint: ${ch.name||''}`,
+      sub:`Affects sector peers in: ${(ch.affectedCommodities||[]).join(', ')}`, col:c,
+      action:`switchTab('supply','choke');showPanel('supply')`, actionLabel:'→ Supply' });
+  });
+  wmBanner(items, 'comparables', `wm-banner-comp-${sym}`);
+}
+
+function wmInjectWatchlistEnrichment(sym, topic, signals, risk) {
+  /* Banner above the watchlist sort bar */
+  const existing = document.getElementById(`wm-banner-wl-${sym}`);
+  if (existing) existing.remove();
+
+  const items = [];
+  if (risk && (risk.score||0) >= 30) {
+    const c = wmScoreColor(risk.score||0);
+    items.push({ icon:'🌡', title:`Sector geo-risk: ${Math.round(risk.score||0)}/100`,
+      sub:`${topic} — ${risk.driver||'Regional instability'}`, col:c,
+      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Risk' });
+  }
+  signals.slice(0,2).forEach(s => {
+    const c = wmSeverityColor(s.severity||'medium');
+    items.push({ icon:'🧠', title:s.title||'', sub:(s.body||'').slice(0,80), col:c,
+      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Intel' });
+  });
+
+  if (!items.length) return;
+
+  const banner = document.createElement('div');
+  banner.id = `wm-banner-wl-${sym}`;
+  banner.className = 'wm-enrich-banner';
+  banner.innerHTML = `
+    <div class="wm-enrich-head">
+      <span class="wm-enrich-logo">🌐 WorldMonitor · ${wmEsc(topic.toUpperCase())}</span>
+      <span class="wm-enrich-count">${items.length} sector signal${items.length>1?'s':''}</span>
+      <button class="wm-enrich-close" onclick="document.getElementById('wm-banner-wl-${wmEsc(sym)}').remove()">✕</button>
+    </div>
+    <div class="wm-enrich-items">
+      ${items.map(item => `
+        <div class="wm-enrich-item" style="border-left:2px solid ${item.col?.border||'var(--border)'}">
+          <span class="wm-enrich-icon">${item.icon||'⚡'}</span>
+          <div class="wm-enrich-body">
+            <div class="wm-enrich-title">${wmEsc(item.title)}</div>
+            ${item.sub ? `<div class="wm-enrich-sub">${wmEsc(item.sub)}</div>` : ''}
+          </div>
+          ${item.action ? `<button class="wm-enrich-act" onclick="${item.action}">${item.actionLabel||'→'}</button>` : ''}
+        </div>`).join('')}
+    </div>`;
+
+  const sortbar = document.querySelector('#panel-watchlist .wl-sortbar');
+  const watchlistPanel = document.getElementById('panel-watchlist');
+  if (sortbar) watchlistPanel.insertBefore(banner, sortbar);
+  else if (watchlistPanel) watchlistPanel.appendChild(banner);
+}
+
+function wmInjectValuationEnrichment(sym, topic, risk, chokes, geoEvents, cyber) {
+  const items = [];
+  if (risk) {
+    const c = wmScoreColor(risk.score||0);
+    const pct = Math.round(risk.score||0);
+    const impact = pct >= 75 ? 'HIGH risk premium warranted' :
+                   pct >= 50 ? 'Elevated risk premium likely' :
+                   pct >= 25 ? 'Moderate geopolitical discount' : 'Low geo-risk';
+    items.push({ icon:'🌡', title:`Geo-risk: ${impact}`,
+      sub:`${risk.country||''} instability index ${pct}/100 — affects DCF discount rate & peer multiples`, col:c,
+      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Details' });
+  }
+  chokes.forEach(ch => {
+    const c = wmSeverityColor(ch.riskLevel||ch.risk||'medium');
+    items.push({ icon:'⛓', title:`Supply chain disruption: ${ch.name||''}`,
+      sub:'May compress margins and affect forward revenue estimates.', col:c,
+      action:`switchTab('supply','choke');showPanel('supply')`, actionLabel:'→ Supply' });
+  });
+  geoEvents.slice(0,1).forEach(e => {
+    items.push({ icon:'⚠', title:e.title||e.description||'Geopolitical event',
+      sub:'Consider in terminal value and scenario analysis.', col:wmSeverityColor(e.severity||'medium') });
+  });
+  cyber.forEach(c => {
+    items.push({ icon:'💻', title:`Cyber exposure: ${c.title||c.sector||''}`,
+      sub:'Factor in operational risk and potential liability.', col:wmSeverityColor(c.severity||'medium'),
+      action:`wmIntelSetFilter('cyber');showPanel('intel')`, actionLabel:'→ Cyber' });
+  });
+  wmBanner(items, 'valuation', `wm-banner-val-${sym}`);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   HOOK INTO FINTERM TICKER LOADING
+   Patch loadTickerFromWatchlist and reloadAllPanels
+   ══════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  /* Patch loadTickerFromWatchlist */
+  if (typeof loadTickerFromWatchlist === 'function') {
+    const _orig = loadTickerFromWatchlist;
+    window.loadTickerFromWatchlist = function(ticker) {
+      _orig(ticker);
+      setTimeout(() => wmEnrichTicker(ticker), 1200);
+    };
+  }
+
+  /* Patch reloadAllPanels */
+  if (typeof reloadAllPanels === 'function') {
+    const _origReload = reloadAllPanels;
+    window.reloadAllPanels = function(ticker) {
+      _origReload(ticker);
+      setTimeout(() => wmEnrichTicker(ticker), 1500);
+    };
+  }
+
+  /* Also enrich on initial ticker load (after page ready) */
+  setTimeout(() => {
+    const t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
+    wmEnrichTicker(t);
+  }, 3000);
+});
