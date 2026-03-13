@@ -1885,3 +1885,503 @@ document.addEventListener('DOMContentLoaded', () => {
     wmEnrichTicker(t);
   }, 3000);
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   NEW ENDPOINTS — GPS JAM · MILITARY OPS · OREF · TELEGRAM
+   ETF FLOWS · SECTORS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── GPS Jamming  → Geo·Risk GPS tab ───────────────────────────── */
+async function wmGeoGpsJam() {
+  const el = document.getElementById('geo-gpsjam');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading GPS jamming data…');
+  try {
+    const raw = await wmFetch('/api/gpsjam');
+    const items = Array.isArray(raw) ? raw
+      : (raw?.data ? (Array.isArray(raw.data) ? raw.data : Object.values(raw.data)) : []);
+
+    if (!items.length) { el.innerHTML = wmEmpty('No GPS jamming events reported.'); return; }
+
+    const sorted = [...items].sort((a,b) => {
+      const levelOrder = { critical:0, high:1, medium:2, low:3 };
+      const al = levelOrder[(a.severity||a.level||'low').toLowerCase()] ?? 3;
+      const bl = levelOrder[(b.severity||b.level||'low').toLowerCase()] ?? 3;
+      return al - bl;
+    });
+
+    let html = wmLiveBar('GPS Jamming Events', `${sorted.length} active zones`);
+    html += '<div class="wm-gps-list">';
+    for (const item of sorted.slice(0, 40)) {
+      const sev   = (item.severity || item.level || 'unknown').toLowerCase();
+      const color = sev === 'critical' ? '#ff2222' : sev === 'high' ? '#ff6600' : sev === 'medium' ? '#ffaa00' : 'var(--text-dim)';
+      const region = wmEsc(item.region || item.area || item.location || item.country || '');
+      const desc   = wmEsc(item.description || item.notes || item.type || '');
+      const date   = wmEsc(item.date || item.timestamp || item.time || '');
+      html += `<div class="wm-gps-row">
+        <span class="wm-gps-sev" style="color:${color};text-transform:uppercase;font-weight:700;min-width:72px">${wmEsc(sev)}</span>
+        <span class="wm-gps-region">${region}</span>
+        ${desc  ? `<span class="wm-gps-desc">${desc}</span>` : ''}
+        ${date  ? `<span class="wm-gps-date">${date}</span>` : ''}
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('GPS jam data unavailable: ' + e.message);
+  }
+}
+
+/* ── Military Operations  → Geo·Risk MILOPS tab ────────────────── */
+async function wmGeoMilOps() {
+  const el = document.getElementById('geo-milops');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading military flight data…');
+  try {
+    const raw = await wmFetch('/api/military-flights');
+    const items = Array.isArray(raw) ? raw
+      : (raw?.flights || raw?.data || (typeof raw === 'object' ? Object.values(raw) : []));
+
+    if (!items.length) { el.innerHTML = wmEmpty('No military flight activity detected.'); return; }
+
+    // Group by region/type
+    const byType = {};
+    for (const f of items) {
+      const type = f.type || f.category || f.aircraft_type || 'Unknown';
+      if (!byType[type]) byType[type] = [];
+      byType[type].push(f);
+    }
+
+    let html = wmLiveBar('Military Flight Activity', `${items.length} active sorties`);
+    html += '<div class="wm-milops-list">';
+    for (const [type, flights] of Object.entries(byType)) {
+      html += `<div class="wm-milops-type-head">${wmEsc(type)} <span style="color:var(--text-dim);font-weight:400">(${flights.length})</span></div>`;
+      for (const f of flights.slice(0,8)) {
+        const callsign = wmEsc(f.callsign || f.id || f.icao || '');
+        const region   = wmEsc(f.region   || f.area || f.country || f.origin || '');
+        const alt      = f.altitude ? ` · ${f.altitude}ft` : '';
+        const note     = wmEsc(f.note || f.description || '');
+        html += `<div class="wm-milops-row">
+          <span class="wm-milops-cs">${callsign}</span>
+          <span class="wm-milops-region">${region}${alt}</span>
+          ${note ? `<span class="wm-milops-note">${note}</span>` : ''}
+        </div>`;
+      }
+    }
+    html += '</div>';
+    html += `<div style="padding:6px 8px;text-align:right">
+      <a href="https://www.worldmonitor.app/?layers=military-flights" target="_blank" rel="noopener"
+         style="color:var(--accent);font-size:11px">View on WorldMonitor ↗</a>
+    </div>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('Military ops data unavailable: ' + e.message);
+  }
+}
+
+/* ── OREF Alerts (Israel sirens)  → Intel·Feed OREF tab ────────── */
+async function wmIntelOref() {
+  const el = document.getElementById('intel-oref');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading OREF alerts…');
+  try {
+    const raw = await wmFetch('/api/oref-alerts');
+    const items = Array.isArray(raw) ? raw
+      : (raw?.alerts || raw?.data || raw?.events || []);
+
+    if (!items.length) {
+      el.innerHTML = `<div class="wm-oref-clear">
+        <span style="font-size:32px">🟢</span>
+        <div style="font-weight:600;margin-top:8px">No Active OREF Alerts</div>
+        <div style="color:var(--text-dim);font-size:12px">Israel Home Front Command — all clear</div>
+      </div>`;
+      return;
+    }
+
+    let html = `<div style="background:#ff2222;color:#fff;padding:6px 10px;font-weight:700;font-size:12px;letter-spacing:.5px">
+      🚨 ACTIVE OREF ALERTS — ${items.length} ZONE${items.length!==1?'S':''}
+    </div>`;
+    html += '<div class="wm-oref-list">';
+    for (const a of items) {
+      const zone     = wmEsc(a.city || a.zone || a.area || a.location || '');
+      const threat   = wmEsc(a.threat || a.type || a.category || 'Rocket');
+      const time     = wmEsc(a.time || a.timestamp || '');
+      const instrHE  = wmEsc(a.instructions_he || '');
+      const instrEN  = wmEsc(a.instructions_en || a.instructions || '');
+      html += `<div class="wm-oref-row">
+        <span class="wm-oref-icon">🚨</span>
+        <div class="wm-oref-body">
+          <div class="wm-oref-zone">${zone}</div>
+          <div class="wm-oref-meta">${threat} ${time ? '· '+time : ''}</div>
+          ${instrEN ? `<div class="wm-oref-instr">${instrEN}</div>` : ''}
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('OREF data unavailable: ' + e.message);
+  }
+}
+
+/* ── Telegram Breaking Feed  → Intel·Feed TELEGRAM tab ─────────── */
+async function wmIntelTelegram() {
+  const el = document.getElementById('intel-telegram');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading Telegram intelligence…');
+  try {
+    const raw = await wmFetch('/api/telegram-feed');
+    const items = Array.isArray(raw) ? raw
+      : (raw?.messages || raw?.posts || raw?.data || []);
+
+    if (!items.length) { el.innerHTML = wmEmpty('No recent Telegram intel messages.'); return; }
+
+    let html = wmLiveBar('Telegram Intelligence Feed', `${items.length} messages`);
+    html += '<div class="wm-tg-list">';
+    for (const msg of items.slice(0,30)) {
+      const channel = wmEsc(msg.channel || msg.source || msg.from || '');
+      const text    = wmEsc(msg.text || msg.message || msg.content || '');
+      const ts      = wmEsc(msg.time || msg.timestamp || msg.date || '');
+      const lang    = wmEsc(msg.lang || '');
+      const tags    = Array.isArray(msg.tags) ? msg.tags : [];
+      html += `<div class="wm-tg-row">
+        <div class="wm-tg-head">
+          <span class="wm-tg-channel">📡 ${channel || 'Intel Channel'}</span>
+          ${lang ? `<span class="wm-tg-lang">${lang.toUpperCase()}</span>` : ''}
+          <span class="wm-tg-ts">${ts}</span>
+        </div>
+        <div class="wm-tg-text">${text}</div>
+        ${tags.length ? `<div class="wm-tg-tags">${tags.map(t=>`<span class="wm-intel-tag">${wmEsc(t)}</span>`).join('')}</div>` : ''}
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('Telegram feed unavailable: ' + e.message);
+  }
+}
+
+/* ── ETF Flows  → Macro·Intel FLOWS tab ────────────────────────── */
+async function wmMacroEtfFlows() {
+  const el = document.getElementById('macro-flows');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading ETF flow data…');
+  try {
+    const d = await wmBootstrap(['etfFlows']);
+    const raw = d.etfFlows?.data || d.etfFlows || [];
+    const items = Array.isArray(raw) ? raw : Object.values(raw);
+
+    if (!items.length) { el.innerHTML = wmEmpty('No ETF flow data available.'); return; }
+
+    // Sort by absolute flow magnitude
+    const sorted = [...items].sort((a,b) => {
+      const af = Math.abs(parseFloat(a.flow || a.netFlow || a.amount || 0));
+      const bf = Math.abs(parseFloat(b.flow || b.netFlow || b.amount || 0));
+      return bf - af;
+    });
+
+    let html = wmLiveBar('ETF Institutional Flows', `${sorted.length} funds`);
+    html += '<div class="wm-flows-list">';
+
+    const fmtFlow = v => {
+      const n = parseFloat(v || 0);
+      const abs = Math.abs(n);
+      const fmt = abs >= 1e9 ? (n/1e9).toFixed(2)+'B' : abs >= 1e6 ? (n/1e6).toFixed(1)+'M' : n.toFixed(0);
+      return { fmt, pos: n >= 0 };
+    };
+
+    for (const f of sorted.slice(0,25)) {
+      const name    = wmEsc(f.name   || f.ticker || f.fund || f.symbol || '');
+      const ticker  = wmEsc(f.ticker || f.symbol || '');
+      const { fmt, pos } = fmtFlow(f.flow || f.netFlow || f.amount);
+      const sector  = wmEsc(f.sector || f.category || f.type || '');
+      const period  = wmEsc(f.period || f.timeframe || '');
+      html += `<div class="wm-flows-row">
+        <span class="wm-flows-ticker" ${ticker ? `onclick="if(typeof loadTicker==='function')loadTicker('${ticker}')" style="cursor:pointer"` : ''}>${ticker || name}</span>
+        <span class="wm-flows-name">${name !== ticker ? name : sector}</span>
+        <span class="wm-flows-flow ${pos ? 'wm-pos' : 'wm-neg'}">${pos ? '▲ +' : '▼ '}$${fmt}</span>
+        ${period ? `<span class="wm-flows-period">${period}</span>` : ''}
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('ETF flow data unavailable: ' + e.message);
+  }
+}
+
+/* ── Sector Performance  → Macro·Intel SECTORS tab ─────────────── */
+async function wmMacroSectors() {
+  const el = document.getElementById('macro-sectors');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading sector data…');
+  try {
+    const d = await wmBootstrap(['sectors']);
+    const raw = d.sectors?.data || d.sectors || [];
+    const items = Array.isArray(raw) ? raw : Object.values(raw);
+
+    if (!items.length) { el.innerHTML = wmEmpty('No sector data available.'); return; }
+
+    // Sort by performance descending
+    const sorted = [...items].sort((a,b) => {
+      const ap = parseFloat(a.change || a.performance || a.change1d || a.changePercent || 0);
+      const bp = parseFloat(b.change || b.performance || b.change1d || b.changePercent || 0);
+      return bp - ap;
+    });
+
+    let html = wmLiveBar('Sector Performance', `${sorted.length} sectors`);
+
+    // Heatmap bar
+    const maxAbs = Math.max(...sorted.map(s => Math.abs(parseFloat(s.change || s.performance || 0))), 1);
+    html += '<div class="wm-sector-heatmap">';
+    for (const s of sorted) {
+      const name = wmEsc(s.name || s.sector || s.label || '');
+      const chg  = parseFloat(s.change || s.performance || s.change1d || 0);
+      const pct  = (chg / maxAbs * 100).toFixed(1);
+      const positive = chg >= 0;
+      const color = positive
+        ? `rgba(76,175,80,${0.2 + Math.abs(chg)/maxAbs * 0.8})`
+        : `rgba(244,67,54,${0.2 + Math.abs(chg)/maxAbs * 0.8})`;
+      const ticker = wmEsc(s.ticker || s.etf || '');
+      html += `<div class="wm-sector-cell" style="background:${color}" 
+          title="${name}: ${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%"
+          ${ticker ? `onclick="if(typeof loadTicker==='function')loadTicker('${ticker}')"` : ''}>
+        <div class="wm-sector-name">${name}</div>
+        <div class="wm-sector-chg ${positive ? 'wm-pos' : 'wm-neg'}">${positive?'+':''}${chg.toFixed(2)}%</div>
+        ${ticker ? `<div class="wm-sector-etf">${ticker}</div>` : ''}
+      </div>`;
+    }
+    html += '</div>';
+
+    // Detailed list
+    html += '<div class="wm-sector-list">';
+    for (const s of sorted) {
+      const name     = wmEsc(s.name || s.sector || '');
+      const chg      = parseFloat(s.change || s.performance || 0);
+      const volume   = s.volume ? wmEsc(String(s.volume)) : null;
+      const mktCap   = s.marketCap ? wmEsc(String(s.marketCap)) : null;
+      const leader   = wmEsc(s.topStock || s.leader || '');
+      const positive = chg >= 0;
+      html += `<div class="wm-sector-row">
+        <span class="wm-sector-row-name">${name}</span>
+        <span class="wm-sector-row-chg ${positive?'wm-pos':'wm-neg'}">${positive?'+':''}${chg.toFixed(2)}%</span>
+        ${leader  ? `<span class="wm-sector-leader">${leader}</span>` : ''}
+        ${volume  ? `<span class="wm-sector-vol">Vol: ${volume}</span>` : ''}
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('Sector data unavailable: ' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CoinGecko Crypto  → Macro·Intel CRYPTO tab
+   No API key required (public endpoint, rate-limited)
+   ══════════════════════════════════════════════════════════════════ */
+const CG_BASE    = 'https://api.coingecko.com/api/v3';
+const CG_CACHE   = new Map();
+const CG_TTL     = 3 * 60 * 1000;  // 3 min
+
+async function cgFetch(path) {
+  const cached = CG_CACHE.get(path);
+  if (cached && Date.now() - cached.ts < CG_TTL) return cached.data;
+  const res = await fetch(`${CG_BASE}${path}`, {
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
+  const data = await res.json();
+  CG_CACHE.set(path, { data, ts: Date.now() });
+  return data;
+}
+
+async function wmMacroCrypto() {
+  const el = document.getElementById('macro-crypto');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading crypto markets…');
+  try {
+    const [markets, global] = await Promise.allSettled([
+      cgFetch('/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=1h%2C24h%2C7d'),
+      cgFetch('/global'),
+    ]);
+
+    const coins = markets.status === 'fulfilled' ? markets.value : [];
+    const gdata = global.status  === 'fulfilled' ? global.value?.data : null;
+
+    let html = '';
+
+    // Global stats bar
+    if (gdata) {
+      const totalMC  = gdata.total_market_cap?.usd;
+      const vol24    = gdata.total_volume?.usd;
+      const btcDom   = gdata.market_cap_percentage?.btc;
+      const ethDom   = gdata.market_cap_percentage?.eth;
+      const fmtT = v => v >= 1e12 ? '$'+(v/1e12).toFixed(2)+'T' : v >= 1e9 ? '$'+(v/1e9).toFixed(1)+'B' : '—';
+      html += `<div class="cg-global-bar">
+        <div class="cg-glob-cell"><span class="cg-glob-label">Total Market Cap</span><span class="cg-glob-val">${fmtT(totalMC)}</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">24h Volume</span><span class="cg-glob-val">${fmtT(vol24)}</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">BTC Dominance</span><span class="cg-glob-val" style="color:#f7931a">${btcDom?.toFixed(1)||'—'}%</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">ETH Dominance</span><span class="cg-glob-val" style="color:#627eea">${ethDom?.toFixed(1)||'—'}%</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">Active Coins</span><span class="cg-glob-val">${gdata.active_cryptocurrencies?.toLocaleString()||'—'}</span></div>
+      </div>`;
+    }
+
+    if (!coins.length) { el.innerHTML += wmEmpty('No crypto data returned.'); return; }
+
+    html += `<div class="cg-coin-list">`;
+    for (const c of coins) {
+      const chg24 = c.price_change_percentage_24h;
+      const chg7  = c.price_change_percentage_7d_in_currency;
+      const fmtPct = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+      const clsPct = v => v == null ? '' : v >= 0 ? 'wm-pos' : 'wm-neg';
+      const fmtPrice = v => {
+        if (v >= 1000) return '$' + v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+        if (v >= 1)    return '$' + v.toFixed(2);
+        if (v >= 0.01) return '$' + v.toFixed(4);
+        return '$' + v.toFixed(8);
+      };
+      const fmtMC = v => v >= 1e12 ? '$'+(v/1e12).toFixed(2)+'T' : v >= 1e9 ? '$'+(v/1e9).toFixed(1)+'B' : v >= 1e6 ? '$'+(v/1e6).toFixed(0)+'M' : '—';
+      html += `<div class="cg-coin-row">
+        <span class="cg-coin-rank">${c.market_cap_rank}</span>
+        <img class="cg-coin-img" src="${wmEsc(c.image||'')}" alt="${wmEsc(c.symbol||'')}" loading="lazy" width="18" height="18" onerror="this.style.display='none'"/>
+        <span class="cg-coin-name">${wmEsc(c.name||'')}</span>
+        <span class="cg-coin-sym">${(c.symbol||'').toUpperCase()}</span>
+        <span class="cg-coin-price">${fmtPrice(c.current_price||0)}</span>
+        <span class="cg-coin-chg ${clsPct(chg24)}">${fmtPct(chg24)}</span>
+        <span class="cg-coin-chg7 ${clsPct(chg7)}">${fmtPct(chg7)}</span>
+        <span class="cg-coin-mc">${fmtMC(c.market_cap||0)}</span>
+        <div class="cg-bar-wrap"><div class="cg-vol-bar" style="width:${Math.min(100,(c.market_cap||0)/coins[0].market_cap*100).toFixed(1)}%"></div></div>
+      </div>`;
+    }
+    html += `</div>`;
+    html += `<div style="padding:6px 8px;text-align:right;font-size:10px;color:var(--text-dim)">
+      Data: <a href="https://www.coingecko.com" target="_blank" rel="noopener" style="color:var(--accent)">CoinGecko</a> · No API key required
+    </div>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('Crypto data unavailable: ' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Frankfurter FX  → Forex panel header enrichment
+   No API key required
+   ══════════════════════════════════════════════════════════════════ */
+const FKT_BASE  = 'https://api.frankfurter.dev/v1';
+const FKT_CACHE = new Map();
+const FKT_TTL   = 5 * 60 * 1000;
+
+async function fktFetch(path) {
+  const cached = FKT_CACHE.get(path);
+  if (cached && Date.now() - cached.ts < FKT_TTL) return cached.data;
+  const res = await fetch(`${FKT_BASE}${path}`);
+  if (!res.ok) throw new Error(`Frankfurter ${res.status}`);
+  const data = await res.json();
+  FKT_CACHE.set(path, { data, ts: Date.now() });
+  return data;
+}
+
+async function frankfurterLoadRates() {
+  const el = document.getElementById('frankfurter-rates');
+  if (!el) return;
+  try {
+    const data = await fktFetch('/latest?base=USD');
+    const rates = data?.rates || {};
+    const majorPairs = ['EUR','GBP','JPY','CHF','CAD','AUD','NZD','CNY','HKD','SEK','NOK','DKK','SGD','MXN','BRL','INR','KRW','TRY','PLN','CZK','HUF'];
+    let html = `<div class="fkt-rates-bar">`;
+    for (const ccy of majorPairs) {
+      if (!rates[ccy]) continue;
+      const rate = rates[ccy];
+      html += `<div class="fkt-rate-chip">
+        <span class="fkt-ccy">USD/${ccy}</span>
+        <span class="fkt-rate">${ccy === 'JPY' || ccy === 'KRW' ? rate.toFixed(2) : rate.toFixed(4)}</span>
+      </div>`;
+    }
+    html += `</div>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="fkt-err">ECB rates unavailable</div>`;
+  }
+}
+
+/* Historical rates for a pair (used by forex panel) */
+async function frankfurterHistory(base, target, days = 90) {
+  const el = document.getElementById('frankfurter-history');
+  if (!el) return;
+  try {
+    const end   = new Date();
+    const start = new Date(); start.setDate(start.getDate() - days);
+    const fmt = d => d.toISOString().slice(0,10);
+    const data = await fktFetch(`/${fmt(start)}..${fmt(end)}?base=${base}&symbols=${target}`);
+    const rates = data?.rates || {};
+    const dates = Object.keys(rates).sort();
+    const vals  = dates.map(d => parseFloat(rates[d][target]));
+    if (!vals.length) return;
+
+    const W = 300, H = 60, PL = 8, PR = 8, PT = 4, PB = 4;
+    const mn = Math.min(...vals), mx = Math.max(...vals), range = mx - mn || 0.001;
+    const cw = W - PL - PR, ch = H - PT - PB;
+    const toX = i => (PL + i / (vals.length - 1) * cw).toFixed(1);
+    const toY = v => (PT + ch - (v - mn) / range * ch).toFixed(1);
+    const d = vals.map((v,i) => `${i===0?'M':'L'}${toX(i)},${toY(v)}`).join(' ');
+    const first = vals[0], last = vals[vals.length-1];
+    const pct   = ((last - first) / first * 100).toFixed(2);
+    const pos   = last >= first;
+
+    el.innerHTML = `
+      <div class="fkt-hist-label">${base}/${target} · ${days}d ${pos?'+':''}${pct}%
+        <span style="color:${pos?'#4caf50':'#f44336'}">${pos?'▲':'▼'}</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:48px">
+        <defs>
+          <linearGradient id="fktGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${pos?'#4caf50':'#f44336'}" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="${pos?'#4caf50':'#f44336'}" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="${d} L${toX(vals.length-1)},${PT+ch} L${PL},${PT+ch} Z" fill="url(#fktGrad)"/>
+        <path d="${d}" fill="none" stroke="${pos?'#4caf50':'#f44336'}" stroke-width="1.5"/>
+      </svg>
+      <div class="fkt-hist-prices">
+        <span>${first.toFixed(4)}</span>
+        <span style="color:var(--accent);font-weight:600">${last.toFixed(4)}</span>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = ``;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   EXTEND wmInitAll with all new endpoints
+   ══════════════════════════════════════════════════════════════════ */
+(function extendWmInitAll() {
+  // Wait for DOMContentLoaded so all panel elements exist
+  document.addEventListener('DOMContentLoaded', () => {
+    // ETF Flows + Sectors in Macro panel
+    wmMacroEtfFlows();
+    wmMacroSectors();
+    // Crypto
+    wmMacroCrypto();
+    // Geo-Risk new tabs (lazy on first click — but pre-load on init)
+    wmGeoGpsJam();
+    wmGeoMilOps();
+    // Intel Feed new tabs
+    wmIntelOref();
+    wmIntelTelegram();
+    // Frankfurter rates in Forex panel
+    frankfurterLoadRates();
+
+    // Refresh schedule
+    setInterval(() => {
+      wmMacroEtfFlows();
+      wmMacroSectors();
+      wmMacroCrypto();
+      wmGeoGpsJam();
+      wmGeoMilOps();
+      wmIntelOref();
+      wmIntelTelegram();
+      frankfurterLoadRates();
+    }, 3 * 60 * 1000);  // 3 min for crypto + fast-moving data
+  });
+})();
