@@ -30,9 +30,13 @@ const KNOWN_PROVIDERS = [
     limit:"Varia per piano", docsUrl:"https://massive.io/",
     sessionKey:"massive_call_count", limitWarn:null, limitMax:null },
   { id:"finnhub", name:"Finnhub", badge:"FH",
-    desc:"Quote · Analyst Consensus · Price Targets · Upgrades/Downgrades · Insider Transactions · Institutional Holders · Company News · Peers",
+    desc:"Quote · Analyst Consensus · Price Targets · Upgrades/Downgrades · Insider Transactions · Institutional Holders · Company News · Peers · Economic Calendar",
     limit:"60 req/min (free)", docsUrl:"https://finnhub.io/docs/api",
     sessionKey:"fh_call_count", limitWarn:50, limitMax:60 },
+  { id:"fred", name:"FRED (St. Louis Fed)", badge:"FRD",
+    desc:"840K+ economic series: Yield Curve (DGS1M–DGS30) · CPI · GDP · Unemployment · Fed Funds Rate · Inflation Breakeven · HY Spreads",
+    limit:"Unlimited (free)", docsUrl:"https://fred.stlouisfed.org/docs/api/fred/",
+    sessionKey:"fred_call_count", limitWarn:null, limitMax:null },
 ];
 
 window._KEYS = {};
@@ -206,6 +210,7 @@ function saveKey(id) {
   if (id === "eodhd"   && typeof eodhdLoadAll   === "function") setTimeout(() => eodhdLoadAll(ticker), 200);
   if (id === "apitube" && typeof apitubeLoadAll  === "function") setTimeout(() => apitubeLoadAll(ticker), 200);
   if (id === "massive" && typeof massiveLoadAll  === "function") setTimeout(() => massiveLoadAll(ticker), 200);
+  if (id === "fred"    && typeof fredInitAll     === "function") setTimeout(() => fredInitAll(), 200);
 }
 
 function clearKey(id) {
