@@ -8,7 +8,83 @@
   <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
+  <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
+  <div id="layoutSidebar" class="layout-sidebar collapsed">
+    <button class="layout-sidebar-toggle" id="layoutSidebarToggle" onclick="toggleLayoutSidebar()" title="Layout Manager">
+      <span class="lsb-toggle-icon">◧</span>
+    </button>
+    <div class="lsb-inner">
+      <div class="lsb-section-title">Layout Presets</div>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('focus')"    title="Chart + Fundamentals + News">
+        <span class="lsb-preset-icon">🎯</span><span>Focus</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('grid')"     title="4-column balanced grid">
+        <span class="lsb-preset-icon">⊞</span><span>Grid</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('research')" title="Fundamentals + Analysts + Comparables">
+        <span class="lsb-preset-icon">🔬</span><span>Research</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('monitor')"  title="Geo + Intel + Macro + Alerts">
+        <span class="lsb-preset-icon">🌍</span><span>Monitor</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('trading')"  title="Chart + Watchlist + Analysts + Webhooks">
+        <span class="lsb-preset-icon">📊</span><span>Trading</span>
+      </button>
+
+      <div class="lsb-divider"></div>
+      <div class="lsb-section-title">Panels</div>
+      <div class="lsb-panel-list" id="lsbPanelList">
+        <!-- Populated by JS -->
+      </div>
+
+      <div class="lsb-divider"></div>
+      <div class="lsb-section-title">Actions</div>
+      <button class="lsb-action-btn" onclick="tileAllPanels()"    title="Auto-tile visible panels">⊡ Tile All</button>
+      <button class="lsb-action-btn" onclick="cascadePanels()"    title="Cascade panels">❐ Cascade</button>
+      <button class="lsb-action-btn" onclick="resetLayout()"      title="Reset to default layout">↺ Reset</button>
+      <button class="lsb-action-btn" onclick="hideAllPanels()"    title="Hide all panels">✕ Hide All</button>
+    </div>
+  </div>
+
 <div class="app-shell">
+  <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
+  <div id="layoutSidebar" class="layout-sidebar collapsed">
+    <button class="layout-sidebar-toggle" id="layoutSidebarToggle" onclick="toggleLayoutSidebar()" title="Layout Manager">
+      <span class="lsb-toggle-icon">◧</span>
+    </button>
+    <div class="lsb-inner">
+      <div class="lsb-section-title">Layout Presets</div>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('focus')"    title="Chart + Fundamentals + News">
+        <span class="lsb-preset-icon">🎯</span><span>Focus</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('grid')"     title="4-column balanced grid">
+        <span class="lsb-preset-icon">⊞</span><span>Grid</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('research')" title="Fundamentals + Analysts + Comparables">
+        <span class="lsb-preset-icon">🔬</span><span>Research</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('monitor')"  title="Geo + Intel + Macro + Alerts">
+        <span class="lsb-preset-icon">🌍</span><span>Monitor</span>
+      </button>
+      <button class="lsb-preset-btn" onclick="applyLayoutPreset('trading')"  title="Chart + Watchlist + Analysts + Webhooks">
+        <span class="lsb-preset-icon">📊</span><span>Trading</span>
+      </button>
+
+      <div class="lsb-divider"></div>
+      <div class="lsb-section-title">Panels</div>
+      <div class="lsb-panel-list" id="lsbPanelList">
+        <!-- Populated by JS -->
+      </div>
+
+      <div class="lsb-divider"></div>
+      <div class="lsb-section-title">Actions</div>
+      <button class="lsb-action-btn" onclick="tileAllPanels()"    title="Auto-tile visible panels">⊡ Tile All</button>
+      <button class="lsb-action-btn" onclick="cascadePanels()"    title="Cascade panels">❐ Cascade</button>
+      <button class="lsb-action-btn" onclick="resetLayout()"      title="Reset to default layout">↺ Reset</button>
+      <button class="lsb-action-btn" onclick="hideAllPanels()"    title="Hide all panels">✕ Hide All</button>
+    </div>
+  </div>
+
 
   <!-- ══ TOPBAR ══════════════════════════════════════════════════ -->
   <header class="topbar" id="topbar">
@@ -56,21 +132,19 @@
       <!-- Compact pill row -->
       <div class="checklist" id="checklistCompact">
         <label><input type="checkbox" class="panel-toggle" data-panel="chart"        checked> Chart</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="forex"              > Forex</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked> Fundamentals</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="news"         checked> News</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="quote"        checked> Quote</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="analysts"     checked> Analysts</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked> Ownership</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked> Comparables</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="notes"        checked> Notes</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked> Watchlist</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="valuation"    checked> Valuation</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked> Geo·Risk</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="supply"       checked> Supply·Chain</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="alert"        checked> Alert·Feed</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="intel"        checked> Intel·Feed</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="webhooks"             > Webhooks</label>
       </div>
       <!-- ⊞ Full tray button -->
       <button class="modules-expand-btn" id="modulesExpandBtn"
@@ -96,13 +170,10 @@
         <div class="modules-tray-grid">
           <div class="modules-tray-section">Market</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="chart"        checked><span class="mti-icon">📈</span><span class="mti-label">Chart</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="quote"        checked><span class="mti-icon">💹</span><span class="mti-label">Quote</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="forex"              ><span class="mti-icon">💱</span><span class="mti-label">Forex</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked><span class="mti-icon">👁</span><span class="mti-label">Watchlist</span></label>
           <div class="modules-tray-section">Analysis</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked><span class="mti-icon">📊</span><span class="mti-label">Fundamentals</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="analysts"     checked><span class="mti-icon">🔬</span><span class="mti-label">Analysts</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="valuation"    checked><span class="mti-icon">🧮</span><span class="mti-label">Valuation</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked><span class="mti-icon">⚖️</span><span class="mti-label">Comparables</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked><span class="mti-icon">🏛</span><span class="mti-label">Ownership</span></label>
           <div class="modules-tray-section">News &amp; Notes</div>
@@ -115,6 +186,7 @@
           <div class="modules-tray-section">Supply &amp; Alerts</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="supply"       checked><span class="mti-icon">⛓</span><span class="mti-label">Supply·Chain</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="alert"        checked><span class="mti-icon">⚡</span><span class="mti-label">Alert·Feed</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="webhooks"            ><span class="mti-icon">🔔</span><span class="mti-label">Webhooks</span></label>
         </div>
       </div>
     </div>
@@ -130,10 +202,14 @@
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Price Chart — GP</h3>
         <div class="panel-actions">
+          <button class="icon-btn" onclick="toggleChart2()" id="chart2Btn" title="Add second chart">⊕ 2nd</button>
           <button class="icon-btn close" onclick="hidePanel('chart')" title="Close">✕</button>
         </div>
       </div>
-      <div id="priceChart" class="panel-content chart-content"></div>
+      <div id="chartSplit" class="chart-split-wrap single">
+        <div id="priceChart" class="chart-content chart-half"></div>
+        <div id="priceChart2" class="chart-content chart-half" style="display:none"></div>
+      </div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -141,38 +217,6 @@
       <div class="size-tooltip" id="tooltip-chart"></div>
     </section>
 
-    <!-- ▸ FOREX ────────────────────────────────────────────────── -->
-    <section class="panel hidden" id="panel-forex" data-panel="forex">
-      <div class="panel-head panel-head-forex">
-        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Forex</h3>
-        <div class="forex-tf-inline">
-          <button class="fx-tf-btn" onclick="setForexInterval('1')">1m</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('5')">5m</button>
-          <button class="fx-tf-btn active" onclick="setForexInterval('60')">1H</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('240')">4H</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('D')">1D</button>
-          <button class="fx-tf-btn" onclick="setForexInterval('W')">1W</button>
-        </div>
-        <div class="panel-actions">
-          <span class="forex-pair-badge" id="forexLabel">EUR/USD</span>
-          <input id="forexPairInput" class="mini-input forex-mini" placeholder="EUR/USD" value="EUR/USD" />
-          <button class="icon-btn" onclick="changeForexPair()" title="Load">↵</button>
-          <button class="icon-btn close" onclick="hidePanel('forex')">✕</button>
-        </div>
-      </div>
-      <div id="forexChart" class="panel-content chart-content"></div>
-      <!-- Frankfurter ECB rates bar (no API key required) -->
-      <div id="frankfurter-rates" class="fkt-rates-strip"></div>
-      <div id="frankfurter-history" class="fkt-history-strip"></div>
-      <div id="oer-rates" style="margin-top:8px"></div>
-      <div id="oer-history" style="margin-top:4px"></div>
-      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-forex"></div>
-    </section>
 
     <!-- ▸ FUNDAMENTALS (DES / FA / ERN / EE / WACC) ───────────── -->
     <section class="panel" id="panel-fundamentals" data-panel="fundamentals">
@@ -249,53 +293,6 @@
       <div class="size-tooltip" id="tooltip-news"></div>
     </section>
 
-    <!-- ▸ QUOTE — live via Finnhub/AV ─────────────────────────── -->
-    <section class="panel" id="panel-quote" data-panel="quote">
-      <div class="panel-head">
-        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Quote</h3>
-        <div class="panel-actions">
-          <button class="icon-btn close" onclick="hidePanel('quote')">✕</button>
-        </div>
-      </div>
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="qr"  onclick="switchTab('quote','qr')">QR</button>
-        <button class="tab-btn"        data-tab="mon" onclick="switchTab('quote','mon')">MON</button>
-      </div>
-      <div class="tab-pane active panel-content" data-tab="qr"  id="quote-qr">
-        <div class="av-loading"><span class="av-spinner"></span>Loading quote…</div>
-      </div>
-      <div class="tab-pane        panel-content" data-tab="mon" id="quote-mon">
-        <div class="av-loading"><span class="av-spinner"></span>Loading market data…</div>
-      </div>
-      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-quote"></div>
-    </section>
-
-    <!-- ▸ ANALYSTS (ANR / BRC) ─────────────────────────────────── -->
-    <section class="panel" id="panel-analysts" data-panel="analysts">
-      <div class="panel-head">
-        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Analysts</h3>
-        <div class="panel-actions">
-          <button class="icon-btn close" onclick="hidePanel('analysts')">✕</button>
-        </div>
-      </div>
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="anr" onclick="switchTab('analysts','anr')">ANR</button>
-        <button class="tab-btn"        data-tab="brc" onclick="switchTab('analysts','brc')">BRC</button>
-      </div>
-      <div class="tab-pane active panel-content" data-tab="anr" id="analysts-anr"></div>
-      <div class="tab-pane        panel-content" data-tab="brc" id="analysts-brc"></div>
-      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-analysts"></div>
-    </section>
 
     <!-- ▸ OWNERSHIP (HDS / MGMT) ───────────────────────────────── -->
     <section class="panel" id="panel-ownership" data-panel="ownership">
@@ -319,21 +316,49 @@
       <div class="size-tooltip" id="tooltip-ownership"></div>
     </section>
 
-    <!-- ▸ COMPARABLES (RV / COMP) ──────────────────────────────── -->
+    <!-- ▸ ANALYSTS + VALUATION SCORECARD ─────────────────────── -->
+    <section class="panel" id="panel-analysts" data-panel="analysts">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <h3>▸ Analysts &amp; Valuation</h3>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('analysts')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="score" onclick="switchTab('analysts','score');renderScorecard(currentTicker)">SCORE</button>
+        <button class="tab-btn"        data-tab="anr"   onclick="switchTab('analysts','anr')">ANR</button>
+        <button class="tab-btn"        data-tab="brc"   onclick="switchTab('analysts','brc')">BRC</button>
+        <button class="tab-btn"        data-tab="val"   onclick="switchTab('analysts','val');renderValuation(currentValTicker||currentTicker)">VAL</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="score" id="analysts-score">
+        <div class="no-data">// Load a ticker to see the Analyst Scorecard.</div>
+      </div>
+      <div class="tab-pane panel-content" data-tab="anr" id="analysts-anr"></div>
+      <div class="tab-pane panel-content" data-tab="brc" id="analysts-brc"></div>
+      <div class="tab-pane panel-content" data-tab="val" id="valuationBox">
+        <div class="no-data">// Click any stock in the Sector Watchlist<br>// to load valuation analysis here.</div>
+      </div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-analysts"></div>
+    </section>
+
+    <!-- ▸ COMPARABLES ───────────────────────────────────────────── -->
     <section class="panel" id="panel-comparables" data-panel="comparables">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Comparables</h3>
+        <div class="panel-title-row">
+          <h3>▸ Comparables</h3>
+          <div class="mode-label" id="compLabel">Sector peers</div>
+        </div>
         <div class="panel-actions">
           <button class="icon-btn close" onclick="hidePanel('comparables')">✕</button>
         </div>
       </div>
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="rv"   onclick="switchTab('comparables','rv');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadPeers==='function')yfLoadPeers(s)})()">RV</button>
-        <button class="tab-btn"        data-tab="comp" onclick="switchTab('comparables','comp');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadComparison==='function')yfLoadComparison(s)})()">COMP</button>
-      </div>
-      <div class="tab-pane active panel-content" data-tab="rv"   id="comp-rv"></div>
-      <div class="tab-pane        panel-content" data-tab="comp" id="comp-comp"></div>
+      <div id="comp-main" class="panel-content comp-main-content"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -390,34 +415,6 @@
       <div class="size-tooltip" id="tooltip-watchlist"></div>
     </section>
 
-    <!-- ▸ VALUATION ANALYZER ──────────────────────────────────── -->
-    <section class="panel" id="panel-valuation" data-panel="valuation">
-      <div class="panel-head">
-        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="panel-title-row">
-          <h3>▸ Valuation Analyzer</h3>
-          <div class="mode-label" id="valuationLabel">Select a stock from Watchlist</div>
-        </div>
-        <div class="panel-actions">
-          <select class="val-method-select" id="valMethodSelect" onchange="renderValuation(currentValTicker)">
-            <option value="all">All Methods</option>
-            <option value="multiples">Multiples</option>
-            <option value="cashflow">Cash Flow</option>
-            <option value="growth">Growth</option>
-            <option value="dcf">DCF</option>
-          </select>
-          <button class="icon-btn close" onclick="hidePanel('valuation')">✕</button>
-        </div>
-      </div>
-      <div id="valuationBox" class="panel-content">
-        <div class="no-data">// Click any stock in the Sector Watchlist<br>// to load its valuation analysis here.</div>
-      </div>
-      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-valuation"></div>
-    </section>
 
     <!-- ▸ GEOPOLITICAL RISK (WAR · RESOURCES) ─────────────────── -->
     <section class="panel" id="panel-geopolitical" data-panel="geopolitical">
@@ -578,6 +575,92 @@
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
       <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
       <div class="size-tooltip" id="tooltip-intel"></div>
+    </section>
+
+
+    <!-- ▸ WEBHOOKS / PRICE ALERTS ─────────────────────────────── -->
+    <section class="panel hidden" id="panel-webhooks" data-panel="webhooks">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Price Alerts &amp; Webhooks</h3>
+          <span id="webhook-active-badge" class="intel-badge">0 ACTIVE</span>
+        </div>
+        <div class="panel-actions">
+          <button class="icon-btn" onclick="whAddAlert()" title="New alert">＋ Alert</button>
+          <button class="icon-btn close" onclick="hidePanel('webhooks')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="wh-alerts" onclick="switchTab('webhooks','wh-alerts')">ALERTS</button>
+        <button class="tab-btn"        data-tab="wh-builder" onclick="switchTab('webhooks','wh-builder')">BUILDER</button>
+        <button class="tab-btn"        data-tab="wh-log"    onclick="switchTab('webhooks','wh-log')">LOG</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="wh-alerts"  id="wh-alerts-list"></div>
+      <div class="tab-pane        panel-content" data-tab="wh-builder" id="wh-builder-form">
+        <div class="wh-form">
+          <div class="wh-field-row">
+            <label class="wh-label">Ticker</label>
+            <input id="wh-ticker" class="wh-input" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()"/>
+          </div>
+          <div class="wh-field-row">
+            <label class="wh-label">Condition</label>
+            <select id="wh-condition" class="wh-select">
+              <option value="price_above">Price &gt; (Above)</option>
+              <option value="price_below">Price &lt; (Below)</option>
+              <option value="pct_change_up">% Change &gt; (Day)</option>
+              <option value="pct_change_down">% Change &lt; (Day)</option>
+              <option value="volume_spike">Volume Spike ×</option>
+              <option value="cross_above">Crosses Above (MA/Level)</option>
+              <option value="cross_below">Crosses Below (MA/Level)</option>
+              <option value="ohlcv_open_above">Open &gt;</option>
+              <option value="ohlcv_high_above">High &gt;</option>
+              <option value="ohlcv_low_below">Low &lt;</option>
+              <option value="ohlcv_close_above">Close &gt;</option>
+              <option value="ohlcv_volume_above">Volume &gt;</option>
+            </select>
+          </div>
+          <div class="wh-field-row">
+            <label class="wh-label">Value</label>
+            <input id="wh-value" class="wh-input" type="number" placeholder="e.g. 200.00" step="0.01"/>
+          </div>
+          <div class="wh-field-row">
+            <label class="wh-label">Interval</label>
+            <select id="wh-interval" class="wh-select">
+              <option value="1m">1 min</option>
+              <option value="5m">5 min</option>
+              <option value="15m" selected>15 min</option>
+              <option value="1h">1 hour</option>
+              <option value="1d">Daily Close</option>
+            </select>
+          </div>
+          <div class="wh-field-row">
+            <label class="wh-label">Webhook URL</label>
+            <input id="wh-url" class="wh-input wh-url-input" placeholder="https://hooks.example.com/..."/>
+          </div>
+          <div class="wh-field-row">
+            <label class="wh-label">Payload (JSON)</label>
+            <textarea id="wh-payload" class="wh-textarea" rows="3" placeholder='{"text":"{{ticker}} hit {{value}} at {{price}}"}' ></textarea>
+          </div>
+          <div class="wh-field-row">
+            <label class="wh-label">Note</label>
+            <input id="wh-note" class="wh-input" placeholder="Optional label…"/>
+          </div>
+          <div class="wh-btn-row">
+            <button class="wh-btn-primary" onclick="whSaveAlert()">💾 Save Alert</button>
+            <button class="wh-btn-secondary" onclick="whTestFire()">🧪 Test Fire</button>
+          </div>
+          <div id="wh-form-status" class="wh-status"></div>
+        </div>
+      </div>
+      <div class="tab-pane        panel-content" data-tab="wh-log" id="wh-log-list">
+        <div class="no-data">// Webhook fire log will appear here.</div>
+      </div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-webhooks"></div>
     </section>
 
   </div><!-- /dashboardCanvas -->
