@@ -51,7 +51,7 @@
 
       <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse">▲</button>
     </div>
-    <div class="topbar-row topbar-row-2" id="topbarRow2">
+    <div class="topbar-row topbar-row-2 compact" id="topbarRow2">
       <span class="checklist-title">Modules</span>
       <!-- Compact pill row -->
       <div class="checklist" id="checklistCompact">
@@ -72,10 +72,15 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="intel"        checked> Intel·Feed</label>
       </div>
-      <!-- ⊞ Expand button -->
+      <!-- ⊞ Full tray button -->
       <button class="modules-expand-btn" id="modulesExpandBtn"
-              onclick="toggleModulesTray()" title="Expand module selector">⊞</button>
+              onclick="toggleModulesTray()" title="Open full module selector">⊞</button>
     </div>
+    <!-- Floating expand/collapse tab on the right edge of the modules bar -->
+    <button class="modules-side-tab" id="modulesSideTab"
+            onclick="toggleModulesRow()" title="Expand module bar">
+      <span class="mst-arrow" id="mstArrow">▼</span>
+    </button>
 
     <!-- ── Expanded module tray ──────────────────────────────────── -->
     <div class="modules-tray" id="modulesTray">
