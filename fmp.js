@@ -530,3 +530,202 @@ async function fmpRefreshWatchlistPrices() {
     showApiToast(`✓ Watchlist: live prices updated (FMP)`, "ok");
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   DIVIDENDS  → Fundamentals DIV tab
+   GET /v3/historical-price-full/stock_dividend/{TICKER}
+   ══════════════════════════════════════════════════════════════════ */
+async function fmpLoadDividends(sym) {
+  const el = document.getElementById('fund-div');
+  if (!el) return;
+  const key = getFmpKey();
+  if (!key) {
+    el.innerHTML = `<div class="no-data">// FMP key required for dividend data.<br>
+      <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">Add key →</a></div>`;
+    return;
+  }
+  el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading dividends…</div>';
+  try {
+    fmpIncrement();
+    const [divRes, splRes] = await Promise.allSettled([
+      fmpFetch(`/v3/historical-price-full/stock_dividend/${encodeURIComponent(sym)}`),
+      fmpFetch(`/v3/historical-price-full/stock_split/${encodeURIComponent(sym)}`),
+    ]);
+
+    const divData  = divRes.status  === 'fulfilled' ? (divRes.value?.historical  || []) : [];
+    const splitData = splRes.status === 'fulfilled' ? (splRes.value?.historical  || []) : [];
+
+    let html = '';
+
+    /* ── Summary strip ─────────────────────────────────────────── */
+    if (divData.length) {
+      const lastDiv   = divData[0];
+      const ttm = divData.slice(0,4).reduce((s,d) => s + (d.dividend || 0), 0);
+      const freq = divData.length >= 2
+        ? (() => {
+            const d1 = new Date(divData[0].date), d2 = new Date(divData[1].date);
+            const days = Math.round(Math.abs(d1 - d2) / 86400000);
+            if (days <= 40)  return 'Monthly';
+            if (days <= 100) return 'Quarterly';
+            if (days <= 200) return 'Semi-Annual';
+            return 'Annual';
+          })() : '—';
+      html += `<div class="div-summary-bar">
+        <div class="div-sum-cell"><span class="div-sum-label">Last Dividend</span><span class="div-sum-val">$${(lastDiv.dividend||0).toFixed(4)}</span></div>
+        <div class="div-sum-cell"><span class="div-sum-label">Ex-Date</span><span class="div-sum-val">${lastDiv.date||'—'}</span></div>
+        <div class="div-sum-cell"><span class="div-sum-label">Pay Date</span><span class="div-sum-val">${lastDiv.paymentDate||'—'}</span></div>
+        <div class="div-sum-cell"><span class="div-sum-label">TTM Total</span><span class="div-sum-val" style="color:var(--accent)">$${ttm.toFixed(4)}</span></div>
+        <div class="div-sum-cell"><span class="div-sum-label">Frequency</span><span class="div-sum-val">${freq}</span></div>
+      </div>`;
+
+      /* Dividend history table */
+      html += `<div class="section-head">Dividend History (last ${Math.min(divData.length,24)})</div>`;
+      html += `<div class="div-table-wrap"><table class="div-table">
+        <thead><tr><th>Ex-Date</th><th>Record</th><th>Pay Date</th><th>Amount</th><th>Decl. Date</th></tr></thead><tbody>`;
+      for (const d of divData.slice(0,24)) {
+        html += `<tr>
+          <td>${d.date||'—'}</td>
+          <td>${d.recordDate||'—'}</td>
+          <td>${d.paymentDate||'—'}</td>
+          <td style="color:var(--accent);font-weight:600">$${(d.dividend||0).toFixed(4)}</td>
+          <td>${d.declarationDate||'—'}</td>
+        </tr>`;
+      }
+      html += `</tbody></table></div>`;
+    } else {
+      html += `<div class="no-data">// No dividend history found for ${sym}.</div>`;
+    }
+
+    /* ── Stock Splits ──────────────────────────────────────────── */
+    html += `<div class="section-head" style="margin-top:14px">✂ Stock Splits</div>`;
+    if (splitData.length) {
+      html += `<div class="div-table-wrap"><table class="div-table">
+        <thead><tr><th>Date</th><th>Numerator</th><th>Denominator</th><th>Ratio</th></tr></thead><tbody>`;
+      for (const s of splitData.slice(0,20)) {
+        const ratio = s.numerator && s.denominator ? `${s.numerator}:${s.denominator}` : '—';
+        html += `<tr>
+          <td>${s.date||'—'}</td>
+          <td>${s.numerator||'—'}</td>
+          <td>${s.denominator||'—'}</td>
+          <td style="color:var(--accent);font-weight:600">${ratio}</td>
+        </tr>`;
+      }
+      html += `</tbody></table></div>`;
+    } else {
+      html += `<div class="no-data">// No split history found for ${sym}.</div>`;
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// Dividend data error: ${e.message}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SEC FILINGS  → Fundamentals FILINGS tab
+   Uses SEC EDGAR (no key) + optional FMP supplement
+   Primary: https://data.sec.gov/submissions/CIK{CIK}.json
+   Search:  https://efts.sec.gov/hits.esf?q=TICKER&forms=8-K,10-K,10-Q
+   ══════════════════════════════════════════════════════════════════ */
+const SEC_CIK_CACHE = new Map();
+
+async function secGetCik(ticker) {
+  if (SEC_CIK_CACHE.has(ticker)) return SEC_CIK_CACHE.get(ticker);
+  // EDGAR full-text search to find CIK
+  const url = `https://efts.sec.gov/hits.esf?q=%22${encodeURIComponent(ticker)}%22&dateRange=custom&startdt=2023-01-01&forms=10-K&hits.hits._source=period_of_report,entity_name,file_date,period_of_report&hits.hits.total=1`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'FINTERM dashboard/1.0' } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const hit = data?.hits?.hits?.[0];
+  if (!hit) return null;
+  const cik = hit._id?.split(':')[0];
+  if (cik) SEC_CIK_CACHE.set(ticker, cik.padStart(10,'0'));
+  return cik ? cik.padStart(10,'0') : null;
+}
+
+async function secFetchFilings(ticker, forms = ['8-K','10-K','10-Q','DEF 14A']) {
+  // Use EDGAR full-text search — returns recent filings without needing CIK
+  const formParam = forms.join(',');
+  const url = `https://efts.sec.gov/hits.esf?q=%22${encodeURIComponent(ticker)}%22&forms=${encodeURIComponent(formParam)}&dateRange=custom&startdt=2023-01-01`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'FINTERM/1.0 research@finterm.app' } });
+  if (!res.ok) throw new Error(`SEC HTTP ${res.status}`);
+  const data = await res.json();
+  return (data?.hits?.hits || []).map(h => {
+    const s = h._source || {};
+    return {
+      form:        s.form_type  || s.period_of_report || '—',
+      entity:      s.entity_name|| '',
+      filed:       s.file_date  || '',
+      period:      s.period_of_report || '',
+      accession:   (h._id || '').replace(/:/g,'-'),
+      url:         h._id ? `https://www.sec.gov/Archives/edgar/${h._id.replace(/:/g,'/')}` : '',
+    };
+  });
+}
+
+async function fmpLoadSecFilings(sym) {
+  const el = document.getElementById('fund-filings');
+  if (!el) return;
+  el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading SEC filings…</div>';
+  try {
+    // Parallel: EDGAR full-text search for different form types
+    const [kRes, qRes, eightRes, proxy4Res] = await Promise.allSettled([
+      secFetchFilings(sym, ['10-K']),
+      secFetchFilings(sym, ['10-Q']),
+      secFetchFilings(sym, ['8-K']),
+      secFetchFilings(sym, ['DEF 14A','SC 13G','13F-HR']),
+    ]);
+
+    const annuals   = kRes.status    === 'fulfilled' ? kRes.value    : [];
+    const quarters  = qRes.status    === 'fulfilled' ? qRes.value    : [];
+    const material  = eightRes.status === 'fulfilled' ? eightRes.value : [];
+    const ownership = proxy4Res.status === 'fulfilled' ? proxy4Res.value : [];
+
+    // Deduplicate & sort by date
+    const dedup = arr => {
+      const seen = new Set();
+      return arr.filter(f => { const k = f.form+f.filed; return seen.has(k) ? false : (seen.add(k), true); })
+        .sort((a,b) => b.filed.localeCompare(a.filed));
+    };
+
+    let html = `<div class="sec-header">
+      <span class="sec-badge">SEC EDGAR</span>
+      <span class="sec-note">No API key required · EDGAR public data</span>
+    </div>`;
+
+    const renderFilings = (label, arr, limit = 10) => {
+      if (!arr.length) return `<div class="section-head">${label}</div><div class="no-data">// No recent filings found.</div>`;
+      const items = dedup(arr).slice(0,limit);
+      let s = `<div class="section-head">${label} (${items.length})</div><div class="sec-filing-list">`;
+      for (const f of items) {
+        const href = f.accession
+          ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=&CIK=${encodeURIComponent(sym)}&type=${encodeURIComponent(f.form)}&dateb=&owner=include&count=20`
+          : '#';
+        s += `<div class="sec-filing-row">
+          <span class="sec-form-badge sec-form-${(f.form||'').replace(/[ /]/g,'-').toLowerCase()}">${f.form}</span>
+          <span class="sec-entity">${f.entity || sym}</span>
+          <span class="sec-filed">${f.filed}</span>
+          <span class="sec-period">${f.period ? 'Period: '+f.period : ''}</span>
+          <a class="sec-link" href="${href}" target="_blank" rel="noopener">EDGAR ↗</a>
+        </div>`;
+      }
+      s += `</div>`;
+      return s;
+    };
+
+    html += renderFilings('📋 Annual Reports (10-K)', annuals);
+    html += renderFilings('📊 Quarterly Reports (10-Q)', quarters);
+    html += renderFilings('⚡ Material Events (8-K)', material, 15);
+    html += renderFilings('🏛 Ownership & Proxy', ownership);
+
+    // Direct EDGAR link
+    html += `<div style="padding:8px 0 4px;text-align:center">
+      <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(sym)}&type=&dateb=&owner=include&count=40" 
+         target="_blank" rel="noopener" class="sec-all-link">View all ${sym} filings on EDGAR ↗</a>
+    </div>`;
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// SEC EDGAR error: ${e.message}</div>`;
+  }
+}
