@@ -165,6 +165,8 @@
       <!-- Frankfurter ECB rates bar (no API key required) -->
       <div id="frankfurter-rates" class="fkt-rates-strip"></div>
       <div id="frankfurter-history" class="fkt-history-strip"></div>
+      <div id="oer-rates" style="margin-top:8px"></div>
+      <div id="oer-history" style="margin-top:4px"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -187,6 +189,11 @@
         <button class="tab-btn"        data-tab="ern"     onclick="switchTab('fundamentals','ern')">ERN</button>
         <button class="tab-btn"        data-tab="ee"      onclick="switchTab('fundamentals','ee')">EE</button>
         <button class="tab-btn"        data-tab="wacc"    onclick="switchTab('fundamentals','wacc')">WACC</button>
+        <button class="tab-btn"        data-tab="tech"    onclick="switchTab('fundamentals','tech');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof avLoadTech==='function')avLoadTech(s)})()">TECH</button>
+        <button class="tab-btn"        data-tab="short"   onclick="switchTab('fundamentals','short');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fhLoadShortInterest==='function')fhLoadShortInterest(s)})()">SHORT</button>
+        <button class="tab-btn"        data-tab="seg"     onclick="switchTab('fundamentals','seg');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadSegmentation==='function')fmpLoadSegmentation(s)})()">SEG</button>
+        <button class="tab-btn"        data-tab="trans"   onclick="switchTab('fundamentals','trans');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadTranscript==='function')fmpLoadTranscript(s)})()">TRANS</button>
+        <button class="tab-btn"        data-tab="form4"   onclick="switchTab('fundamentals','form4');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadForm4==='function')fmpLoadForm4(s)})()">FORM 4</button>
         <button class="tab-btn"        data-tab="div"     onclick="switchTab('fundamentals','div');if(typeof fmpLoadDividends==='function')fmpLoadDividends(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">DIV</button>
         <button class="tab-btn"        data-tab="filings" onclick="switchTab('fundamentals','filings');if(typeof fmpLoadSecFilings==='function')fmpLoadSecFilings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">FILINGS</button>
       </div>
@@ -195,6 +202,11 @@
       <div class="tab-pane        panel-content" data-tab="ern"     id="fund-ern"></div>
       <div class="tab-pane        panel-content" data-tab="ee"      id="fund-ee"></div>
       <div class="tab-pane        panel-content" data-tab="wacc"    id="fund-wacc"></div>
+      <div class="tab-pane        panel-content" data-tab="tech"    id="fund-tech"></div>
+      <div class="tab-pane        panel-content" data-tab="short"   id="fund-short"></div>
+      <div class="tab-pane        panel-content" data-tab="seg"     id="fund-seg"></div>
+      <div class="tab-pane        panel-content" data-tab="trans"   id="fund-trans"></div>
+      <div class="tab-pane        panel-content" data-tab="form4"   id="fund-form4"></div>
       <div class="tab-pane        panel-content" data-tab="div"     id="fund-div"></div>
       <div class="tab-pane        panel-content" data-tab="filings" id="fund-filings"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
@@ -424,6 +436,7 @@
         <button class="tab-btn"        data-tab="quakes"    onclick="switchTab('geopolitical','quakes');wmGeoQuakes()">QUAKES</button>
         <button class="tab-btn"        data-tab="gps"       onclick="switchTab('geopolitical','gps');if(typeof wmGeoGpsJam==='function')wmGeoGpsJam()">GPS JAM</button>
         <button class="tab-btn"        data-tab="milops"    onclick="switchTab('geopolitical','milops');if(typeof wmGeoMilOps==='function')wmGeoMilOps()">MIL·OPS</button>
+        <button class="tab-btn"        data-tab="fema"      onclick="switchTab('geopolitical','fema');if(typeof femaLoadDisasters==='function')femaLoadDisasters()">FEMA</button>
       </div>
 
       <!-- WARS TAB -->
@@ -474,12 +487,15 @@
         </div>
       </div>
 
-      <!-- QUAKES TAB (earthquakes + natural events) -->\n      <div class="tab-pane" data-tab="quakes" id="geo-quakes">
+      <!-- QUAKES TAB — USGS authoritative real-time seismic data -->
+      <div class="tab-pane" data-tab="quakes" id="geo-quakes">
         <div class="geo-cross-bar">
-          <span class="geo-cross-label">Seismic &amp; natural hazard events</span>
+          <span class="geo-cross-label">USGS Seismic · M4.5+ global real-time</span>
           <button class="geo-cross-btn" onclick="wmIntelSetFilter('weather');showPanel('intel')">🌪 Weather Alerts</button>
-          <button class="geo-cross-btn" onclick="switchTab('alert','quakes');showPanel('alert')">⚡ Alert Feed</button>
+          <button class="geo-cross-btn" onclick="switchTab('alert','wm');showPanel('alert');if(typeof wmAlertLoad==='function')wmAlertLoad('quake')">⚡ Alert Feed</button>
+          <button class="geo-cross-btn" onclick="if(typeof usgsLoadQuakes==='function')usgsLoadQuakes()">↻ Refresh</button>
         </div>
+        <div id="geo-quakes-usgs" class="panel-content"></div>
       </div>
 
       <!-- GPS JAM TAB (WorldMonitor GPS jamming) -->
@@ -497,6 +513,14 @@
           <span class="geo-cross-label">Military flight activity · Live sorties &amp; operations</span>
           <button class="geo-cross-btn" onclick="switchTab('geopolitical','gps');wmGeoGpsJam()">📡 GPS Jamming</button>
           <button class="geo-cross-btn" onclick="wmIntelSetFilter('risk');showPanel('intel')">🌡 Risk Feed</button>
+        </div>
+      </div>
+
+      <!-- FEMA TAB — US disaster declarations (OpenFEMA, no key) -->
+      <div class="tab-pane panel-content" data-tab="fema" id="geo-fema">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">OpenFEMA · US Disaster Declarations · No API key</span>
+          <button class="geo-cross-btn" onclick="if(typeof femaLoadDisasters==='function')femaLoadDisasters()">↻ Refresh</button>
         </div>
       </div>
 
@@ -568,12 +592,14 @@
         <button class="tab-btn"        data-tab="minerals" onclick="switchTab('supply','minerals')">MINERALS</button>
         <button class="tab-btn"        data-tab="flights" onclick="switchTab('supply','flights')">FLIGHTS</button>
         <button class="tab-btn"        data-tab="energy"  onclick="switchTab('supply','energy')">ENERGY</button>
+        <button class="tab-btn"        data-tab="weather" onclick="switchTab('supply','weather');if(typeof meteoLoadSupplyWeather==='function')meteoLoadSupplyWeather()">WEATHER</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="choke"    id="supply-choke"></div>
       <div class="tab-pane        panel-content" data-tab="ship"     id="supply-ship"></div>
       <div class="tab-pane        panel-content" data-tab="minerals" id="supply-minerals"></div>
       <div class="tab-pane        panel-content" data-tab="flights"  id="supply-flights"></div>
       <div class="tab-pane        panel-content" data-tab="energy"   id="supply-energy"></div>
+      <div class="tab-pane        panel-content" data-tab="weather"  id="supply-weather"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -593,14 +619,22 @@
           <button class="icon-btn close" onclick="hidePanel('alert')">✕</button>
         </div>
       </div>
-      <div class="wm-filter-bar">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="wm"    onclick="switchTab('alert','wm')">ALL</button>
+        <button class="tab-btn"        data-tab="noaa"  onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
+        <button class="tab-btn"        data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
+      </div>
+      <!-- WM sub-filter bar shown only on WM tab -->
+      <div class="wm-filter-bar" id="alert-wm-filters">
         <button class="wm-filter-btn active" data-filter="all"     onclick="wmAlertLoad('all')">ALL</button>
         <button class="wm-filter-btn"        data-filter="weather" onclick="wmAlertLoad('weather')">🌪 WEATHER</button>
         <button class="wm-filter-btn"        data-filter="quake"   onclick="wmAlertLoad('quake')">🏔 QUAKES</button>
         <button class="wm-filter-btn"        data-filter="unrest"  onclick="wmAlertLoad('unrest')">✊ UNREST</button>
         <button class="wm-filter-btn"        data-filter="fire"    onclick="wmAlertLoad('fire')">🔥 FIRES</button>
       </div>
-      <div class="panel-content" id="alert-feed"></div>
+      <div class="tab-pane active panel-content" data-tab="wm"    id="alert-feed"></div>
+      <div class="tab-pane        panel-content" data-tab="noaa"  id="alert-noaa"></div>
+      <div class="tab-pane        panel-content" data-tab="eonet" id="alert-eonet"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -630,6 +664,7 @@
         <button class="tab-btn"        data-tab="crypto"  onclick="switchTab('macro','crypto');if(typeof wmMacroCrypto==='function')wmMacroCrypto()">CRYPTO</button>
         <button class="tab-btn"        data-tab="flows"   onclick="switchTab('macro','flows');if(typeof wmMacroEtfFlows==='function')wmMacroEtfFlows()">FLOWS</button>
         <button class="tab-btn"        data-tab="sectors" onclick="switchTab('macro','sectors');if(typeof wmMacroSectors==='function')wmMacroSectors()">SECTORS</button>
+        <button class="tab-btn"        data-tab="ipo"     onclick="switchTab('macro','ipo');if(typeof fmpLoadIpoCalendar==='function')fmpLoadIpoCalendar()">IPO</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="signals" id="macro-signals"></div>
       <div class="tab-pane        panel-content" data-tab="comm"    id="macro-comm"></div>
@@ -640,6 +675,7 @@
       <div class="tab-pane        panel-content" data-tab="crypto"  id="macro-crypto"></div>
       <div class="tab-pane        panel-content" data-tab="flows"   id="macro-flows"></div>
       <div class="tab-pane        panel-content" data-tab="sectors" id="macro-sectors"></div>
+      <div class="tab-pane        panel-content" data-tab="ipo"     id="macro-ipo"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -665,6 +701,8 @@
 <script src="supabase.js"></script>
 <script src="smartsearch.js"></script>
 <script src="fred.js"></script>
+<script src="geodata.js"></script>
+<script src="openexchange.js"></script>
 <script>
 /* Intel Feed — OREF / TELEGRAM sub-panel switcher */
 function wmIntelShowOref() {
