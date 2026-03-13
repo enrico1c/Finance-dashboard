@@ -729,3 +729,345 @@ async function fmpLoadSecFilings(sym) {
     el.innerHTML = `<div class="no-data">// SEC EDGAR error: ${e.message}</div>`;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   SHORT INTEREST  (Finnhub — endpoint /stock/short-interest)
+   Called from Fundamentals → SHORT tab
+   ══════════════════════════════════════════════════════════════════ */
+async function fhLoadShortInterest(sym) {
+  const el = document.getElementById("fund-short");
+  if (!el) return;
+  const key = (typeof getKey === "function") ? getKey("finnhub") : localStorage.getItem("finterm_key_finnhub") || "";
+  if (!key) {
+    el.innerHTML = `<div class="no-data">// Finnhub key required for short interest data.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest…</div>`;
+  try {
+    const url = `https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${key}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    const recs = data.data || [];
+    if (!recs.length) {
+      el.innerHTML = `<div class="no-data">// No short interest data available for ${sym}.</div>`;
+      return;
+    }
+    const latest = recs[0];
+    const prev   = recs[1] || null;
+    const chg    = (prev && latest.shortInterest && prev.shortInterest)
+                   ? ((latest.shortInterest - prev.shortInterest) / prev.shortInterest * 100).toFixed(1)
+                   : null;
+    const chgCls = chg ? (parseFloat(chg) > 0 ? "neg" : "pos") : "";
+    const fmt    = v => v ? Number(v).toLocaleString() : "—";
+    const fmtPct = v => v ? parseFloat(v).toFixed(2)+"%" : "—";
+
+    let html = `<div class="av-live-badge">● Short Interest · ${sym} · Finnhub</div>`;
+    html += `<div class="short-summary">
+      <div class="short-kpi">
+        <span class="short-kpi-lbl">Short Interest</span>
+        <span class="short-kpi-val">${fmt(latest.shortInterest)}</span>
+      </div>
+      <div class="short-kpi">
+        <span class="short-kpi-lbl">% of Float</span>
+        <span class="short-kpi-val">${fmtPct(latest.shortInterestRatio)}</span>
+      </div>
+      <div class="short-kpi">
+        <span class="short-kpi-lbl">Days to Cover</span>
+        <span class="short-kpi-val">${latest.daysToCover ? parseFloat(latest.daysToCover).toFixed(1) : "—"}</span>
+      </div>
+      <div class="short-kpi">
+        <span class="short-kpi-lbl">Period Chg</span>
+        <span class="short-kpi-val ${chgCls}">${chg !== null ? (parseFloat(chg) > 0 ? "+" : "")+chg+"%" : "—"}</span>
+      </div>
+    </div>`;
+
+    html += `<table class="fmp-table" style="margin-top:10px">
+      <thead><tr><th>Settlement Date</th><th>Short Shares</th><th>% Float</th><th>Days Cover</th></tr></thead>
+      <tbody>`;
+    recs.slice(0, 12).forEach(r => {
+      html += `<tr>
+        <td>${r.date || "—"}</td>
+        <td>${fmt(r.shortInterest)}</td>
+        <td>${fmtPct(r.shortInterestRatio)}</td>
+        <td>${r.daysToCover ? parseFloat(r.daysToCover).toFixed(1) : "—"}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>
+    <div class="av-note" style="margin-top:6px">// Short interest data from Finnhub. Bi-monthly FINRA settlement dates.</div>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// Short interest error: ${e.message}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   REVENUE SEGMENTATION  (FMP — product + geographic breakdown)
+   Called from Fundamentals → SEG tab
+   ══════════════════════════════════════════════════════════════════ */
+async function fmpLoadSegmentation(sym) {
+  const el = document.getElementById("fund-seg");
+  if (!el) return;
+  const key = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
+  if (!key) {
+    el.innerHTML = `<div class="no-data">// FMP key required for revenue segmentation.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading revenue segmentation…</div>`;
+  try {
+    const [prodRes, geoRes] = await Promise.all([
+      fetch(`https://financialmodelingprep.com/api/v3/revenue-product-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
+      fetch(`https://financialmodelingprep.com/api/v3/revenue-geographic-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
+    ]);
+
+    const renderSegTable = (title, records) => {
+      if (!records || !records.length) return `<div class="av-note">// No ${title} data available.</div>`;
+      const latest = records[0];
+      const date   = Object.keys(latest)[0];
+      const segs   = latest[date];
+      if (!segs || typeof segs !== "object") return "";
+      const entries = Object.entries(segs).sort(([,a],[,b]) => b - a);
+      const total   = entries.reduce((s,[,v]) => s + (v||0), 0);
+      let s = `<div class="seg-section-title">${title} <span class="seg-date">${date}</span></div>`;
+      s += `<div class="seg-bars">`;
+      const colors = ["#4a9eff","#7c9","#f90","#e55","#a8f","#8b6","#fc6","#4cf","#f6a","#9bf"];
+      entries.forEach(([name, val], i) => {
+        const pct = total > 0 ? (val / total * 100) : 0;
+        const fmtV = Math.abs(val) >= 1e9 ? (val/1e9).toFixed(1)+"B" :
+                     Math.abs(val) >= 1e6 ? (val/1e6).toFixed(0)+"M" : val.toLocaleString();
+        s += `<div class="seg-row">
+          <div class="seg-label" title="${name}">${name.length > 28 ? name.slice(0,27)+"…" : name}</div>
+          <div class="seg-bar-wrap"><div class="seg-bar" style="width:${Math.min(pct,100).toFixed(1)}%;background:${colors[i % colors.length]}"></div></div>
+          <div class="seg-pct">${pct.toFixed(1)}%</div>
+          <div class="seg-val">${fmtV}</div>
+        </div>`;
+      });
+      s += `</div>`;
+      return s;
+    };
+
+    let html = `<div class="av-live-badge">● Revenue Segmentation · ${sym} · FMP</div>`;
+    html += renderSegTable("By Product / Segment", prodRes);
+    html += `<div style="height:12px"></div>`;
+    html += renderSegTable("By Geography", geoRes);
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// Segmentation error: ${e.message}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   EARNINGS TRANSCRIPT  (FMP — /v3/earning_call_transcript)
+   Called from Fundamentals → TRANS tab
+   ══════════════════════════════════════════════════════════════════ */
+async function fmpLoadTranscript(sym) {
+  const el = document.getElementById("fund-trans");
+  if (!el) return;
+  const key = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
+  if (!key) {
+    el.innerHTML = `<div class="no-data">// FMP key required for earnings transcripts.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading transcript list…</div>`;
+  try {
+    // Step 1: get list of available transcripts
+    const list = await fetch(`https://financialmodelingprep.com/api/v4/earning_call_transcript?symbol=${sym}&apikey=${key}`).then(r=>r.json());
+    if (!list || !list.length) {
+      el.innerHTML = `<div class="no-data">// No earnings transcripts found for ${sym}.</div>`;
+      return;
+    }
+    // Show list with load button
+    let html = `<div class="av-live-badge">● Earnings Transcripts · ${sym} · FMP</div>`;
+    html += `<div class="trans-list">`;
+    list.slice(0, 8).forEach((item, idx) => {
+      const label = `Q${item.quarter} ${item.year}`;
+      html += `<div class="trans-list-item">
+        <span class="trans-label">${label}</span>
+        <span class="trans-date">${item.date ? item.date.slice(0,10) : ""}</span>
+        <button class="trans-load-btn" onclick="fmpFetchTranscriptText('${sym}',${item.quarter},${item.year})">Load ↓</button>
+      </div>`;
+    });
+    html += `</div>`;
+    html += `<div id="trans-text-area" style="margin-top:10px"></div>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// Transcript error: ${e.message}</div>`;
+  }
+}
+
+async function fmpFetchTranscriptText(sym, quarter, year) {
+  const key  = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
+  const area = document.getElementById("trans-text-area");
+  if (!area || !key) return;
+  area.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading Q${quarter} ${year} transcript…</div>`;
+  try {
+    const data = await fetch(`https://financialmodelingprep.com/api/v3/earning_call_transcript/${sym}?quarter=${quarter}&year=${year}&apikey=${key}`).then(r=>r.json());
+    if (!data || !data.length || !data[0].content) {
+      area.innerHTML = `<div class="no-data">// Transcript content not available.</div>`;
+      return;
+    }
+    const t   = data[0];
+    const txt = t.content.replace(/\n/g, "<br>");
+    area.innerHTML = `
+      <div class="trans-header">
+        <span class="trans-title">Q${quarter} ${year} Earnings Call</span>
+        <span class="trans-meta">${t.date ? t.date.slice(0,10) : ""}</span>
+      </div>
+      <div class="trans-body">${txt}</div>`;
+  } catch(e) {
+    area.innerHTML = `<div class="no-data">// Transcript load error: ${e.message}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   IPO CALENDAR  (FMP — /v3/ipo_calendar)
+   Called from Macro·Intel → IPO tab
+   ══════════════════════════════════════════════════════════════════ */
+async function fmpLoadIpoCalendar() {
+  const el = document.getElementById("macro-ipo");
+  if (!el) return;
+  const key = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
+  if (!key) {
+    el.innerHTML = `<div class="no-data">// FMP key required for IPO calendar.</div>`;
+    return;
+  }
+  if (el.dataset.loaded === "1") return;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading IPO calendar…</div>`;
+  try {
+    const today  = new Date();
+    const from   = today.toISOString().slice(0,10);
+    const toDate = new Date(today); toDate.setDate(toDate.getDate() + 90);
+    const to     = toDate.toISOString().slice(0,10);
+    const data   = await fetch(`https://financialmodelingprep.com/api/v3/ipo_calendar?from=${from}&to=${to}&apikey=${key}`).then(r=>r.json());
+
+    if (!data || !data.length) {
+      el.innerHTML = `<div class="no-data">// No upcoming IPOs found in the next 90 days.</div>`;
+      return;
+    }
+
+    let html = `<div class="av-live-badge">● IPO Calendar · Next 90 days · FMP</div>`;
+    html += `<table class="fmp-table">
+      <thead><tr><th>Date</th><th>Symbol</th><th>Company</th><th>Exchange</th><th>Price Range</th><th>Shares</th></tr></thead>
+      <tbody>`;
+    data.forEach(ipo => {
+      const priceRange = (ipo.priceRange) ? ipo.priceRange :
+                         (ipo.priceLow && ipo.priceHigh) ? `$${ipo.priceLow}–$${ipo.priceHigh}` : "TBD";
+      const shares = ipo.shares ? (ipo.shares >= 1e6 ? (ipo.shares/1e6).toFixed(1)+"M" : ipo.shares.toLocaleString()) : "—";
+      html += `<tr>
+        <td>${ipo.date || "—"}</td>
+        <td><strong>${ipo.symbol || "—"}</strong></td>
+        <td>${ipo.company || ipo.name || "—"}</td>
+        <td>${ipo.exchange || "—"}</td>
+        <td>${priceRange}</td>
+        <td>${shares}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    el.dataset.loaded = "1";
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// IPO Calendar error: ${e.message}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FORM 4 INSIDER TRADING  (SEC EDGAR — no API key)
+   Enhances Fundamentals → FILINGS tab with live Form 4 feed
+   Also available as standalone: fmpLoadForm4(sym)
+   ══════════════════════════════════════════════════════════════════ */
+async function fmpLoadForm4(sym) {
+  const el = document.getElementById("fund-form4");
+  if (!el) return;
+  if (el.dataset.loaded === "1") return;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading Form 4 insider trades…</div>`;
+  try {
+    // Use EDGAR full-text search for Form 4 filings for this issuer ticker
+    const url = `https://efts.sec.gov/LATEST/search-index?q=%22${encodeURIComponent(sym)}%22&dateRange=custom&startdt=${new Date(Date.now()-90*864e5).toISOString().slice(0,10)}&forms=4`;
+    const res  = await fetch(url, { headers: { "User-Agent": "FINTERM research@finterm.io" } });
+    const data = await res.json();
+    const hits  = data.hits?.hits || [];
+
+    if (!hits.length) {
+      // Fallback: Finnhub insider transactions (if key set)
+      const fhKey = localStorage.getItem("finterm_key_finnhub") || "";
+      if (fhKey) {
+        await fhLoadInsiderTransactions(sym);
+        return;
+      }
+      el.innerHTML = `<div class="no-data">// No Form 4 filings found for ${sym} in last 90 days.</div>`;
+      el.dataset.loaded = "1";
+      return;
+    }
+
+    let html = `<div class="av-live-badge">● Form 4 Insider Filings · ${sym} · SEC EDGAR</div>`;
+    html += `<table class="fmp-table">
+      <thead><tr><th>Filed</th><th>Insider</th><th>Relationship</th><th>Transaction</th><th>Shares</th><th>Price</th></tr></thead>
+      <tbody>`;
+
+    hits.slice(0, 20).forEach(h => {
+      const src  = h._source || {};
+      const filed = src.file_date || src.period_of_report || "—";
+      const name  = src.display_names?.[0]?.name || src.entity_name || "Unknown";
+      const rel   = src.display_names?.[0]?.forms?.[0] || "—";
+      // EDGAR raw filings — show link to full document
+      const accNo = src.accession_no?.replace(/-/g,"") || "";
+      const link  = accNo ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&filenum=${accNo}&type=4&dateb=&owner=include&count=1` : "#";
+      html += `<tr>
+        <td>${filed}</td>
+        <td>${name.length > 22 ? name.slice(0,21)+"…" : name}</td>
+        <td>${rel}</td>
+        <td><a href="${link}" target="_blank" rel="noopener" class="sec-link">View →</a></td>
+        <td>—</td><td>—</td>
+      </tr>`;
+    });
+    html += `</tbody></table>
+    <div class="av-note" style="margin-top:6px">// Form 4 data from SEC EDGAR EFTS. Click View for transaction detail.</div>`;
+    el.innerHTML = html;
+    el.dataset.loaded = "1";
+  } catch(e) {
+    // Fallback to Finnhub if EDGAR fails
+    const fhKey = localStorage.getItem("finterm_key_finnhub") || "";
+    if (fhKey) { await fhLoadInsiderTransactions(sym); return; }
+    el.innerHTML = `<div class="no-data">// Form 4 error: ${e.message}</div>`;
+  }
+}
+
+/* Finnhub fallback for insider transactions */
+async function fhLoadInsiderTransactions(sym) {
+  const el  = document.getElementById("fund-form4");
+  const key = localStorage.getItem("finterm_key_finnhub") || "";
+  if (!el || !key) return;
+  try {
+    const data = await fetch(`https://finnhub.io/api/v1/stock/insider-transactions?symbol=${sym}&token=${key}`).then(r=>r.json());
+    const txns = data.data || [];
+    if (!txns.length) {
+      el.innerHTML = `<div class="no-data">// No insider transactions found for ${sym}.</div>`;
+      el.dataset.loaded = "1";
+      return;
+    }
+    let html = `<div class="av-live-badge">● Insider Transactions · ${sym} · Finnhub</div>`;
+    html += `<table class="fmp-table">
+      <thead><tr><th>Date</th><th>Insider</th><th>Title</th><th>Type</th><th>Shares</th><th>Price</th><th>Value</th></tr></thead>
+      <tbody>`;
+    txns.slice(0, 20).forEach(t => {
+      const isBuy = t.transactionCode === "P" || (t.share > 0 && t.transactionCode !== "S");
+      const cls   = isBuy ? "pos" : "neg";
+      const type  = t.transactionCode === "P" ? "Buy" : t.transactionCode === "S" ? "Sale" : t.transactionCode || "—";
+      const val   = t.share && t.price ? (t.share * t.price) : null;
+      const fmtV  = val ? (Math.abs(val) >= 1e6 ? "$"+(val/1e6).toFixed(2)+"M" : "$"+val.toFixed(0)) : "—";
+      html += `<tr>
+        <td>${t.transactionDate || t.filingDate || "—"}</td>
+        <td>${(t.name||"—").length > 18 ? t.name.slice(0,17)+"…" : t.name||"—"}</td>
+        <td>${(t.position||"—").length > 14 ? t.position.slice(0,13)+"…" : t.position||"—"}</td>
+        <td class="${cls}"><strong>${type}</strong></td>
+        <td>${t.share ? Number(t.share).toLocaleString() : "—"}</td>
+        <td>${t.price ? "$"+parseFloat(t.price).toFixed(2) : "—"}</td>
+        <td>${fmtV}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    el.innerHTML = html;
+    el.dataset.loaded = "1";
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// Insider transactions error: ${e.message}</div>`;
+  }
+}
