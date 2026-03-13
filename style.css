@@ -735,7 +735,34 @@ textarea::placeholder { color:var(--text-muted); }
 }
 
 .tab-pane { display: none; }
-.tab-pane.active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.tab-pane.active {
+  display: flex; flex-direction: column;
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+}
+
+/* Geo·Risk tab panes — direct scroll on the pane itself */
+#geo-wars,
+#geo-resources,
+#geo-routes,
+#geo-intel,
+#geo-signals,
+#geo-quakes {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 10px 12px;
+}
+
+/* The inner content divs must NOT constrain height */
+#georisk-wars-content,
+#georisk-resources-content,
+#georisk-routes-content {
+  display: block;
+  min-height: 0;
+  height: auto;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    FINANCIAL TABLES
@@ -2697,3 +2724,96 @@ textarea::placeholder { color:var(--text-muted); }
 .wm-alert-row:hover {
   outline: 1px solid rgba(0,212,160,.3);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   GEO·RISK SCROLL FIX + CROSS-PANEL CONNECTION BAR
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Ensure the geo panel itself has a flex column that fills height */
+#panel-geopolitical {
+  display: flex;
+  flex-direction: column;
+}
+
+/* panel-head + tab-bar are fixed height, tab-pane fills the rest */
+#panel-geopolitical .panel-head,
+#panel-geopolitical .tab-bar {
+  flex-shrink: 0;
+}
+
+/* The geo tab panes get direct scroll — override panel-content padding */
+#geo-wars,
+#geo-resources,
+#geo-routes,
+#geo-intel,
+#geo-signals,
+#geo-quakes {
+  padding: 0;          /* padding moved inside content divs */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: none;       /* hidden by default (tab-pane rule) */
+}
+
+/* When active — restore flex column but keep scroll */
+#geo-wars.active,
+#geo-resources.active,
+#geo-routes.active,
+#geo-intel.active,
+#geo-signals.active,
+#geo-quakes.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Inner content wrappers: no fixed height, grow freely */
+#georisk-wars-content,
+#georisk-resources-content,
+#georisk-routes-content {
+  flex: none;
+  padding: 10px 12px;
+}
+
+/* ── Cross-panel connection bar ─────────────────────────────────── */
+.geo-cross-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  background: rgba(0, 212, 160, 0.05);
+  border-bottom: 1px solid rgba(0, 212, 160, 0.18);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.geo-cross-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: .03em;
+  flex: 1;
+  min-width: 100px;
+}
+
+.geo-cross-btn {
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  background: transparent;
+  border: 1px solid rgba(0, 212, 160, 0.35);
+  color: var(--accent);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+}
+.geo-cross-btn:hover {
+  background: rgba(0, 212, 160, 0.12);
+  border-color: var(--accent);
+}
+
+/* Resource rows / chips cursor feedback (already have hover outline) */
+#georisk-wars-content     .geo-res-chip    { cursor: pointer; }
+#georisk-resources-content .geo-resource-row { cursor: pointer; }
+#georisk-routes-content   .geo-route-card  { cursor: pointer; }
