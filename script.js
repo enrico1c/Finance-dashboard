@@ -844,8 +844,8 @@ function renderWatchlistRows() {
    ══════════════════════════════════════════════════════════════════ */
 function openValuation(ticker) {
   currentValTicker = ticker;
-  showPanel("valuation");
-  const cb = document.querySelector('.panel-toggle[data-panel="valuation"]');
+  showPanel("analysts");
+  const cb = document.querySelector('.panel-toggle[data-panel="analysts"]');
   if (cb) cb.checked = true;
   renderValuation(ticker);
 }
@@ -1109,16 +1109,14 @@ function computeDefaultLayout(){
   panelLayout.chart        ={x:0,       y:0,     w:cW, h:cH};
   panelLayout.fundamentals ={x:cW+G,    y:0,     w:rW, h:Math.round(cH*0.55)};
   panelLayout.news         ={x:cW+G,    y:Math.round(cH*0.55)+G, w:rW, h:cH-Math.round(cH*0.55)-G};
-  panelLayout.quote        ={x:0,       y:cH+G,  w:col,h:bH};
-  panelLayout.analysts     ={x:col+G,   y:cH+G,  w:col,h:bH};
-  panelLayout.ownership    ={x:(col+G)*2,y:cH+G, w:col,h:bH};
-  panelLayout.comparables  ={x:(col+G)*3,y:cH+G, w:col,h:bH};
+  panelLayout.analysts     ={x:0,        y:cH+G,  w:col,h:bH};
+  panelLayout.ownership    ={x:col+G,    y:cH+G,  w:col,h:bH};
+  panelLayout.comparables  ={x:(col+G)*2, y:cH+G, w:col,h:bH};
+  panelLayout.webhooks     ={x:(col+G)*3, y:cH+G, w:col,h:bH};
   panelLayout.notes        ={x:Math.round(W*0.25),y:Math.round(H*0.15),w:Math.round(W*0.3),h:Math.round(H*0.4)};
-  panelLayout.forex        ={x:Math.round(W*0.15),y:Math.round(H*0.1), w:Math.round(W*0.45),h:Math.round(H*0.55)};
   // Watchlist + Valuation: placed at bottom-left, side by side
   const wlW=Math.round(W*0.28), valW=Math.round(W*0.36);
   panelLayout.watchlist    ={x:0,      y:cH+G, w:wlW,  h:bH};
-  panelLayout.valuation    ={x:wlW+G,  y:cH+G, w:valW, h:bH};
 
   // Geo/Supply/Alert/Macro/Intel: stacked on the right side, below the main row
   const geoW=Math.round(W*0.38), geoH=Math.round(H*0.48);
@@ -1312,6 +1310,8 @@ function changeTicker(){
   if(at === "yf-hist" && typeof yfLoadHistory         === "function") yfLoadHistory(sym);
   // Always refresh Yahoo quote on ticker change if key is set
   if(typeof yfLoadAll === "function") yfLoadAll(sym);
+  loadComparables(sym);
+  renderScorecard(ticker);
   // Enrich watchlist rows with Yahoo live prices
   if(typeof yfEnrichWatchlist === "function") setTimeout(() => yfEnrichWatchlist(), 1500);
   // Reset comparables comp tab
@@ -1458,8 +1458,10 @@ window.addEventListener("load",()=>{
 
   requestAnimationFrame(()=>{
     initLayout();
+    initLayoutSidebar();
+    whRenderAlerts();
+    whStartPolling();
     loadChart(resolveSymbol(currentTicker));
-    loadForexChart();
     reloadAllPanels(currentTicker);
     // Fetch live data on startup — strip exchange prefix for API calls
     const initSym = currentTicker.replace(/.*:/,"").toUpperCase();
@@ -1478,4 +1480,687 @@ window.addEventListener("resize",()=>{
     let y=Math.max(minY,Math.min(parseInt(panel.style.top)||0,canvas.clientHeight-panel.offsetHeight));
     panel.style.left=x+"px"; panel.style.top=y+"px";
   });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   TASK 1 — already fixed in CSS (wm-intel-tabs z-index)
+   TASK 2 — DUAL CHART
+   ══════════════════════════════════════════════════════════════════ */
+let _chart2Active = false;
+let _chart2Widget = null;
+
+function toggleChart2() {
+  const wrap = document.getElementById('chartSplit');
+  const c2   = document.getElementById('priceChart2');
+  const btn  = document.getElementById('chart2Btn');
+  if (!wrap || !c2) return;
+  _chart2Active = !_chart2Active;
+  if (_chart2Active) {
+    wrap.classList.replace('single','dual');
+    c2.style.display = 'block';
+    btn.textContent = '⊗ 1 Chart';
+    // load second chart with same ticker
+    const sym = resolveSymbol(currentTicker);
+    _chart2Widget = new TradingView.widget({
+      autosize: true, symbol: sym, interval: '60', timezone: 'Etc/UTC',
+      theme: document.body.classList.contains('light') ? 'Light' : 'Dark',
+      style: '1', locale: 'en', toolbar_bg: '#0d1117',
+      hide_side_toolbar: true, allow_symbol_change: true,
+      enable_publishing: false, container_id: 'priceChart2'
+    });
+  } else {
+    wrap.classList.replace('dual','single');
+    c2.style.display = 'none';
+    btn.textContent = '⊕ 2nd';
+    c2.innerHTML = '';
+    _chart2Widget = null;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TASK 4 — SCORECARD (Bloomberg-style)
+   ══════════════════════════════════════════════════════════════════ */
+function renderScorecard(ticker) {
+  const el = document.getElementById('analysts-score');
+  if (!el) return;
+  const lbl = document.getElementById('analystsLabel');
+
+  const sym = (ticker || currentTicker || 'AAPL').replace(/.*:/, '').toUpperCase();
+  if (lbl) lbl.textContent = sym;
+
+  const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+  const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+  const r       = fmpLive?.ratios || {};
+  const q       = fhLive?.quote  || {};
+  const pr      = fhLive?.profile || {};
+  const analRaw = fmpLive?.analysts || [];
+  const targets = fmpLive?.priceTargets || [];
+
+  // ── Company health bar ──────────────────────────────────────────
+  const healthScores = [];
+  if (r.roe   != null) healthScores.push(r.roe   > 15 ? 2 : r.roe > 5 ? 1 : 0);
+  if (r.netMgn!= null) healthScores.push(r.netMgn > 10 ? 2 : r.netMgn > 0 ? 1 : 0);
+  if (r.debtEq!= null) healthScores.push(r.debtEq < 0.5 ? 2 : r.debtEq < 2 ? 1 : 0);
+  if (r.currentRatio != null) healthScores.push(r.currentRatio > 1.5 ? 2 : r.currentRatio > 1 ? 1 : 0);
+  const healthPct = healthScores.length ? Math.round(healthScores.reduce((a,b)=>a+b,0) / (healthScores.length * 2) * 100) : null;
+  const healthLabel = healthPct == null ? '—' : healthPct >= 75 ? 'Excellent' : healthPct >= 50 ? 'Good' : healthPct >= 25 ? 'Fair' : 'Weak';
+  const healthColor = healthPct == null ? 'var(--text-muted)' : healthPct >= 75 ? '#3fb950' : healthPct >= 50 ? '#58a6ff' : healthPct >= 25 ? '#d29922' : '#f85149';
+
+  // ── Fair Value ──────────────────────────────────────────────────
+  let fairPrice = null, upside = null;
+  const price = q.price || null;
+  const pt    = targets.length ? targets.reduce((s,t) => s + (t.priceTarget||0), 0) / targets.length : null;
+  if (pt && price) { fairPrice = pt; upside = ((pt - price) / price) * 100; }
+
+  const fairLabel = upside == null ? '—' : upside > 15 ? 'Undervalued' : upside < -15 ? 'Overvalued' : 'Fair';
+  const fairColor = upside == null ? 'var(--text-muted)' : upside > 15 ? '#3fb950' : upside < -15 ? '#f85149' : '#58a6ff';
+
+  // ── Technical signal (simplified from AV tech cache) ────────────
+  let techSignal = '—', techColor = 'var(--text-muted)';
+  if (typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.rsi) {
+    const rsi = avLiveCache[sym].rsi;
+    if (rsi < 30)      { techSignal = 'Strong Buy';  techColor = '#3fb950'; }
+    else if (rsi < 45) { techSignal = 'Buy';         techColor = '#58a6ff'; }
+    else if (rsi > 70) { techSignal = 'Strong Sell'; techColor = '#f85149'; }
+    else if (rsi > 55) { techSignal = 'Sell';        techColor = '#f0883e'; }
+    else               { techSignal = 'Neutral';     techColor = '#d29922'; }
+  }
+
+  // ── Analyst consensus from FMP ──────────────────────────────────
+  let buyCount = 0, holdCount = 0, sellCount = 0;
+  analRaw.slice(0, 4).forEach(a => {
+    buyCount  += (a.analystRatingsStrongBuy || 0) + (a.analystRatingsBuy || 0);
+    holdCount += (a.analystRatingsHold || 0);
+    sellCount += (a.analystRatingsSell || 0) + (a.analystRatingsStrongSell || 0);
+  });
+  const totalAnalysts = buyCount + holdCount + sellCount;
+  const consensusLabel = totalAnalysts === 0 ? '—' :
+    buyCount > holdCount && buyCount > sellCount ? 'Strong Buy' :
+    sellCount > buyCount && sellCount > holdCount ? 'Strong Sell' :
+    buyCount > sellCount ? 'Buy' : 'Hold';
+  const consensusColor = consensusLabel.includes('Buy') ? '#3fb950' : consensusLabel.includes('Sell') ? '#f85149' : '#d29922';
+  const avgPT  = pt ? '$' + pt.toFixed(2) : '—';
+  const upPct  = upside != null ? (upside >= 0 ? '+' : '') + upside.toFixed(2) + '%' : '—';
+  const upClr  = upside != null ? (upside >= 0 ? '#3fb950' : '#f85149') : 'var(--text-muted)';
+
+  el.innerHTML = `
+    <div class="sc-card">
+      <!-- Header -->
+      <div class="sc-header">
+        <div class="sc-sym">${escapeHtml(sym)}</div>
+        <div class="sc-name">${escapeHtml(pr.name || sym)}</div>
+        <div class="sc-price">${price != null ? '$' + price.toFixed(2) : '—'}</div>
+        <div class="sc-exchange">${escapeHtml(pr.exchange || '')} · ${escapeHtml(pr.currency || 'USD')}</div>
+      </div>
+
+      <!-- Company Health -->
+      <div class="sc-section sc-section-border">
+        <div class="sc-section-top">
+          <span class="sc-section-label">Company's Health</span>
+          <span class="sc-section-badge" style="color:${healthColor}">${healthLabel}</span>
+        </div>
+        ${healthPct != null ? `
+        <div class="sc-bar-wrap">
+          <div class="sc-bar-track">
+            <div class="sc-bar-fill" style="width:${healthPct}%;background:${healthColor}"></div>
+          </div>
+          <div class="sc-bar-labels"><span>Weak</span><span>Fair</span><span>Good</span><span>Excellent</span></div>
+        </div>` : '<div class="sc-nodata">// Add FMP key for health data</div>'}
+        ${healthScores.length ? `
+        <div class="sc-kpi-row">
+          ${r.roe   !=null?`<span class="sc-kpi">ROE <b>${r.roe.toFixed(1)}%</b></span>`:''}
+          ${r.netMgn!=null?`<span class="sc-kpi">Net Mgn <b>${r.netMgn.toFixed(1)}%</b></span>`:''}
+          ${r.debtEq!=null?`<span class="sc-kpi">D/E <b>${r.debtEq.toFixed(2)}</b></span>`:''}
+        </div>` : ''}
+      </div>
+
+      <!-- Fair Value -->
+      <div class="sc-section sc-section-border">
+        <div class="sc-section-top">
+          <span class="sc-section-label">Fair Value</span>
+          <span class="sc-section-badge" style="color:${fairColor}">${fairLabel}</span>
+        </div>
+        <div class="sc-fv-row">
+          <span class="sc-fv-label">Avg Price Target</span>
+          <span class="sc-fv-val">${avgPT}</span>
+        </div>
+        <div class="sc-fv-row">
+          <span class="sc-fv-label">Upside / Downside</span>
+          <span class="sc-fv-val" style="color:${upClr}">${upPct}</span>
+        </div>
+        ${r.pe!=null?`<div class="sc-fv-row"><span class="sc-fv-label">P/E</span><span class="sc-fv-val">${r.pe.toFixed(1)}</span></div>`:''}
+        ${r.pb!=null?`<div class="sc-fv-row"><span class="sc-fv-label">P/B</span><span class="sc-fv-val">${r.pb.toFixed(2)}</span></div>`:''}
+        ${r.evEbitda!=null?`<div class="sc-fv-row"><span class="sc-fv-label">EV/EBITDA</span><span class="sc-fv-val">${r.evEbitda.toFixed(1)}</span></div>`:''}
+      </div>
+
+      <!-- Technical Analysis -->
+      <div class="sc-section sc-section-border">
+        <div class="sc-section-top">
+          <span class="sc-section-label">Technical Analysis <a href="#" onclick="switchTab('fundamentals','tech');return false" style="font-size:9px;color:var(--link)">›</a></span>
+          <span class="sc-section-badge" style="color:${techColor}">${techSignal}</span>
+        </div>
+        <div class="sc-gauge-wrap">
+          <svg viewBox="0 0 100 55" class="sc-gauge-svg">
+            <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="#f85149" stroke-width="6" stroke-dasharray="50 75"/>
+            <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="#d29922" stroke-width="6" stroke-dasharray="25 75" stroke-dashoffset="-50"/>
+            <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="#3fb950" stroke-width="6" stroke-dasharray="25 75" stroke-dashoffset="-75"/>
+            <text x="50" y="48" text-anchor="middle" fill="${techColor}" font-size="9" font-weight="700">${escapeHtml(techSignal)}</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Analyst Sentiment -->
+      <div class="sc-section sc-section-border">
+        <div class="sc-section-top">
+          <span class="sc-section-label">Analysts Sentiment <a href="#" onclick="switchTab('analysts','anr');return false" style="font-size:9px;color:var(--link)">›</a></span>
+          <span class="sc-section-badge" style="color:${consensusColor}">${consensusLabel}</span>
+        </div>
+        ${totalAnalysts > 0 ? `
+        <div class="sc-fv-row"><span class="sc-fv-label">Price Target</span><span class="sc-fv-val">${avgPT}</span></div>
+        <div class="sc-fv-row"><span class="sc-fv-label">Upside</span><span class="sc-fv-val" style="color:${upClr}">${upPct}</span></div>
+        <div class="sc-consensus-pills">
+          ${buyCount >0 ? `<span class="sc-pill sc-pill-buy">🐂 Buy ${buyCount}</span>` : ''}
+          ${holdCount>0 ? `<span class="sc-pill sc-pill-hold">◆ Hold ${holdCount}</span>` : ''}
+          ${sellCount>0 ? `<span class="sc-pill sc-pill-sell">🐻 Sell ${sellCount}</span>` : ''}
+        </div>` : '<div class="sc-nodata">// Add FMP key for analyst data</div>'}
+      </div>
+
+      <!-- Members Sentiment (placeholder) -->
+      <div class="sc-section sc-section-border">
+        <div class="sc-section-label" style="margin-bottom:6px">Members' Sentiments</div>
+        <div class="sc-members-row">
+          <span class="sc-pill sc-pill-sell">🐻 Bearish</span>
+          <span class="sc-pill sc-pill-buy">🐂 Bullish</span>
+        </div>
+      </div>
+
+      <!-- Pro Tips -->
+      <div class="sc-section">
+        <div class="sc-section-top">
+          <span class="sc-section-label">ProTips</span>
+          <a href="#" onclick="switchTab('analysts','val');renderValuation(currentTicker);return false" style="font-size:9px;color:var(--link)">All Tips ›</a>
+        </div>
+        <div class="sc-protip">
+          ${r.roe!=null && r.roe > 15 ? '✅ High ROE — strong capital efficiency' :
+            r.roe!=null && r.roe < 0  ? '⚠️ Negative ROE — watch profitability' : ''}
+          ${r.netMgn!=null && r.netMgn > 20 ? '<br>✅ Wide net margin — pricing power' : ''}
+          ${r.debtEq!=null && r.debtEq > 2  ? '<br>⚠️ High leverage — debt risk' : ''}
+          ${upside != null && upside > 20 ? '<br>✅ Analysts see significant upside' : ''}
+          ${upside != null && upside < -15 ? '<br>⚠️ Analysts see downside risk' : ''}
+          ${!r.roe && !r.netMgn ? '// Add FMP key for ProTips' : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TASK 5 — COMPARABLES single view (peer list + expandable detail)
+   ══════════════════════════════════════════════════════════════════ */
+let _compExpandedSym = null;
+
+async function loadComparables(sym) {
+  const el = document.getElementById('comp-main');
+  if (!el) return;
+  const lbl = document.getElementById('compLabel');
+  if (lbl) lbl.textContent = sym;
+
+  el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading peers…</div>';
+
+  // Get peers via FMP
+  let peers = [];
+  const key = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  if (key) {
+    try {
+      const res  = await fetch(`https://financialmodelingprep.com/api/v4/stock_peers?symbol=${sym}&apikey=${key}`);
+      const json = await res.json();
+      peers = json?.[0]?.peersList ?? [];
+    } catch {}
+  }
+
+  // Also check Finnhub peers
+  if (!peers.length && typeof fhGetLive === 'function') {
+    peers = fhGetLive(sym)?.peers || [];
+  }
+
+  const allSyms  = [sym, ...peers.slice(0, 9)];
+  let quotes = {};
+  if (key && allSyms.length) {
+    try {
+      const res = await fetch(`https://financialmodelingprep.com/api/v3/quote/${allSyms.join(',')}?apikey=${key}`);
+      const arr = await res.json();
+      (arr||[]).forEach(q => { if(q.symbol) quotes[q.symbol.toUpperCase()] = q; });
+    } catch {}
+  }
+
+  el.innerHTML = `
+    <div class="comp-peers-header">
+      <span class="comp-peers-title">${escapeHtml(sym)} vs Sector Peers</span>
+      <span class="comp-peers-hint">Click a row to expand details</span>
+    </div>
+    <div class="comp-peers-list" id="comp-peers-list">
+      ${allSyms.map((s, i) => {
+        const q   = quotes[s.toUpperCase()];
+        const chg = q?.changesPercentage ?? null;
+        const isCurrent = s === sym;
+        return `<div class="comp-peer-row ${isCurrent?'comp-peer-current':''}"
+                     onclick="compExpandPeer('${escapeHtml(s)}')"
+                     data-sym="${escapeHtml(s)}">
+          <div class="comp-peer-rank">${i + 1}</div>
+          <div class="comp-peer-info">
+            <span class="comp-peer-sym">${escapeHtml(s)}</span>
+            <span class="comp-peer-name">${escapeHtml((q?.name||'').slice(0,22))}</span>
+          </div>
+          <div class="comp-peer-nums">
+            <span class="comp-peer-price">${q?.price!=null?'$'+q.price.toFixed(2):'—'}</span>
+            <span class="comp-peer-chg ${chg!=null?(chg>=0?'pos':'neg'):''}">${chg!=null?(chg>=0?'+':'')+chg.toFixed(2)+'%':'—'}</span>
+          </div>
+          <div class="comp-peer-mktcap">${q?.marketCap!=null?_compFmt(q.marketCap):'—'}</div>
+          <div class="comp-peer-expand-icon">▶</div>
+        </div>
+        <div class="comp-peer-detail hidden" id="comp-detail-${escapeHtml(s)}"></div>`;
+      }).join('')}
+    </div>`;
+}
+
+function _compFmt(n) {
+  if (n >= 1e12) return (n/1e12).toFixed(1)+'T';
+  if (n >= 1e9)  return (n/1e9).toFixed(1)+'B';
+  if (n >= 1e6)  return (n/1e6).toFixed(1)+'M';
+  return n;
+}
+
+async function compExpandPeer(sym) {
+  const detailEl = document.getElementById(`comp-detail-${sym}`);
+  const rowEl    = document.querySelector(`.comp-peer-row[data-sym="${sym}"]`);
+  if (!detailEl || !rowEl) return;
+
+  const isOpen = !detailEl.classList.contains('hidden');
+  // Close all
+  document.querySelectorAll('.comp-peer-detail').forEach(d => d.classList.add('hidden'));
+  document.querySelectorAll('.comp-peer-row').forEach(r => r.classList.remove('comp-peer-open'));
+  document.querySelectorAll('.comp-peer-expand-icon').forEach(i => i.textContent = '▶');
+
+  if (isOpen) return; // toggle close
+
+  rowEl.classList.add('comp-peer-open');
+  rowEl.querySelector('.comp-peer-expand-icon').textContent = '▼';
+  detailEl.classList.remove('hidden');
+  detailEl.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading…</div>';
+
+  const key = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  if (!key) {
+    detailEl.innerHTML = '<div class="sc-nodata">// Add FMP key for peer detail.</div>';
+    return;
+  }
+
+  try {
+    const [profileRes, ratioRes] = await Promise.all([
+      fetch(`https://financialmodelingprep.com/api/v3/profile/${sym}?apikey=${key}`),
+      fetch(`https://financialmodelingprep.com/api/v3/ratios-ttm/${sym}?apikey=${key}`),
+    ]);
+    const profiles = await profileRes.json();
+    const ratios   = await ratioRes.json();
+    const p = profiles?.[0] || {};
+    const r = ratios?.[0]   || {};
+
+    const kpi = (l, v) => v != null ? `<div class="comp-detail-kpi"><span>${escapeHtml(l)}</span><strong>${escapeHtml(String(v))}</strong></div>` : '';
+
+    detailEl.innerHTML = `
+      <div class="comp-detail-inner">
+        <div class="comp-detail-header">
+          <div>
+            <span class="comp-detail-sym">${escapeHtml(sym)}</span>
+            <span class="comp-detail-name">${escapeHtml(p.companyName||'')}</span>
+          </div>
+          <button class="comp-detail-load-btn" onclick="event.stopPropagation();changeTicker('${escapeHtml(sym)}')">▶ Load Chart</button>
+        </div>
+        <div class="comp-detail-desc">${escapeHtml((p.description||'').slice(0,180))}${p.description?.length>180?'…':''}</div>
+        <div class="comp-detail-kpis">
+          ${kpi('Price',    p.price  !=null?'$'+p.price.toFixed(2):null)}
+          ${kpi('Mkt Cap',  p.mktCap !=null?_compFmt(p.mktCap):null)}
+          ${kpi('Sector',   p.sector||null)}
+          ${kpi('Industry', p.industry||null)}
+          ${kpi('P/E',      r.peRatioTTM?.toFixed(1))}
+          ${kpi('P/B',      r.priceToBookRatioTTM?.toFixed(2))}
+          ${kpi('EV/EBITDA',r.enterpriseValueMultipleTTM?.toFixed(1))}
+          ${kpi('ROE',      r.returnOnEquityTTM!=null?((r.returnOnEquityTTM*100).toFixed(1)+'%'):null)}
+          ${kpi('Net Mgn',  r.netProfitMarginTTM!=null?((r.netProfitMarginTTM*100).toFixed(1)+'%'):null)}
+          ${kpi('D/E',      r.debtEquityRatioTTM?.toFixed(2))}
+          ${kpi('Beta',     p.beta?.toFixed(2))}
+          ${kpi('52W Range',p.range||null)}
+        </div>
+        <div class="comp-detail-links">
+          <a href="${escapeHtml(p.website||'#')}" target="_blank" class="geo-wm-link">${escapeHtml(p.website||'—')}</a>
+          · ${escapeHtml(p.exchangeShortName||'')} · ${escapeHtml(p.country||'')}
+        </div>
+      </div>`;
+  } catch {
+    detailEl.innerHTML = '<div class="sc-nodata">// Could not load peer details.</div>';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TASK 6 — WEBHOOK / PRICE ALERTS
+   ══════════════════════════════════════════════════════════════════ */
+let whAlerts = JSON.parse(localStorage.getItem('finterm_wh_alerts') || '[]');
+let whLog    = [];
+let _whIntervalId = null;
+
+function whSaveAlerts() {
+  try { localStorage.setItem('finterm_wh_alerts', JSON.stringify(whAlerts)); } catch {}
+}
+
+function whRenderAlerts() {
+  const el = document.getElementById('wh-alerts-list');
+  if (!el) return;
+  const badge = document.getElementById('webhook-active-badge');
+  const active = whAlerts.filter(a => a.active).length;
+  if (badge) badge.textContent = `${active} ACTIVE`;
+
+  if (!whAlerts.length) {
+    el.innerHTML = '<div class="no-data">// No alerts configured.<br>// Use the BUILDER tab to add one.</div>';
+    return;
+  }
+
+  el.innerHTML = whAlerts.map((a, i) => `
+    <div class="wh-alert-row ${a.active?'wh-alert-active':'wh-alert-paused'}">
+      <div class="wh-alert-main">
+        <span class="wh-alert-sym">${escapeHtml(a.ticker)}</span>
+        <span class="wh-alert-cond">${escapeHtml(whCondLabel(a.condition))} ${escapeHtml(String(a.value))}</span>
+        <span class="wh-alert-interval">${escapeHtml(a.interval)}</span>
+        ${a.note ? `<span class="wh-alert-note">${escapeHtml(a.note)}</span>` : ''}
+      </div>
+      <div class="wh-alert-actions">
+        <button class="wh-act-btn" title="${a.active?'Pause':'Resume'}" onclick="whToggleAlert(${i})">${a.active?'⏸':'▶'}</button>
+        <button class="wh-act-btn" title="Edit" onclick="whEditAlert(${i})">✏</button>
+        <button class="wh-act-btn wh-act-delete" title="Delete" onclick="whDeleteAlert(${i})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function whCondLabel(c) {
+  const MAP = {
+    price_above:'Price >', price_below:'Price <',
+    pct_change_up:'Chg% >', pct_change_down:'Chg% <',
+    volume_spike:'Vol Spike ×',
+    cross_above:'Crosses >', cross_below:'Crosses <',
+    ohlcv_open_above:'Open >', ohlcv_high_above:'High >',
+    ohlcv_low_below:'Low <', ohlcv_close_above:'Close >',
+    ohlcv_volume_above:'Vol >',
+  };
+  return MAP[c] || c;
+}
+
+function whSaveAlert() {
+  const status = document.getElementById('wh-form-status');
+  const ticker    = document.getElementById('wh-ticker')?.value.trim().toUpperCase();
+  const condition = document.getElementById('wh-condition')?.value;
+  const value     = parseFloat(document.getElementById('wh-value')?.value);
+  const interval  = document.getElementById('wh-interval')?.value;
+  const url       = document.getElementById('wh-url')?.value.trim();
+  const payload   = document.getElementById('wh-payload')?.value.trim();
+  const note      = document.getElementById('wh-note')?.value.trim();
+
+  if (!ticker)           { _whStatus('error', 'Ticker required'); return; }
+  if (isNaN(value))      { _whStatus('error', 'Value must be a number'); return; }
+  if (!condition)        { _whStatus('error', 'Select a condition'); return; }
+
+  // Validate payload JSON if provided
+  if (payload) {
+    try { JSON.parse(payload); } catch { _whStatus('error', 'Payload is not valid JSON'); return; }
+  }
+
+  const alert = { id: Date.now(), ticker, condition, value, interval, url, payload, note, active: true, triggered: false };
+  whAlerts.unshift(alert);
+  whSaveAlerts();
+  whRenderAlerts();
+  _whStatus('ok', `✅ Alert saved for ${ticker}`);
+  switchTab('webhooks', 'wh-alerts');
+}
+
+function _whStatus(type, msg) {
+  const el = document.getElementById('wh-form-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'wh-status ' + (type === 'ok' ? 'wh-status-ok' : 'wh-status-err');
+  setTimeout(() => { if (el) el.textContent = ''; }, 4000);
+}
+
+function whToggleAlert(i) {
+  if (!whAlerts[i]) return;
+  whAlerts[i].active = !whAlerts[i].active;
+  whSaveAlerts(); whRenderAlerts();
+}
+
+function whDeleteAlert(i) {
+  whAlerts.splice(i, 1);
+  whSaveAlerts(); whRenderAlerts();
+}
+
+function whEditAlert(i) {
+  const a = whAlerts[i];
+  if (!a) return;
+  document.getElementById('wh-ticker').value    = a.ticker;
+  document.getElementById('wh-condition').value = a.condition;
+  document.getElementById('wh-value').value     = a.value;
+  document.getElementById('wh-interval').value  = a.interval;
+  document.getElementById('wh-url').value       = a.url || '';
+  document.getElementById('wh-payload').value   = a.payload || '';
+  document.getElementById('wh-note').value      = a.note || '';
+  whAlerts.splice(i, 1);
+  whSaveAlerts();
+  switchTab('webhooks', 'wh-builder');
+}
+
+function whAddAlert() {
+  showPanel('webhooks');
+  switchTab('webhooks', 'wh-builder');
+  const key = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  // Pre-fill ticker
+  const t = document.getElementById('wh-ticker');
+  if (t && currentTicker) t.value = currentTicker.replace(/.*:/, '');
+}
+
+async function whTestFire() {
+  const url     = document.getElementById('wh-url')?.value.trim();
+  const ticker  = document.getElementById('wh-ticker')?.value.trim() || 'TEST';
+  const payload = document.getElementById('wh-payload')?.value.trim();
+
+  if (!url) { _whStatus('error', 'Enter a webhook URL first'); return; }
+
+  let body = payload || JSON.stringify({ ticker, event: 'test', message: `FINTERM test fire for ${ticker}`, timestamp: new Date().toISOString() });
+  // Replace template vars
+  body = body.replace(/\{\{ticker\}\}/g, ticker).replace(/\{\{price\}\}/g, '—').replace(/\{\{value\}\}/g, '—').replace(/\{\{time\}\}/g, new Date().toISOString());
+
+  _whStatus('ok', '📤 Sending…');
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    _whStatus('ok', `✅ Sent! HTTP ${res.status}`);
+    _whLog(ticker, 'test', '—', url, res.status);
+  } catch (e) {
+    _whStatus('error', `❌ Failed: ${e.message}`);
+  }
+}
+
+function _whLog(ticker, condition, value, url, status) {
+  const el = document.getElementById('wh-log-list');
+  const entry = { time: new Date().toLocaleTimeString(), ticker, condition, value, url: url?.slice(0,40)+'…', status };
+  whLog.unshift(entry);
+  if (!el) return;
+  if (el.querySelector('.no-data')) el.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'wh-log-row';
+  row.innerHTML = `<span class="wh-log-time">${entry.time}</span><span class="wh-log-sym">${escapeHtml(ticker)}</span><span class="wh-log-cond">${escapeHtml(condition)} ${escapeHtml(String(value))}</span><span class="wh-log-status ${status===200||status==='test'?'wh-status-ok':'wh-status-err'}">${status}</span>`;
+  el.prepend(row);
+}
+
+// Polling check every 60s for active alerts (uses FMP/Finnhub live cache)
+function whStartPolling() {
+  if (_whIntervalId) return;
+  _whIntervalId = setInterval(async () => {
+    const active = whAlerts.filter(a => a.active && !a.triggered);
+    for (const a of active) {
+      const sym = a.ticker.toUpperCase();
+      const q   = (typeof fhGetLive === 'function' ? fhGetLive(sym) : null)?.quote;
+      const p   = q?.price;
+      if (p == null) continue;
+      let fired = false;
+      if (a.condition === 'price_above'      && p > a.value)         fired = true;
+      if (a.condition === 'price_below'      && p < a.value)         fired = true;
+      if (a.condition === 'pct_change_up'    && (q.changePercent||0) > a.value) fired = true;
+      if (a.condition === 'pct_change_down'  && (q.changePercent||0) < -a.value) fired = true;
+      if (a.condition === 'ohlcv_close_above'&& p > a.value)         fired = true;
+      if (!fired) continue;
+      a.triggered = true; whSaveAlerts();
+      // Fire webhook
+      if (a.url) {
+        const body = (a.payload || JSON.stringify({ ticker: sym, condition: a.condition, value: a.value, price: p, time: new Date().toISOString() }))
+          .replace(/\{\{ticker\}\}/g, sym).replace(/\{\{price\}\}/g, p).replace(/\{\{value\}\}/g, a.value).replace(/\{\{time\}\}/g, new Date().toISOString());
+        try {
+          const res = await fetch(a.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+          _whLog(sym, a.condition, a.value, a.url, res.status);
+        } catch (e) { _whLog(sym, a.condition, a.value, a.url, 'ERR'); }
+      }
+      // Toast notification
+      if (typeof wmIntelToast === 'function') {
+        wmIntelToast({ title: `🔔 Alert: ${sym}`, detail: `${whCondLabel(a.condition)} ${a.value} — current $${p.toFixed(2)}`, severity: 'high', icon: '🔔' });
+      }
+    }
+    whRenderAlerts();
+  }, 60000);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TASK 7 — LEFT SIDEBAR LAYOUT MANAGER
+   ══════════════════════════════════════════════════════════════════ */
+const PANEL_META = {
+  chart:         { label:'Chart',        icon:'📈' },
+  fundamentals:  { label:'Fundamentals', icon:'📊' },
+  news:          { label:'News',         icon:'📰' },
+  analysts:      { label:'Analysts',     icon:'🔬' },
+  ownership:     { label:'Ownership',    icon:'🏛'  },
+  comparables:   { label:'Comparables',  icon:'⚖️'  },
+  notes:         { label:'Notes',        icon:'📝' },
+  watchlist:     { label:'Watchlist',    icon:'👁'  },
+  geopolitical:  { label:'Geo·Risk',     icon:'🌍' },
+  supply:        { label:'Supply·Chain', icon:'⛓'  },
+  alert:         { label:'Alert·Feed',   icon:'⚡' },
+  macro:         { label:'Macro·Intel',  icon:'📡' },
+  intel:         { label:'Intel·Feed',   icon:'🧠' },
+  webhooks:      { label:'Webhooks',     icon:'🔔' },
+};
+
+function initLayoutSidebar() {
+  const list = document.getElementById('lsbPanelList');
+  if (!list) return;
+  list.innerHTML = Object.entries(PANEL_META).map(([id, m]) => {
+    const panel   = document.getElementById(`panel-${id}`);
+    const visible = panel && !panel.classList.contains('hidden');
+    return `<label class="lsb-panel-item">
+      <input type="checkbox" class="lsb-panel-cb" data-panel="${id}" ${visible?'checked':''}
+             onchange="lsbTogglePanel('${id}',this.checked)">
+      <span class="lsb-panel-icon">${m.icon}</span>
+      <span class="lsb-panel-label">${m.label}</span>
+    </label>`;
+  }).join('');
+}
+
+function lsbTogglePanel(id, on) {
+  on ? showPanel(id) : hidePanel(id);
+  // sync topbar checkboxes
+  document.querySelectorAll(`.panel-toggle[data-panel="${id}"]`).forEach(cb => cb.checked = on);
+}
+
+function toggleLayoutSidebar() {
+  const sb  = document.getElementById('layoutSidebar');
+  const btn = document.getElementById('layoutSidebarToggle');
+  if (!sb) return;
+  sb.classList.toggle('collapsed');
+  document.body.classList.toggle('sidebar-open', !sb.classList.contains('collapsed'));
+  if (btn) btn.querySelector('.lsb-toggle-icon').textContent = sb.classList.contains('collapsed') ? '◧' : '◨';
+}
+
+const LAYOUT_PRESETS = {
+  focus: {
+    show: ['chart','fundamentals','news','analysts'],
+    hide: ['ownership','comparables','notes','watchlist','geopolitical','supply','alert','macro','intel','webhooks'],
+  },
+  grid: {
+    show: ['chart','fundamentals','news','analysts','ownership','comparables','watchlist','macro'],
+    hide: ['notes','geopolitical','supply','alert','intel','webhooks'],
+  },
+  research: {
+    show: ['fundamentals','analysts','comparables','ownership','watchlist','news'],
+    hide: ['chart','notes','geopolitical','supply','alert','macro','intel','webhooks'],
+  },
+  monitor: {
+    show: ['geopolitical','intel','macro','alert','supply','news'],
+    hide: ['chart','fundamentals','analysts','ownership','comparables','notes','watchlist','webhooks'],
+  },
+  trading: {
+    show: ['chart','watchlist','analysts','webhooks','news','fundamentals'],
+    hide: ['ownership','comparables','notes','geopolitical','supply','alert','macro','intel'],
+  },
+};
+
+function applyLayoutPreset(name) {
+  const preset = LAYOUT_PRESETS[name];
+  if (!preset) return;
+
+  preset.show.forEach(id => { showPanel(id); document.querySelectorAll(`.panel-toggle[data-panel="${id}"],.lsb-panel-cb[data-panel="${id}"]`).forEach(c=>c.checked=true); });
+  preset.hide.forEach(id => { hidePanel(id); document.querySelectorAll(`.panel-toggle[data-panel="${id}"],.lsb-panel-cb[data-panel="${id}"]`).forEach(c=>c.checked=false); });
+
+  // Re-compute layout for visible panels
+  setTimeout(() => { computeDefaultLayout(); Object.keys(panelLayout).forEach(applyPanelPosition); }, 50);
+  // Highlight active preset button
+  document.querySelectorAll('.lsb-preset-btn').forEach(b => b.classList.remove('lsb-preset-active'));
+  document.querySelectorAll(`.lsb-preset-btn`).forEach(b => { if (b.textContent.toLowerCase().includes(name.slice(0,4))) b.classList.add('lsb-preset-active'); });
+}
+
+function tileAllPanels() {
+  const canvas  = document.getElementById('dashboardCanvas');
+  if (!canvas) return;
+  const W = canvas.clientWidth, H = canvas.clientHeight, G = 6;
+  const visible = [...document.querySelectorAll('.panel:not(.hidden)')];
+  if (!visible.length) return;
+  const cols = Math.ceil(Math.sqrt(visible.length));
+  const rows = Math.ceil(visible.length / cols);
+  const pw   = Math.floor((W - G * (cols + 1)) / cols);
+  const ph   = Math.floor((H - G * (rows + 1)) / rows);
+  const minY = getTopbarGuard();
+  visible.forEach((p, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const x = G + col * (pw + G);
+    const y = Math.max(minY, G + row * (ph + G));
+    Object.assign(p.style, { left: x+'px', top: y+'px', width: pw+'px', height: ph+'px' });
+    const id = p.dataset.panel;
+    if (id && panelLayout[id]) Object.assign(panelLayout[id], { x, y: y - minY, w: pw, h: ph });
+  });
+}
+
+function cascadePanels() {
+  const minY  = getTopbarGuard();
+  const visible = [...document.querySelectorAll('.panel:not(.hidden)')];
+  visible.forEach((p, i) => {
+    const x = 30 + i * 24, y = Math.max(minY, minY + i * 24);
+    Object.assign(p.style, { left: x+'px', top: y+'px' });
+    bringToFront(p);
+  });
+}
+
+function resetLayout() {
+  computeDefaultLayout(); Object.keys(panelLayout).forEach(applyPanelPosition);
+}
+
+function hideAllPanels() {
+  document.querySelectorAll('.panel').forEach(p => hidePanel(p.dataset.panel));
+  document.querySelectorAll('.panel-toggle,.lsb-panel-cb').forEach(cb => cb.checked = false);
+}
+
+// Keep sidebar panel checkboxes in sync when topbar toggles change
+document.addEventListener('change', e => {
+  if (e.target.classList.contains('panel-toggle')) {
+    const id = e.target.dataset.panel;
+    document.querySelectorAll(`.lsb-panel-cb[data-panel="${id}"]`).forEach(cb => cb.checked = e.target.checked);
+  }
 });
