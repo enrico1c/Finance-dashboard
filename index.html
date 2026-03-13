@@ -372,28 +372,61 @@
       </div>
 
       <!-- WARS TAB -->
-      <div class="tab-pane active panel-content" data-tab="wars" id="geo-wars">
+      <div class="tab-pane active" data-tab="wars" id="geo-wars">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">🔗 Click any resource chip to open News &amp; Watchlist</span>
+          <button class="geo-cross-btn" onclick="wmIntelSetFilter('all');showPanel('intel')">🧠 Intel Feed</button>
+          <button class="geo-cross-btn" onclick="switchTab('supply','choke');showPanel('supply')">⛓ Supply Chain</button>
+        </div>
         <div id="georisk-wars-content"></div>
       </div>
 
       <!-- RESOURCES TAB -->
-      <div class="tab-pane panel-content" data-tab="resources" id="geo-resources">
+      <div class="tab-pane" data-tab="resources" id="geo-resources">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">🔗 Click any resource row to open News &amp; Watchlist</span>
+          <button class="geo-cross-btn" onclick="switchTab('supply','minerals');showPanel('supply')">⛏ Minerals</button>
+          <button class="geo-cross-btn" onclick="switchTab('supply','energy');showPanel('supply')">🛢 Energy</button>
+        </div>
         <div id="georisk-resources-content"></div>
       </div>
 
       <!-- ROUTES TAB -->
-      <div class="tab-pane panel-content" data-tab="routes" id="geo-routes">
+      <div class="tab-pane" data-tab="routes" id="geo-routes">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">🔗 Click any route card to open News &amp; Watchlist</span>
+          <button class="geo-cross-btn" onclick="switchTab('supply','choke');showPanel('supply')">🌊 Chokepoints</button>
+          <button class="geo-cross-btn" onclick="switchTab('supply','ship');showPanel('supply')">🚢 Shipping</button>
+        </div>
         <div id="georisk-routes-content"></div>
       </div>
 
-      <!-- INTEL TAB (WorldMonitor live) -->
-      <div class="tab-pane panel-content" data-tab="intel" id="geo-intel"></div>
+      <!-- INTEL TAB (WorldMonitor theater posture + risk) -->
+      <div class="tab-pane" data-tab="intel" id="geo-intel">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">Theater posture &amp; country risk</span>
+          <button class="geo-cross-btn" onclick="wmIntelSetFilter('risk');showPanel('intel')">🌡 Full Risk Feed</button>
+          <button class="geo-cross-btn" onclick="wmIntelSetFilter('iran');showPanel('intel')">🇮🇷 Iran Events</button>
+        </div>
+      </div>
 
       <!-- SIGNALS TAB (WorldMonitor insights) -->
-      <div class="tab-pane panel-content" data-tab="signals" id="geo-signals"></div>
+      <div class="tab-pane" data-tab="signals" id="geo-signals">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">Intelligence signals with ticker links</span>
+          <button class="geo-cross-btn" onclick="wmIntelSetFilter('insight');showPanel('intel')">🧠 Full Intel Feed</button>
+          <button class="geo-cross-btn" onclick="switchTab('macro','signals');showPanel('macro')">📊 Macro Signals</button>
+        </div>
+      </div>
 
       <!-- QUAKES TAB (earthquakes + natural events) -->
-      <div class="tab-pane panel-content" data-tab="quakes" id="geo-quakes"></div>
+      <div class="tab-pane" data-tab="quakes" id="geo-quakes">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">Seismic &amp; natural hazard events</span>
+          <button class="geo-cross-btn" onclick="wmIntelSetFilter('weather');showPanel('intel')">🌪 Weather Alerts</button>
+          <button class="geo-cross-btn" onclick="switchTab('alert','quakes');showPanel('alert')">⚡ Alert Feed</button>
+        </div>
+      </div>
 
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
