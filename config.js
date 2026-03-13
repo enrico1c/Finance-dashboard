@@ -17,10 +17,7 @@ const KNOWN_PROVIDERS = [
     desc:"Analyst Ratings · Targets · Estimates · Holders · Insiders · Management · Events · Ratios",
     limit:"250 req/day (free)", docsUrl:"https://financialmodelingprep.com/developer/docs/",
     sessionKey:"fmp_call_count", limitWarn:200, limitMax:250 },
-  { id:"yahoo", name:"Yahoo Finance (RapidAPI)", badge:"YHO",
-    desc:"Real-time Quote · Options Chain · Income Statement · Institutional Holders · Price History · Trending Tickers · 8000+ global symbols",
-    limit:"500 req/month (free tier)", docsUrl:"https://rapidapi.com/search/yahoo+finance",
-    sessionKey:"yahoo_call_count", limitWarn:450, limitMax:500 },
+
   { id:"eodhd", name:"EODHD", badge:"EOD",
     desc:"Quote live/EOD · Fondamentali globali (150K+ ticker) · News · Dividendi · Earnings Calendar · Screener · 70+ borse",
     limit:"20 req/day (free) — illimitato sui piani paid", docsUrl:"https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis",
@@ -45,6 +42,10 @@ const KNOWN_PROVIDERS = [
     desc:"200+ currency pairs · Forex rates live + historical · Currency converter · Exotic pairs (VND, NGN, KES, IDR…) · 1K req/month free",
     limit:"1,000 req/month (free)", docsUrl:"https://openexchangerates.org/account/app-ids",
     sessionKey:"oer_call_count", limitWarn:900, limitMax:1000 },
+  { id:"yahoo", name:"Yahoo Finance (RapidAPI)", badge:"YHO",
+    desc:"Options chain · Income statement · Institutional holders · Trending tickers · Analyst consensus · Peer comparison · 52W price history — Optional: all features fall back to FMP/AV when key is absent",
+    limit:"500 req/month (free tier)", docsUrl:"https://rapidapi.com/search/yahoo+finance",
+    sessionKey:"yf_call_count", limitWarn:450, limitMax:500 },
 ];
 
 window._KEYS = {};
