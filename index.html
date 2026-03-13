@@ -196,6 +196,10 @@
         <button class="tab-btn"        data-tab="form4"   onclick="switchTab('fundamentals','form4');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadForm4==='function')fmpLoadForm4(s)})()">FORM 4</button>
         <button class="tab-btn"        data-tab="div"     onclick="switchTab('fundamentals','div');if(typeof fmpLoadDividends==='function')fmpLoadDividends(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">DIV</button>
         <button class="tab-btn"        data-tab="filings" onclick="switchTab('fundamentals','filings');if(typeof fmpLoadSecFilings==='function')fmpLoadSecFilings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">FILINGS</button>
+        <button class="tab-btn"        data-tab="yf-fin"  onclick="switchTab('fundamentals','yf-fin');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadFinancials==='function')yfLoadFinancials(s)})()">YF·FIN</button>
+        <button class="tab-btn"        data-tab="yf-opt"  onclick="switchTab('fundamentals','yf-opt');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadOptions==='function')yfLoadOptions(s)})()">OPTIONS</button>
+        <button class="tab-btn"        data-tab="yf-hld"  onclick="switchTab('fundamentals','yf-hld');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHolders==='function')yfLoadHolders(s)})()">YF·HLD</button>
+        <button class="tab-btn"        data-tab="yf-hist" onclick="switchTab('fundamentals','yf-hist');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHistory==='function')yfLoadHistory(s)})()">YF·HIST</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="des"     id="fund-des"></div>
       <div class="tab-pane        panel-content" data-tab="fa"      id="fund-fa"></div>
@@ -209,6 +213,10 @@
       <div class="tab-pane        panel-content" data-tab="form4"   id="fund-form4"></div>
       <div class="tab-pane        panel-content" data-tab="div"     id="fund-div"></div>
       <div class="tab-pane        panel-content" data-tab="filings" id="fund-filings"></div>
+      <div class="tab-pane        panel-content" data-tab="yf-fin"  id="yf-financials"></div>
+      <div class="tab-pane        panel-content" data-tab="yf-opt"  id="yf-options"></div>
+      <div class="tab-pane        panel-content" data-tab="yf-hld"  id="yf-holders"></div>
+      <div class="tab-pane        panel-content" data-tab="yf-hist" id="yf-history"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -321,8 +329,8 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="rv"   onclick="switchTab('comparables','rv')">RV</button>
-        <button class="tab-btn"        data-tab="comp" onclick="switchTab('comparables','comp')">COMP</button>
+        <button class="tab-btn active" data-tab="rv"   onclick="switchTab('comparables','rv');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadPeers==='function')yfLoadPeers(s)})()">RV</button>
+        <button class="tab-btn"        data-tab="comp" onclick="switchTab('comparables','comp');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadComparison==='function')yfLoadComparison(s)})()">COMP</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="rv"   id="comp-rv"></div>
       <div class="tab-pane        panel-content" data-tab="comp" id="comp-comp"></div>
@@ -665,6 +673,7 @@
         <button class="tab-btn"        data-tab="flows"   onclick="switchTab('macro','flows');if(typeof wmMacroEtfFlows==='function')wmMacroEtfFlows()">FLOWS</button>
         <button class="tab-btn"        data-tab="sectors" onclick="switchTab('macro','sectors');if(typeof wmMacroSectors==='function')wmMacroSectors()">SECTORS</button>
         <button class="tab-btn"        data-tab="ipo"     onclick="switchTab('macro','ipo');if(typeof fmpLoadIpoCalendar==='function')fmpLoadIpoCalendar()">IPO</button>
+        <button class="tab-btn"        data-tab="trending" onclick="switchTab('macro','trending');if(typeof yfLoadTrending==='function')yfLoadTrending()">TRENDING</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="signals" id="macro-signals"></div>
       <div class="tab-pane        panel-content" data-tab="comm"    id="macro-comm"></div>
@@ -676,6 +685,9 @@
       <div class="tab-pane        panel-content" data-tab="flows"   id="macro-flows"></div>
       <div class="tab-pane        panel-content" data-tab="sectors" id="macro-sectors"></div>
       <div class="tab-pane        panel-content" data-tab="ipo"     id="macro-ipo"></div>
+      <div class="tab-pane        panel-content" data-tab="trending" id="macro-trending">
+        <div id="yf-trending" class="panel-content"></div>
+      </div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -703,6 +715,7 @@
 <script src="fred.js"></script>
 <script src="geodata.js"></script>
 <script src="openexchange.js"></script>
+<script src="yahoo.js"></script>
 <script>
 /* Intel Feed — OREF / TELEGRAM sub-panel switcher */
 function wmIntelShowOref() {
