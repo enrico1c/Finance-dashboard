@@ -615,3 +615,194 @@ function avRenderWACC(sym, ov) {
     ${mRow("Implied Intrinsic Value", iv)}
     <div class="av-note" style="margin-top:8px">// Debt weight uses market cap only (full balance sheet<br>// requires BALANCE_SHEET endpoint — loaded in FA tab).</div>`;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   TECHNICAL INDICATORS  (Alpha Vantage — RSI · MACD · BBANDS · ATR · OBV)
+   Tab: Fundamentals → TECH
+   ══════════════════════════════════════════════════════════════════ */
+
+const TECH_CACHE    = {};
+const TECH_CACHE_MS = 30 * 60 * 1000; // 30 min
+
+function techCacheGet(sym, fn) {
+  const k = `${sym}_${fn}`;
+  const c = TECH_CACHE[k];
+  return (c && Date.now() - c.ts < TECH_CACHE_MS) ? c.data : null;
+}
+function techCacheSet(sym, fn, data) {
+  TECH_CACHE[`${sym}_${fn}`] = { data, ts: Date.now() };
+}
+
+async function avGetIndicator(sym, fn, extra = {}) {
+  const cached = techCacheGet(sym, fn);
+  if (cached) return cached;
+  if (!getAvKey()) return null;
+  if (avCallCount() >= 25) return null;
+  const params = { function: fn, symbol: sym, apikey: getAvKey(), datatype: "json", ...extra };
+  const url = AV_BASE + "?" + new URLSearchParams(params);
+  try {
+    avIncrementCount();
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data["Information"] || data["Note"] || data["Error Message"]) return null;
+    techCacheSet(sym, fn, data);
+    return data;
+  } catch(e) { return null; }
+}
+
+/* Sparkline SVG helper (inline, 80×32px) */
+function techSparkline(values, color = "#4a9eff", label = "") {
+  if (!values || values.length < 2) return "";
+  const mn = Math.min(...values), mx = Math.max(...values);
+  const range = mx - mn || 1;
+  const W = 80, H = 28;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - ((v - mn) / range) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const last = values[values.length - 1];
+  const lastY = H - ((last - mn) / range) * H;
+  return `<svg width="${W}" height="${H}" style="display:block">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="${W}" cy="${lastY.toFixed(1)}" r="2.5" fill="${color}"/>
+  </svg>`;
+}
+
+/* Parse AV indicator time series → last N values (newest first from AV, so reverse) */
+function techParse(data, seriesKey, valueKey, limit = 30) {
+  if (!data) return [];
+  const series = data[seriesKey];
+  if (!series) return [];
+  return Object.entries(series)
+    .sort(([a], [b]) => a < b ? -1 : 1)   // sort ascending by date
+    .slice(-limit)
+    .map(([date, vals]) => ({ date, value: parseFloat(vals[valueKey]) }));
+}
+
+/* RSI → signal text */
+function rsiSignal(v) {
+  if (v >= 70) return { text: "Overbought", cls: "tech-sig-sell" };
+  if (v <= 30) return { text: "Oversold",   cls: "tech-sig-buy"  };
+  return { text: "Neutral", cls: "tech-sig-neutral" };
+}
+
+/* Render the TECH tab */
+async function avLoadTech(sym) {
+  const el = document.getElementById("fund-tech");
+  if (!el) return;
+  if (!getAvKey()) {
+    el.innerHTML = `<div class="no-data">// Alpha Vantage key required for technical indicators. Set it in ⚙ API Settings.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading indicators for ${sym}…</div>`;
+
+  // Fetch all in parallel — each costs 1 AV call (total: 5 calls)
+  const [rsiData, macdData, bbandsData, atrData, obvData, smaData] = await Promise.all([
+    avGetIndicator(sym, "RSI",    { interval: "daily", time_period: 14,  series_type: "close" }),
+    avGetIndicator(sym, "MACD",   { interval: "daily", series_type: "close", fastperiod: 12, slowperiod: 26, signalperiod: 9 }),
+    avGetIndicator(sym, "BBANDS", { interval: "daily", time_period: 20,  series_type: "close", nbdevup: 2, nbdevdn: 2 }),
+    avGetIndicator(sym, "ATR",    { interval: "daily", time_period: 14 }),
+    avGetIndicator(sym, "OBV",    { interval: "daily" }),
+    avGetIndicator(sym, "SMA",    { interval: "daily", time_period: 50,  series_type: "close" }),
+  ]);
+
+  // ── RSI
+  const rsiSeries  = techParse(rsiData,    "Technical Analysis: RSI",    "RSI",         30);
+  const rsiLast    = rsiSeries.length ? rsiSeries[rsiSeries.length - 1].value : null;
+  const rsiSig     = rsiLast !== null ? rsiSignal(rsiLast) : null;
+  const rsiVals    = rsiSeries.map(d => d.value);
+
+  // ── MACD
+  const macdSeries = techParse(macdData,   "Technical Analysis: MACD",   "MACD",        30);
+  const macdSig    = techParse(macdData,   "Technical Analysis: MACD",   "MACD_Signal", 30);
+  const macdHist   = techParse(macdData,   "Technical Analysis: MACD",   "MACD_Hist",   30);
+  const macdLast   = macdSeries.length ? macdSeries[macdSeries.length - 1].value : null;
+  const macdSigLast = macdSig.length  ? macdSig[macdSig.length - 1].value : null;
+  const macdHistLast = macdHist.length ? macdHist[macdHist.length - 1].value : null;
+
+  // ── Bollinger Bands
+  const bbUp   = techParse(bbandsData, "Technical Analysis: BBANDS", "Real Upper Band", 30);
+  const bbMid  = techParse(bbandsData, "Technical Analysis: BBANDS", "Real Middle Band", 30);
+  const bbLow  = techParse(bbandsData, "Technical Analysis: BBANDS", "Real Lower Band", 30);
+  const bbW    = bbUp.length ? ((bbUp[bbUp.length-1].value - bbLow[bbLow.length-1].value) / (bbMid[bbMid.length-1].value || 1) * 100).toFixed(2) : null;
+
+  // ── ATR
+  const atrSeries = techParse(atrData, "Technical Analysis: ATR", "ATR", 30);
+  const atrLast   = atrSeries.length ? atrSeries[atrSeries.length - 1].value : null;
+
+  // ── OBV
+  const obvSeries = techParse(obvData, "Technical Analysis: OBV", "OBV", 30);
+  const obvLast   = obvSeries.length ? obvSeries[obvSeries.length - 1].value : null;
+  const obvPrev   = obvSeries.length >= 2 ? obvSeries[obvSeries.length - 2].value : null;
+  const obvTrend  = (obvLast !== null && obvPrev !== null) ? (obvLast > obvPrev ? "↑ Accumulation" : "↓ Distribution") : "—";
+  const obvTrendCls = (obvLast !== null && obvPrev !== null) ? (obvLast > obvPrev ? "tech-sig-buy" : "tech-sig-sell") : "";
+
+  // ── SMA 50
+  const smaSeries = techParse(smaData, "Technical Analysis: SMA", "SMA", 5);
+  const smaLast   = smaSeries.length ? smaSeries[smaSeries.length - 1].value : null;
+
+  const fmt2 = v => v !== null ? parseFloat(v).toFixed(2) : "—";
+  const fmtM = v => v !== null ? (Math.abs(v) >= 1e9 ? (v/1e9).toFixed(2)+"B" : Math.abs(v) >= 1e6 ? (v/1e6).toFixed(1)+"M" : v.toFixed(0)) : "—";
+
+  el.innerHTML = `
+  <div class="av-live-badge">● Technical Indicators · ${sym} · Daily</div>
+
+  <div class="tech-grid">
+
+    <!-- RSI -->
+    <div class="tech-card">
+      <div class="tech-card-hd">RSI (14)</div>
+      <div class="tech-card-val ${rsiSig ? rsiSig.cls : ''}">${fmt2(rsiLast)}</div>
+      <div class="tech-card-sig">${rsiSig ? rsiSig.text : '—'}</div>
+      ${techSparkline(rsiVals, rsiLast >= 70 ? "#e55" : rsiLast <= 30 ? "#4a9" : "#4a9eff")}
+      <div class="tech-card-note">Overbought &gt;70 · Oversold &lt;30</div>
+    </div>
+
+    <!-- MACD -->
+    <div class="tech-card">
+      <div class="tech-card-hd">MACD (12,26,9)</div>
+      <div class="tech-card-val ${macdLast !== null ? (macdLast > macdSigLast ? 'tech-sig-buy' : 'tech-sig-sell') : ''}">${fmt2(macdLast)}</div>
+      <div class="tech-card-sig">${macdLast !== null ? (macdLast > macdSigLast ? "Bullish crossover" : "Bearish crossover") : "—"}</div>
+      ${techSparkline(macdHist.map(d => d.value), macdHistLast >= 0 ? "#4a9" : "#e55")}
+      <div class="tech-card-note">Signal: ${fmt2(macdSigLast)} · Hist: ${fmt2(macdHistLast)}</div>
+    </div>
+
+    <!-- Bollinger Bands -->
+    <div class="tech-card">
+      <div class="tech-card-hd">Bollinger Bands (20,2)</div>
+      <div class="tech-card-val">${bbW !== null ? bbW+"%" : "—"}</div>
+      <div class="tech-card-sig">Band width</div>
+      ${techSparkline(bbMid.map(d => d.value), "#8b6")}
+      <div class="tech-card-note">Upper: ${fmt2(bbUp.length ? bbUp[bbUp.length-1].value : null)} · Lower: ${fmt2(bbLow.length ? bbLow[bbLow.length-1].value : null)}</div>
+    </div>
+
+    <!-- ATR -->
+    <div class="tech-card">
+      <div class="tech-card-hd">ATR (14)</div>
+      <div class="tech-card-val">${fmt2(atrLast)}</div>
+      <div class="tech-card-sig">Avg True Range</div>
+      ${techSparkline(atrSeries.map(d => d.value), "#f90")}
+      <div class="tech-card-note">Volatility proxy · higher = wider swings</div>
+    </div>
+
+    <!-- OBV -->
+    <div class="tech-card">
+      <div class="tech-card-hd">OBV</div>
+      <div class="tech-card-val">${fmtM(obvLast)}</div>
+      <div class="tech-card-sig ${obvTrendCls}">${obvTrend}</div>
+      ${techSparkline(obvSeries.map(d => d.value), "#7c9")}
+      <div class="tech-card-note">On-Balance Volume</div>
+    </div>
+
+    <!-- SMA 50 -->
+    <div class="tech-card">
+      <div class="tech-card-hd">SMA (50)</div>
+      <div class="tech-card-val">${fmt2(smaLast)}</div>
+      <div class="tech-card-sig">50-day moving avg</div>
+      ${techSparkline(smaSeries.map(d => d.value), "#a8f")}
+      <div class="tech-card-note">Support/resistance reference</div>
+    </div>
+
+  </div>`;
+}
