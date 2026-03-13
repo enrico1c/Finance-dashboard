@@ -246,6 +246,11 @@ function switchTab(panelId, tabId){
   if(!p) return;
   p.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tabId));
   p.querySelectorAll(".tab-pane").forEach(x=>x.classList.toggle("active",x.dataset.tab===tabId));
+  // Alert Feed: show WM sub-filter bar only on the WM tab
+  if(panelId === "alert"){
+    const wmFilters = document.getElementById("alert-wm-filters");
+    if(wmFilters) wmFilters.classList.toggle("hidden", tabId !== "wm");
+  }
 }
 
 /* ── Shared renderers ─── */
@@ -346,22 +351,48 @@ function renderFundamentals(ticker){
 
   /* WACC */
   const wc=document.getElementById("fund-wacc");
-  if(wc && d){
-    const w=d.wacc;
+  if(wc){
+    // Try live data first: FMP ratios + Finnhub profile for beta
+    const fmpLive = (typeof fmpGetLive === "function") ? fmpGetLive(sym) : null;
+    const fhLive  = (typeof fhGetLive  === "function") ? fhGetLive(sym)  : null;
+    const yfLive  = (typeof window.yfValData !== "undefined") ? window.yfValData[sym] : null;
+
+    const liveBeta = fhLive?.profile?.beta ?? fmpLive?.ratios?.beta ?? yfLive?.beta ?? d?.wacc?.beta ?? 1.0;
+    const liveDebtEq = fmpLive?.ratios?.debtEq ?? null;
+
+    // WACC inputs (use static base, patch with live where available)
+    const w = d?.wacc || {};
+    const rf  = w.riskFreeRate ?? 4.5;
+    const erp = w.erp ?? 5.5;
+    const beta = parseFloat(liveBeta).toFixed(2);
+    const ke  = (rf + parseFloat(beta) * erp).toFixed(2);
+    const kd  = w.costOfDebt ?? 5.5;
+    const tax = w.taxRate ?? 21;
+    const debtWeight = liveDebtEq != null
+      ? Math.min(Math.round((liveDebtEq / (1 + liveDebtEq)) * 100), 80)
+      : (w.debtWeight ?? 30);
+    const eqWeight = 100 - debtWeight;
+    const wacc = ((eqWeight/100 * parseFloat(ke)) + (debtWeight/100 * kd * (1 - tax/100))).toFixed(2);
+    const termG = w.terminalGrowth ?? 2.5;
+
+    const liveNote = (fhLive?.profile?.beta || fmpLive?.ratios?.beta || yfLive?.beta)
+      ? `<div class="av-live-badge" style="margin-bottom:6px">● Beta from ${fhLive?.profile?.beta ? "Finnhub" : fmpLive?.ratios?.beta ? "FMP" : "Yahoo"} live data</div>`
+      : `<div class="av-note">// Static data — add FMP or Finnhub for live beta & leverage</div>`;
+
     wc.innerHTML=`
+      ${liveNote}
       ${sHead("WACC Calculation")}
-      ${mRow("Risk-Free Rate (Rf)",   w.riskFreeRate+"%")}
-      ${mRow("Equity Risk Premium",   w.erp+"%")}
-      ${mRow("Beta (Levered)",        w.beta)}
-      ${mRow("Cost of Equity (Ke)",   w.costOfEquity+"%")}
-      ${mRow("Pre-Tax Cost of Debt",  w.costOfDebt+"%")}
-      ${mRow("Tax Rate",              w.taxRate+"%")}
-      ${mRow("Equity Weight",         w.equityWeight+"%")}
-      ${mRow("Debt Weight",           w.debtWeight+"%")}
-      <div class="metric wacc-result"><span>→ WACC</span><span>${w.wacc}%</span></div>
+      ${mRow("Risk-Free Rate (Rf)",   rf+"%")}
+      ${mRow("Equity Risk Premium",   erp+"%")}
+      ${mRow("Beta (Levered)",        beta + (liveDebtEq ? ` · D/E ${parseFloat(liveDebtEq).toFixed(2)}` : ""))}
+      ${mRow("Cost of Equity (Ke)",   ke+"%")}
+      ${mRow("Pre-Tax Cost of Debt",  kd+"%")}
+      ${mRow("Tax Rate",              tax+"%")}
+      ${mRow("Equity Weight",         eqWeight+"%")}
+      ${mRow("Debt Weight",           debtWeight+"%")}
+      <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
       ${sHead("DCF Sensitivity")}
-      ${mRow("Terminal Growth Rate",  w.terminalGrowth+"%")}
-      ${mRow("Implied Intrinsic Value",w.impliedIV)}`;
+      ${mRow("Terminal Growth Rate",  termG+"%")}`;
   }
 }
 
@@ -849,13 +880,44 @@ function renderValuation(ticker) {
   const lbl = document.getElementById("valuationLabel");
   if (!box) return;
 
-  // Find in all sector DBs
+  const sym = ticker.replace(/.*:/,"").toUpperCase();
+
+  // 1. Try live FMP ratios (most accurate — from fmpLiveCache)
   let stock = null;
-  for (const key in sectorDB) {
-    stock = sectorDB[key].stocks.find(s => s.ticker === ticker || s.ticker.endsWith(":"+ticker));
-    if (stock) break;
+  const fmpLive = (typeof fmpGetLive === "function") ? fmpGetLive(sym) : null;
+  if (fmpLive?.ratios) {
+    const r = fmpLive.ratios;
+    const q = (typeof fhGetLive === "function" ? fhGetLive(sym) : null)?.quote || null;
+    const avQ = (typeof avLiveCache !== "undefined") ? avLiveCache[sym]?.quote : null;
+    const price = q?.price || avQ?.price || null;
+    stock = {
+      ticker: sym,
+      name: fmpLive.mgmt?.[0] ? ticker : sym,
+      price,
+      pe:       r.pe,
+      pb:       r.pb,
+      evEbitda: r.evEbitda,
+      fcfYield: r.fcfYield,
+      peg:      r.peg,
+      divYield: r.divYield,
+      epsGrowth: fmpLive.estimates?.[0]?.epsGrowth ?? 15,
+    };
   }
-  // Fallback to main DB
+
+  // 2. Try Yahoo live data (yfValData set by yfEnrichValuation)
+  if (!stock && typeof window.yfValData !== "undefined" && window.yfValData[sym]) {
+    stock = window.yfValData[sym];
+  }
+
+  // 3. Try sectorDB
+  if (!stock) {
+    for (const key in sectorDB) {
+      stock = sectorDB[key].stocks.find(s => s.ticker === ticker || s.ticker.endsWith(":"+ticker));
+      if (stock) break;
+    }
+  }
+
+  // 4. Fallback to static getTickerData
   if (!stock) {
     const d = getTickerData(ticker);
     if (d) {
@@ -865,8 +927,15 @@ function renderValuation(ticker) {
     }
   }
 
+  // 5. If Yahoo key active and no data yet, trigger async enrichment
+  if (!stock && typeof yfEnrichValuation === "function") {
+    yfEnrichValuation(sym);
+    box.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading live valuation data for ${escapeHtml(sym)}…</div>`;
+    return;
+  }
+
   if (!stock) {
-    box.innerHTML = `<div class="no-data">// No valuation data for <strong>${escapeHtml(ticker)}</strong>.</div>`;
+    box.innerHTML = `<div class="no-data">// No valuation data for <strong>${escapeHtml(ticker)}</strong>.<br>// Add FMP or Yahoo Finance key for live data.</div>`;
     return;
   }
 
@@ -1195,6 +1264,12 @@ function loadForexChart(pair,interval){
     const parts = pair.replace(/[^A-Z/]/g,"").split("/");
     if(parts.length===2) frankfurterHistory(parts[0], parts[1], 90);
   }
+  // Open Exchange Rates — update rate strip and history on pair change
+  if(typeof oerLoadRates   === "function") oerLoadRates();
+  if(typeof oerLoadHistory === "function") {
+    const oerParts = pair.replace(/[^A-Z/]/g,"").split("/");
+    if(oerParts.length===2) oerLoadHistory(oerParts[0], oerParts[1], 30);
+  }
 }
 function formatInterval(iv){return{"1":"1m","5":"5m","15":"15m","60":"1H","240":"4H","D":"1D","W":"1W"}[iv]??iv;}
 function changeForexPair(){const v=document.getElementById("forexPairInput")?.value.trim().toUpperCase();if(v)loadForexChart(v,currentForexInterval);}
@@ -1215,15 +1290,36 @@ function changeTicker(){
   // Fire all data providers — avLoadAll orchestrates AV + FMP + EODHD + APITube + Massive
   if(typeof avLoadAll       === "function") avLoadAll(sym);
   if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
-  // Reset lazy-loaded tabs so they reload on next visit
-  const divEl = document.getElementById("fund-div");
-  const filEl = document.getElementById("fund-filings");
-  if(divEl) { divEl.innerHTML = ""; divEl.dataset.loaded = ""; }
-  if(filEl) { filEl.innerHTML = ""; filEl.dataset.loaded = ""; }
-  // If DIV or FILINGS tab is currently active, load immediately
+  // Reset ALL lazy-loaded Fundamentals tabs so they reload on next visit
+  ["fund-div","fund-filings","fund-tech","fund-short","fund-seg","fund-trans","fund-form4",
+   "yf-financials","yf-options","yf-holders","yf-history"].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) { el.innerHTML = ""; el.dataset.loaded = ""; }
+  });
+  // If a lazy tab is currently active, load it immediately for the new ticker
   const activeFundTab = document.querySelector("#panel-fundamentals .tab-btn.active");
-  if(activeFundTab?.dataset.tab === "div"     && typeof fmpLoadDividends  === "function") fmpLoadDividends(sym);
-  if(activeFundTab?.dataset.tab === "filings" && typeof fmpLoadSecFilings === "function") fmpLoadSecFilings(sym);
+  const at = activeFundTab?.dataset.tab;
+  if(at === "div"     && typeof fmpLoadDividends      === "function") fmpLoadDividends(sym);
+  if(at === "filings" && typeof fmpLoadSecFilings     === "function") fmpLoadSecFilings(sym);
+  if(at === "tech"    && typeof avLoadTech            === "function") avLoadTech(sym);
+  if(at === "short"   && typeof fhLoadShortInterest   === "function") fhLoadShortInterest(sym);
+  if(at === "seg"     && typeof fmpLoadSegmentation   === "function") fmpLoadSegmentation(sym);
+  if(at === "trans"   && typeof fmpLoadTranscript     === "function") fmpLoadTranscript(sym);
+  if(at === "form4"   && typeof fmpLoadForm4          === "function") fmpLoadForm4(sym);
+  if(at === "yf-fin"  && typeof yfLoadFinancials      === "function") yfLoadFinancials(sym);
+  if(at === "yf-opt"  && typeof yfLoadOptions         === "function") yfLoadOptions(sym);
+  if(at === "yf-hld"  && typeof yfLoadHolders         === "function") yfLoadHolders(sym);
+  if(at === "yf-hist" && typeof yfLoadHistory         === "function") yfLoadHistory(sym);
+  // Always refresh Yahoo quote on ticker change if key is set
+  if(typeof yfLoadAll === "function") yfLoadAll(sym);
+  // Enrich watchlist rows with Yahoo live prices
+  if(typeof yfEnrichWatchlist === "function") setTimeout(() => yfEnrichWatchlist(), 1500);
+  // Reset comparables comp tab
+  const compComp = document.getElementById("comp-comp");
+  if(compComp) { compComp.innerHTML = ""; compComp.dataset.loaded = ""; }
+  const activeCompTab = document.querySelector("#panel-comparables .tab-btn.active");
+  if(activeCompTab?.dataset.tab === "comp" && typeof yfLoadComparison === "function") yfLoadComparison(sym);
+  if(activeCompTab?.dataset.tab === "rv"   && typeof yfLoadPeers      === "function") yfLoadPeers(sym);
 }
 
 async function searchTopicNews(){
