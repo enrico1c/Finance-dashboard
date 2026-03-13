@@ -125,7 +125,33 @@ body::before {
 
 .topbar-row-2 {
   border-top: 1px solid var(--border);
+  min-height: 32px;
+  height: auto;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 4px 8px;
+  align-items: center;
+  transition: all .2s;
+}
+
+/* Compact (default): single scrollable row, no wrap */
+.topbar-row-2.compact {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
   height: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+}
+.topbar-row-2.compact::-webkit-scrollbar { display: none; }
+
+/* Expanded: allow wrap onto multiple lines */
+.topbar-row-2.expanded {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 8px;
 }
 
 /* collapse leftovers */
@@ -2974,4 +3000,126 @@ textarea::placeholder { color:var(--text-muted); }
 }
 .modules-tray-item:has(input:checked) .mti-label {
   color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODULE ROW EXPAND/COLLAPSE BUTTON
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Dedicated expand button for the modules row */
+.modules-row-toggle {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 3px 8px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px; font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: .04em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+  position: sticky;
+  right: 0;
+}
+.modules-row-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow, rgba(0,212,160,.07));
+}
+.modules-row-toggle.expanded {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,212,160,.08);
+}
+.modules-row-toggle .mrt-icon {
+  font-size: 12px;
+  transition: transform .2s;
+}
+.modules-row-toggle.expanded .mrt-icon {
+  transform: rotate(45deg);
+}
+
+/* When expanded, checklist wraps cleanly */
+.topbar-row-2.expanded .checklist {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+/* Keep checklist horizontally scrollable when compact */
+.topbar-row-2.compact .checklist {
+  flex-wrap: nowrap;
+  overflow: visible;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Smooth height transition on the row */
+#topbarRow2 {
+  transition: height .22s cubic-bezier(.4,0,.2,1),
+              padding .22s ease,
+              background .15s ease;
+}
+
+/* Subtle highlight when expanded */
+#topbarRow2.expanded {
+  background: rgba(0,212,160,.025);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODULES SIDE TAB — floating expand/collapse button
+   ══════════════════════════════════════════════════════════════════ */
+
+/* The topbar is relative so the tab can anchor to it */
+.topbar { position: relative; }
+
+/* The floating tab — sticks to the right edge just below the modules bar */
+.modules-side-tab {
+  position: absolute;
+  right: 0;
+  /* Sits just below topbar-row-1 (≈40px), vertically centred on row-2 (32px) */
+  top: calc(40px + 6px);   /* row1 height + half (32-20)/2 */
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  transition: background .15s, border-color .15s, color .15s, top .2s;
+}
+
+.modules-side-tab:hover {
+  background: var(--accent-glow, rgba(0,212,160,.1));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* When expanded: row-2 is taller so the tab moves down */
+.modules-side-tab.expanded {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,212,160,.08);
+}
+
+.mst-arrow {
+  display: block;
+  line-height: 1;
+  transition: transform .2s;
+}
+
+/* Ensure topbar-row-2 doesn't overlap the side tab */
+.topbar-row-2 {
+  padding-right: 24px !important;
 }
