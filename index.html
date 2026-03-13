@@ -53,7 +53,8 @@
     </div>
     <div class="topbar-row topbar-row-2" id="topbarRow2">
       <span class="checklist-title">Modules</span>
-      <div class="checklist">
+      <!-- Compact pill row -->
+      <div class="checklist" id="checklistCompact">
         <label><input type="checkbox" class="panel-toggle" data-panel="chart"        checked> Chart</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="forex"              > Forex</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked> Fundamentals</label>
@@ -70,6 +71,46 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="alert"        checked> Alert·Feed</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="intel"        checked> Intel·Feed</label>
+      </div>
+      <!-- ⊞ Expand button -->
+      <button class="modules-expand-btn" id="modulesExpandBtn"
+              onclick="toggleModulesTray()" title="Expand module selector">⊞</button>
+    </div>
+
+    <!-- ── Expanded module tray ──────────────────────────────────── -->
+    <div class="modules-tray" id="modulesTray">
+      <div class="modules-tray-inner">
+        <div class="modules-tray-header">
+          <span>Modules — click to show/hide panels</span>
+          <div class="modules-tray-actions">
+            <button onclick="modulesSelectAll(true)"  class="modules-tray-btn">All on</button>
+            <button onclick="modulesSelectAll(false)" class="modules-tray-btn">All off</button>
+            <button onclick="toggleModulesTray()" class="modules-tray-btn modules-tray-close">✕ Close</button>
+          </div>
+        </div>
+        <div class="modules-tray-grid">
+          <div class="modules-tray-section">Market</div>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="chart"        checked><span class="mti-icon">📈</span><span class="mti-label">Chart</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="quote"        checked><span class="mti-icon">💹</span><span class="mti-label">Quote</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="forex"              ><span class="mti-icon">💱</span><span class="mti-label">Forex</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked><span class="mti-icon">👁</span><span class="mti-label">Watchlist</span></label>
+          <div class="modules-tray-section">Analysis</div>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked><span class="mti-icon">📊</span><span class="mti-label">Fundamentals</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="analysts"     checked><span class="mti-icon">🔬</span><span class="mti-label">Analysts</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="valuation"    checked><span class="mti-icon">🧮</span><span class="mti-label">Valuation</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked><span class="mti-icon">⚖️</span><span class="mti-label">Comparables</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked><span class="mti-icon">🏛</span><span class="mti-label">Ownership</span></label>
+          <div class="modules-tray-section">News &amp; Notes</div>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="news"         checked><span class="mti-icon">📰</span><span class="mti-label">News</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="notes"        checked><span class="mti-icon">📝</span><span class="mti-label">Notes</span></label>
+          <div class="modules-tray-section">Intelligence</div>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked><span class="mti-icon">🌍</span><span class="mti-label">Geo·Risk</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="intel"        checked><span class="mti-icon">🧠</span><span class="mti-label">Intel·Feed</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="macro"        checked><span class="mti-icon">📡</span><span class="mti-label">Macro·Intel</span></label>
+          <div class="modules-tray-section">Supply &amp; Alerts</div>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="supply"       checked><span class="mti-icon">⛓</span><span class="mti-label">Supply·Chain</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="alert"        checked><span class="mti-icon">⚡</span><span class="mti-label">Alert·Feed</span></label>
+        </div>
       </div>
     </div>
   </header>
