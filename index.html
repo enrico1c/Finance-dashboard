@@ -145,6 +145,8 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="intel"        checked> Intel·Feed</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="webhooks"             > Webhooks</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="portfolio"            > Portfolio</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="screener"             > Screener</label>
       </div>
       <!-- ⊞ Full tray button -->
       <button class="modules-expand-btn" id="modulesExpandBtn"
@@ -187,6 +189,8 @@
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="supply"       checked><span class="mti-icon">⛓</span><span class="mti-label">Supply·Chain</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="alert"        checked><span class="mti-icon">⚡</span><span class="mti-label">Alert·Feed</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="webhooks"            ><span class="mti-icon">🔔</span><span class="mti-label">Webhooks</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="portfolio"           ><span class="mti-icon">💼</span><span class="mti-label">Portfolio</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="screener"            ><span class="mti-icon">🔍</span><span class="mti-label">Screener</span></label>
         </div>
       </div>
     </div>
@@ -756,6 +760,7 @@
         <button class="tab-btn"        data-tab="sectors" onclick="switchTab('macro','sectors');if(typeof wmMacroSectors==='function')wmMacroSectors()">SECTORS</button>
         <button class="tab-btn"        data-tab="ipo"     onclick="switchTab('macro','ipo');if(typeof fmpLoadIpoCalendar==='function')fmpLoadIpoCalendar()">IPO</button>
         <button class="tab-btn"        data-tab="trending" onclick="switchTab('macro','trending');if(typeof yfLoadTrending==='function')yfLoadTrending()">TRENDING</button>
+        <button class="tab-btn"        data-tab="bonds"    onclick="switchTab('macro','bonds');if(typeof bondsLoadSpreads==='function')bondsLoadSpreads()">BONDS</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="signals" id="macro-signals"></div>
       <div class="tab-pane        panel-content" data-tab="comm"    id="macro-comm"></div>
@@ -767,6 +772,7 @@
       <div class="tab-pane        panel-content" data-tab="flows"   id="macro-flows"></div>
       <div class="tab-pane        panel-content" data-tab="sectors" id="macro-sectors"></div>
       <div class="tab-pane        panel-content" data-tab="ipo"     id="macro-ipo"></div>
+      <div class="tab-pane        panel-content" data-tab="bonds"    id="bonds-content"></div>
       <div class="tab-pane        panel-content" data-tab="trending" id="macro-trending">
         <div id="yf-trending" class="panel-content"></div>
       </div>
@@ -777,7 +783,133 @@
       <div class="size-tooltip" id="tooltip-macro"></div>
     </section>
 
-    </div><!-- /dashboardCanvas -->
+  
+    <!-- ▸ PORTFOLIO P&L TRACKER ────────────────────────────────── -->
+    <section class="panel hidden" id="panel-portfolio" data-panel="portfolio">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Portfolio P&amp;L</h3>
+          <div class="mode-label" id="portLabel">Live P&amp;L tracker</div>
+        </div>
+        <div class="panel-actions">
+          <button class="icon-btn" onclick="portRender()" title="Refresh prices">↺</button>
+          <button class="icon-btn close" onclick="hidePanel('portfolio')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="portfolio" onclick="switchTab('portfolio','portfolio');portRender()">POSITIONS</button>
+        <button class="tab-btn"        data-tab="port-add"  onclick="switchTab('portfolio','port-add')">+ ADD</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="portfolio" id="portfolio-content">
+        <div class="port-empty"><div class="port-empty-icon">💼</div><div>Loading…</div></div>
+      </div>
+      <div class="tab-pane        panel-content" data-tab="port-add">
+        <div class="wh-form">
+          <div class="wh-field-row"><label class="wh-label">Ticker</label><input id="port-ticker" class="wh-input" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()"/></div>
+          <div class="wh-field-row"><label class="wh-label">Shares</label><input id="port-shares" class="wh-input" type="number" placeholder="100" step="0.01"/></div>
+          <div class="wh-field-row"><label class="wh-label">Avg Cost ($)</label><input id="port-cost" class="wh-input" type="number" placeholder="150.00" step="0.01"/></div>
+          <div class="wh-field-row"><label class="wh-label">Note (optional)</label><input id="port-note" class="wh-input" placeholder="Long-term hold…"/></div>
+          <div class="wh-btn-row">
+            <button class="wh-btn-primary" onclick="portAddPosition()">➕ Add Position</button>
+            <label class="wh-btn-secondary" style="display:flex;align-items:center;justify-content:center;cursor:pointer">
+              📂 Import CSV
+              <input type="file" accept=".csv" style="display:none" onchange="portImportCSV(this.files[0])"/>
+            </label>
+          </div>
+          <div id="port-form-status" class="wh-status"></div>
+          <div class="wh-field-row" style="margin-top:10px;color:var(--text-muted);font-size:9px">
+            CSV format: ticker,shares,avgcost,note (one per line, no header required)
+          </div>
+        </div>
+      </div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-portfolio"></div>
+    </section>
+
+    <!-- ▸ STOCK SCREENER ────────────────────────────────────────── -->
+    <section class="panel hidden" id="panel-screener" data-panel="screener">
+      <div class="panel-head">
+        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="panel-title-row">
+          <h3>▸ Stock Screener</h3>
+          <span id="screener-status" class="av-live-badge" style="font-size:9px"></span>
+        </div>
+        <div class="panel-actions">
+          <button class="icon-btn close" onclick="hidePanel('screener')">✕</button>
+        </div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="scr-results" onclick="switchTab('screener','scr-results')">RESULTS</button>
+        <button class="tab-btn"        data-tab="scr-filters" onclick="switchTab('screener','scr-filters')">FILTERS</button>
+      </div>
+      <div class="tab-pane active panel-content" data-tab="scr-results" id="screener-results">
+        <div class="no-data">// Set filters and click Run Screen.</div>
+      </div>
+      <div class="tab-pane        panel-content" data-tab="scr-filters">
+        <div class="scr-filters-grid">
+          <div class="scr-filter-row"><label>Sector</label>
+            <select id="scr-sector" class="wh-select">
+              <option value="">Any</option>
+              <option>Technology</option><option>Healthcare</option><option>Financials</option>
+              <option>Consumer Cyclical</option><option>Communication Services</option>
+              <option>Industrials</option><option>Consumer Defensive</option>
+              <option>Energy</option><option>Basic Materials</option><option>Real Estate</option><option>Utilities</option>
+            </select>
+          </div>
+          <div class="scr-filter-row"><label>Exchange</label>
+            <select id="scr-exchange" class="wh-select">
+              <option value="">Any</option>
+              <option>NYSE</option><option>NASDAQ</option><option>AMEX</option>
+              <option>TSX</option><option>LSE</option>
+            </select>
+          </div>
+          <div class="scr-filter-row"><label>Country</label>
+            <input id="scr-country" class="wh-input" placeholder="US, GB, DE…"/>
+          </div>
+          <div class="scr-filter-row"><label>Mkt Cap Min ($)</label>
+            <input id="scr-mktcap-min" class="wh-input" type="number" placeholder="e.g. 1000000000"/>
+          </div>
+          <div class="scr-filter-row"><label>Mkt Cap Max ($)</label>
+            <input id="scr-mktcap-max" class="wh-input" type="number" placeholder="e.g. 500000000000"/>
+          </div>
+          <div class="scr-filter-row"><label>Price Min ($)</label>
+            <input id="scr-price-min" class="wh-input" type="number" placeholder="1"/>
+          </div>
+          <div class="scr-filter-row"><label>Price Max ($)</label>
+            <input id="scr-price-max" class="wh-input" type="number" placeholder="500"/>
+          </div>
+          <div class="scr-filter-row"><label>Beta Min</label>
+            <input id="scr-beta-min" class="wh-input" type="number" placeholder="0.5" step="0.1"/>
+          </div>
+          <div class="scr-filter-row"><label>Beta Max</label>
+            <input id="scr-beta-max" class="wh-input" type="number" placeholder="2" step="0.1"/>
+          </div>
+          <div class="scr-filter-row"><label>Volume Min</label>
+            <input id="scr-vol-min" class="wh-input" type="number" placeholder="100000"/>
+          </div>
+          <div class="scr-filter-row"><label>Dividend Min (%)</label>
+            <input id="scr-div-min" class="wh-input" type="number" placeholder="2" step="0.1"/>
+          </div>
+          <div class="scr-filter-row"><label>Industry</label>
+            <input id="scr-industry" class="wh-input" placeholder="Semiconductors…"/>
+          </div>
+        </div>
+        <div style="padding:10px 12px 4px">
+          <button class="wh-btn-primary" style="width:100%" onclick="screenerRun();switchTab('screener','scr-results')">🔍 Run Screen</button>
+        </div>
+      </div>
+      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
+      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
+      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
+      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
+      <div class="size-tooltip" id="tooltip-screener"></div>
+    </section>
+
+  </div><!-- /dashboardCanvas -->
 
   <!-- Toast notification (used by api.js) -->
   <div id="apiToast" class="api-toast"></div>
@@ -802,6 +934,7 @@
 <script src="technical.js"></script>
 <script src="yahoo.js"></script>
 <script src="sbcache.js"></script>
+<script src="finterm-extras.js"></script>
 <script>
 /* Intel Feed — OREF / TELEGRAM sub-panel switcher */
 function wmIntelShowOref() {
