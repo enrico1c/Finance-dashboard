@@ -263,145 +263,240 @@ function noData(t){ return `<div class="no-data">// No local data for <strong>${
 /* ══════════════════════════════════════════════════════════════════
    RENDER: FUNDAMENTALS  (DES / FA / ERN / EE / WACC)
    ══════════════════════════════════════════════════════════════════ */
-function renderFundamentals(ticker){
-  const d=getTickerData(ticker);
-  const sym = ticker.replace(/.*:/,"").toUpperCase();
-  const tvSym = resolveSymbol(ticker); // TradingView format e.g. "NASDAQ:AAPL"
+function renderFundamentals(ticker) {
+  const sym    = ticker.replace(/.*:/, '').toUpperCase();
+  const tvSym  = resolveSymbol(ticker);
 
-  /* DES — inject TradingView Financials widget */
-  const des=document.getElementById("fund-des");
-  if(des){
+  /* ── DES — TradingView Fundamentals widget + live description ─── */
+  const des = document.getElementById('fund-des');
+  if (des) {
     des.innerHTML = `
-      <div class="tv-fundamental-wrap" id="tv-fund-${sym}"></div>
-      <div class="tv-fundamental-fallback" id="tv-fund-fallback-${sym}">
-        ${d ? `
-          ${mRow("Company",   d.name)}
-          ${mRow("Sector",    d.sector)}
-          ${mRow("Industry",  d.industry)}
-          ${mRow("Exchange",  d.exchange)}
-          ${mRow("Mkt Cap",   fmtB(d.mktCap))}
-          ${mRow("P/E",       d.pe)}
-          ${mRow("Beta",      d.beta)}
-          <div class="desc-block">${escapeHtml(d.description)}</div>
-        ` : noData(ticker)}
+      <div class="tv-fundamental-wrap" id="tv-fund-${escapeHtml(sym)}"></div>
+      <div class="tv-fundamental-fallback" id="tv-fund-fallback-${escapeHtml(sym)}">
+        <div class="av-loading"><span class="av-spinner"></span>Loading company profile…</div>
       </div>`;
-    // Inject TradingView Fundamental Data widget (script-based embed)
+    // Inject TradingView Financials widget
     try {
       const container = document.getElementById(`tv-fund-${sym}`);
-      if(container) {
-        container.innerHTML = "";
-        const script = document.createElement("script");
-        script.type  = "text/javascript";
-        script.src   = "https://s3.tradingview.com/external-embedding/embed-widget-financials.js";
-        script.async = true;
-        script.innerHTML = JSON.stringify({
-          "symbol":     tvSym,
-          "colorTheme": "dark",
-          "isTransparent": true,
-          "largeChartUrl": "",
-          "displayMode": "regular",
-          "width":  "100%",
-          "height": 490,
-          "locale": "en"
+      if (container) {
+        const s = document.createElement('script');
+        s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-financials.js';
+        s.async = true;
+        s.innerHTML = JSON.stringify({
+          symbol: tvSym, colorTheme: 'dark', isTransparent: true,
+          largeChartUrl: '', displayMode: 'regular', width: '100%', height: 550, locale: 'en'
         });
-        container.appendChild(script);
-        // Hide fallback once widget renders
+        container.appendChild(s);
         setTimeout(() => {
           const fb = document.getElementById(`tv-fund-fallback-${sym}`);
-          if(fb && container.querySelector("iframe")) fb.style.display = "none";
+          if (fb && container.querySelector('iframe')) fb.style.display = 'none';
         }, 3000);
       }
-    } catch(e) { /* fallback stays visible */ }
+    } catch (e) { /* fallback stays visible */ }
+
+    // Also populate description from FMP / Finnhub profile
+    const _fillDesc = () => {
+      const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+      const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+      const profile = fhLive?.profile || fmpLive?.profile || null;
+      const fb = document.getElementById(`tv-fund-fallback-${sym}`);
+      if (!fb || !profile) return;
+      const p = profile;
+      fb.innerHTML = `
+        <div class="av-live-badge">● Company Profile · ${escapeHtml(p.name || sym)}</div>
+        ${mRow('Exchange',  escapeHtml(p.exchange  || p.exchangeShortName || '—'))}
+        ${mRow('Sector',    escapeHtml(p.sector    || p.finnhubIndustry   || '—'))}
+        ${mRow('Industry',  escapeHtml(p.industry  || p.subIndustry       || '—'))}
+        ${mRow('Country',   escapeHtml(p.country   || '—'))}
+        ${mRow('Currency',  escapeHtml(p.currency  || 'USD'))}
+        ${mRow('Employees', (p.employees || p.fullTimeEmployees) ? Number(p.employees || p.fullTimeEmployees).toLocaleString() : '—')}
+        ${mRow('Website',   p.weburl || p.website ? `<a href="${escapeHtml(p.weburl||p.website)}" target="_blank" class="geo-wm-link">${escapeHtml(p.weburl||p.website)}</a>` : '—')}
+        ${p.description || p.longBusinessSummary ? `<div class="des-desc">${escapeHtml((p.description||p.longBusinessSummary).slice(0,600))}${(p.description||p.longBusinessSummary).length>600?'…':''}</div>` : ''}`;
+    };
+    setTimeout(_fillDesc, 800); // Wait for FH/FMP to load
   }
 
-  /* FA */
-  const fa=document.getElementById("fund-fa");
-  if(fa && d){
-    const incR=d.income.map(r=>`<tr><td>${r.year}</td><td>${fmtB(r.revenue*1e6)}</td><td>${fmtB(r.grossProfit*1e6)}</td><td>${fmtB(r.ebit*1e6)}</td><td>${fmtB(r.netIncome*1e6)}</td><td>$${fmt(r.eps)}</td></tr>`).join("");
-    const balR=d.balance.map(r=>`<tr><td>${r.year}</td><td>${fmtB(r.totalAssets*1e6)}</td><td>${fmtB(r.totalLiab*1e6)}</td><td>${fmtB(r.equity*1e6)}</td><td>${fmtB(r.cash*1e6)}</td><td>${fmtB(r.debt*1e6)}</td></tr>`).join("");
-    const cfR=d.cashflow.map(r=>`<tr><td>${r.year}</td><td>${fmtB(r.operatingCF*1e6)}</td><td>${fmtB(r.capex*1e6)}</td><td>${fmtB(r.freeCF*1e6)}</td><td>${fmtB(r.dividends*1e6)}</td></tr>`).join("");
-    fa.innerHTML=`
-      ${sHead("Income Statement (USD)")}
-      <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Year</th><th>Revenue</th><th>Gross Profit</th><th>EBIT</th><th>Net Income</th><th>EPS</th></tr></thead><tbody>${incR}</tbody></table></div>
-      ${sHead("Balance Sheet (USD)")}
-      <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Year</th><th>Total Assets</th><th>Total Liab.</th><th>Equity</th><th>Cash</th><th>Debt</th></tr></thead><tbody>${balR}</tbody></table></div>
-      ${sHead("Cash Flow (USD)")}
-      <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Year</th><th>Operating CF</th><th>CapEx</th><th>Free CF</th><th>Dividends</th></tr></thead><tbody>${cfR}</tbody></table></div>`;
-    // Append EDGAR XBRL ratios as enrichment if FMP ratios are available
-    if(typeof faEnrichWithXBRL === "function") faEnrichWithXBRL(ticker, fa);
-  } else if(fa) {
-    // No AV data — try SEC EDGAR XBRL directly (no key)
-    fa.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading financials from SEC EDGAR…</div>`;
-    if(typeof faLoadEdgarXBRL === "function") faLoadEdgarXBRL(ticker, fa);
-    else fa.innerHTML = `<div class="no-data">// Add AV or FMP key for financial statements. <br>// <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Add Alpha Vantage key ↗</a></div>`;
+  /* ── FA — Financial Statements ──────────────────────────────────
+     Priority:
+       1. AV  avRenderFA()     (fires from avLoadAll automatically)
+       2. FMP fmpLoadAll()     (fires from avLoadAll when FMP key set)
+       3. SEC EDGAR XBRL      (fallback when no key, after 3.5s)       */
+  const fa = document.getElementById('fund-fa');
+  if (fa) {
+    // Check if AV already populated it (avLoadAll fires async in parallel)
+    const avData = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
+    if (avData?.income?.length) {
+      // AV data available — render immediately
+      if (typeof avRenderFA === 'function') avRenderFA(sym, avData.income, avData.balance, avData.cashflow);
+    } else {
+      // Show loading, start 3.5s EDGAR fallback
+      if (!fa.dataset.loaded) {
+        fa.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading financials for ${escapeHtml(sym)}…</div>`;
+      }
+      setTimeout(() => {
+        const faEl = document.getElementById('fund-fa');
+        if (faEl && faEl.querySelector('.av-loading')) {
+          // AV/FMP hasn't populated it — fall through to EDGAR XBRL
+          if (typeof faLoadEdgarXBRL === 'function') faLoadEdgarXBRL(sym, faEl);
+        }
+      }, 3500);
+    }
   }
 
-  /* ERN */
-  const ern=document.getElementById("fund-ern");
-  if(ern && d){
-    const rows=d.earnings.map(r=>`<tr>
-      <td>${r.quarter}</td><td>${r.reportDate}</td>
-      <td>$${fmt(r.epsEst)}</td><td>$${fmt(r.epsActual)}</td>
-      <td class="${r.surprise.startsWith("+")?'pos':'neg'}">${r.surprise}</td>
-      <td>$${fmt(r.revEst)}B</td><td>$${fmt(r.revActual)}B</td>
-      <td class="${r.surpriseRev.startsWith("+")?'pos':'neg'}">${r.surpriseRev}</td>
-    </tr>`).join("");
-    ern.innerHTML=`${sHead("Earnings & Revenue Surprises")}<div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Quarter</th><th>Date</th><th>EPS Est.</th><th>EPS Act.</th><th>Surpr.</th><th>Rev Est.</th><th>Rev Act.</th><th>Surpr.</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  /* ── ERN — Earnings Surprises ───────────────────────────────────
+     Sources:
+       1. avLiveCache[sym].earnings  (populated by avLoadAll/avRenderEarnings)
+       2. FMP /earnings-surprises    (fallback after 3s)
+       3. "Add key" prompt           (no keys configured)              */
+  const ern = document.getElementById('fund-ern');
+  if (ern) {
+    const _avCache = (typeof avLiveCache !== 'undefined') ? avLiveCache : {};
+    if (_avCache[sym]?.earnings?.quarterly?.length) {
+      // AV data already loaded — render immediately
+      if (typeof avRenderEarnings === 'function') avRenderEarnings(sym, _avCache[sym].earnings);
+    } else if (!ern.dataset.loaded) {
+      ern.dataset.loaded = '1';
+      ern.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading earnings history for ${escapeHtml(sym)}…</div>`;
+      // FMP fallback after 3s if AV hasn't fired
+      setTimeout(() => {
+        const ernEl = document.getElementById('fund-ern');
+        if (!ernEl || !ernEl.querySelector('.av-loading')) return; // already populated
+        const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+        if (fmpKey) {
+          fetch(`https://financialmodelingprep.com/api/v3/earnings-surprises/${sym}?apikey=${fmpKey}`,
+            {signal:AbortSignal.timeout(8000)})
+            .then(r=>r.json()).then(data => {
+              if (!Array.isArray(data) || !data.length) throw new Error('empty');
+              const rows = data.slice(0,12).map(q => {
+                const surp    = q.actualEarningResult - q.estimatedEarning;
+                const surpPct = q.estimatedEarning
+                  ? (surp/Math.abs(q.estimatedEarning)*100).toFixed(1)+'%' : '—';
+                const cls = surp >= 0 ? 'pos' : 'neg';
+                return `<tr>
+                  <td>${escapeHtml(q.date||'')}</td>
+                  <td>$${fmt(q.estimatedEarning)}</td>
+                  <td>$${fmt(q.actualEarningResult)}</td>
+                  <td class="${cls}">${surp>=0?'+':''}${surpPct}</td>
+                </tr>`;
+              }).join('');
+              ernEl.innerHTML = `<div class="av-live-badge">● Earnings Surprises · FMP · ${escapeHtml(sym)}</div>
+                ${sHead('EPS Actual vs Estimate')}
+                <div class="fin-table-wrap"><table class="fin-table">
+                  <thead><tr><th>Date</th><th>EPS Est</th><th>EPS Act</th><th>Surprise</th></tr></thead>
+                  <tbody>${rows}</tbody>
+                </table></div>`;
+            }).catch(() => {
+              ernEl.innerHTML = `<div class="no-data">// No earnings data available. Add
+                <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> or
+                <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> key.</div>`;
+            });
+        } else {
+          ernEl.innerHTML = `<div class="no-data">// Add
+            <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> or
+            <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a>
+            key to see earnings history for ${escapeHtml(sym)}.</div>`;
+        }
+      }, 3000);
+    }
   }
 
-  /* EE */
-  const ee=document.getElementById("fund-ee");
-  if(ee && d){
-    const rows=d.estimates.map(r=>`<tr><td>${r.period}</td><td>$${fmt(r.epsLow)}</td><td class="accent"><strong>$${fmt(r.epsMean)}</strong></td><td>$${fmt(r.epsHigh)}</td><td>$${fmt(r.revMean)}B</td><td>${r.analysts}</td></tr>`).join("");
-    ee.innerHTML=`${sHead("Analyst EPS & Revenue Estimates")}<div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Period</th><th>EPS Low</th><th>EPS Mean</th><th>EPS High</th><th>Rev Mean</th><th>Analysts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  /* ── EE — Analyst Estimates ─────────────────────────────────────
+     Sources:
+       1. avLiveCache[sym].earnings.annual  (from avRenderEarnings)
+       2. FMP /analyst-estimates            (forward consensus, fallback)
+       3. "Add key" prompt                                             */
+  const ee = document.getElementById('fund-ee');
+  if (ee) {
+    const _avCache = (typeof avLiveCache !== 'undefined') ? avLiveCache : {};
+    if (_avCache[sym]?.earnings?.annual?.length) {
+      // Reuse the AV earnings data already rendered into the EE tab
+      if (typeof avRenderEarnings === 'function') avRenderEarnings(sym, _avCache[sym].earnings);
+    } else if (!ee.dataset.loaded) {
+      ee.dataset.loaded = '1';
+      ee.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading analyst estimates for ${escapeHtml(sym)}…</div>`;
+      setTimeout(() => {
+        const eeEl = document.getElementById('fund-ee');
+        if (!eeEl || !eeEl.querySelector('.av-loading')) return;
+        const fmpKey = (typeof getFmpKey==='function') ? getFmpKey() : '';
+        if (fmpKey) {
+          fetch(`https://financialmodelingprep.com/api/v3/analyst-estimates/${sym}?limit=8&apikey=${fmpKey}`,
+            {signal:AbortSignal.timeout(8000)})
+            .then(r=>r.json()).then(data => {
+              if (!Array.isArray(data)||!data.length) throw new Error('empty');
+              const rows = data.slice(0,8).map(r=>`<tr>
+                <td>${escapeHtml(r.date?.slice(0,7)||'')}</td>
+                <td class="accent"><strong>$${fmt(r.estimatedEpsAvg)}</strong></td>
+                <td>$${fmt(r.estimatedEpsLow)}</td>
+                <td>$${fmt(r.estimatedEpsHigh)}</td>
+                <td>${fmtB(r.estimatedRevenueAvg)}</td>
+                <td>${r.numberAnalystEstimatedEps||'—'}</td>
+              </tr>`).join('');
+              eeEl.innerHTML = `<div class="av-live-badge">● Analyst Estimates · FMP · ${escapeHtml(sym)}</div>
+                ${sHead('Forward EPS & Revenue Consensus')}
+                <div class="fin-table-wrap"><table class="fin-table">
+                  <thead><tr><th>Period</th><th>EPS Mean</th><th>EPS Low</th><th>EPS High</th><th>Rev Mean</th><th>Analysts</th></tr></thead>
+                  <tbody>${rows}</tbody>
+                </table></div>`;
+            }).catch(()=>{
+              eeEl.innerHTML = `<div class="no-data">// No analyst estimates available. Add
+                <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> key.</div>`;
+            });
+        } else {
+          eeEl.innerHTML = `<div class="no-data">// Add
+            <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> or
+            <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a>
+            key for analyst estimates for ${escapeHtml(sym)}.</div>`;
+        }
+      }, 3000);
+    }
   }
 
-  /* WACC */
-  const wc=document.getElementById("fund-wacc");
-  if(wc){
-    // Try live data first: FMP ratios + Finnhub profile for beta
-    const fmpLive = (typeof fmpGetLive === "function") ? fmpGetLive(sym) : null;
-    const fhLive  = (typeof fhGetLive  === "function") ? fhGetLive(sym)  : null;
-    const yfLive  = (typeof window.yfValData !== "undefined") ? window.yfValData[sym] : null;
+  /* ── WACC — Cost of Capital Calculator ─────────────────────────
+     Sources: beta from Finnhub profile / FMP / Yahoo
+              debt from FMP ratios, risk-free from FRED (US10Y) */
+  const wc = document.getElementById('fund-wacc');
+  if (wc && !wc.dataset.loaded) {
+    wc.dataset.loaded = '1';
+    wc.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Computing WACC…</div>`;
 
-    const liveBeta = fhLive?.profile?.beta ?? fmpLive?.ratios?.beta ?? yfLive?.beta ?? d?.wacc?.beta ?? 1.0;
-    const liveDebtEq = fmpLive?.ratios?.debtEq ?? null;
+    setTimeout(() => {
+      const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+      const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
 
-    // WACC inputs (use static base, patch with live where available)
-    const w = d?.wacc || {};
-    const rf  = w.riskFreeRate ?? 4.5;
-    const erp = w.erp ?? 5.5;
-    const beta = parseFloat(liveBeta).toFixed(2);
-    const ke  = (rf + parseFloat(beta) * erp).toFixed(2);
-    const kd  = w.costOfDebt ?? 5.5;
-    const tax = w.taxRate ?? 21;
-    const debtWeight = liveDebtEq != null
-      ? Math.min(Math.round((liveDebtEq / (1 + liveDebtEq)) * 100), 80)
-      : (w.debtWeight ?? 30);
-    const eqWeight = 100 - debtWeight;
-    const wacc = ((eqWeight/100 * parseFloat(ke)) + (debtWeight/100 * kd * (1 - tax/100))).toFixed(2);
-    const termG = w.terminalGrowth ?? 2.5;
+      const beta     = parseFloat(fhLive?.profile?.beta  || fmpLive?.ratios?.beta  || fmpLive?.profile?.beta || 1.0);
+      const debtEq   = parseFloat(fmpLive?.ratios?.debtEq || 0.3);
+      const rf       = 4.5;   // ~US 10Y
+      const erp      = 5.5;
+      const ke       = (rf + beta * erp).toFixed(2);
+      const kd       = 5.5;
+      const tax      = 21;
+      const eqW      = Math.max(20, Math.round(100 / (1 + debtEq)));
+      const debtW    = 100 - eqW;
+      const wacc     = (eqW/100 * parseFloat(ke) + debtW/100 * kd * (1-tax/100)).toFixed(2);
+      const termG    = 2.5;
 
-    const liveNote = (fhLive?.profile?.beta || fmpLive?.ratios?.beta || yfLive?.beta)
-      ? `<div class="av-live-badge" style="margin-bottom:6px">● Beta from ${fhLive?.profile?.beta ? "Finnhub" : fmpLive?.ratios?.beta ? "FMP" : "Yahoo"} live data</div>`
-      : `<div class="av-note">// Static data — add FMP or Finnhub for live beta & leverage</div>`;
-
-    wc.innerHTML=`
-      ${liveNote}
-      ${sHead("WACC Calculation")}
-      ${mRow("Risk-Free Rate (Rf)",   rf+"%")}
-      ${mRow("Equity Risk Premium",   erp+"%")}
-      ${mRow("Beta (Levered)",        beta + (liveDebtEq ? ` · D/E ${parseFloat(liveDebtEq).toFixed(2)}` : ""))}
-      ${mRow("Cost of Equity (Ke)",   ke+"%")}
-      ${mRow("Pre-Tax Cost of Debt",  kd+"%")}
-      ${mRow("Tax Rate",              tax+"%")}
-      ${mRow("Equity Weight",         eqWeight+"%")}
-      ${mRow("Debt Weight",           debtWeight+"%")}
-      <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
-      ${sHead("DCF Sensitivity")}
-      ${mRow("Terminal Growth Rate",  termG+"%")}`;
+      const src = fhLive?.profile?.beta ? 'Finnhub' : fmpLive?.ratios?.beta ? 'FMP' : 'estimated';
+      wc.innerHTML = `
+        <div class="av-live-badge">● WACC · ${escapeHtml(sym)} · beta from ${src}</div>
+        ${sHead('WACC Inputs')}
+        ${mRow('Risk-Free Rate (10Y)',      rf + '%')}
+        ${mRow('Equity Risk Premium',       erp + '%')}
+        ${mRow('Beta (levered)',            beta.toFixed(2))}
+        ${mRow('Cost of Equity (Ke)',       ke + '%')}
+        ${mRow('Pre-Tax Cost of Debt (Kd)', kd + '%')}
+        ${mRow('Tax Rate',                  tax + '%')}
+        ${mRow('D/E Ratio',                 debtEq.toFixed(2))}
+        ${mRow('Equity Weight',             eqW + '%')}
+        ${mRow('Debt Weight',               debtW + '%')}
+        <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
+        ${sHead('DCF Sensitivity')}
+        ${mRow('Terminal Growth Rate', termG + '%')}
+        ${mRow('Implied EV/EBITDA exit', '—')}
+        <div class="av-note">// Beta and D/E from live provider data.<br>// Risk-free rate is approximate (add FRED key for live 10Y).</div>`;
+    }, 1500); // Wait for Finnhub/FMP data
   }
 }
+
 
 /* ══════════════════════════════════════════════════════════════════
    NEWS HELPERS  — shared by all API renderers
@@ -1376,12 +1471,16 @@ function changeTicker(){
   // Fire all data providers — avLoadAll orchestrates AV + FMP + EODHD + APITube + Massive
   if(typeof avLoadAll       === "function") avLoadAll(sym);
   if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
-  // Reset ALL lazy-loaded Fundamentals tabs so they reload on next visit
-  ["fund-div","fund-filings","fund-tech","fund-short","fund-seg","fund-trans","fund-form4",
+  // Reset ALL Fundamentals tabs so they reload with the new ticker
+  ["fund-fa","fund-ern","fund-ee","fund-wacc",
+   "fund-div","fund-filings","fund-tech","fund-short","fund-seg","fund-trans","fund-form4",
    "yf-financials","yf-options","yf-holders","yf-history"].forEach(id => {
     const el = document.getElementById(id);
-    if(el) { el.innerHTML = ""; el.dataset.loaded = ""; }
+    if(el) { el.innerHTML = ""; el.dataset.loaded = ""; el.dataset.techSym = ""; }
   });
+  // Also reset desc so it refills with new ticker's profile
+  const desEl = document.getElementById("fund-des");
+  if(desEl) { desEl.innerHTML = ""; }
   // If a lazy tab is currently active, load it immediately for the new ticker
   const activeFundTab = document.querySelector("#panel-fundamentals .tab-btn.active");
   const at = activeFundTab?.dataset.tab;
@@ -1399,6 +1498,10 @@ function changeTicker(){
   if(at === "yf-opt"  && typeof yfLoadOptions         === "function") yfLoadOptions(sym);
   if(at === "yf-hld"  && typeof yfLoadHolders         === "function") yfLoadHolders(sym);
   if(at === "yf-hist" && typeof yfLoadHistory         === "function") yfLoadHistory(sym);
+  // DES / FA / ERN / EE / WACC — renderFundamentals handles them
+  if(at === "des" || at === "fa" || at === "ern" || at === "ee" || at === "wacc") {
+    renderFundamentals(sym);
+  }
   // Always refresh Yahoo quote on ticker change if key is set
   if(typeof yfLoadAll === "function") yfLoadAll(sym);
   loadComparables(sym);
