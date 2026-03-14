@@ -899,14 +899,18 @@
           <button class="icon-btn close" onclick="hidePanel('screener')">✕</button>
         </div>
       </div>
+      <!-- Preset bar -->
+      <div id="scr-preset-bar" class="scr-preset-bar">
+        <!-- populated by _screenerRenderPresetBar() -->
+      </div>
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="scr-results" onclick="switchTab('screener','scr-results')">RESULTS</button>
         <button class="tab-btn"        data-tab="scr-filters" onclick="switchTab('screener','scr-filters')">FILTERS</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="scr-results" id="screener-results">
-        <div class="no-data">// Set filters and click Run Screen.</div>
+        <div class="no-data">// Pick a preset above or set filters and click Run Screen.</div>
       </div>
-      <div class="tab-pane        panel-content" data-tab="scr-filters">
+      <div class="tab-pane panel-content" data-tab="scr-filters">
         <div class="scr-filters-grid">
           <div class="scr-filter-row"><label>Sector</label>
             <select id="scr-sector" class="wh-select">
@@ -928,16 +932,31 @@
             <input id="scr-country" class="wh-input" placeholder="US, GB, DE…"/>
           </div>
           <div class="scr-filter-row"><label>Mkt Cap Min ($)</label>
-            <input id="scr-mktcap-min" class="wh-input" type="number" placeholder="e.g. 1000000000"/>
+            <input id="scr-mktcap-min" class="wh-input" type="number" placeholder="e.g. 500000000"/>
           </div>
           <div class="scr-filter-row"><label>Mkt Cap Max ($)</label>
             <input id="scr-mktcap-max" class="wh-input" type="number" placeholder="e.g. 500000000000"/>
           </div>
           <div class="scr-filter-row"><label>Price Min ($)</label>
-            <input id="scr-price-min" class="wh-input" type="number" placeholder="1"/>
+            <input id="scr-price-min" class="wh-input" type="number" placeholder="2"/>
           </div>
           <div class="scr-filter-row"><label>Price Max ($)</label>
             <input id="scr-price-max" class="wh-input" type="number" placeholder="500"/>
+          </div>
+          <div class="scr-filter-row"><label>P/E Min</label>
+            <input id="scr-pe-min" class="wh-input" type="number" placeholder="0" step="0.5"/>
+          </div>
+          <div class="scr-filter-row"><label>P/E Max</label>
+            <input id="scr-pe-max" class="wh-input" type="number" placeholder="20" step="0.5"/>
+          </div>
+          <div class="scr-filter-row"><label>ROE Min (%)</label>
+            <input id="scr-roe-min" class="wh-input" type="number" placeholder="10" step="1"/>
+          </div>
+          <div class="scr-filter-row"><label>Debt/Equity Max</label>
+            <input id="scr-debt-max" class="wh-input" type="number" placeholder="1.0" step="0.1"/>
+          </div>
+          <div class="scr-filter-row"><label>Net Margin Min (%)</label>
+            <input id="scr-margin-min" class="wh-input" type="number" placeholder="5" step="1"/>
           </div>
           <div class="scr-filter-row"><label>Beta Min</label>
             <input id="scr-beta-min" class="wh-input" type="number" placeholder="0.5" step="0.1"/>
@@ -955,8 +974,9 @@
             <input id="scr-industry" class="wh-input" placeholder="Semiconductors…"/>
           </div>
         </div>
-        <div style="padding:10px 12px 4px">
-          <button class="wh-btn-primary" style="width:100%" onclick="screenerRun();switchTab('screener','scr-results')">🔍 Run Screen</button>
+        <div style="padding:8px 12px 4px;display:flex;gap:8px">
+          <button class="wh-btn-primary" style="flex:1" onclick="screenerRun();switchTab('screener','scr-results')">🔍 Run Screen</button>
+          <button class="wh-btn-secondary" onclick="screenerSavePreset()">💾 Save Preset</button>
         </div>
       </div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
