@@ -299,9 +299,499 @@ window.femaLoadDisasters = async function() {
   el.innerHTML = html;
 };
 
+
+/* ══════════════════════════════════════════════════════════════════
+   PUNTO 5 — AIR QUALITY  (OpenAQ v3 + WAQI demo + Open-Meteo)
+   Sources:
+   1. OpenAQ v3  api.openaq.org/v3/locations  (free key — X-API-Key)
+   2. WAQI       api.waqi.info/feed/{city}/?token=demo  (no key)
+   3. Open-Meteo air-quality-api (no key, already in geodata)
+   Widget target: Geo·Risk → AIR tab
+   ══════════════════════════════════════════════════════════════════ */
+
+const _AQI_COLORS = [
+  { max:50,  label:'Good',        color:'#3fb950', bg:'rgba(63,185,80,.15)' },
+  { max:100, label:'Moderate',    color:'#d29922', bg:'rgba(210,153,34,.15)' },
+  { max:150, label:'Unhealthy (Sensitive)', color:'#f0883e', bg:'rgba(240,136,62,.15)' },
+  { max:200, label:'Unhealthy',   color:'#f85149', bg:'rgba(248,81,73,.15)' },
+  { max:300, label:'Very Unhealthy', color:'#a371f7', bg:'rgba(163,113,247,.15)' },
+  { max:500, label:'Hazardous',   color:'#d62728', bg:'rgba(214,39,40,.15)' },
+];
+function _aqiCategory(v) { return _AQI_COLORS.find(c => v <= c.max) || _AQI_COLORS[_AQI_COLORS.length-1]; }
+
+window.openaqLoadCity = async function(lat, lon, cityName) {
+  const el = document.getElementById('geo-air');
+  if (!el) return;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading air quality…</div>`;
+
+  // Try to get lat/lon from company HQ ticker if not provided
+  if (!lat || !lon) {
+    lat = 41.8781; lon = -87.6298; cityName = cityName || 'Default location';
+  }
+
+  let aqData = null, src = '';
+
+  // ── 1. OpenAQ v3 (key in config) ─────────────────────────────
+  const aqKey = (typeof getOpenAQKey === 'function') ? getOpenAQKey() : '';
+  if (aqKey) {
+    try {
+      const res = await fetch(
+        `https://api.openaq.org/v3/locations?coordinates=${lat},${lon}&radius=25000&limit=5&order_by=lastUpdated&sort_order=desc`,
+        { headers: { 'X-API-Key': aqKey, 'Accept': 'application/json' }, signal: AbortSignal.timeout(8000) }
+      );
+      const json = await res.json();
+      const stations = json?.results || [];
+      if (stations.length) {
+        // Get latest measurements from first station
+        const stId = stations[0].id;
+        const mRes = await fetch(
+          `https://api.openaq.org/v3/locations/${stId}/latest`,
+          { headers: { 'X-API-Key': aqKey }, signal: AbortSignal.timeout(7000) }
+        );
+        const mJson = await mRes.json();
+        aqData = { station: stations[0].name, measurements: mJson?.results || [], stations };
+        src = 'OpenAQ v3';
+      }
+    } catch(e) { console.warn('[OpenAQ]', e.message); }
+  }
+
+  // ── 2. WAQI demo token (no key, global coverage) ─────────────
+  if (!aqData) {
+    try {
+      const res = await fetch(
+        `https://api.waqi.info/feed/geo:${lat};${lon}/?token=demo`,
+        { signal: AbortSignal.timeout(7000) }
+      );
+      const json = await res.json();
+      if (json?.status === 'ok' && json.data) {
+        const d = json.data;
+        aqData = {
+          station: d.city?.name || cityName || 'Nearest station',
+          aqi: d.aqi,
+          measurements: Object.entries(d.iaqi || {}).map(([k,v]) => ({
+            parameter: k, value: v.v, unit: k === 'aqi' ? 'AQI' : 'µg/m³',
+          })),
+          _waqi: d,
+        };
+        src = 'WAQI';
+      }
+    } catch {}
+  }
+
+  // ── 3. Open-Meteo fallback ────────────────────────────────────
+  if (!aqData) {
+    try {
+      const res = await fetch(
+        `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone,european_aqi&timezone=auto`,
+        { signal: AbortSignal.timeout(7000) }
+      );
+      const json = await res.json();
+      const c = json?.current;
+      if (c) {
+        aqData = {
+          station: cityName || `${lat.toFixed(2)},${lon.toFixed(2)}`,
+          aqi: c.european_aqi,
+          measurements: [
+            { parameter:'pm2_5', value: c.pm2_5, unit:'µg/m³' },
+            { parameter:'pm10',  value: c.pm10,  unit:'µg/m³' },
+            { parameter:'no2',   value: c.nitrogen_dioxide, unit:'µg/m³' },
+            { parameter:'o3',    value: c.ozone,  unit:'µg/m³' },
+            { parameter:'co',    value: c.carbon_monoxide, unit:'µg/m³' },
+          ].filter(m => m.value != null),
+        };
+        src = 'Open-Meteo';
+      }
+    } catch {}
+  }
+
+  if (!aqData) {
+    el.innerHTML = `<div class="no-data">
+      // Air quality data unavailable for this location.<br>
+      ${!aqKey ? `// <a href="#" onclick="openApiConfig('openaq');return false" style="color:var(--accent)">Add OpenAQ v3 key</a> (free) for full global coverage.` : ''}
+    </div>`;
+    return;
+  }
+
+  const mainAqi = aqData.aqi || aqData.measurements?.find(m => m.parameter === 'us-aqi' || m.parameter === 'aqi')?.value;
+  const cat = mainAqi != null ? _aqiCategory(mainAqi) : null;
+
+  let html = `<div class="av-live-badge">● Air Quality · ${gdEsc(aqData.station)} · ${gdEsc(src)}</div>`;
+
+  // Main AQI gauge
+  if (cat && mainAqi != null) {
+    html += `<div class="aq-main-gauge" style="background:${cat.bg};border-left:3px solid ${cat.color};padding:10px 14px;margin:8px;border-radius:4px;display:flex;align-items:center;gap:14px">
+      <div style="font-size:32px;font-weight:800;color:${cat.color};font-family:var(--font-mono)">${mainAqi}</div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:${cat.color}">${gdEsc(cat.label)}</div>
+        <div style="font-size:9px;color:var(--text-muted)">AQI · ${new Date().toLocaleTimeString()}</div>
+      </div>
+    </div>`;
+  }
+
+  // Pollutant grid
+  const PARAM_LABELS = { pm2_5:'PM2.5', pm10:'PM10', no2:'NO₂', o3:'O₃', co:'CO', so2:'SO₂', nh3:'NH₃', 'us-aqi':'US AQI', 'european_aqi':'EU AQI' };
+  const PARAM_LIMITS = { pm2_5:25, pm10:50, no2:40, o3:100, co:4000, so2:20 };
+
+  const pollutants = aqData.measurements.filter(m => m.parameter !== 'aqi' && m.parameter !== 'us-aqi' && m.value != null);
+  if (pollutants.length) {
+    html += `<div class="aq-grid">`;
+    pollutants.slice(0,8).forEach(m => {
+      const lbl   = PARAM_LABELS[m.parameter] || m.parameter.toUpperCase();
+      const limit = PARAM_LIMITS[m.parameter];
+      const pct   = limit ? Math.min(m.value / limit * 100, 100) : null;
+      const bad   = limit && m.value > limit;
+      html += `<div class="aq-cell">
+        <div class="aq-cell-label">${gdEsc(lbl)}</div>
+        <div class="aq-cell-val ${bad?'wm-neg':''}">${typeof m.value==='number'?m.value.toFixed(1):m.value} <span style="font-size:8px;color:var(--text-muted)">${gdEsc(m.unit||'')}</span></div>
+        ${pct!=null?`<div class="aq-bar-wrap"><div class="aq-bar" style="width:${pct.toFixed(0)}%;background:${bad?'#f85149':'#3fb950'}"></div></div>`:''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // No key nudge
+  if (!aqKey && src !== 'OpenAQ v3') {
+    html += `<div class="av-note" style="margin-top:6px">
+      Add <a href="#" onclick="openApiConfig('openaq');return false" style="color:var(--accent)">OpenAQ v3 key</a> (free) for 30,000+ global stations with historical data.
+    </div>`;
+  }
+  el.innerHTML = html;
+};
+
+/* Auto-expose gdEsc if not already defined at module scope */
+function gdEsc(s) { return String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
+
 /* ══════════════════════════════════════════════════════════════════
    INIT & AUTO-REFRESH
    ══════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════
+   PUNTO 5 — AIR QUALITY MODULE
+   ──────────────────────────────────────────────────────────────────
+   Sources (priority cascade):
+   1. OpenAQ v3  api.openaq.org/v3  (free key, user has it)
+      — 30,000+ stations, PM2.5/PM10/NO2/O3/CO/SO2, 100+ countries
+      — Fetches nearest stations to company HQ lat/lon
+   2. WAQI       api.waqi.info/feed/{city}/?token=demo
+      — AQI real-time, 1000+ cities, token 'demo' works (~100/day)
+   3. Open-Meteo air quality  (already in geodata.js)
+      — PM2.5, PM10, ozone, CO from Copernicus forecast model
+   Context: HQ coords read from FMP company profile or geocoded
+   ══════════════════════════════════════════════════════════════════ */
+
+const _AQ_CACHE  = {};
+const _AQ_TTL_MS = 30 * 60 * 1000; // 30 min
+
+/* ── AQI category helper ─────────────────────────────────────────── */
+function _aqiCategory(aqi) {
+  if (aqi == null) return { label:'Unknown', color:'#8b949e', bg:'rgba(139,148,158,.12)' };
+  if (aqi <= 50)  return { label:'Good',           color:'#3fb950', bg:'rgba(63,185,80,.12)' };
+  if (aqi <= 100) return { label:'Moderate',        color:'#d29922', bg:'rgba(210,153,34,.12)' };
+  if (aqi <= 150) return { label:'Unhealthy (Sensitive)', color:'#f0883e', bg:'rgba(240,136,62,.12)' };
+  if (aqi <= 200) return { label:'Unhealthy',       color:'#f85149', bg:'rgba(248,81,73,.12)' };
+  if (aqi <= 300) return { label:'Very Unhealthy',  color:'#a371f7', bg:'rgba(163,113,247,.12)' };
+  return               { label:'Hazardous',          color:'#8b0000', bg:'rgba(139,0,0,.15)' };
+}
+
+/* ── Gauge SVG for AQI value ────────────────────────────────────── */
+function _aqiGaugeSVG(aqi) {
+  const cat = _aqiCategory(aqi);
+  const pct = aqi != null ? Math.min(1, aqi/300) : 0;
+  const r=38, cx=50, cy=50;
+  const startA = Math.PI;
+  const endA   = startA + pct * Math.PI;
+  const x1 = cx + r*Math.cos(startA), y1 = cy + r*Math.sin(startA);
+  const x2 = cx + r*Math.cos(endA),   y2 = cy + r*Math.sin(endA);
+  const large = pct >= 0.5 ? 1 : 0;
+  return `<svg viewBox="0 0 100 55" width="110" height="60" style="display:block;margin:0 auto">
+    <path d="M${cx-r},${cy} A${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="#21262d" stroke-width="8"/>
+    <path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${cat.color}" stroke-width="8" stroke-linecap="round"/>
+    <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="17" font-weight="800" fill="${cat.color}" font-family="var(--font-mono,monospace)">${aqi!=null?aqi:'—'}</text>
+    <text x="${cx}" y="${cy+9}" text-anchor="middle" font-size="7" fill="#8b949e">${cat.label}</text>
+  </svg>`;
+}
+
+/* ── Pollutant bar ──────────────────────────────────────────────── */
+function _aqPollutantBar(name, value, unit, max, color) {
+  if (value == null) return '';
+  const pct = Math.min(100, (value/max)*100).toFixed(1);
+  return `<div class="aq-pol-row">
+    <span class="aq-pol-name">${name}</span>
+    <div class="aq-pol-bar-wrap">
+      <div class="aq-pol-bar" style="width:${pct}%;background:${color}"></div>
+    </div>
+    <span class="aq-pol-val">${typeof value==='number'?value.toFixed(1):value} ${unit}</span>
+  </div>`;
+}
+
+/* ── Source 1: OpenAQ v3 ─────────────────────────────────────────── */
+async function _openaqFetch(lat, lon) {
+  const key = (typeof getOpenAQKey==='function') ? getOpenAQKey() : '';
+  if (!key) return null;
+
+  const cacheKey = `openaq_${lat.toFixed(2)}_${lon.toFixed(2)}`;
+  const cached = _AQ_CACHE[cacheKey];
+  if (cached && Date.now() - cached.ts < _AQ_TTL_MS) return cached.data;
+
+  try {
+    // Find nearest stations
+    const locRes = await fetch(
+      `https://api.openaq.org/v3/locations?coordinates=${lat},${lon}&radius=25000&limit=5&order_by=distance`,
+      { headers: { 'X-API-Key': key, 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(9000) }
+    );
+    if (!locRes.ok) return null;
+    const locData = await locRes.json();
+    const stations = locData.results || [];
+    if (!stations.length) return null;
+
+    // Fetch latest measurements from nearest station
+    const stationId = stations[0].id;
+    const measRes = await fetch(
+      `https://api.openaq.org/v3/locations/${stationId}/latest`,
+      { headers: { 'X-API-Key': key, 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(9000) }
+    );
+    if (!measRes.ok) return null;
+    const measData = await measRes.json();
+
+    const result = {
+      station: stations[0].name || 'Station',
+      city:    stations[0].locality || stations[0].country?.name || '',
+      country: stations[0].country?.code || '',
+      lat: stations[0].coordinates?.latitude,
+      lon: stations[0].coordinates?.longitude,
+      distance: stations[0].distance ? Math.round(stations[0].distance/1000) : null,
+      updated: measData.results?.[0]?.datetime?.local || null,
+      pollutants: {},
+      _src: 'OpenAQ v3',
+    };
+
+    // Parse pollutant measurements
+    (measData.results || []).forEach(m => {
+      const param = m.parameter?.name || m.parameterId;
+      result.pollutants[param] = {
+        value: m.value,
+        unit:  m.unit || 'µg/m³',
+        lastUpdated: m.datetime?.local,
+      };
+    });
+
+    _AQ_CACHE[cacheKey] = { data: result, ts: Date.now() };
+    return result;
+  } catch(e) {
+    console.warn('[OpenAQ]', e.message);
+    return null;
+  }
+}
+
+/* ── Source 2: WAQI (token demo fallback) ───────────────────────── */
+async function _waqiFetch(city) {
+  const city_enc = encodeURIComponent(city);
+  const cacheKey = `waqi_${city_enc}`;
+  const cached = _AQ_CACHE[cacheKey];
+  if (cached && Date.now() - cached.ts < _AQ_TTL_MS) return cached.data;
+
+  try {
+    const res  = await fetch(
+      `https://api.waqi.info/feed/${city_enc}/?token=demo`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const json = await res.json();
+    if (json.status !== 'ok') return null;
+
+    const d = json.data;
+    const result = {
+      aqi:     d.aqi,
+      station: d.city?.name || city,
+      city,
+      updated: d.time?.s || null,
+      pollutants: {},
+      _src: 'WAQI (demo)',
+    };
+
+    // WAQI iaqi field: { pm25: { v: 42.3 }, pm10: { v: 58 }, ... }
+    const iaqi = d.iaqi || {};
+    const paramMap = { pm25:'pm2.5', pm10:'pm10', no2:'no2', o3:'o3', co:'co', so2:'so2' };
+    Object.entries(paramMap).forEach(([k, name]) => {
+      if (iaqi[k]?.v != null) result.pollutants[name] = { value: iaqi[k].v, unit: 'µg/m³' };
+    });
+
+    _AQ_CACHE[cacheKey] = { data: result, ts: Date.now() };
+    return result;
+  } catch(e) {
+    console.warn('[WAQI]', e.message);
+    return null;
+  }
+}
+
+/* ── Source 3: Open-Meteo (already in geodata.js — re-export) ───── */
+async function _openmeteoAirFetch(lat, lon) {
+  try {
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone,dust&timezone=auto`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const json = await res.json();
+    const c    = json.current;
+    if (!c) return null;
+    return {
+      station: 'Open-Meteo forecast',
+      city:    '',
+      updated: c.time || null,
+      pollutants: {
+        'pm2.5': { value: c.pm2_5,            unit: 'µg/m³' },
+        'pm10':  { value: c.pm10,             unit: 'µg/m³' },
+        'no2':   { value: c.nitrogen_dioxide,  unit: 'µg/m³' },
+        'o3':    { value: c.ozone,             unit: 'µg/m³' },
+        'co':    { value: c.carbon_monoxide,   unit: 'µg/m³' },
+      },
+      _src: 'Open-Meteo',
+    };
+  } catch { return null; }
+}
+
+/* ── Get HQ coordinates from company profile ─────────────────────── */
+async function _getCompanyHQ(sym) {
+  // Try FMP company profile first
+  const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  if (fmpKey && sym) {
+    try {
+      const res  = await fetch(
+        `https://financialmodelingprep.com/api/v3/profile/${sym}?apikey=${fmpKey}`,
+        { signal: AbortSignal.timeout(7000) }
+      );
+      const data = await res.json();
+      const p    = data?.[0];
+      if (p?.country) {
+        // Return HQ info if profile has city/address
+        return {
+          city:    p.city || p.country,
+          country: p.country,
+          lat:     null, // FMP free doesn't always give lat/lon
+          lon:     null,
+          name:    p.companyName || sym,
+          symbol:  sym,
+        };
+      }
+    } catch {}
+  }
+
+  // Fallback: use ticker exchange to infer city
+  const EXCHANGE_CITIES = {
+    NASDAQ: { city:'New York', lat: 40.7128, lon:-74.0060 },
+    NYSE:   { city:'New York', lat: 40.7128, lon:-74.0060 },
+    LSE:    { city:'London',   lat: 51.5074, lon: -0.1278 },
+    TSE:    { city:'Tokyo',    lat: 35.6762, lon:139.6503 },
+    HKEX:   { city:'Hong Kong',lat: 22.3193, lon:114.1694 },
+    SSE:    { city:'Shanghai', lat: 31.2304, lon:121.4737 },
+    NSE:    { city:'Mumbai',   lat: 19.0760, lon: 72.8777 },
+    BSE:    { city:'Mumbai',   lat: 19.0760, lon: 72.8777 },
+    ASX:    { city:'Sydney',   lat:-33.8688, lon:151.2093 },
+    FSE:    { city:'Frankfurt',lat: 50.1109, lon:  8.6821 },
+  };
+
+  // Default New York
+  return { city:'New York', lat:40.7128, lon:-74.0060, country:'US', name:sym, symbol:sym };
+}
+
+/* ── Main loader — called from geo AIR tab ───────────────────────── */
+window.openaqLoadCity = async function(sym) {
+  const el = document.getElementById('geo-airqual-content');
+  if (!el) return;
+
+  // Get current ticker from dashboard
+  const ticker = sym || (typeof window.currentTicker !== 'undefined'
+    ? window.currentTicker.replace(/.*:/,'').toUpperCase()
+    : 'AAPL');
+
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching air quality data…</div>`;
+
+  const hq = await _getCompanyHQ(ticker);
+
+  let aqData = null;
+
+  // 1. OpenAQ v3 (if lat/lon available and key set)
+  if (hq.lat && hq.lon && (typeof getOpenAQKey==='function' ? getOpenAQKey() : '')) {
+    aqData = await _openaqFetch(hq.lat, hq.lon);
+  }
+
+  // 2. WAQI with city name
+  if (!aqData) {
+    aqData = await _waqiFetch(hq.city);
+  }
+
+  // 3. Open-Meteo with default coords (NYC if no lat/lon)
+  if (!aqData && hq.lat && hq.lon) {
+    aqData = await _openmeteoAirFetch(hq.lat, hq.lon);
+  }
+  if (!aqData) {
+    aqData = await _openmeteoAirFetch(40.7128, -74.0060);
+  }
+
+  if (!aqData) {
+    el.innerHTML = `<div class="no-data">
+      // Air quality data unavailable.<br>
+      // <a href="#" onclick="openApiConfig('openaq');return false" style="color:var(--accent)">Add OpenAQ v3 key</a> (free) for 30,000+ global stations.
+    </div>`;
+    return;
+  }
+
+  // ── Compute AQI from PM2.5 if not provided by source ────────────
+  let aqi = aqData.aqi || null;
+  if (!aqi && aqData.pollutants['pm2.5']?.value != null) {
+    // US EPA simple PM2.5 to AQI conversion (breakpoints)
+    const pm = aqData.pollutants['pm2.5'].value;
+    const _toAQI = (c, cL, cH, iL, iH) => Math.round(((iH-iL)/(cH-cL))*(c-cL)+iL);
+    if      (pm <= 12.0)  aqi = _toAQI(pm, 0,    12.0,  0,   50);
+    else if (pm <= 35.4)  aqi = _toAQI(pm, 12.1, 35.4,  51,  100);
+    else if (pm <= 55.4)  aqi = _toAQI(pm, 35.5, 55.4,  101, 150);
+    else if (pm <= 150.4) aqi = _toAQI(pm, 55.5, 150.4, 151, 200);
+    else if (pm <= 250.4) aqi = _toAQI(pm, 150.5,250.4, 201, 300);
+    else                  aqi = _toAQI(pm, 250.5,500.4, 301, 500);
+  }
+
+  const cat = _aqiCategory(aqi);
+  const pols = aqData.pollutants;
+  const hasKey = typeof getOpenAQKey==='function' ? getOpenAQKey() : '';
+
+  let html = `
+    <div class="aq-header" style="background:${cat.bg};border-bottom:1px solid var(--border)">
+      <div class="aq-location">
+        <span class="aq-ticker">${ticker}</span>
+        <span class="aq-city">${aqData.city || hq.city}${hq.country ? ', '+hq.country : ''}</span>
+        ${aqData.distance!=null ? `<span class="aq-dist">${aqData.distance}km from center</span>` : ''}
+      </div>
+      <div class="aq-gauge">${_aqiGaugeSVG(aqi)}</div>
+      <div class="aq-station-info">
+        <span class="aq-station-name">${aqData.station || '—'}</span>
+        ${aqData.updated ? `<span class="aq-updated">${new Date(aqData.updated).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</span>` : ''}
+        <span class="aq-src-badge">${aqData._src}</span>
+      </div>
+    </div>
+
+    <div class="aq-pollutants">
+      <div class="aq-pol-title">Pollutant readings</div>
+      ${_aqPollutantBar('PM 2.5', pols['pm2.5']?.value, 'µg/m³', 150, '#f85149')}
+      ${_aqPollutantBar('PM 10',  pols['pm10']?.value,  'µg/m³', 250, '#f0883e')}
+      ${_aqPollutantBar('NO₂',   pols['no2']?.value,   'µg/m³', 200, '#d29922')}
+      ${_aqPollutantBar('O₃',    pols['o3']?.value,    'µg/m³', 180, '#3fb950')}
+      ${_aqPollutantBar('CO',    pols['co']?.value,    'µg/m³', 10000,'#58a6ff')}
+      ${_aqPollutantBar('SO₂',   pols['so2']?.value,   'µg/m³', 200, '#a371f7')}
+    </div>
+
+    ${!hasKey ? `<div class="aq-upgrade-note">
+      Using WAQI demo token · limited to ~100 req/day ·
+      <a href="#" onclick="openApiConfig('openaq');return false" style="color:var(--accent)">Add OpenAQ v3 key</a> for full global coverage.
+    </div>` : ''}
+
+    <div class="aq-footer">
+      Source: <a href="https://openaq.org" target="_blank" class="geo-wm-link">OpenAQ ↗</a> ·
+      <a href="https://waqi.info/city/${encodeURIComponent(hq.city)}" target="_blank" class="geo-wm-link">WAQI ↗</a> ·
+      <a href="https://open-meteo.com" target="_blank" class="geo-wm-link">Open-Meteo ↗</a>
+    </div>`;
+
+  el.innerHTML = html;
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   // Load USGS quakes immediately (replaces/supplements WM quakes)
   setTimeout(() => {
