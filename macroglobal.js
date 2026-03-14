@@ -512,29 +512,52 @@ window.macroLoadCentralBanks = async function() {
   if (!el) return;
   el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading central bank data…</div>';
 
-  // Get current policy rates from FRED if key available
-  let fedRate = null, sofr = null;
+  // Fetch ALL policy rates from FRED (FEDFUNDS, ECBDFR, BOERUKQ, IRLTLT01JPM156N, PBOC)
+  // FRED series: ECBDFR = ECB Deposit Rate, BOERUKQ = BOE Rate, IRSTCI01JPM156N = BOJ
+  let fedRate = null, sofr = null, ecbRate = null, boeRate = null, bojRate = null, pbocRate = null;
   const fredKey = (typeof getFredKey === 'function') ? getFredKey() : '';
+
   if (fredKey) {
     try {
-      const [fedRes, sofrRes] = await Promise.all([
-        fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${fredKey}&file_type=json&sort_order=desc&limit=1`),
-        fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=SOFR&api_key=${fredKey}&file_type=json&sort_order=desc&limit=1`),
+      const fredFetch = id =>
+        fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${fredKey}&file_type=json&sort_order=desc&limit=1`, {signal:AbortSignal.timeout(6000)})
+          .then(r=>r.json()).then(j=>parseFloat(j.observations?.[0]?.value)||null).catch(()=>null);
+
+      let pbocRate = null;
+      [fedRate, sofr, ecbRate, boeRate, bojRate, pbocRate] = await Promise.all([
+        fredFetch('FEDFUNDS'),
+        fredFetch('SOFR'),
+        fredFetch('ECBDFR'),          // ECB Deposit Facility Rate
+        fredFetch('BOERUKQ'),         // Bank of England Base Rate
+        fredFetch('IRSTCI01JPM156N'), // Bank of Japan policy rate proxy
+        fredFetch('PBCFINSR'),        // PBoC 1-year LPR (loan prime rate)
       ]);
-      const fedJson  = await fedRes.json();
-      const sofrJson = await sofrRes.json();
-      fedRate = parseFloat(fedJson.observations?.[0]?.value);
-      sofr    = parseFloat(sofrJson.observations?.[0]?.value);
     } catch {}
   }
 
-  // Current rates (approximate fallback if FRED not available)
+  // Try no-key fallback for ECB via ECB API (free, no auth)
+  if (ecbRate == null) {
+    try {
+      const ecbRes = await fetch(
+        'https://data-api.ecb.europa.eu/service/data/FM/B.U2.EUR.4F.KR.DFR.LEV?format=jsondata&lastNObservations=1',
+        {signal:AbortSignal.timeout(6000)}
+      );
+      const ecbJson = await ecbRes.json();
+      const obs = ecbJson?.dataSets?.[0]?.series?.['0:0:0:0:0:0:0']?.observations;
+      if (obs) {
+        const lastKey = Object.keys(obs).sort((a,b)=>+b-+a)[0];
+        ecbRate = obs[lastKey]?.[0];
+      }
+    } catch {}
+  }
+
+  // Latest known rates as fallback (updated approx. to current policy)
   const RATES = [
-    { bank:'Federal Reserve', country:'🇺🇸 USA',  rate: fedRate ?? 4.33, currency:'USD', nextMeeting: nextMeeting(FOMC_DATES_2025_26), color:'#58a6ff' },
-    { bank:'ECB',             country:'🇪🇺 Euro',  rate: 2.65,  currency:'EUR', nextMeeting: nextMeeting(ECB_DATES_2025_26),  color:'#3fb950' },
-    { bank:'Bank of England', country:'🇬🇧 UK',    rate: 4.50,  currency:'GBP', nextMeeting: nextMeeting(BOE_DATES_2025_26),  color:'#d29922' },
-    { bank:'Bank of Japan',   country:'🇯🇵 Japan', rate: 0.50,  currency:'JPY', nextMeeting: nextMeeting(BOJ_DATES_2025_26),  color:'#f0883e' },
-    { bank:'PBoC',            country:'🇨🇳 China', rate: 3.10,  currency:'CNY', nextMeeting: null, color:'#a371f7' },
+    { bank:'Federal Reserve', country:'🇺🇸 USA',  rate: fedRate  ?? 4.33, currency:'USD', nextMeeting: nextMeeting(FOMC_DATES_2025_26), color:'#58a6ff', live: fedRate  != null },
+    { bank:'ECB',             country:'🇪🇺 Euro',  rate: ecbRate  ?? 2.65, currency:'EUR', nextMeeting: nextMeeting(ECB_DATES_2025_26),  color:'#3fb950', live: ecbRate  != null },
+    { bank:'Bank of England', country:'🇬🇧 UK',    rate: boeRate  ?? 4.50, currency:'GBP', nextMeeting: nextMeeting(BOE_DATES_2025_26),  color:'#d29922', live: boeRate  != null },
+    { bank:'Bank of Japan',   country:'🇯🇵 Japan', rate: bojRate  ?? 0.50, currency:'JPY', nextMeeting: nextMeeting(BOJ_DATES_2025_26),  color:'#f0883e', live: bojRate  != null },
+    { bank:'PBoC',            country:'🇨🇳 China', rate: pbocRate ?? 3.10, currency:'CNY', nextMeeting: null,                             color:'#a371f7', live: pbocRate != null },
   ];
 
   // Merge all calendar events, sort chronologically
@@ -564,7 +587,7 @@ window.macroLoadCentralBanks = async function() {
         return `<div class="cb-rate-card" style="border-top:3px solid ${r.color}">
           <div class="cb-rate-bank">${_me(r.bank)}</div>
           <div class="cb-rate-country">${_me(r.country)}</div>
-          <div class="cb-rate-val" style="color:${r.color}">${r.rate.toFixed(2)}%</div>
+          <div class="cb-rate-val" style="color:${r.color}">${r.rate.toFixed(2)}%${r.live ? '<span style="font-size:8px;color:#3fb950;margin-left:3px">●</span>' : '<span style="font-size:8px;color:#6e7681;margin-left:3px" title="approximate">~</span>'}</div>
           <div class="cb-rate-ccy">${_me(r.currency)} Policy Rate</div>
           ${daysToNext != null ? `
           <div class="cb-rate-next">
