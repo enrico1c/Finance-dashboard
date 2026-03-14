@@ -804,170 +804,491 @@ async function fhLoadShortInterest(sym) {
    REVENUE SEGMENTATION  (FMP — product + geographic breakdown)
    Called from Fundamentals → SEG tab
    ══════════════════════════════════════════════════════════════════ */
+/* ── SVG donut builder ───────────────────────────────────────────── */
+function _segDonutSVG(entries, total, colors) {
+  const cx=60, cy=60, r=50, ri=30;
+  let angle=-Math.PI/2, paths='';
+  entries.forEach(([,val],i)=>{
+    const pct = total>0 ? val/total : 0;
+    if (pct<=0) return;
+    const a2   = angle + pct*2*Math.PI;
+    const large = pct>0.5?1:0;
+    const x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(a2),   y2=cy+r*Math.sin(a2);
+    const xi1=cx+ri*Math.cos(angle),yi1=cy+ri*Math.sin(angle);
+    const xi2=cx+ri*Math.cos(a2),  yi2=cy+ri*Math.sin(a2);
+    const col=colors[i%colors.length];
+    paths+=`<path d="M${xi1.toFixed(1)},${yi1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} L${xi2.toFixed(1)},${yi2.toFixed(1)} A${ri},${ri} 0 ${large},0 ${xi1.toFixed(1)},${yi1.toFixed(1)} Z" fill="${col}" stroke="var(--bg-panel)" stroke-width="1"/>`;
+    angle=a2;
+  });
+  return `<svg viewBox="0 0 120 120" width="120" height="120" style="display:block;flex-shrink:0">${paths}</svg>`;
+}
+
+/* ── EDGAR XBRL fallback for revenue segmentation ────────────────── */
+async function _segEdgarXBRL(sym) {
+  try {
+    // First get CIK from EDGAR company search
+    const searchRes = await fetch(
+      `https://efts.sec.gov/LATEST/search-index?q="${encodeURIComponent(sym)}"&forms=10-K&dateRange=custom&startdt=${new Date(Date.now()-400*86400000).toISOString().slice(0,10)}`,
+      { headers:{'User-Agent':'FINTERM dashboard@finterm.io'}, signal:AbortSignal.timeout(8000) }
+    );
+    const searchData = await searchRes.json();
+    const cik = searchData?.hits?.hits?.[0]?._source?.file_num?.replace(/\D/g,'')?.slice(0,10)
+             || searchData?.hits?.hits?.[0]?._source?.entity_id;
+    if (!cik) return null;
+
+    const factsRes = await fetch(
+      `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik.toString().padStart(10,'0')}.json`,
+      { headers:{'User-Agent':'FINTERM dashboard@finterm.io'}, signal:AbortSignal.timeout(10000) }
+    );
+    const facts = await factsRes.json();
+    // Try to find RevenueFromContractWithCustomer by segment
+    const revFacts = facts?.facts?.['us-gaap']?.RevenueFromContractWithCustomerExcludingAssessedTax?.units?.USD
+                  || facts?.facts?.['us-gaap']?.Revenues?.units?.USD;
+    if (!revFacts?.length) return null;
+
+    // Filter to latest annual period with segment dimension
+    const withDim = revFacts.filter(f=>f.segment?.dimension && f.form==='10-K')
+                             .sort((a,b)=>b.end.localeCompare(a.end));
+    if (!withDim.length) return null;
+
+    // Group by end date (latest fiscal year)
+    const latestEnd = withDim[0].end;
+    const segs = withDim.filter(f=>f.end===latestEnd);
+    if (segs.length<2) return null;
+
+    const segMap = {};
+    segs.forEach(f=>{ segMap[f.segment?.value||f.segment?.dimension||'Other'] = f.val; });
+    return { date: latestEnd, segs: segMap, src: 'SEC EDGAR XBRL' };
+  } catch { return null; }
+}
+
 async function fmpLoadSegmentation(sym) {
   const el = document.getElementById("fund-seg");
   if (!el) return;
-  const key = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
-  if (!key) {
-    el.innerHTML = `<div class="no-data">// FMP key required for revenue segmentation.</div>`;
-    return;
-  }
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading revenue segmentation…</div>`;
-  try {
-    const [prodRes, geoRes] = await Promise.all([
-      fetch(`https://financialmodelingprep.com/api/v3/revenue-product-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
-      fetch(`https://financialmodelingprep.com/api/v3/revenue-geographic-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
-    ]);
 
-    const renderSegTable = (title, records) => {
-      if (!records || !records.length) return `<div class="av-note">// No ${title} data available.</div>`;
-      const latest = records[0];
-      const date   = Object.keys(latest)[0];
-      const segs   = latest[date];
-      if (!segs || typeof segs !== "object") return "";
-      const entries = Object.entries(segs).sort(([,a],[,b]) => b - a);
-      const total   = entries.reduce((s,[,v]) => s + (v||0), 0);
-      let s = `<div class="seg-section-title">${title} <span class="seg-date">${date}</span></div>`;
-      s += `<div class="seg-bars">`;
-      const colors = ["#4a9eff","#7c9","#f90","#e55","#a8f","#8b6","#fc6","#4cf","#f6a","#9bf"];
-      entries.forEach(([name, val], i) => {
-        const pct = total > 0 ? (val / total * 100) : 0;
-        const fmtV = Math.abs(val) >= 1e9 ? (val/1e9).toFixed(1)+"B" :
-                     Math.abs(val) >= 1e6 ? (val/1e6).toFixed(0)+"M" : val.toLocaleString();
-        s += `<div class="seg-row">
-          <div class="seg-label" title="${name}">${name.length > 28 ? name.slice(0,27)+"…" : name}</div>
-          <div class="seg-bar-wrap"><div class="seg-bar" style="width:${Math.min(pct,100).toFixed(1)}%;background:${colors[i % colors.length]}"></div></div>
-          <div class="seg-pct">${pct.toFixed(1)}%</div>
-          <div class="seg-val">${fmtV}</div>
-        </div>`;
-      });
-      s += `</div>`;
-      return s;
-    };
+  const key = (typeof getFmpKey==="function") ? getFmpKey() : "";
+  const SEG_COLORS = ["#4a9eff","#3fb950","#f0883e","#a371f7","#f85149","#d29922","#4dbbff","#ffd700","#ff9800","#e91e63"];
 
-    let html = `<div class="av-live-badge">● Revenue Segmentation · ${sym} · FMP</div>`;
-    html += renderSegTable("By Product / Segment", prodRes);
-    html += `<div style="height:12px"></div>`;
-    html += renderSegTable("By Geography", geoRes);
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = `<div class="no-data">// Segmentation error: ${e.message}</div>`;
-  }
-}
+  const renderSegBlock = (title, records, src) => {
+    if (!records?.length) return '';
+    const latest = records[0];
+    const date   = Object.keys(latest)[0];
+    const segs   = latest[date];
+    if (!segs || typeof segs !== "object") return '';
+    const entries = Object.entries(segs).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+    if (!entries.length) return '';
+    const total = entries.reduce((s,[,v])=>s+(v||0),0);
+    const fmtV = v => Math.abs(v)>=1e9?(v/1e9).toFixed(1)+"B":Math.abs(v)>=1e6?(v/1e6).toFixed(0)+"M":v.toLocaleString();
 
-/* ══════════════════════════════════════════════════════════════════
-   EARNINGS TRANSCRIPT  (FMP — /v3/earning_call_transcript)
-   Called from Fundamentals → TRANS tab
-   ══════════════════════════════════════════════════════════════════ */
-async function fmpLoadTranscript(sym) {
-  const el = document.getElementById("fund-trans");
-  if (!el) return;
-  const key = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
-  if (!key) {
-    el.innerHTML = `<div class="no-data">// FMP key required for earnings transcripts.</div>`;
-    return;
-  }
-  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading transcript list…</div>`;
-  try {
-    // Step 1: get list of available transcripts
-    const list = await fetch(`https://financialmodelingprep.com/api/v4/earning_call_transcript?symbol=${sym}&apikey=${key}`).then(r=>r.json());
-    if (!list || !list.length) {
-      el.innerHTML = `<div class="no-data">// No earnings transcripts found for ${sym}.</div>`;
-      return;
-    }
-    // Show list with load button
-    let html = `<div class="av-live-badge">● Earnings Transcripts · ${sym} · FMP</div>`;
-    html += `<div class="trans-list">`;
-    list.slice(0, 8).forEach((item, idx) => {
-      const label = `Q${item.quarter} ${item.year}`;
-      html += `<div class="trans-list-item">
-        <span class="trans-label">${label}</span>
-        <span class="trans-date">${item.date ? item.date.slice(0,10) : ""}</span>
-        <button class="trans-load-btn" onclick="fmpFetchTranscriptText('${sym}',${item.quarter},${item.year})">Load ↓</button>
+    let s = `<div class="seg-donut-section">
+      <div class="seg-section-title">${fmpEsc(title)} <span class="seg-date">${fmpEsc(date)}</span> <span class="seg-src">· ${fmpEsc(src||'FMP')}</span></div>
+      <div class="seg-donut-row">
+        ${_segDonutSVG(entries, total, SEG_COLORS)}
+        <div class="seg-bars" style="flex:1;min-width:0">`;
+    entries.forEach(([name, val], i) => {
+      const pct = total>0?(val/total*100):0;
+      s += `<div class="seg-row">
+        <div class="seg-dot" style="background:${SEG_COLORS[i%SEG_COLORS.length]}"></div>
+        <div class="seg-label" title="${fmpEsc(name)}">${fmpEsc(name.length>24?name.slice(0,23)+"…":name)}</div>
+        <div class="seg-bar-wrap"><div class="seg-bar" style="width:${Math.min(pct,100).toFixed(1)}%;background:${SEG_COLORS[i%SEG_COLORS.length]}"></div></div>
+        <div class="seg-pct">${pct.toFixed(1)}%</div>
+        <div class="seg-val">${fmpEsc(fmtV(val))}</div>
       </div>`;
     });
-    html += `</div>`;
-    html += `<div id="trans-text-area" style="margin-top:10px"></div>`;
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = `<div class="no-data">// Transcript error: ${e.message}</div>`;
-  }
-}
+    s += `</div></div></div>`;
+    return s;
+  };
 
-async function fmpFetchTranscriptText(sym, quarter, year) {
-  const key  = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
-  const area = document.getElementById("trans-text-area");
-  if (!area || !key) return;
-  area.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading Q${quarter} ${year} transcript…</div>`;
-  try {
-    const data = await fetch(`https://financialmodelingprep.com/api/v3/earning_call_transcript/${sym}?quarter=${quarter}&year=${year}&apikey=${key}`).then(r=>r.json());
-    if (!data || !data.length || !data[0].content) {
-      area.innerHTML = `<div class="no-data">// Transcript content not available.</div>`;
-      return;
-    }
-    const t   = data[0];
-    const txt = t.content.replace(/\n/g, "<br>");
-    area.innerHTML = `
-      <div class="trans-header">
-        <span class="trans-title">Q${quarter} ${year} Earnings Call</span>
-        <span class="trans-meta">${t.date ? t.date.slice(0,10) : ""}</span>
-      </div>
-      <div class="trans-body">${txt}</div>`;
-  } catch(e) {
-    area.innerHTML = `<div class="no-data">// Transcript load error: ${e.message}</div>`;
+  let html = '', src = '';
+
+  // ── 1. FMP (primary) ─────────────────────────────────────────
+  if (key) {
+    try {
+      const [prodRes, geoRes] = await Promise.all([
+        fetch(`https://financialmodelingprep.com/api/v3/revenue-product-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/api/v3/revenue-geographic-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
+      ]);
+      src = 'FMP';
+      html += renderSegBlock("By Product / Segment", prodRes, src);
+      html += renderSegBlock("By Geography", geoRes, src);
+    } catch {}
   }
+
+  // ── 2. SEC EDGAR XBRL fallback ────────────────────────────────
+  if (!html) {
+    const xbrl = await _segEdgarXBRL(sym);
+    if (xbrl?.segs) {
+      const fakeRecord = [{ [xbrl.date]: xbrl.segs }];
+      src = xbrl.src;
+      html += renderSegBlock("By Segment (EDGAR XBRL)", fakeRecord, src);
+    }
+  }
+
+  if (!html) {
+    html = `<div class="no-data">
+      // Revenue segmentation unavailable.<br>
+      // <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">Add FMP key</a> for product/geographic breakdown.
+    </div>`;
+  }
+
+  el.innerHTML = `<div class="av-live-badge">● Revenue Segmentation · ${fmpEsc(sym)} · ${fmpEsc(src||'—')}</div>` + html;
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   IPO CALENDAR  (FMP — /v3/ipo_calendar)
-   Called from Macro·Intel → IPO tab
+   EARNINGS TRANSCRIPT  — Punto 2 Gap Analysis
+   ──────────────────────────────────────────────────────────────────
+   Source stack (priority):
+   1. API Ninjas /v1/earningscalltranscript  (key: ninjas)
+      — Full text with speaker labels, ~10K req/mo free
+   2. FMP /v4/earning_call_transcript        (key: fmp)
+      — Full text, 250 req/day free
+   3. SEC EDGAR 8-K EX-99 full-text search  (no key)
+      — Exhibits only, not full transcript
    ══════════════════════════════════════════════════════════════════ */
-async function fmpLoadIpoCalendar() {
-  const el = document.getElementById("macro-ipo");
-  if (!el) return;
-  const key = (typeof getFmpKey === "function") ? getFmpKey() : localStorage.getItem("finterm_key_fmp") || "";
-  if (!key) {
-    el.innerHTML = `<div class="no-data">// FMP key required for IPO calendar.</div>`;
-    return;
-  }
-  if (el.dataset.loaded === "1") return;
-  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading IPO calendar…</div>`;
-  try {
-    const today  = new Date();
-    const from   = today.toISOString().slice(0,10);
-    const toDate = new Date(today); toDate.setDate(toDate.getDate() + 90);
-    const to     = toDate.toISOString().slice(0,10);
-    const data   = await fetch(`https://financialmodelingprep.com/api/v3/ipo_calendar?from=${from}&to=${to}&apikey=${key}`).then(r=>r.json());
 
-    if (!data || !data.length) {
-      el.innerHTML = `<div class="no-data">// No upcoming IPOs found in the next 90 days.</div>`;
+/* Helper: fetch via API Ninjas */
+async function _transcriptNinjas(sym, year, quarter) {
+  const key = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
+  if (!key) return null;
+  try {
+    const params = new URLSearchParams({ ticker: sym });
+    if (year)    params.set('year',    year);
+    if (quarter) params.set('quarter', quarter);
+    const res  = await fetch(`https://api.api-ninjas.com/v1/earningscalltranscript?${params}`, {
+      headers: { 'X-Api-Key': key },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    // API Ninjas returns array or object
+    const items = Array.isArray(json) ? json : (json ? [json] : []);
+    return items.length ? items : null;
+  } catch { return null; }
+}
+
+/* Helper: fetch full text via FMP */
+async function _transcriptFMP(sym, quarter, year) {
+  const key = (typeof getFmpKey==='function') ? getFmpKey() : '';
+  if (!key) return null;
+  try {
+    const res  = await fetch(
+      `https://financialmodelingprep.com/api/v3/earning_call_transcript/${sym}?quarter=${quarter}&year=${year}&apikey=${key}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    const data = await res.json();
+    return Array.isArray(data) && data.length ? data : null;
+  } catch { return null; }
+}
+
+/* Helper: get list of available transcripts via FMP */
+async function _transcriptListFMP(sym) {
+  const key = (typeof getFmpKey==='function') ? getFmpKey() : '';
+  if (!key) return [];
+  try {
+    const res  = await fetch(
+      `https://financialmodelingprep.com/api/v4/earning_call_transcript?symbol=${sym}&apikey=${key}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch { return []; }
+}
+
+/* Helper: EDGAR 8-K search fallback */
+async function _transcriptEdgar(sym) {
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const from  = new Date(Date.now() - 365*86400000).toISOString().slice(0,10);
+    const url   = `https://efts.sec.gov/LATEST/search-index?q=%22${encodeURIComponent(sym)}%22+%22earnings+call%22&forms=8-K&dateRange=custom&startdt=${from}&enddt=${today}`;
+    const res   = await fetch(url, {
+      headers: { 'User-Agent': 'FINTERM dashboard@finterm.io' },
+      signal: AbortSignal.timeout(8000)
+    });
+    const data  = await res.json();
+    return data?.hits?.hits || [];
+  } catch { return []; }
+}
+
+/* Render speaker-labeled transcript from API Ninjas format */
+function _renderNinjasTranscript(item) {
+  const lines = (item.transcript || item.content || '').split('\n').filter(l=>l.trim());
+  let html = '';
+  lines.forEach(line => {
+    // Detect speaker labels: "John Smith (CEO):" or "ANALYST:"
+    const speakerMatch = line.match(/^([A-Z][^:]{2,40}(?:\([^)]+\))?)\s*:/);
+    if (speakerMatch) {
+      const speaker = fmpEsc(speakerMatch[1]);
+      const text    = fmpEsc(line.slice(speakerMatch[0].length).trim());
+      const isMgmt  = /CEO|CFO|COO|President|Chairman|Chief|Officer|VP|Director/i.test(speaker);
+      const cls     = isMgmt ? 'trans-speaker-mgmt' : 'trans-speaker-analyst';
+      html += `<div class="trans-line">
+        <span class="${cls}">${speaker}</span>
+        <span class="trans-speech">${text}</span>
+      </div>`;
+    } else if (line.trim()) {
+      html += `<div class="trans-line"><span class="trans-speech">${fmpEsc(line)}</span></div>`;
+    }
+  });
+  return html || `<div class="trans-speech">${fmpEsc(item.transcript||item.content||'')}</div>`;
+}
+
+/* Main loader — shown in Fundamentals → TRANS tab */
+async function fmpLoadTranscript(sym) {
+  const el = document.getElementById('fund-trans');
+  if (!el) return;
+
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading transcripts for ${fmpEsc(sym)}…</div>`;
+
+  const ninjasKey = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
+  const fmpKey    = (typeof getFmpKey==='function')    ? getFmpKey()    : '';
+
+  // Show source badge
+  const srcLabel = ninjasKey ? '● API Ninjas + FMP' : fmpKey ? '● FMP' : '● SEC EDGAR (limited)';
+  const srcColor = ninjasKey ? '#3fb950' : fmpKey ? '#58a6ff' : '#d29922';
+
+  // ── Get list of available transcripts ────────────────────────────
+  let transcriptList = [];
+  if (fmpKey) transcriptList = await _transcriptListFMP(sym);
+
+  // Also add API Ninjas entry if available (always shows latest)
+  if (ninjasKey) {
+    const ninjasLatest = await _transcriptNinjas(sym);
+    if (ninjasLatest?.length) {
+      // Prepend Ninjas source as "latest" entry
+      transcriptList = [{ quarter: '?', year: 'Latest', _ninjas: true, _data: ninjasLatest }, ...transcriptList];
+    }
+  }
+
+  // EDGAR fallback if no keys
+  if (!transcriptList.length) {
+    const edgar = await _transcriptEdgar(sym);
+    if (edgar.length) {
+      el.innerHTML = `
+        <div class="av-live-badge" style="color:${srcColor}">${srcLabel}</div>
+        <div class="trans-no-key-note">
+          ⚠ No Ninjas or FMP key configured — showing SEC EDGAR 8-K filings only (partial content).
+          <br>Add an <a href="#" onclick="openApiConfig('ninjas');return false" style="color:var(--accent)">API Ninjas key</a> for full transcripts.
+        </div>
+        <div class="trans-list">
+          ${edgar.slice(0,8).map(h=>{
+            const d = h._source;
+            return `<div class="trans-list-item">
+              <span class="trans-label">${fmpEsc(d?.period_of_report||'8-K')}</span>
+              <span class="trans-date">${fmpEsc(d?.file_date||'')}</span>
+              <a href="https://www.sec.gov${fmpEsc(d?.file_path||'#')}" target="_blank" class="trans-load-btn">EDGAR ↗</a>
+            </div>`;
+          }).join('')}
+        </div>`;
       return;
     }
-
-    let html = `<div class="av-live-badge">● IPO Calendar · Next 90 days · FMP</div>`;
-    html += `<table class="fmp-table">
-      <thead><tr><th>Date</th><th>Symbol</th><th>Company</th><th>Exchange</th><th>Price Range</th><th>Shares</th></tr></thead>
-      <tbody>`;
-    data.forEach(ipo => {
-      const priceRange = (ipo.priceRange) ? ipo.priceRange :
-                         (ipo.priceLow && ipo.priceHigh) ? `$${ipo.priceLow}–$${ipo.priceHigh}` : "TBD";
-      const shares = ipo.shares ? (ipo.shares >= 1e6 ? (ipo.shares/1e6).toFixed(1)+"M" : ipo.shares.toLocaleString()) : "—";
-      html += `<tr>
-        <td>${ipo.date || "—"}</td>
-        <td><strong>${ipo.symbol || "—"}</strong></td>
-        <td>${ipo.company || ipo.name || "—"}</td>
-        <td>${ipo.exchange || "—"}</td>
-        <td>${priceRange}</td>
-        <td>${shares}</td>
-      </tr>`;
-    });
-    html += `</tbody></table>`;
-    el.dataset.loaded = "1";
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = `<div class="no-data">// IPO Calendar error: ${e.message}</div>`;
+    el.innerHTML = `<div class="no-data">
+      // No transcripts available without API keys.<br>
+      // <a href="#" onclick="openApiConfig('ninjas');return false" style="color:var(--accent)">Add API Ninjas key</a> (free, ~10K req/month) for full earnings call transcripts.
+    </div>`;
+    return;
   }
+
+  // ── Render list ────────────────────────────────────────────────
+  let html = `<div class="av-live-badge" style="color:${srcColor}">${srcLabel} · ${sym}</div>`;
+  html += `<div class="trans-list">`;
+  transcriptList.slice(0, 10).forEach((item, idx) => {
+    const label = item._ninjas ? `Latest (API Ninjas)` : `Q${item.quarter} ${item.year}`;
+    const dateStr = item.date ? item.date.slice(0,10) : '';
+    const btnFn   = item._ninjas
+      ? `fmpShowNinjasTranscript(${idx})`
+      : `fmpFetchTranscriptText('${sym}',${item.quarter},${item.year})`;
+    html += `<div class="trans-list-item">
+      <span class="trans-label">${fmpEsc(label)}</span>
+      <span class="trans-date">${fmpEsc(dateStr)}</span>
+      <button class="trans-load-btn" onclick="${btnFn}">Load ↓</button>
+    </div>`;
+  });
+  html += `</div>`;
+  html += `<div id="trans-text-area" style="margin-top:10px"></div>`;
+
+  // Store Ninjas data for inline access
+  if (transcriptList[0]?._ninjas) {
+    window._transNinjasData = transcriptList[0]._data;
+  }
+
+  el.innerHTML = html;
 }
+
+/* Show Ninjas transcript inline (pre-fetched) */
+window.fmpShowNinjasTranscript = function(idx) {
+  const area = document.getElementById('trans-text-area');
+  if (!area || !window._transNinjasData) return;
+  const item = window._transNinjasData[0];
+  if (!item) return;
+
+  area.innerHTML = `
+    <div class="trans-header">
+      <span class="trans-title">${fmpEsc(item.company_name || window.currentTicker || '')} Earnings Call</span>
+      <span class="trans-meta">${fmpEsc(item.date || item.year || '')} · API Ninjas</span>
+    </div>
+    <div class="trans-body">${_renderNinjasTranscript(item)}</div>`;
+};
+
+/* Load FMP transcript text (called from list button) */
+async function fmpFetchTranscriptText(sym, quarter, year) {
+  const area = document.getElementById('trans-text-area');
+  if (!area) return;
+  area.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading Q${quarter} ${year} transcript…</div>`;
+
+  // Try Ninjas first (has speaker labels), fall back to FMP
+  let content = null, source = '';
+  const ninjasKey = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
+  if (ninjasKey) {
+    const data = await _transcriptNinjas(sym, year, quarter);
+    if (data?.length) { content = data[0]; source = 'API Ninjas'; }
+  }
+  if (!content) {
+    const data = await _transcriptFMP(sym, quarter, year);
+    if (data?.length) { content = data[0]; source = 'FMP'; }
+  }
+
+  if (!content) {
+    area.innerHTML = `<div class="no-data">// Transcript not available for Q${quarter} ${year}.</div>`;
+    return;
+  }
+
+  const txt = content.content || content.transcript || '';
+  area.innerHTML = `
+    <div class="trans-header">
+      <span class="trans-title">Q${quarter} ${year} Earnings Call · <span style="color:var(--accent);font-size:9px">${fmpEsc(source)}</span></span>
+      <span class="trans-meta">${fmpEsc(content.date ? content.date.slice(0,10) : '')}</span>
+    </div>
+    <div class="trans-body">${source==='API Ninjas' ? _renderNinjasTranscript(content) : fmpEsc(txt).replace(/\n/g,'<br>')}</div>`;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   IPO CALENDAR  — Punto 3 Gap Analysis
+   ──────────────────────────────────────────────────────────────────
+   Source stack:
+   1. NASDAQ Public API  api.nasdaq.com/api/ipo/calendar  (NO KEY)
+   2. Finnhub /calendar/ipo                              (existing key)
+   3. FMP /v3/ipo_calendar                               (existing key)
+   ══════════════════════════════════════════════════════════════════ */
+
+async function fmpLoadIpoCalendar() {
+  const el = document.getElementById('macro-ipo');
+  if (!el) return;
+  if (el.dataset.loaded === '1') return;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading IPO calendar…</div>`;
+
+  // ── 1. NASDAQ Public API (no key) ────────────────────────────
+  let ipos = [], src = '';
+  try {
+    const now   = new Date();
+    const ym    = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const ymNext= new Date(now.getFullYear(), now.getMonth()+2, 1);
+    const ym2   = `${ymNext.getFullYear()}-${String(ymNext.getMonth()+1).padStart(2,'0')}`;
+    const [r1, r2] = await Promise.allSettled([
+      fetch(`https://api.nasdaq.com/api/ipo/calendar?date=${ym}`,
+        { headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'}, signal:AbortSignal.timeout(7000) }).then(r=>r.json()),
+      fetch(`https://api.nasdaq.com/api/ipo/calendar?date=${ym2}`,
+        { headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'}, signal:AbortSignal.timeout(7000) }).then(r=>r.json()),
+    ]);
+    const parse = res => {
+      if (res.status !== 'fulfilled') return [];
+      const d = res.value?.data;
+      // NASDAQ response: { data: { upcoming: { upcomingTable: { rows: [...] } }, priced: {...}, filed: {...} } }
+      const all = [];
+      for (const section of ['upcoming','priced','filed']) {
+        const rows = d?.[section]?.rows || d?.[section]?.upcomingTable?.rows || [];
+        rows.forEach(r => all.push({ ...r, _section: section }));
+      }
+      return all;
+    };
+    ipos = [...parse(r1), ...parse(r2)];
+    if (ipos.length) src = 'NASDAQ (no key)';
+  } catch {}
+
+  // ── 2. Finnhub fallback ───────────────────────────────────────
+  if (!ipos.length) {
+    const fhKey = (typeof getFinnhubKey==='function') ? getFinnhubKey() : '';
+    if (fhKey) {
+      try {
+        const today = new Date().toISOString().slice(0,10);
+        const plus90= new Date(Date.now()+90*86400000).toISOString().slice(0,10);
+        const r = await fetch(`https://finnhub.io/api/v1/calendar/ipo?from=${today}&to=${plus90}&token=${fhKey}`,
+          { signal: AbortSignal.timeout(7000) });
+        const d = await r.json();
+        ipos = (d.ipoCalendar || []).map(x => ({
+          dealId: x.symbol, companyName: x.name, exchange: x.exchange,
+          expectedPriceDate: x.date, priceLow: x.price?.split('-')?.[0]?.replace('$',''),
+          priceHigh: x.price?.split('-')?.[1]?.replace('$',''),
+          proposedSharePrice: x.price, sharesOffered: x.numberOfShares,
+          _section: 'upcoming',
+        }));
+        if (ipos.length) src = 'Finnhub';
+      } catch {}
+    }
+  }
+
+  // ── 3. FMP fallback ───────────────────────────────────────────
+  if (!ipos.length) {
+    const key = (typeof getFmpKey==='function') ? getFmpKey() : '';
+    if (key) {
+      try {
+        const today  = new Date().toISOString().slice(0,10);
+        const future = new Date(Date.now()+90*86400000).toISOString().slice(0,10);
+        const d = await fetch(`https://financialmodelingprep.com/api/v3/ipo_calendar?from=${today}&to=${future}&apikey=${key}`,
+          { signal: AbortSignal.timeout(7000) }).then(r=>r.json());
+        ipos = (d||[]).map(x => ({
+          dealId: x.symbol, companyName: x.company||x.name, exchange: x.exchange,
+          expectedPriceDate: x.date, priceLow: x.priceLow, priceHigh: x.priceHigh,
+          proposedSharePrice: x.priceRange, sharesOffered: x.shares,
+          _section: 'upcoming',
+        }));
+        if (ipos.length) src = 'FMP';
+      } catch {}
+    }
+  }
+
+  if (!ipos.length) {
+    el.innerHTML = `<div class="no-data">// No IPO data available. NASDAQ, Finnhub, and FMP returned no results.</div>`;
+    return;
+  }
+
+  // Sort by date
+  ipos.sort((a,b) => (a.expectedPriceDate||'').localeCompare(b.expectedPriceDate||''));
+
+  const sectionColor = { upcoming:'#58a6ff', priced:'#3fb950', filed:'#d29922', withdrawn:'#f85149' };
+
+  let html = `<div class="av-live-badge">● IPO Calendar · ${ipos.length} IPOs · ${fmpEsc(src)}</div>`;
+  html += `<div style="overflow-x:auto"><table class="fmp-table">
+    <thead><tr>
+      <th>Status</th><th>Date</th><th>Symbol</th><th>Company</th>
+      <th>Exchange</th><th>Price Range</th><th>Shares</th>
+    </tr></thead><tbody>`;
+
+  ipos.forEach(ipo => {
+    const sec    = ipo._section || 'upcoming';
+    const col    = sectionColor[sec] || '#888';
+    const pr     = ipo.proposedSharePrice || (ipo.priceLow && ipo.priceHigh ? `$${ipo.priceLow}–$${ipo.priceHigh}` : ipo.priceLow ? `$${ipo.priceLow}` : '—');
+    const shares = ipo.sharesOffered ? (parseInt(ipo.sharesOffered)>=1e6
+      ? (parseInt(ipo.sharesOffered)/1e6).toFixed(1)+'M'
+      : parseInt(ipo.sharesOffered).toLocaleString()) : '—';
+    const sym    = ipo.dealId||ipo.symbol||'—';
+    html += `<tr>
+      <td><span style="font-size:9px;font-weight:700;color:${col}">${fmpEsc(sec.toUpperCase())}</span></td>
+      <td style="font-family:var(--font-mono)">${fmpEsc(ipo.expectedPriceDate||ipo.pricingDate||'—')}</td>
+      <td><strong style="color:var(--accent);cursor:pointer" onclick="if(typeof changeTicker==='function')changeTicker('${fmpEsc(sym)}')">${fmpEsc(sym)}</strong></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${fmpEsc(ipo.companyName||ipo.name||'')}">${fmpEsc((ipo.companyName||ipo.name||'').slice(0,30))}</td>
+      <td>${fmpEsc(ipo.exchange||ipo.proposedExchange||'—')}</td>
+      <td style="font-family:var(--font-mono)">${fmpEsc(pr)}</td>
+      <td style="font-family:var(--font-mono)">${fmpEsc(shares)}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  el.dataset.loaded = '1';
+  el.innerHTML = html;
+}
+
 
 /* ══════════════════════════════════════════════════════════════════
    FORM 4 INSIDER TRADING  (SEC EDGAR — no API key)
