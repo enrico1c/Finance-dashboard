@@ -5137,3 +5137,246 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 .bonds-spread-pill   { display:inline-block; margin-top:8px; padding:4px 10px; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:10px; font-size:11px; font-weight:700; font-family:var(--font-mono); }
 .bonds-interp        { display:flex; flex-direction:column; gap:5px; }
 .bonds-interp-row    { display:flex; gap:8px; font-size:10px; color:var(--text-muted); line-height:1.4; align-items:flex-start; }
+
+/* ══════════════════════════════════════════════════════════════════
+   GEOINTEL MODULE — Terror / Cyber / Travel
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Shared section layout */
+.gi-section      { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.gi-section-title{ font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 700; margin-bottom: 7px; }
+.gi-footer       { font-size: 9px; color: var(--text-muted); padding: 6px 12px; }
+.gi-event-link   { color: var(--accent); text-decoration: none; }
+.gi-event-link:hover { text-decoration: underline; }
+.gi-more         { font-size: 9px; color: var(--text-muted); padding: 4px 0; text-align: center; }
+.gi-links-grid   { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.gi-link-card    { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--text); text-decoration: none; font-size: 11px; transition: all .12s; }
+.gi-link-card:hover { border-color: var(--accent); background: rgba(88,166,255,.06); }
+.gi-link-icon    { font-size: 16px; }
+
+/* Country chips (heatmap) */
+.gi-country-chips{ display: flex; flex-wrap: wrap; gap: 5px; }
+.gi-country-chip { font-size: 10px; padding: 3px 8px; background: var(--bg-input,#161b22); border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+.gi-country-chip strong { color: var(--accent); }
+
+/* Terror event cards */
+.gi-event-card   { padding: 7px 0; border-bottom: 1px solid var(--border); }
+.gi-event-card:last-child { border-bottom: none; }
+.gi-event-header { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 3px; }
+.gi-event-cat    { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 3px; letter-spacing: .04em; }
+.gi-event-country{ font-size: 9px; color: var(--text-muted); }
+.gi-event-time   { font-size: 9px; color: var(--text-muted); margin-left: auto; }
+.gi-event-title  { font-size: 11px; color: var(--text); line-height: 1.4; }
+.gi-event-source { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
+
+/* Cyber CVE cards */
+.cyber-stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+.cyber-stat      { background: var(--bg-panel); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.cyber-stat-val  { font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--text); }
+.cyber-stat-lbl  { font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
+
+.cyber-cve-card  { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.cyber-cve-card:last-child { border-bottom: none; }
+.cyber-cve-ransom{ background: rgba(248,81,73,.04); }
+.cyber-cve-header{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 3px; }
+.cyber-cve-id    { font-size: 11px; font-weight: 800; color: var(--accent); font-family: var(--font-mono); }
+.cyber-ransom-badge { font-size: 9px; font-weight: 700; padding: 1px 6px; background: rgba(248,81,73,.15); color: #f85149; border: 1px solid rgba(248,81,73,.3); border-radius: 3px; }
+.cyber-cve-date  { font-size: 9px; color: var(--text-muted); }
+.cyber-cve-due   { font-size: 9px; color: #d29922; font-weight: 600; }
+.cyber-cve-vendor{ font-size: 10px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.cyber-cve-name  { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+.cyber-cve-action{ font-size: 9px; color: var(--text-muted); line-height: 1.4; }
+
+/* Travel advisory */
+.travel-level-row{ display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.travel-level-pill{ display: flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.travel-level-num { font-size: 12px; font-weight: 800; font-family: var(--font-mono); }
+.travel-level-cnt { font-size: 14px; font-weight: 800; font-family: var(--font-mono); }
+.travel-level-lbl { font-size: 9px; opacity: .8; }
+.travel-item      { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+.travel-item-header{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 3px; }
+.travel-item-country{ font-size: 12px; font-weight: 700; color: var(--text); }
+.travel-item-level{ font-size: 10px; font-weight: 600; }
+.travel-item-date { font-size: 9px; color: var(--text-muted); margin-left: auto; }
+.travel-item-desc { font-size: 10px; color: var(--text-muted); line-height: 1.4; margin-bottom: 3px; }
+
+/* GDELT Instability scores in INTEL tab */
+.gi-stab-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; padding: 6px 12px 10px; }
+.gi-stab-cell    { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; background: var(--bg-input,#161b22); border-radius: 4px; text-align: center; }
+.gi-stab-name    { font-size: 9px; color: var(--text-muted); }
+.gi-stab-score   { font-size: 14px; font-weight: 800; font-family: var(--font-mono); }
+.gi-stab-trend   { font-size: 11px; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════════════════
+   MACROGLOBAL MODULE — Global Macro / PMI / Central Banks
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Shared section */
+.mg-section       { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.mg-section-title { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; }
+.mg-footer        { font-size: 9px; color: var(--text-muted); padding: 6px 12px; }
+
+/* Global overview KPIs */
+.mg-overview-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+.mg-overview-kpi  { background: var(--bg-panel); padding: 9px 10px; display: flex; flex-direction: column; gap: 2px; }
+.mg-ov-lbl        { font-size: 9px; text-transform: uppercase; color: var(--text-muted); letter-spacing: .05em; font-weight: 700; }
+.mg-ov-val        { font-size: 18px; font-weight: 800; font-family: var(--font-mono); color: var(--text); }
+
+/* Country table */
+.mg-table         { width: 100%; border-collapse: collapse; font-size: 10px; }
+.mg-table th      { padding: 5px 8px; text-align: center; color: var(--text-muted); font-size: 8px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: 700; }
+.mg-table th:first-child { text-align: left; }
+.mg-table td      { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: center; font-family: var(--font-mono); font-size: 10px; }
+.mg-table td:first-child { text-align: left; }
+.mg-table td small{ font-size: 8px; color: var(--text-muted); display: block; }
+.mg-table tr:hover td { background: rgba(255,255,255,.03); }
+.mg-country-cell  { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 11px; font-weight: 600; }
+.mg-flag          { font-size: 14px; }
+
+/* GDP bar chart */
+.mg-bar-chart     { display: flex; flex-direction: column; gap: 4px; }
+.mg-bar-row       { display: grid; grid-template-columns: 110px 1fr 50px; gap: 8px; align-items: center; font-size: 10px; }
+.mg-bar-label     { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+.mg-bar-track     { height: 8px; background: var(--bg-input,#161b22); border-radius: 4px; overflow: hidden; }
+.mg-bar-fill      { height: 100%; border-radius: 4px; transition: width .4s ease; }
+.mg-bar-val       { font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-align: right; }
+
+/* CLI / PMI */
+.mg-cli-summary   { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.mg-cli-group     { padding: 5px 10px; border: 1px solid; border-radius: 4px; font-size: 10px; }
+.mg-cli-group-label{ font-weight: 700; margin-bottom: 3px; }
+.mg-cli-group-countries { display: flex; flex-wrap: wrap; gap: 4px; font-size: 9px; color: var(--text-muted); }
+
+.mg-cli-grid      { display: grid; grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); gap: 6px; padding: 10px 12px; }
+.mg-cli-card      { background: var(--bg-input,#161b22); padding: 8px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px; }
+.mg-cli-name      { font-size: 10px; color: var(--text-muted); }
+.mg-cli-val       { font-size: 16px; font-weight: 800; font-family: var(--font-mono); }
+.mg-cli-signal    { font-size: 9px; font-weight: 700; }
+.mg-cli-trend     { font-size: 9px; font-family: var(--font-mono); }
+.mg-cli-bar-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; position: relative; margin: 3px 0; }
+.mg-cli-bar-fill  { height: 100%; border-radius: 2px; }
+.mg-cli-bar-center{ position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--text-muted); opacity: .4; }
+.mg-cli-period    { font-size: 8px; color: var(--text-muted); }
+
+/* Central Banks */
+.cb-rates-grid    { display: grid; grid-template-columns: repeat(auto-fill,minmax(120px,1fr)); gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.cb-rate-card     { padding: 8px; background: var(--bg-input,#161b22); border-radius: 4px; display: flex; flex-direction: column; gap: 2px; }
+.cb-rate-bank     { font-size: 10px; font-weight: 700; color: var(--text); }
+.cb-rate-country  { font-size: 9px; color: var(--text-muted); }
+.cb-rate-val      { font-size: 20px; font-weight: 800; font-family: var(--font-mono); }
+.cb-rate-ccy      { font-size: 8px; color: var(--text-muted); }
+.cb-rate-next     { font-size: 9px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+
+.cb-links-row     { display: flex; flex-wrap: wrap; gap: 6px; }
+.cb-link-btn      { font-size: 9px; padding: 4px 8px; background: var(--bg-input,#161b22); border: 1px solid var(--border); border-radius: 3px; color: var(--accent); text-decoration: none; transition: all .12s; }
+.cb-link-btn:hover{ border-color: var(--accent); background: rgba(88,166,255,.06); }
+
+.cb-calendar      { display: flex; flex-direction: column; gap: 2px; }
+.cb-event-row     { display: grid; grid-template-columns: 20px 80px 40px 1fr 40px; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 10px; }
+.cb-event-row:last-child { border-bottom: none; }
+.cb-event-near    { background: rgba(255,255,255,.03); border-radius: 3px; padding: 4px 6px; }
+.cb-event-past    { opacity: .6; }
+.cb-event-flag    { font-size: 12px; }
+.cb-event-date    { font-family: var(--font-mono); color: var(--text-muted); font-size: 9px; }
+.cb-event-bank    { font-weight: 700; font-size: 9px; }
+.cb-event-type    { color: var(--text-muted); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-event-days    { font-family: var(--font-mono); font-weight: 700; text-align: right; font-size: 9px; }
+
+/* Econ tab enrichment strip */
+.mg-econ-strip    { display: flex; flex-wrap: wrap; gap: 6px; }
+.mg-econ-chip     { display: flex; align-items: center; gap: 5px; padding: 4px 8px; background: var(--bg-input,#161b22); border: 1px solid var(--border); border-radius: 4px; font-size: 9px; font-family: var(--font-mono); }
+.mg-econ-flag     { font-size: 12px; }
+.mg-econ-gdp      { font-weight: 700; }
+.mg-econ-cpi      { color: var(--text-muted); }
+
+/* ══════════════════════════════════════════════════════════════════
+   TECHNICAL INDICATORS UPGRADE — Gauges, BB Position, RSI Visual
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Wide cards span 2 columns */
+.tech-ind-card-wide {
+  grid-column: span 2;
+}
+
+/* Generic gauge bar (Stochastic, Williams %R) */
+.tech-gauge-wrap   { margin: 6px 0 2px; }
+.tech-gauge-track  { position: relative; height: 10px; border-radius: 5px; overflow: visible; display: flex; }
+.tech-gauge-zone-low  { background: #3fb950; border-radius: 5px 0 0 5px; }
+.tech-gauge-zone-mid  { background: #d29922; }
+.tech-gauge-zone-high { background: #f85149; border-radius: 0 5px 5px 0; }
+.tech-gauge-needle {
+  position: absolute; top: -3px;
+  width: 3px; height: 16px;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(0,0,0,.5);
+  transform: translateX(-50%);
+  transition: left .3s ease;
+}
+.tech-gauge-labels {
+  display: flex; justify-content: space-between;
+  font-size: 8px; color: var(--text-muted); margin-top: 3px;
+  font-family: var(--font-mono);
+}
+
+/* RSI Gauge Visual */
+.rsi-gauge-visual  { padding: 4px 0; }
+.rsi-gauge-bar {
+  position: relative; height: 18px; border-radius: 9px; overflow: visible;
+  background: linear-gradient(to right, #3fb950 0%, #3fb950 30%, #d29922 30%, #d29922 70%, #f85149 70%, #f85149 100%);
+}
+.rsi-gauge-pointer {
+  position: absolute; top: -4px;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+  transition: left .3s ease;
+}
+.rsi-gauge-val {
+  background: var(--bg-panel);
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  font-size: 11px; font-weight: 800;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  white-space: nowrap;
+  color: var(--text);
+  margin-top: 20px;
+}
+.rsi-gauge-scale {
+  display: flex; justify-content: space-between;
+  font-size: 8px; color: var(--text-muted);
+  margin-top: 2px; font-family: var(--font-mono);
+}
+
+/* BB Position Bar */
+.bb-pos-wrap  { padding: 4px 0; }
+.bb-pos-bar {
+  position: relative; height: 12px; border-radius: 6px;
+  background: linear-gradient(to right, #3fb950, #d29922, #f85149);
+  margin: 4px 0;
+}
+.bb-pos-marker {
+  position: absolute; top: -6px;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+}
+.bb-pos-price {
+  background: var(--bg-panel);
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  font-size: 10px; font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 1px 4px;
+  color: var(--accent);
+  margin-top: 16px;
+  white-space: nowrap;
+}
+.bb-pos-label-upper {
+  position: absolute; right: 0; top: -14px;
+  font-size: 8px; color: var(--text-muted); font-family: var(--font-mono);
+}
+.bb-pos-label-lower {
+  position: absolute; left: 0; top: -14px;
+  font-size: 8px; color: var(--text-muted); font-family: var(--font-mono);
+}
+.bb-pos-pctb { font-size: 9px; color: var(--text-muted); margin-top: 18px; font-family: var(--font-mono); }
