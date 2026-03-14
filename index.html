@@ -2,6 +2,10 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FINTERM — Finance Dashboard</title>
   <link rel="stylesheet" href="style.css" />
@@ -233,12 +237,12 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="des"     onclick="switchTab('fundamentals','des')">DES</button>
-        <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa')">FA</button>
-        <button class="tab-btn"        data-tab="ern"     onclick="switchTab('fundamentals','ern')">ERN</button>
-        <button class="tab-btn"        data-tab="ee"      onclick="switchTab('fundamentals','ee')">EE</button>
-        <button class="tab-btn"        data-tab="wacc"    onclick="switchTab('fundamentals','wacc')">WACC</button>
-        <button class="tab-btn"        data-tab="tech"    onclick="switchTab('fundamentals','tech');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof avLoadTech==='function')avLoadTech(s)})()">TECH</button>
+        <button class="tab-btn active" data-tab="des"     onclick="switchTab('fundamentals','des');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';renderFundamentals(s)})()">DES</button>
+        <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-fa');if(el&&!el.dataset.loaded){if(typeof avRenderFA!=='undefined'&&typeof avLiveCache!=='undefined'&&avLiveCache[s]?.income?.length){avRenderFA(s,avLiveCache[s].income,avLiveCache[s].balance,avLiveCache[s].cashflow);el.dataset.loaded='av';}else if(typeof faLoadEdgarXBRL==='function'){faLoadEdgarXBRL(s,el);el.dataset.loaded='xbrl';}}})()">FA</button>
+        <button class="tab-btn"        data-tab="ern"     onclick="switchTab('fundamentals','ern');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ern');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">ERN</button>
+        <button class="tab-btn"        data-tab="ee"      onclick="switchTab('fundamentals','ee');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ee');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">EE</button>
+        <button class="tab-btn"        data-tab="wacc"    onclick="switchTab('fundamentals','wacc');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-wacc');if(el&&!el.dataset.loaded){renderFundamentals(s);}})()">WACC</button>
+        <button class="tab-btn"        data-tab="tech"    onclick="switchTab('fundamentals','tech');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-tech');if(el&&!el.dataset.techSym){if(typeof techLoadFull==='function')techLoadFull(s);else if(typeof avLoadTech==='function')avLoadTech(s);el.dataset.techSym=s;}})()">TECH</button>
         <button class="tab-btn"        data-tab="short"   onclick="switchTab('fundamentals','short');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fhLoadShortInterest==='function')fhLoadShortInterest(s)})()">SHORT</button>
         <button class="tab-btn"        data-tab="seg"     onclick="switchTab('fundamentals','seg');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadSegmentation==='function')fmpLoadSegmentation(s)})()">SEG</button>
         <button class="tab-btn"        data-tab="trans"   onclick="switchTab('fundamentals','trans');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadTranscript==='function')fmpLoadTranscript(s)})()">TRANS</button>
@@ -446,7 +450,7 @@
         <button class="tab-btn"        data-tab="quakes"    onclick="switchTab('geopolitical','quakes');wmGeoQuakes()">QUAKES</button>
         <button class="tab-btn"        data-tab="gps"       onclick="switchTab('geopolitical','gps');if(typeof wmGeoGpsJam==='function')wmGeoGpsJam()">GPS JAM</button>
         <button class="tab-btn"        data-tab="milops"    onclick="switchTab('geopolitical','milops');if(typeof wmGeoMilOps==='function')wmGeoMilOps()">MIL·OPS</button>
-        <button class="tab-btn"        data-tab="fema"      onclick="switchTab('geopolitical','fema');if(typeof femaLoadDisasters==='function')femaLoadDisasters()">FEMA</button>
+        <button class="tab-btn"        data-tab="fema"      onclick="switchTab('geopolitical','fema');if(typeof femaLoadDisasters==='function')femaLoadDisasters();if(typeof gdacsLoadEvents==='function')gdacsLoadEvents()">FEMA</button>
         <button class="tab-btn"        data-tab="terror"    onclick="switchTab('geopolitical','terror');if(typeof geoLoadTerror==='function')geoLoadTerror()">💥 TERROR</button>
         <button class="tab-btn"        data-tab="cyber"     onclick="switchTab('geopolitical','cyber');if(typeof geoLoadCyber==='function')geoLoadCyber()">🔒 CYBER</button>
         <button class="tab-btn"        data-tab="travel"    onclick="switchTab('geopolitical','travel');if(typeof geoLoadTravel==='function')geoLoadTravel()">✈ TRAVEL</button>
@@ -530,11 +534,12 @@
         </div>
       </div>
 
-      <!-- FEMA TAB — US disaster declarations (OpenFEMA, no key) -->
+      <!-- FEMA TAB — US disaster declarations (OpenFEMA) + GDACS global alerts -->
       <div class="tab-pane panel-content" data-tab="fema" id="geo-fema">
         <div class="geo-cross-bar">
-          <span class="geo-cross-label">OpenFEMA · US Disaster Declarations · No API key</span>
-          <button class="geo-cross-btn" onclick="if(typeof femaLoadDisasters==='function')femaLoadDisasters()">↻ Refresh</button>
+          <span class="geo-cross-label">OpenFEMA · GDACS Global Disasters · No API key</span>
+          <button class="geo-cross-btn" onclick="if(typeof femaLoadDisasters==='function')femaLoadDisasters();if(typeof gdacsLoadEvents==='function')gdacsLoadEvents()">↻ Refresh</button>
+          <button class="geo-cross-btn" onclick="if(typeof gdacsLoadEvents==='function')gdacsLoadEvents()">🌍 GDACS</button>
         </div>
       </div>
 
@@ -1325,5 +1330,25 @@ document.addEventListener("DOMContentLoaded", () => {
   renderGeoRoutes();
 });
 </script>
+  <!-- PWA: Service Worker registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+          console.info('[SW] Registered:', reg.scope);
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Show subtle update toast
+                if (typeof showApiToast === 'function')
+                  showApiToast('↻ Update available — reload to apply', 'info');
+              }
+            });
+          });
+        }).catch(err => console.warn('[SW] Registration failed:', err));
+      });
+    }
+  </script>
 </body>
 </html>
