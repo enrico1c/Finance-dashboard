@@ -446,6 +446,9 @@
         <button class="tab-btn"        data-tab="gps"       onclick="switchTab('geopolitical','gps');if(typeof wmGeoGpsJam==='function')wmGeoGpsJam()">GPS JAM</button>
         <button class="tab-btn"        data-tab="milops"    onclick="switchTab('geopolitical','milops');if(typeof wmGeoMilOps==='function')wmGeoMilOps()">MIL·OPS</button>
         <button class="tab-btn"        data-tab="fema"      onclick="switchTab('geopolitical','fema');if(typeof femaLoadDisasters==='function')femaLoadDisasters()">FEMA</button>
+        <button class="tab-btn"        data-tab="terror"    onclick="switchTab('geopolitical','terror');if(typeof geoLoadTerror==='function')geoLoadTerror()">💥 TERROR</button>
+        <button class="tab-btn"        data-tab="cyber"     onclick="switchTab('geopolitical','cyber');if(typeof geoLoadCyber==='function')geoLoadCyber()">🔒 CYBER</button>
+        <button class="tab-btn"        data-tab="travel"    onclick="switchTab('geopolitical','travel');if(typeof geoLoadTravel==='function')geoLoadTravel()">✈ TRAVEL</button>
       </div>
 
       <!-- WARS TAB -->
@@ -531,6 +534,33 @@
           <span class="geo-cross-label">OpenFEMA · US Disaster Declarations · No API key</span>
           <button class="geo-cross-btn" onclick="if(typeof femaLoadDisasters==='function')femaLoadDisasters()">↻ Refresh</button>
         </div>
+      </div>
+
+      <!-- TERROR TAB — GDELT terrorism events (no key) -->
+      <div class="tab-pane panel-content" data-tab="terror" id="geo-terror">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">GDELT · Global terrorism &amp; conflict events · No API key</span>
+          <button class="geo-cross-btn" onclick="if(typeof geoLoadTerror==='function')geoLoadTerror()">↻ Refresh</button>
+        </div>
+        <div id="geo-terror-content"></div>
+      </div>
+
+      <!-- CYBER TAB — CISA KEV + NVD (no key) -->
+      <div class="tab-pane panel-content" data-tab="cyber" id="geo-cyber">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">CISA KEV · Known Exploited Vulnerabilities · No API key</span>
+          <button class="geo-cross-btn" onclick="if(typeof geoLoadCyber==='function')geoLoadCyber()">↻ Refresh</button>
+        </div>
+        <div id="geo-cyber-content"></div>
+      </div>
+
+      <!-- TRAVEL TAB — US State Dept travel advisories (RSS, no key) -->
+      <div class="tab-pane panel-content" data-tab="travel" id="geo-travel">
+        <div class="geo-cross-bar">
+          <span class="geo-cross-label">US State Dept · Travel Advisories · No API key</span>
+          <button class="geo-cross-btn" onclick="if(typeof geoLoadTravel==='function')geoLoadTravel()">↻ Refresh</button>
+        </div>
+        <div id="geo-travel-content"></div>
       </div>
 
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
@@ -761,6 +791,9 @@
         <button class="tab-btn"        data-tab="ipo"     onclick="switchTab('macro','ipo');if(typeof fmpLoadIpoCalendar==='function')fmpLoadIpoCalendar()">IPO</button>
         <button class="tab-btn"        data-tab="trending" onclick="switchTab('macro','trending');if(typeof yfLoadTrending==='function')yfLoadTrending()">TRENDING</button>
         <button class="tab-btn"        data-tab="bonds"    onclick="switchTab('macro','bonds');if(typeof bondsLoadSpreads==='function')bondsLoadSpreads()">BONDS</button>
+        <button class="tab-btn"        data-tab="global"   onclick="switchTab('macro','global');if(typeof macroLoadGlobal==='function')macroLoadGlobal()">🌐 GLOBAL</button>
+        <button class="tab-btn"        data-tab="pmi"      onclick="switchTab('macro','pmi');if(typeof macroLoadPMI==='function')macroLoadPMI()">📊 PMI</button>
+        <button class="tab-btn"        data-tab="cb"       onclick="switchTab('macro','cb');if(typeof macroLoadCentralBanks==='function')macroLoadCentralBanks()">🏦 BANKS</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="signals" id="macro-signals"></div>
       <div class="tab-pane        panel-content" data-tab="comm"    id="macro-comm"></div>
@@ -773,6 +806,9 @@
       <div class="tab-pane        panel-content" data-tab="sectors" id="macro-sectors"></div>
       <div class="tab-pane        panel-content" data-tab="ipo"     id="macro-ipo"></div>
       <div class="tab-pane        panel-content" data-tab="bonds"    id="bonds-content"></div>
+      <div class="tab-pane        panel-content" data-tab="global"   id="macro-global"></div>
+      <div class="tab-pane        panel-content" data-tab="pmi"      id="macro-pmi"></div>
+      <div class="tab-pane        panel-content" data-tab="cb"       id="macro-cb"></div>
       <div class="tab-pane        panel-content" data-tab="trending" id="macro-trending">
         <div id="yf-trending" class="panel-content"></div>
       </div>
@@ -806,20 +842,41 @@
       </div>
       <div class="tab-pane        panel-content" data-tab="port-add">
         <div class="wh-form">
-          <div class="wh-field-row"><label class="wh-label">Ticker</label><input id="port-ticker" class="wh-input" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()"/></div>
-          <div class="wh-field-row"><label class="wh-label">Shares</label><input id="port-shares" class="wh-input" type="number" placeholder="100" step="0.01"/></div>
-          <div class="wh-field-row"><label class="wh-label">Avg Cost ($)</label><input id="port-cost" class="wh-input" type="number" placeholder="150.00" step="0.01"/></div>
-          <div class="wh-field-row"><label class="wh-label">Note (optional)</label><input id="port-note" class="wh-input" placeholder="Long-term hold…"/></div>
+          <div class="wh-field-row">
+            <label class="wh-label">Entry Type</label>
+            <select id="port-tx-type" class="wh-select">
+              <option value="position">Direct Position</option>
+              <option value="buy">Buy Transaction</option>
+              <option value="sell">Sell Transaction</option>
+              <option value="dividend">Dividend</option>
+            </select>
+          </div>
+          <div class="wh-field-row">
+            <label class="wh-label">Asset Type</label>
+            <select id="port-asset-type" class="wh-select">
+              <option value="stock">Stock</option>
+              <option value="etf">ETF</option>
+              <option value="crypto">Crypto</option>
+              <option value="bond">Bond</option>
+              <option value="option">Option</option>
+            </select>
+          </div>
+          <div class="wh-field-row"><label class="wh-label">Ticker</label><input id="port-ticker" class="wh-input" placeholder="AAPL · BTC · SPY" oninput="this.value=this.value.toUpperCase()"/></div>
+          <div class="wh-field-row"><label class="wh-label">Shares / Qty</label><input id="port-shares" class="wh-input" type="number" placeholder="100" step="0.000001"/></div>
+          <div class="wh-field-row"><label class="wh-label">Avg Cost / Price ($)</label><input id="port-cost" class="wh-input" type="number" placeholder="150.00" step="0.01"/></div>
+          <div class="wh-field-row"><label class="wh-label">Note (optional)</label><input id="port-note" class="wh-input" placeholder="Long-term hold · earnings play…"/></div>
           <div class="wh-btn-row">
-            <button class="wh-btn-primary" onclick="portAddPosition()">➕ Add Position</button>
+            <button class="wh-btn-primary" onclick="portAddPosition()">➕ Save</button>
             <label class="wh-btn-secondary" style="display:flex;align-items:center;justify-content:center;cursor:pointer">
-              📂 Import CSV
-              <input type="file" accept=".csv" style="display:none" onchange="portImportCSV(this.files[0])"/>
+              📂 CSV Import
+              <input type="file" accept=".csv,.txt" style="display:none" onchange="portImportCSV(this.files[0])"/>
             </label>
+            <button class="wh-btn-secondary" onclick="portExportJSON()">💾 Export</button>
           </div>
           <div id="port-form-status" class="wh-status"></div>
-          <div class="wh-field-row" style="margin-top:10px;color:var(--text-muted);font-size:9px">
-            CSV format: ticker,shares,avgcost,note (one per line, no header required)
+          <div style="font-size:9px;color:var(--text-muted);margin-top:8px;line-height:1.6">
+            Supports: Robinhood, Schwab, E*TRADE, IBKR CSV — auto-detected<br>
+            Transactions (buy/sell) auto-update positions with weighted avg cost
           </div>
         </div>
       </div>
@@ -935,6 +992,8 @@
 <script src="yahoo.js"></script>
 <script src="sbcache.js"></script>
 <script src="finterm-extras.js"></script>
+<script src="geointel.js"></script>
+<script src="macroglobal.js"></script>
 <script>
 /* Intel Feed — OREF / TELEGRAM sub-panel switcher */
 function wmIntelShowOref() {
