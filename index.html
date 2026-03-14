@@ -262,7 +262,31 @@
       <div class="tab-pane        panel-content" data-tab="tech"    id="fund-tech"></div>
       <div class="tab-pane        panel-content" data-tab="short"   id="fund-short"></div>
       <div class="tab-pane        panel-content" data-tab="seg"     id="fund-seg"></div>
-      <div class="tab-pane        panel-content" data-tab="trans"   id="fund-trans"></div>
+      <div class="tab-pane        panel-content" data-tab="trans"   id="fund-trans">
+        <div class="api-quicksetup-banner" id="trans-setup-banner">
+          <div class="api-qs-icon">🎙️</div>
+          <div class="api-qs-body">
+            <div class="api-qs-title">Earnings Call Transcripts — API Ninjas</div>
+            <div class="api-qs-desc">
+              Testo integrale con speaker labels (CEO, CFO, Analyst) · ~10K req/mese free.<br>
+              <span style="color:var(--text-muted);font-size:9px">Senza key: fallback automatico a SEC EDGAR 8-K (solo metadati)</span>
+            </div>
+            <div class="api-qs-actions">
+              <button class="api-qs-btn-primary" onclick="openApiConfig('ninjas')">⚙ Configura API Ninjas</button>
+              <a href="https://api-ninjas.com/register" target="_blank" class="api-qs-btn-link">Ottieni key gratuita ↗</a>
+            </div>
+          </div>
+          <button class="api-qs-dismiss" onclick="this.closest('.api-quicksetup-banner').style.display='none'" title="Nascondi">✕</button>
+        </div>
+        <script>
+          (function() {
+            try {
+              var k = localStorage.getItem('finterm_key_ninjas');
+              if (k) { var b = document.getElementById('trans-setup-banner'); if(b) b.style.display='none'; }
+            } catch(e) {}
+          })();
+        </script>
+      </div>
       <div class="tab-pane        panel-content" data-tab="form4"   id="fund-form4"></div>
       <div class="tab-pane        panel-content" data-tab="div"     id="fund-div"></div>
       <div class="tab-pane        panel-content" data-tab="filings" id="fund-filings"></div>
@@ -550,7 +574,31 @@
           <button class="geo-cross-btn" onclick="if(typeof openaqLoadCity==='function')openaqLoadCity()">↻ Refresh</button>
           <button class="geo-cross-btn" onclick="openApiConfig('openaq')">⚙ API Key</button>
         </div>
-        <div id="geo-airqual-content" class="panel-content"></div>
+        <div id="geo-airqual-content" class="panel-content">
+          <div class="api-quicksetup-banner" id="airqual-setup-banner">
+            <div class="api-qs-icon">💨</div>
+            <div class="api-qs-body">
+              <div class="api-qs-title">Air Quality Intelligence — OpenAQ v3</div>
+              <div class="api-qs-desc">
+                PM2.5, PM10, NO2, O3, CO, SO2 da 30.000+ stazioni in 100+ paesi · Free tier generoso.<br>
+                <span style="color:var(--text-muted);font-size:9px">Senza key: WAQI demo token + Open-Meteo (funziona, ma stazioni limitate)</span>
+              </div>
+              <div class="api-qs-actions">
+                <button class="api-qs-btn-primary" onclick="openApiConfig('openaq')">⚙ Configura OpenAQ v3</button>
+                <a href="https://explore.openaq.org/register" target="_blank" class="api-qs-btn-link">Ottieni key gratuita ↗</a>
+              </div>
+            </div>
+            <button class="api-qs-dismiss" onclick="this.closest('.api-quicksetup-banner').style.display='none'" title="Nascondi">✕</button>
+          </div>
+          <script>
+            (function() {
+              try {
+                var k = localStorage.getItem('finterm_key_openaq');
+                if (k) { var b = document.getElementById('airqual-setup-banner'); if(b) b.style.display='none'; }
+              } catch(e) {}
+            })();
+          </script>
+        </div>
       </div>
 
       <!-- TERROR TAB — GDELT terrorism events (no key) -->
