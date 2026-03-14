@@ -95,102 +95,109 @@ const FRED_SPREAD_SERIES = [
   { id:'T10Y2Y',   label:'10Y−2Y Spread',   note:'Inversion signals recession' },
   { id:'T10Y3M',   label:'10Y−3M Spread',   note:'Classic recession predictor'  },
   { id:'T5YIE',    label:'5Y Breakeven',     note:'5-yr inflation expectation'   },
-  { id:'T10YIE',   label:'10Y Breakeven',    note:'10-yr inflation expectation'  },
-  { id:'BAMLH0A0HYM2', label:'HY OAS Spread', note:'High-yield credit risk'     },
+  { id:'T10YIE',        label:'10Y Breakeven',   note:'10-yr inflation expectation'   },
+  { id:'BAMLH0A0HYM2',  label:'HY OAS Spread',  note:'High-yield credit risk (BAMLH)'  },
+  { id:'BAMLC0A0CM',    label:'IG OAS Spread',   note:'Investment grade credit risk'   },
+  { id:'BAMLC0A4CBBB',  label:'BBB OAS Spread',  note:'BBB-rated credit spread'        },
+  { id:'BAMLH0A1HYBB',  label:'BB OAS Spread',   note:'BB-rated (top HY) spread'       },
 ];
+
+/* ── Shared yield curve renderer ────────────────────────────────── */
+function _fredRenderYieldCurve(el, yields, date, src) {
+  const W=360, H=100, PL=36, PR=10, PT=12, PB=20;
+  const cw=W-PL-PR, ch=H-PT-PB;
+  const vals = yields.map(y=>y.value);
+  const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||0.5;
+  const toX = i => (PL + i/(yields.length-1)*cw).toFixed(1);
+  const toY = v => (PT + ch - (v-mn)/rng*ch).toFixed(1);
+  const pts  = yields.map((y,i)=>`${toX(i)},${toY(y.value)}`).join(' ');
+  const isInverted = vals[0] > vals[vals.length-1];
+  const col = isInverted ? '#f85149' : '#3fb950';
+
+  let svgHtml = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block">
+    <defs><linearGradient id="ycGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${col}" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${'M'+pts.split(' ').join(' L')} L${toX(yields.length-1)},${PT+ch} L${PL},${PT+ch} Z" fill="url(#ycGrad)"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>`;
+  // X labels (every 3rd)
+  yields.forEach((y,i)=>{ if(i%3===0) svgHtml += `<text x="${toX(i)}" y="${H-4}" font-size="7" fill="#6e7681" text-anchor="middle">${y.label}</text>`; });
+  // Y labels min/max
+  svgHtml += `<text x="${PL-3}" y="${toY(mx)}" font-size="7" fill="#6e7681" text-anchor="end" dominant-baseline="central">${mx.toFixed(2)}</text>`;
+  svgHtml += `<text x="${PL-3}" y="${toY(mn)}" font-size="7" fill="#6e7681" text-anchor="end" dominant-baseline="central">${mn.toFixed(2)}</text>`;
+  svgHtml += `</svg>`;
+
+  // KPI row
+  const two = yields.find(y=>y.label==='2Y')?.value;
+  const ten = yields.find(y=>y.label==='10Y')?.value;
+  const spread = (two!=null&&ten!=null) ? (ten-two).toFixed(2) : null;
+  const spreadCls = spread!=null && parseFloat(spread)<0 ? 'neg' : 'pos';
+
+  el.innerHTML = `<div class="av-live-badge">● Treasury Yield Curve · ${date} · <span style="color:var(--accent)">${src}</span>${isInverted?'<span style="color:#f85149;margin-left:6px">⚠ INVERTED</span>':''}</div>
+    <div class="fred-yield-kpis">
+      ${[{l:'3M',v:yields.find(y=>y.label==='3M')?.value},{l:'2Y',v:two},{l:'5Y',v:yields.find(y=>y.label==='5Y')?.value},{l:'10Y',v:ten},{l:'30Y',v:yields.find(y=>y.label==='30Y')?.value}]
+        .filter(k=>k.v!=null).map(k=>`<div class="fred-yc-kpi"><span class="fred-yc-lbl">${k.l}</span><span class="fred-yc-val">${k.v.toFixed(2)}%</span></div>`).join('')}
+      ${spread!=null?`<div class="fred-yc-kpi"><span class="fred-yc-lbl">10Y−2Y</span><span class="fred-yc-val ${spreadCls}">${parseFloat(spread)>=0?'+':''}${spread}%</span></div>`:''}
+    </div>
+    <div style="padding:6px 10px 8px">${svgHtml}</div>`;
+  // Return the container so credit spreads can be appended after
+  return el;
+}
 
 async function fredLoadYieldCurve() {
   const el = document.getElementById('macro-yield');
   if (!el) return;
-  if (!getFredKey()) { el.innerHTML = fredNoKey(); return; }
   el.innerHTML = fredSpinner();
+
+  // ── 1. US Treasury Direct (no key needed) ────────────────────
+  const treasuryData = await fredLoadTreasuryDirect();
+  if (treasuryData?.yields?.length) {
+    _fredRenderYieldCurve(el, treasuryData.yields, treasuryData.date, treasuryData.src);
+  }
+
+  // ── 2. FRED credit spreads (BAMLC0A0CM, BAMLH0A0HYM2, T10YIE) ─
+  if (!getFredKey()) {
+    if (!treasuryData?.yields?.length) el.innerHTML = fredNoKey();
+    return;
+  }
+
   try {
+    const SPREAD_SERIES = [
+      { id:'BAMLC0A0CM',    label:'IG OAS',     note:'Investment Grade spread vs Treasury', col:'#58a6ff' },
+      { id:'BAMLH0A0HYM2',  label:'HY OAS',     note:'High-Yield spread vs Treasury',       col:'#f85149' },
+      { id:'BAMLC0A4CBBB',  label:'BBB OAS',    note:'BBB-rated spread',                    col:'#d29922' },
+      { id:'T10YIE',        label:'10Y Breakeven',note:'Inflation expectation 10Y',          col:'#3fb950' },
+    ];
+
     const results = await Promise.allSettled(
-      FRED_YIELD_SERIES.map(s => fredLatest(s.id).then(v => ({ ...s, value: v ? parseFloat(v.value) : null, date: v?.date })))
+      SPREAD_SERIES.map(s => fredLatest(s.id).then(v => ({ ...s, value: v ? parseFloat(v.value) : null, date: v?.date })))
     );
-    const points = results.map((r,i) => r.status === 'fulfilled' ? r.value : { ...FRED_YIELD_SERIES[i], value: null });
-    const valid  = points.filter(p => p.value !== null);
 
-    /* SVG yield curve chart */
-    const maxY  = Math.max(...valid.map(p => p.value), 6);
-    const minY  = Math.min(...valid.map(p => p.value), 0);
-    const range = maxY - minY || 1;
-    const W = 320, H = 120, PL = 36, PR = 10, PT = 8, PB = 28;
-    const cw = W - PL - PR, ch = H - PT - PB;
-    const xStep = valid.length > 1 ? cw / (valid.length - 1) : cw;
-    const toX = i => PL + i * xStep;
-    const toY = v => PT + ch - ((v - minY) / range) * ch;
-
-    const pathD = valid.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(p.value).toFixed(1)}`).join(' ');
-    const areaD = pathD + ` L${toX(valid.length-1).toFixed(1)},${(PT+ch).toFixed(1)} L${PL},${(PT+ch).toFixed(1)} Z`;
-
-    const yTicks = [minY, (minY+maxY)/2, maxY].map(v => ({
-      y: toY(v), label: v.toFixed(2) + '%'
-    }));
-    const inverted = valid.length >= 2 && valid[0].value > valid[valid.length - 1].value;
-
-    let html = `
-    <div class="fred-section-head">🏦 US Treasury Yield Curve
-      <span class="fred-badge ${inverted ? 'fred-badge-warn' : 'fred-badge-ok'}">
-        ${inverted ? '⚠ INVERTED' : '✓ NORMAL'}
-      </span>
-      <span class="fred-date">${valid[0]?.date || ''}</span>
-    </div>
-    <svg viewBox="0 0 ${W} ${H}" class="fred-yield-svg" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="yieldGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${inverted ? '#ff4d4d' : 'var(--accent)'}" stop-opacity="0.3"/>
-          <stop offset="100%" stop-color="${inverted ? '#ff4d4d' : 'var(--accent)'}" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      ${yTicks.map(t => `
-        <line x1="${PL}" y1="${t.y.toFixed(1)}" x2="${W-PR}" y2="${t.y.toFixed(1)}" stroke="var(--border)" stroke-width="0.5"/>
-        <text x="${PL-4}" y="${(t.y+3).toFixed(1)}" text-anchor="end" font-size="7" fill="var(--text-dim)">${t.label}</text>
-      `).join('')}
-      <path d="${areaD}" fill="url(#yieldGrad)"/>
-      <path d="${pathD}" fill="none" stroke="${inverted ? '#ff4d4d' : 'var(--accent)'}" stroke-width="1.5"/>
-      ${valid.map((p, i) => `
-        <circle cx="${toX(i).toFixed(1)}" cy="${toY(p.value).toFixed(1)}" r="2.5"
-          fill="${inverted ? '#ff4d4d' : 'var(--accent)'}"/>
-        <text x="${toX(i).toFixed(1)}" y="${(PT+ch+PB-4).toFixed(1)}"
-          text-anchor="middle" font-size="7" fill="var(--text-dim)">${p.label}</text>
-      `).join('')}
-    </svg>`;
-
-    /* Yield table */
-    html += `<div class="fred-yield-grid">`;
-    for (const p of valid) {
-      html += `<div class="fred-yield-cell">
-        <span class="fred-y-label">${fredEsc(p.label)}</span>
-        <span class="fred-y-val">${p.value !== null ? p.value.toFixed(2)+'%' : '—'}</span>
-      </div>`;
-    }
-    html += `</div>`;
-
-    /* Spreads */
-    const spreadResults = await Promise.allSettled(
-      FRED_SPREAD_SERIES.map(s => fredLatest(s.id).then(v => ({ ...s, value: v ? parseFloat(v.value) : null, date: v?.date })))
-    );
-    html += `<div class="fred-section-head" style="margin-top:12px">📊 Key Spreads & Breakevens</div>`;
-    html += `<div class="fred-spread-list">`;
-    for (const r of spreadResults) {
-      if (r.status !== 'fulfilled') continue;
+    let credHtml = `<div class="fred-section-head" style="margin-top:10px">📊 Credit Spreads &amp; Inflation Breakeven</div>
+      <div class="fred-cs-grid">`;
+    for (const r of results) {
+      if (r.status !== 'fulfilled' || r.value.value == null) continue;
       const p = r.value;
-      const cls = p.id === 'T10Y2Y' || p.id === 'T10Y3M'
-        ? (p.value < 0 ? 'fred-neg' : 'fred-pos')
-        : (p.value !== null && p.value > 3 ? 'fred-warn' : 'fred-ok');
-      html += `<div class="fred-spread-row">
-        <span class="fred-spread-label">${fredEsc(p.label)}</span>
-        <span class="fred-spread-note">${fredEsc(p.note)}</span>
-        <span class="fred-spread-val ${cls}">${p.value !== null ? p.value.toFixed(2)+'%' : '—'}</span>
+      const level = p.label==='IG OAS' ? (p.value<100?'tight':'wide') : p.label==='HY OAS' ? (p.value<400?'tight':'wide') : '';
+      credHtml += `<div class="fred-cs-card" title="${fredEsc(p.note)}">
+        <div class="fred-cs-label">${fredEsc(p.label)}</div>
+        <div class="fred-cs-val" style="color:${p.col}">${p.value.toFixed(0)}<span style="font-size:9px;margin-left:2px">bps</span></div>
+        ${level?`<div class="fred-cs-note ${level==='tight'?'pos':'neg'}">${level.toUpperCase()}</div>`:''}
+        <div class="fred-cs-date">${p.date||''}</div>
       </div>`;
     }
-    html += `</div>`;
-    el.innerHTML = html;
+    credHtml += `</div>`;
+
+    // Append to yield curve section
+    const section = el.querySelector('.fred-yield-kpis')?.closest('div[data-fred-yc]') || el;
+    el.innerHTML += credHtml;
+
   } catch(e) {
-    el.innerHTML = e.message === 'NO_KEY' ? fredNoKey() : fredError(e.message);
+    el.innerHTML += fredError(e.message);
   }
 }
+
 
 /* ══════════════════════════════════════════════════════════════════
    MACRO INDICATORS  — Macro·Intel ECON tab
@@ -302,6 +309,49 @@ function fredInitAll() {
   fredLoadYieldCurve();
   fredLoadMacroIndicators();
 }
+
+/* ── US Treasury Direct XML (no key, official daily data) ────────── */
+async function fredLoadTreasuryDirect() {
+  const el = document.getElementById('macro-yield');
+  if (!el) return;
+  try {
+    const now   = new Date();
+    const yyyymm= `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}`;
+    const url   = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value_month=${yyyymm}`;
+    const res   = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const text  = await res.text();
+    const parser= new DOMParser();
+    const xml   = parser.parseFromString(text, 'text/xml');
+    const entries = xml.querySelectorAll('entry');
+    if (!entries.length) return null;
+    const last  = entries[entries.length-1];
+    const getV  = tag => parseFloat(last.querySelector(tag)?.textContent || '0');
+    const result = {
+      date: last.querySelector('d\:NEW_DATE, NEW_DATE')?.textContent?.slice(0,10) || '',
+      yields: {
+        '1M': getV('d\:BC_1MONTH,  BC_1MONTH'),
+        '3M': getV('d\:BC_3MONTH,  BC_3MONTH'),
+        '6M': getV('d\:BC_6MONTH,  BC_6MONTH'),
+        '1Y': getV('d\:BC_1YEAR,   BC_1YEAR'),
+        '2Y': getV('d\:BC_2YEAR,   BC_2YEAR'),
+        '3Y': getV('d\:BC_3YEAR,   BC_3YEAR'),
+        '5Y': getV('d\:BC_5YEAR,   BC_5YEAR'),
+        '7Y': getV('d\:BC_7YEAR,   BC_7YEAR'),
+        '10Y': getV('d\:BC_10YEAR, BC_10YEAR'),
+        '20Y': getV('d\:BC_20YEAR, BC_20YEAR'),
+        '30Y': getV('d\:BC_30YEAR, BC_30YEAR'),
+      },
+      _src: 'US Treasury Direct',
+    };
+    // Cache globally for WACC/other modules
+    window._treasuryYields = result.yields;
+    return result;
+  } catch(e) {
+    console.warn('[Treasury Direct]', e.message);
+    return null;
+  }
+}
+window.fredLoadTreasuryDirect = fredLoadTreasuryDirect;
 
 /* Lazy-load when tab is first clicked */
 function fredLazyYield() {
