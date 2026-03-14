@@ -303,15 +303,23 @@ async function refreshSectorDBPrices() {
     // Batch in chunks of 50
     for (let i = 0; i < unique.length; i += 50) {
       const chunk = unique.slice(i, i+50);
-      const res   = await fetch(`https://financialmodelingprep.com/api/v3/quote-short/${chunk.join(',')}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(8000)});
+      // Use full quote for PE/PB/mktCap updates
+      const res   = await fetch(`https://financialmodelingprep.com/api/v3/quote/${chunk.join(',')}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(8000)});
       const data  = await res.json();
       (Array.isArray(data) ? data : []).forEach(q => {
         const sym = q.symbol?.toUpperCase();
         Object.values(sectorDB).forEach(sector => {
           const s = sector.stocks.find(st => st.ticker.replace(/.*:/,'').toUpperCase() === sym);
           if (s && q.price) {
-            s.price  = q.price;
-            s.change = q.changesPercentage || s.change;
+            s.price    = q.price;
+            s.change   = q.changesPercentage ?? s.change;
+            if (q.pe        != null) s.pe       = q.pe;
+            if (q.priceAvg50!= null) s.ma50     = q.priceAvg50;
+            if (q.marketCap != null) s.mktCap   = q.marketCap >= 1e12
+              ? (q.marketCap/1e12).toFixed(2)+'T'
+              : (q.marketCap/1e9).toFixed(1)+'B';
+            if (q.eps       != null) s.eps      = q.eps;
+            if (q.sharesOutstanding != null) s.float = (q.sharesOutstanding/1e9).toFixed(2)+'B';
           }
         });
       });
@@ -547,8 +555,10 @@ function renderFundamentals(ticker) {
 
       const beta     = parseFloat(fhLive?.profile?.beta  || fmpLive?.ratios?.beta  || fmpLive?.profile?.beta || 1.0);
       const debtEq   = parseFloat(fmpLive?.ratios?.debtEq || 0.3);
-      const rf       = 4.5;   // ~US 10Y
-      const erp      = 5.5;
+      // Use live 10Y Treasury yield if available from fredLoadTreasuryDirect
+      const _ty = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
+      const rf       = _ty['10Y'] ?? 4.5;  // Live US 10Y
+      const erp      = 5.5;  // Damodaran implied ERP
       const ke       = (rf + beta * erp).toFixed(2);
       const kd       = 5.5;
       const tax      = 21;
