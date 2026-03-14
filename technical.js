@@ -202,6 +202,85 @@ function _vwap(o, h, l, c, v) {
   }
   return out;
 }
+function _stochastic(h, l, c, kPeriod = 14, dPeriod = 3) {
+  const kArr = new Array(c.length).fill(null);
+  for (let i = kPeriod - 1; i < c.length; i++) {
+    const hi = Math.max(...h.slice(i - kPeriod + 1, i + 1));
+    const lo = Math.min(...l.slice(i - kPeriod + 1, i + 1));
+    kArr[i] = (hi === lo) ? 50 : (c[i] - lo) / (hi - lo) * 100;
+  }
+  // %D = SMA(kPeriod=3) of %K
+  const dArr = _sma(kArr.map(v => v ?? 0), dPeriod);
+  // Restore nulls for early bars
+  for (let i = 0; i < kPeriod - 1; i++) { kArr[i] = null; dArr[i] = null; }
+  return { k: kArr, d: dArr };
+}
+
+function _williamsR(h, l, c, period = 14) {
+  const out = new Array(c.length).fill(null);
+  for (let i = period - 1; i < c.length; i++) {
+    const hi = Math.max(...h.slice(i - period + 1, i + 1));
+    const lo = Math.min(...l.slice(i - period + 1, i + 1));
+    out[i] = (hi === lo) ? -50 : ((hi - c[i]) / (hi - lo)) * -100;
+  }
+  return out;
+}
+
+function _cci(h, l, c, period = 20) {
+  const out = new Array(c.length).fill(null);
+  for (let i = period - 1; i < c.length; i++) {
+    const tp  = (h[i] + l[i] + c[i]) / 3;
+    const slc = [];
+    for (let j = i - period + 1; j <= i; j++) slc.push((h[j]+l[j]+c[j])/3);
+    const mean = slc.reduce((a,b)=>a+b,0) / period;
+    const md   = slc.reduce((a,b)=>a+Math.abs(b-mean),0) / period;
+    out[i] = md === 0 ? 0 : (tp - mean) / (0.015 * md);
+  }
+  return out;
+}
+
+function _ema9(arr)  { return _ema(arr, 9);  }
+function _ema21(arr) { return _ema(arr, 21); }
+function _ema50(arr) { return _ema(arr, 50); }
+
+function _rvol(volumes, period = 20) {
+  // Relative Volume: today's vol / avg vol over period
+  const avgVol = _sma(volumes, period);
+  return volumes.map((v,i) => avgVol[i] ? v / avgVol[i] : null);
+}
+
+function _ichimoku(h, l, c) {
+  const N = c.length;
+  // Tenkan-sen (9), Kijun-sen (26), Senkou Span A, B, Chikou
+  const hi = (a, p, i) => Math.max(...a.slice(Math.max(0, i-p+1), i+1));
+  const lo = (a, p, i) => Math.min(...a.slice(Math.max(0, i-p+1), i+1));
+
+  const tenkan = new Array(N).fill(null);
+  const kijun  = new Array(N).fill(null);
+  const senkouA= new Array(N + 26).fill(null);
+  const senkouB= new Array(N + 52).fill(null);
+
+  for (let i = 8; i < N; i++) {
+    tenkan[i] = (hi(h,9,i) + lo(l,9,i)) / 2;
+  }
+  for (let i = 25; i < N; i++) {
+    kijun[i] = (hi(h,26,i) + lo(l,26,i)) / 2;
+    if (tenkan[i] != null) {
+      // Senkou Span A = (Tenkan + Kijun)/2 shifted 26 forward
+      senkouA[i + 26] = (tenkan[i] + kijun[i]) / 2;
+    }
+  }
+  for (let i = 51; i < N; i++) {
+    senkouB[i + 26] = (hi(h,52,i) + lo(l,52,i)) / 2;
+  }
+  // Chikou = close shifted 26 back (plot current close 26 periods ago)
+  const chikou = new Array(N).fill(null);
+  for (let i = 26; i < N; i++) chikou[i - 26] = c[i];
+
+  return { tenkan, kijun, senkouA: senkouA.slice(0,N), senkouB: senkouB.slice(0,N), chikou };
+}
+
+
 
 function _pivots(h, l, c) {
   // Classic pivot points from last completed day
@@ -266,6 +345,34 @@ function _aggregateSignals(indicators, currentPrice) {
   if (ema12 != null && ema26 != null) {
     const cross = ema12 > ema26;
     signals.push({ label: cross ? 'EMA Bullish' : 'EMA Bearish', score: cross ? 1 : -1, color: cross ? '#58a6ff' : '#f0883e' });
+  }
+
+  // Stochastic
+  if (indicators.stochK != null) {
+    if (indicators.stochK < 20)       signals.push({ label:'Stoch Oversold',   score: 1, color:'#3fb950' });
+    else if (indicators.stochK > 80)  signals.push({ label:'Stoch Overbought', score:-1, color:'#f85149' });
+    else                               signals.push({ label:'Stoch Neutral',    score: 0, color:'#d29922' });
+  }
+
+  // Williams %R
+  if (indicators.willR != null) {
+    if (indicators.willR < -80)       signals.push({ label:'W%R Oversold',   score: 1, color:'#3fb950' });
+    else if (indicators.willR > -20)  signals.push({ label:'W%R Overbought', score:-1, color:'#f85149' });
+  }
+
+  // CCI
+  if (indicators.cci != null) {
+    if (indicators.cci < -100)        signals.push({ label:'CCI Oversold',   score: 1, color:'#3fb950' });
+    else if (indicators.cci > 100)    signals.push({ label:'CCI Overbought', score:-1, color:'#f85149' });
+  }
+
+  // Ichimoku cloud
+  if (indicators.cloudBull != null) {
+    signals.push({ label: indicators.cloudBull ? 'Kumo Bullish ☁' : 'Kumo Bearish ☁', score: indicators.cloudBull ? 1 : -1, color: indicators.cloudBull ? '#3fb950' : '#f85149' });
+  }
+  // Price vs Tenkan/Kijun
+  if (indicators.ichimoku?.tenkan != null && currentPrice != null) {
+    signals.push({ label: currentPrice > indicators.ichimoku.tenkan ? 'Above Tenkan' : 'Below Tenkan', score: currentPrice > indicators.ichimoku.tenkan ? 1 : -1, color: currentPrice > indicators.ichimoku.tenkan ? '#58a6ff' : '#f0883e' });
   }
 
   const total   = signals.reduce((s,x) => s + x.score, 0);
@@ -347,19 +454,44 @@ function _renderCandleChart(el, candles, overlays, period) {
   };
 
   let overlayStr = '';
-  if (overlays.sma20)  overlayStr += _line(null, overlays.sma20,  '#58a6ff');
-  if (overlays.sma50)  overlayStr += _line(null, overlays.sma50,  '#f0883e');
-  if (overlays.sma200) overlayStr += _line(null, overlays.sma200, '#a371f7');
-  if (overlays.bbUpper)overlayStr += _line(null, overlays.bbUpper,'#8b9467', true);
-  if (overlays.bbLower)overlayStr += _line(null, overlays.bbLower,'#8b9467', true);
-  if (overlays.bbMid)  overlayStr += _line(null, overlays.bbMid,  '#8b9467');
-  if (overlays.vwap)   overlayStr += _line(null, overlays.vwap,   '#d29922');
-  if (overlays.ema12)  overlayStr += _line(null, overlays.ema12,  '#4dbbff', true);
+  if (overlays.sma20)   overlayStr += _line(null, overlays.sma20,   '#58a6ff');
+  if (overlays.sma50)   overlayStr += _line(null, overlays.sma50,   '#f0883e');
+  if (overlays.sma200)  overlayStr += _line(null, overlays.sma200,  '#a371f7');
+  if (overlays.ema9)    overlayStr += _line(null, overlays.ema9,    '#ffd700', true);
+  if (overlays.ema21)   overlayStr += _line(null, overlays.ema21,   '#ff9800', true);
+  if (overlays.ema12)   overlayStr += _line(null, overlays.ema12,   '#4dbbff', true);
+  if (overlays.bbUpper) overlayStr += _line(null, overlays.bbUpper, '#8b9467', true);
+  if (overlays.bbLower) overlayStr += _line(null, overlays.bbLower, '#8b9467', true);
+  if (overlays.bbMid)   overlayStr += _line(null, overlays.bbMid,   '#8b9467');
+  if (overlays.vwap)    overlayStr += _line(null, overlays.vwap,    '#d29922');
+  // Ichimoku lines
+  if (overlays.ichTenkan) overlayStr += _line(null, overlays.ichTenkan, '#d29922');
+  if (overlays.ichKijun)  overlayStr += _line(null, overlays.ichKijun,  '#4dbbff');
+  // Ichimoku cloud (shaded area between SpanA and SpanB)
+  if (overlays.ichSpanA && overlays.ichSpanB) {
+    const upperPts = [], lowerPts = [];
+    for (let i = 0; i < N; i++) {
+      const gi = from + i;
+      const a = overlays.ichSpanA[gi], b = overlays.ichSpanB[gi];
+      if (a == null || b == null) continue;
+      const bull = a >= b;
+      upperPts.push(`${xOf(i)},${yOf(Math.max(a,b))}`);
+      lowerPts.push(`${xOf(i)},${yOf(Math.min(a,b))}`);
+    }
+    if (upperPts.length > 2) {
+      const poly = [...upperPts, ...[...lowerPts].reverse()].join(' ');
+      overlayStr += `<polygon points="${poly}" fill="rgba(88,166,255,0.08)" stroke="none"/>`;
+    }
+    overlayStr += _line(null, overlays.ichSpanA, '#3fb95060');
+    overlayStr += _line(null, overlays.ichSpanB, '#f8514960');
+  }
 
   // Legend
   const legend = [
     ['SMA20','#58a6ff'], ['SMA50','#f0883e'], ['SMA200','#a371f7'],
-    ['BB','#8b9467'], ['VWAP','#d29922'], ['EMA12','#4dbbff'],
+    ['BB','#8b9467'], ['VWAP','#d29922'],
+    ['EMA9','#ffd700'], ['EMA21','#ff9800'], ['EMA12','#4dbbff'],
+    ['Tenkan','#d29922'], ['Kijun','#4dbbff'],
   ];
   let legendStr = '';
   let lx = PAD.l;
@@ -409,14 +541,22 @@ async function techLoadFull(sym, resolution) {
   const sma20  = _sma(C, 20);
   const sma50  = _sma(C, 50);
   const sma200 = _sma(C, 200);
+  const ema9   = _ema9(C);
   const ema12  = _ema(C, 12);
+  const ema21  = _ema21(C);
   const ema26  = _ema(C, 26);
+  const ema50  = _ema50(C);
   const rsiArr = _rsi(C, 14);
   const macdR  = _macd(C, 12, 26, 9);
   const bbR    = _bbands(C, 20, 2);
   const atrArr = _atr(candles.h, candles.l, candles.c, 14);
   const obvArr = _obv(C, candles.v);
   const vwapArr= _vwap(candles.o, candles.h, candles.l, candles.c, candles.v);
+  const stochR = _stochastic(candles.h, candles.l, candles.c, 14, 3);
+  const willR  = _williamsR(candles.h, candles.l, candles.c, 14);
+  const cciArr = _cci(candles.h, candles.l, candles.c, 20);
+  const rvolArr= _rvol(candles.v, 20);
+  const ichR   = _ichimoku(candles.h, candles.l, candles.c);
 
   // Last values
   const last    = C[N-1];
@@ -429,8 +569,19 @@ async function techLoadFull(sym, resolution) {
   const sma20L  = sma20[N-1];
   const sma50L  = sma50[N-1];
   const sma200L = sma200[N-1];
+  const ema9L   = ema9[N-1];
   const ema12L  = ema12[N-1];
+  const ema21L  = ema21[N-1];
   const ema26L  = ema26[N-1];
+  const ema50L  = ema50[N-1];
+  const stochKL = stochR.k[N-1];
+  const stochDL = stochR.d[N-1];
+  const willRL  = willR[N-1];
+  const cciL    = cciArr[N-1];
+  const rvolL   = rvolArr[N-1];
+  const ichL    = { tenkan: ichR.tenkan[N-1], kijun: ichR.kijun[N-1], senkouA: ichR.senkouA[N-1], senkouB: ichR.senkouB[N-1] };
+  // Ichimoku cloud color: green if A>B (bullish), red if A<B (bearish)
+  const cloudBull = (ichL.senkouA != null && ichL.senkouB != null) ? ichL.senkouA > ichL.senkouB : null;
 
   // ── Pivots & Fibonacci (last 52 bars ≈ 52 days)
   const pivots = _pivots(candles.h, candles.l, candles.c);
@@ -441,6 +592,7 @@ async function techLoadFull(sym, resolution) {
     rsi: rsiL, macd: macdL, bb: bbL,
     sma20: sma20L, sma50: sma50L, sma200: sma200L,
     ema12: ema12L, ema26: ema26L, atr: atrL,
+    stochK: stochKL, willR: willRL, cci: cciL, ichimoku: ichL, cloudBull,
   }, last);
 
   const f2  = v => v != null ? parseFloat(v).toFixed(2) : '—';
@@ -488,8 +640,10 @@ async function techLoadFull(sym, resolution) {
     <label class="tech-ov-toggle"><input type="checkbox" id="tov-sma" checked onchange="techRedraw()"> SMA</label>
     <label class="tech-ov-toggle"><input type="checkbox" id="tov-bb" onchange="techRedraw()"> BB</label>
     <label class="tech-ov-toggle"><input type="checkbox" id="tov-vwap" onchange="techRedraw()"> VWAP</label>
-    <label class="tech-ov-toggle"><input type="checkbox" id="tov-ema" onchange="techRedraw()"> EMA12</label>
+    <label class="tech-ov-toggle"><input type="checkbox" id="tov-ema" onchange="techRedraw()"> EMA</label>
+    <label class="tech-ov-toggle"><input type="checkbox" id="tov-ich" onchange="techRedrawIchimoku()"> Ichimoku</label>
   </div>
+  <button class="tech-res-btn" onclick="techOpenTV('${escapeHtml(sym)}')" style="margin-left:auto;background:var(--accent);color:#000">📺 TradingView</button>
 </div>
 
 <!-- ══ Main chart ══ -->
@@ -579,6 +733,115 @@ async function techLoadFull(sym, resolution) {
     </div>
   </div>
 
+  <!-- Stochastic with visual gauge -->
+  <div class="tech-ind-card">
+    <div class="tech-ind-title">Stochastic (14,3)</div>
+    <div class="tech-ind-val ${stochKL<20?'tech-sig-buy':stochKL>80?'tech-sig-sell':'tech-sig-neutral'}">${f2(stochKL)}</div>
+    <div class="tech-ind-sig ${stochKL<20?'tech-sig-buy':stochKL>80?'tech-sig-sell':'tech-sig-neutral'}">${stochKL<20?'Oversold (<20)':stochKL>80?'Overbought (>80)':'Neutral'}</div>
+    <!-- Stochastic gauge bar -->
+    <div class="tech-gauge-wrap">
+      <div class="tech-gauge-track">
+        <div class="tech-gauge-zone-low"  style="width:20%"></div>
+        <div class="tech-gauge-zone-mid"  style="width:60%"></div>
+        <div class="tech-gauge-zone-high" style="width:20%"></div>
+        <div class="tech-gauge-needle" style="left:${stochKL!=null?Math.min(98,Math.max(2,stochKL)):50}%"></div>
+      </div>
+      <div class="tech-gauge-labels"><span>0</span><span>20</span><span>80</span><span>100</span></div>
+    </div>
+    <div class="tech-ind-note">%D (signal): ${f2(stochDL)}</div>
+  </div>
+
+  <!-- Williams %R with gauge -->
+  <div class="tech-ind-card">
+    <div class="tech-ind-title">Williams %R (14)</div>
+    <div class="tech-ind-val ${willRL>-20?'tech-sig-sell':willRL<-80?'tech-sig-buy':'tech-sig-neutral'}">${f2(willRL)}</div>
+    <div class="tech-ind-sig ${willRL>-20?'tech-sig-sell':willRL<-80?'tech-sig-buy':'tech-sig-neutral'}">${willRL>-20?'Overbought (>-20)':willRL<-80?'Oversold (<-80)':'Neutral'}</div>
+    <div class="tech-gauge-wrap">
+      <div class="tech-gauge-track">
+        <div class="tech-gauge-zone-high" style="width:20%"></div>
+        <div class="tech-gauge-zone-mid"  style="width:60%"></div>
+        <div class="tech-gauge-zone-low"  style="width:20%"></div>
+        <div class="tech-gauge-needle" style="left:${willRL!=null?Math.min(98,Math.max(2,((willRL+100)))):'50'}%"></div>
+      </div>
+      <div class="tech-gauge-labels"><span>-100</span><span>-80</span><span>-20</span><span>0</span></div>
+    </div>
+    <div class="tech-ind-note">Range: -100 (oversold) to 0 (overbought)</div>
+  </div>
+
+  <!-- CCI -->
+  <div class="tech-ind-card">
+    <div class="tech-ind-title">CCI (20)</div>
+    <div class="tech-ind-val ${cciL>100?'tech-sig-sell':cciL<-100?'tech-sig-buy':'tech-sig-neutral'}">${f2(cciL)}</div>
+    <div class="tech-ind-sig ${cciL>100?'tech-sig-sell':cciL<-100?'tech-sig-buy':'tech-sig-neutral'}">${cciL>100?'Overbought (>100)':cciL<-100?'Oversold (<-100)':'Neutral'}</div>
+    <div class="tech-ind-note">Commodity Channel Index · extremes ±100</div>
+  </div>
+
+  <!-- Relative Volume -->
+  <div class="tech-ind-card">
+    <div class="tech-ind-title">RVOL (20d avg)</div>
+    <div class="tech-ind-val ${rvolL>2?'pos':rvolL<0.5?'neg':''}">${rvolL!=null?rvolL.toFixed(2)+'x':'—'}</div>
+    <div class="tech-ind-sig ${rvolL>2?'tech-sig-buy':rvolL<0.5?'tech-sig-sell':'tech-sig-neutral'}">${rvolL>2?'High volume spike':rvolL<0.5?'Low volume warning':'Normal volume'}</div>
+    <div class="tech-ind-note">>2x = unusual activity · <0.5x = low conviction</div>
+  </div>
+
+  <!-- Ichimoku Cloud -->
+  <div class="tech-ind-card">
+    <div class="tech-ind-title">Ichimoku Cloud</div>
+    <div class="tech-ind-val ${cloudBull===true?'tech-sig-buy':cloudBull===false?'tech-sig-sell':'tech-sig-neutral'}">${cloudBull===true?'Bullish ☁':cloudBull===false?'Bearish ☁':'—'}</div>
+    <div class="tech-ind-note" style="margin-top:4px">
+      <div class="tech-ma-row"><span>Tenkan</span><span style="color:#d29922">${f2(ichL.tenkan)}</span><span class="${last>ichL.tenkan?'pos':'neg'}">${last&&ichL.tenkan?(last>ichL.tenkan?'▲':'▼'):''}</span></div>
+      <div class="tech-ma-row"><span>Kijun</span><span style="color:#4dbbff">${f2(ichL.kijun)}</span><span class="${last>ichL.kijun?'pos':'neg'}">${last&&ichL.kijun?(last>ichL.kijun?'▲':'▼'):''}</span></div>
+      <div class="tech-ma-row"><span>Span A</span><span style="color:#3fb95080">${f2(ichL.senkouA)}</span><span></span></div>
+      <div class="tech-ma-row"><span>Span B</span><span style="color:#f8514980">${f2(ichL.senkouB)}</span><span></span></div>
+    </div>
+  </div>
+
+  <!-- Extended EMA grid -->
+  <div class="tech-ind-card">
+    <div class="tech-ind-title">EMA Stack</div>
+    <div class="tech-ind-note" style="margin-top:4px">
+      <div class="tech-ma-row"><span>EMA 9</span><span style="color:#ffd700">${f2(ema9L)}</span><span class="${last>ema9L?'pos':'neg'}">${pct(last,ema9L)}</span></div>
+      <div class="tech-ma-row"><span>EMA 21</span><span style="color:#ff9800">${f2(ema21L)}</span><span class="${last>ema21L?'pos':'neg'}">${pct(last,ema21L)}</span></div>
+      <div class="tech-ma-row"><span>EMA 50</span><span style="color:#e91e63">${f2(ema50L)}</span><span class="${last>ema50L?'pos':'neg'}">${pct(last,ema50L)}</span></div>
+    </div>
+  </div>
+
+  <!-- RSI Visual Gauge (enhanced) -->
+  <div class="tech-ind-card tech-ind-card-wide">
+    <div class="tech-ind-title">RSI Gauge (14)</div>
+    <div class="rsi-gauge-visual">
+      <div class="rsi-gauge-bar">
+        <div class="rsi-zone-os" title="Oversold (<30)"></div>
+        <div class="rsi-zone-neutral" title="Neutral 30-70"></div>
+        <div class="rsi-zone-ob" title="Overbought (>70)"></div>
+        <div class="rsi-gauge-pointer" style="left:${rsiL!=null?Math.min(97,Math.max(3,rsiL))+'%':'50%'}">
+          <div class="rsi-gauge-val">${f2(rsiL)}</div>
+        </div>
+      </div>
+      <div class="rsi-gauge-scale">
+        <span>0</span><span>30</span><span>50</span><span>70</span><span>100</span>
+      </div>
+    </div>
+    <div class="tech-ind-sig ${rsiCl}" style="text-align:center;margin-top:6px">${rsiLbl}</div>
+  </div>
+
+  <!-- Bollinger Band Position Bar -->
+  <div class="tech-ind-card tech-ind-card-wide">
+    <div class="tech-ind-title">Bollinger Band Position</div>
+    <div class="bb-pos-wrap">
+      <div class="bb-pos-bar">
+        <div class="bb-pos-fill" style="left:0;width:100%"></div>
+        <div class="bb-pos-marker" style="left:${bbPctB!=null?Math.min(97,Math.max(3,parseFloat(bbPctB)))+'%':'50%'}">
+          <div class="bb-pos-price">$${f2(last)}</div>
+        </div>
+        <div class="bb-pos-label-upper">$${f2(bbL.upper)}</div>
+        <div class="bb-pos-label-lower">$${f2(bbL.lower)}</div>
+      </div>
+      <div class="bb-pos-pctb">%B = ${bbPctB!=null?bbPctB+'%':'—'} · BW = ${bbBand!=null?bbBand+'%':'—'}</div>
+      <div class="tech-ind-sig">${bbPctB!=null&&parseFloat(bbPctB)>100?'🔴 Above upper band':bbPctB!=null&&parseFloat(bbPctB)<0?'🟢 Below lower band':bbBand!=null&&parseFloat(bbBand)<4?'🟡 BB Squeeze — breakout imminent':'Price within bands'}</div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ══ Pivot Points ══ -->
@@ -633,15 +896,29 @@ ${patterns.length ? `
   setTimeout(() => {
     const wrap = document.getElementById('techChartWrap');
     if (!wrap) return;
+    const showSma = document.getElementById('tov-sma')?.checked !== false;
+    const showBb  = document.getElementById('tov-bb')?.checked;
+    const showVwap= document.getElementById('tov-vwap')?.checked;
+    const showEma = document.getElementById('tov-ema')?.checked !== false;
+    const showIch = document.getElementById('tov-ich')?.checked;
     const ov = {
-      sma20, sma50, sma200, ema12,
-      bbUpper: document.getElementById('tov-bb')?.checked ? bbR.upper : null,
-      bbLower: document.getElementById('tov-bb')?.checked ? bbR.lower : null,
-      bbMid:   document.getElementById('tov-bb')?.checked ? bbR.mid   : null,
-      vwap:    document.getElementById('tov-vwap')?.checked ? vwapArr : null,
+      sma20:   showSma  ? sma20   : null,
+      sma50:   showSma  ? sma50   : null,
+      sma200:  showSma  ? sma200  : null,
+      ema12:   showEma  ? ema12   : null,
+      ema9:    showEma  ? ema9    : null,
+      ema21:   showEma  ? ema21   : null,
+      bbUpper: showBb   ? bbR.upper : null,
+      bbLower: showBb   ? bbR.lower : null,
+      bbMid:   showBb   ? bbR.mid   : null,
+      vwap:    showVwap ? vwapArr   : null,
+      ichTenkan: showIch ? ichR.tenkan : null,
+      ichKijun:  showIch ? ichR.kijun  : null,
+      ichSpanA:  showIch ? ichR.senkouA: null,
+      ichSpanB:  showIch ? ichR.senkouB: null,
     };
     _renderCandleChart(wrap, candles, ov, _techPeriod);
-    _techOverlays = { sma20, sma50, sma200, ema12, bbR, vwapArr };
+    _techOverlays = { sma20, sma50, sma200, ema12, ema9, ema21, bbR, vwapArr, ichR };
   }, 60);
 }
 
@@ -650,21 +927,56 @@ let _techOverlays = {};
 function techRedraw() {
   const wrap = document.getElementById('techChartWrap');
   if (!wrap || !_techCandles) return;
-  const showSma  = document.getElementById('tov-sma')?.checked;
+  const showSma  = document.getElementById('tov-sma')?.checked !== false;
   const showBb   = document.getElementById('tov-bb')?.checked;
   const showVwap = document.getElementById('tov-vwap')?.checked;
-  const showEma  = document.getElementById('tov-ema')?.checked;
+  const showEma  = document.getElementById('tov-ema')?.checked !== false;
+  const showIch  = document.getElementById('tov-ich')?.checked;
   const ov = {
-    sma20:   showSma  ? _techOverlays.sma20   : null,
-    sma50:   showSma  ? _techOverlays.sma50   : null,
-    sma200:  showSma  ? _techOverlays.sma200  : null,
-    ema12:   showEma  ? _techOverlays.ema12   : null,
+    sma20:   showSma  ? _techOverlays.sma20    : null,
+    sma50:   showSma  ? _techOverlays.sma50    : null,
+    sma200:  showSma  ? _techOverlays.sma200   : null,
+    ema9:    showEma  ? _techOverlays.ema9     : null,
+    ema12:   showEma  ? _techOverlays.ema12    : null,
+    ema21:   showEma  ? _techOverlays.ema21    : null,
     bbUpper: showBb   ? _techOverlays.bbR?.upper : null,
     bbLower: showBb   ? _techOverlays.bbR?.lower : null,
     bbMid:   showBb   ? _techOverlays.bbR?.mid   : null,
-    vwap:    showVwap ? _techOverlays.vwapArr  : null,
+    vwap:    showVwap ? _techOverlays.vwapArr   : null,
+    ichTenkan: showIch ? _techOverlays.ichR?.tenkan  : null,
+    ichKijun:  showIch ? _techOverlays.ichR?.kijun   : null,
+    ichSpanA:  showIch ? _techOverlays.ichR?.senkouA : null,
+    ichSpanB:  showIch ? _techOverlays.ichR?.senkouB : null,
   };
   _renderCandleChart(wrap, _techCandles, ov, _techPeriod);
+}
+
+function techRedrawIchimoku() { techRedraw(); }
+
+// Opens TradingView popup with pre-loaded studies
+function techOpenTV(sym) {
+  const tvSym = sym.includes(':') ? sym : 'NASDAQ:' + sym;
+  const w = window.open('', '_blank', 'width=1100,height=700');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <title>TradingView – ${sym}</title>
+    <script src="https://s3.tradingview.com/tv.js"><\/script>
+  </head><body style="margin:0;background:#0d1117">
+    <div id="tv" style="height:100vh"></div>
+    <script>
+      new TradingView.widget({
+        autosize:true, symbol:"${tvSym}", interval:"D",
+        timezone:"Etc/UTC", theme:"dark", style:"1", locale:"en",
+        toolbar_bg:"#0d1117", enable_publishing:false,
+        allow_symbol_change:true, container_id:"tv",
+        studies:["RSI@tv-basicstudies","MACD@tv-basicstudies",
+                 "BB@tv-basicstudies","MASimple@tv-basicstudies",
+                 "StochasticRSI@tv-basicstudies","ATR@tv-basicstudies",
+                 "Volume@tv-basicstudies","IchimokuCloud@tv-basicstudies"],
+        details:true
+      });
+    <\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 /* ── Expose RSI to scorecard (for gauge) ───────────────────────── */
