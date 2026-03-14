@@ -715,3 +715,214 @@ async function fhRenderEconCalendar(containerId) {
     document.getElementById('econ-cal-head').innerHTML = '📅 Economic Calendar';
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   FINNHUB WEBSOCKET SINGLETON  — Punto 1 Gap Analysis
+   ──────────────────────────────────────────────────────────────────
+   Real-time price push for:
+   • Topbar ticker badge
+   • Watchlist rows (.fh-ws-price[data-ticker])
+   • Portfolio P&L cells (.port-live-price[data-ticker])
+   • Quote hero price display (#quotePrice, #quoteChange)
+   Pattern: one WS connection, N subscriptions, auto-reconnect 5s
+   ══════════════════════════════════════════════════════════════════ */
+
+const FH_WS_URL     = 'wss://ws.finnhub.io?token=';
+const FH_WS_MAX_SUBS= 50;  // free tier limit
+
+let _fhWs           = null;        // the WebSocket instance
+let _fhWsReady      = false;       // true after 'connected' message
+let _fhWsSubs       = new Set();   // currently subscribed symbols
+let _fhWsLastPrices = {};          // { SYM: {p, t, v, c} } latest trade
+let _fhWsConnAttempt= 0;
+let _fhWsReconTimer = null;
+let _fhWsEnabled    = false;       // set to true once key is available
+
+/* ── Connect / reconnect ─────────────────────────────────────────── */
+function fhWsConnect() {
+  const key = getFinnhubKey();
+  if (!key) { _fhWsEnabled = false; return; }
+  if (_fhWs && _fhWs.readyState <= WebSocket.OPEN) return; // already open/connecting
+
+  _fhWsEnabled = true;
+  _fhWsConnAttempt++;
+  try {
+    _fhWs = new WebSocket(FH_WS_URL + key);
+
+    _fhWs.onopen = () => {
+      _fhWsReady = true;
+      _fhWsConnAttempt = 0;
+      console.info('[FH-WS] Connected');
+      // Re-subscribe to all tracked symbols
+      _fhWsSubs.forEach(sym => _fhWsSend({ type:'subscribe', symbol: sym }));
+      // Update badge indicator
+      _fhWsUpdateBadge('live');
+    };
+
+    _fhWs.onmessage = e => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'trade' && Array.isArray(msg.data)) {
+          msg.data.forEach(trade => _fhWsHandleTrade(trade));
+        }
+      } catch {}
+    };
+
+    _fhWs.onclose = ev => {
+      _fhWsReady = false;
+      _fhWsUpdateBadge('disconnected');
+      if (!ev.wasClean && _fhWsEnabled) {
+        // Exponential backoff: 5s, 10s, 20s, max 30s
+        const delay = Math.min(30000, 5000 * Math.pow(1.5, Math.min(_fhWsConnAttempt, 4)));
+        _fhWsReconTimer = setTimeout(fhWsConnect, delay);
+        console.info(`[FH-WS] Reconnecting in ${(delay/1000).toFixed(0)}s…`);
+      }
+    };
+
+    _fhWs.onerror = () => { _fhWs?.close(); };
+
+  } catch(e) {
+    console.warn('[FH-WS] WebSocket error:', e.message);
+  }
+}
+
+/* ── Disconnect cleanly ──────────────────────────────────────────── */
+function fhWsDisconnect() {
+  _fhWsEnabled = false;
+  clearTimeout(_fhWsReconTimer);
+  if (_fhWs) { _fhWs.close(1000, 'user disconnect'); _fhWs = null; }
+  _fhWsReady = false;
+  _fhWsSubs.clear();
+  _fhWsUpdateBadge('off');
+}
+
+/* ── Reconnect (called after new key is saved) ───────────────────── */
+window.fhWsReconnect = function() {
+  fhWsDisconnect();
+  setTimeout(fhWsConnect, 300);
+};
+
+/* ── Subscribe / unsubscribe a symbol ───────────────────────────── */
+function fhWsSubscribe(sym) {
+  if (!sym || _fhWsSubs.has(sym)) return;
+  if (_fhWsSubs.size >= FH_WS_MAX_SUBS) {
+    // Drop oldest subscription
+    const oldest = _fhWsSubs.values().next().value;
+    _fhWsUnsubscribe(oldest);
+  }
+  _fhWsSubs.add(sym);
+  if (_fhWsReady) _fhWsSend({ type:'subscribe', symbol: sym });
+}
+
+function _fhWsUnsubscribe(sym) {
+  _fhWsSubs.delete(sym);
+  if (_fhWsReady) _fhWsSend({ type:'unsubscribe', symbol: sym });
+}
+
+function _fhWsSend(obj) {
+  if (_fhWs?.readyState === WebSocket.OPEN) {
+    try { _fhWs.send(JSON.stringify(obj)); } catch {}
+  }
+}
+
+/* ── Handle incoming trade ───────────────────────────────────────── */
+function _fhWsHandleTrade(trade) {
+  // trade: { s: sym, p: price, t: timestamp_ms, v: volume, c: conditions[] }
+  const sym = (trade.s || '').toUpperCase();
+  if (!sym) return;
+
+  const prev  = _fhWsLastPrices[sym]?.p;
+  _fhWsLastPrices[sym] = trade;
+
+  // Derive change direction
+  const dir = prev != null ? (trade.p > prev ? 1 : trade.p < prev ? -1 : 0) : 0;
+
+  // Dispatch DOM patches
+  _fhWsPatchDOM(sym, trade.p, dir);
+
+  // Also update the in-memory fhGetLive cache if it exists
+  if (typeof _fhLive !== 'undefined' && _fhLive[sym]) {
+    _fhLive[sym].quote = { ..._fhLive[sym].quote, price: trade.p };
+  }
+}
+
+/* ── Patch all price DOM elements for a symbol ───────────────────── */
+function _fhWsPatchDOM(sym, price, dir) {
+  const fmt = p => {
+    if (!p && p !== 0) return '—';
+    return p >= 1000 ? '$' + p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
+                     : p >= 1 ? '$' + p.toFixed(2)
+                     : p >= 0.01 ? '$' + p.toFixed(4)
+                     : '$' + p.toFixed(8);
+  };
+  const flashCls = dir > 0 ? 'fh-ws-flash-up' : dir < 0 ? 'fh-ws-flash-dn' : '';
+
+  // Universal selector: any element with data-ticker attribute
+  document.querySelectorAll(`[data-ticker="${sym}"]`).forEach(el => {
+    // Portfolio live price cells
+    if (el.classList.contains('port-live-price')) {
+      el.textContent = fmt(price);
+      if (flashCls) { el.classList.add(flashCls); setTimeout(() => el.classList.remove(flashCls), 800); }
+    }
+    // Crypto price cells
+    if (el.classList.contains('cg-live-price')) {
+      el.textContent = fmt(price);
+    }
+  });
+
+  // Watchlist rows
+  document.querySelectorAll(`.fh-ws-price[data-ticker="${sym}"]`).forEach(el => {
+    el.textContent = fmt(price);
+    if (flashCls) { el.classList.add(flashCls); setTimeout(() => el.classList.remove(flashCls), 800); }
+  });
+
+  // Quote hero — only if this is the currently loaded ticker
+  const currentTicker = (typeof window.currentTicker !== 'undefined' ? window.currentTicker : '').replace(/.*:/,'').toUpperCase();
+  if (sym === currentTicker) {
+    // Price display in topbar / quote strip
+    const priceEl = document.getElementById('quotePrice') || document.getElementById('fh-ws-quote-price');
+    if (priceEl) {
+      priceEl.textContent = fmt(price);
+      if (flashCls) { priceEl.classList.add(flashCls); setTimeout(() => priceEl.classList.remove(flashCls), 800); }
+    }
+    // Update the ticker badge in topbar
+    const badge = document.getElementById('fh-ws-live-badge');
+    if (badge) badge.textContent = fmt(price);
+  }
+}
+
+/* ── WS status badge (tiny indicator near topbar) ────────────────── */
+function _fhWsUpdateBadge(state) {
+  let badge = document.getElementById('fh-ws-status');
+  if (!badge) return;
+  const map = { live:'● WS', disconnected:'○ WS', off:'' };
+  const col = { live:'#3fb950', disconnected:'#f85149', off:'transparent' };
+  badge.textContent = map[state] || '';
+  badge.style.color = col[state] || 'var(--text-muted)';
+}
+
+/* ── Public API ──────────────────────────────────────────────────── */
+window.fhWsConnect     = fhWsConnect;
+window.fhWsDisconnect  = fhWsDisconnect;
+window.fhWsSubscribe   = fhWsSubscribe;
+window.fhWsLastPrices  = _fhWsLastPrices;
+
+/* ── Auto-subscribe to current ticker on ticker change ───────────── */
+(function() {
+  const _origChange = window.changeTicker;
+  if (typeof _origChange === 'function') {
+    window.changeTicker = function() {
+      _origChange.apply(this, arguments);
+      const raw = document.getElementById('tickerInput')?.value?.trim()?.toUpperCase() || '';
+      const sym = raw.replace(/.*:/,'');
+      if (sym && _fhWsEnabled) fhWsSubscribe(sym);
+    };
+  }
+})();
+
+/* ── Init: connect when Finnhub key is present ───────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  if (getFinnhubKey()) {
+    setTimeout(fhWsConnect, 1500); // slight delay so DOM is fully ready
+  }
+});
