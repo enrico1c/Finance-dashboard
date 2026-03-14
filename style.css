@@ -5567,3 +5567,51 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 
 /* ── Footer ── */
 .cg-footer      { font-size:9px; color:var(--text-muted); padding:6px 12px; border-top:1px solid var(--border); display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+
+/* ══════════════════════════════════════════════════════════════════
+   PORTFOLIO MODULE v2 — Full Analytics Dashboard
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Sub-tab bar */
+.port-subtab-bar { display:flex; gap:2px; padding:5px 8px; background:var(--bg-panel); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.port-stab       { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:10px; font-weight:600; padding:3px 9px; border-radius:4px; cursor:pointer; transition:all .12s; }
+.port-stab:hover { border-color:var(--accent); color:var(--accent); }
+.port-stab.active{ background:var(--accent); border-color:var(--accent); color:#000; }
+
+/* Tab panes */
+.port-tab        { display:none; }
+.port-tab.active { display:block; }
+
+/* Allocation donut + bar row */
+.port-alloc-row  { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border); }
+.port-donut-wrap { flex-shrink:0; }
+
+/* Holdings table */
+.port-row:hover td { background:rgba(255,255,255,.025); }
+.port-type-badge { font-size:8px; font-weight:700; text-transform:uppercase; padding:1px 5px; border-radius:3px; background:var(--border); color:var(--text-muted); letter-spacing:.04em; }
+.port-tx-buy     { background:rgba(63,185,80,.15); color:#3fb950; }
+.port-tx-sell    { background:rgba(248,81,73,.15); color:#f85149; }
+.port-tx-dividend{ background:rgba(88,166,255,.15); color:#58a6ff; }
+.port-tx-split   { background:rgba(210,153,34,.15); color:#d29922; }
+
+/* Live price flash */
+.port-price-flash { animation:portFlash .7s ease; }
+@keyframes portFlash { 0%,100%{background:transparent} 40%{background:rgba(63,185,80,.2)} }
+
+/* Performance chart */
+.port-perf-wrap  { padding:6px 10px 8px; border-top:1px solid var(--border); }
+.port-perf-header{ display:flex; justify-content:space-between; align-items:center; font-size:9px; color:var(--text-muted); margin-bottom:3px; }
+
+/* Analytics grid */
+.port-analytics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; padding:10px; }
+.port-analytics-card  { background:var(--bg-input,#161b22); border:1px solid var(--border); border-radius:6px; padding:10px; }
+.port-analytics-title { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:700; margin-bottom:8px; }
+.port-analytics-row   { display:flex; justify-content:space-between; padding:3px 0; font-size:10px; border-bottom:1px solid var(--border); }
+.port-analytics-row:last-child { border:none; }
+.port-analytics-best  { display:flex; flex-direction:column; gap:3px; margin-top:6px; font-size:9px; color:var(--text-muted); border-top:1px solid var(--border); padding-top:6px; }
+
+/* Dividend tab */
+.port-div-total  { padding:8px 12px; font-size:11px; border-bottom:1px solid var(--border); }
+
+/* Transaction actions */
+.port-tx-actions { display:flex; gap:8px; padding:8px 10px; border-top:1px solid var(--border); }
