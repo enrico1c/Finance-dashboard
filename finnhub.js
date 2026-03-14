@@ -262,7 +262,7 @@ function fhRenderQuote(sym, q, profile) {
   if (qr) qr.innerHTML = `
     <div class="av-live-badge">● LIVE — Finnhub  <span class="av-ts">${ts}</span></div>
     <div class="quote-grid">
-      ${fhRow("Last",       `<span class="${chgCls}">$${fhFmt(q.price)}</span>`)}
+      ${fhRow("Last",       `<span class="${chgCls} fh-ws-price" id="fh-quote-live-price" data-ticker="${fhEsc(sym)}" data-live="1">$${fhFmt(q.price)}</span>`)}
       ${fhRow("Change",     `<span class="${chgCls}">${sign}$${fhFmt(Math.abs(chg))} (${sign}${fhFmt(Math.abs(chgPct),2)}%)</span>`)}
       ${fhRow("Open",       "$"+fhFmt(q.open))}
       ${fhRow("High",       `<span class="metric-up">$${fhFmt(q.high)}</span>`)}
@@ -879,15 +879,18 @@ function _fhWsPatchDOM(sym, price, dir) {
   // Quote hero — only if this is the currently loaded ticker
   const currentTicker = (typeof window.currentTicker !== 'undefined' ? window.currentTicker : '').replace(/.*:/,'').toUpperCase();
   if (sym === currentTicker) {
-    // Price display in topbar / quote strip
-    const priceEl = document.getElementById('quotePrice') || document.getElementById('fh-ws-quote-price');
-    if (priceEl) {
-      priceEl.textContent = fmt(price);
-      if (flashCls) { priceEl.classList.add(flashCls); setTimeout(() => priceEl.classList.remove(flashCls), 800); }
+    // Live price in quote-qr panel (fhRenderQuote)
+    const liveEl = document.getElementById('fh-quote-live-price');
+    if (liveEl) {
+      liveEl.textContent = '$' + (price >= 1000
+        ? price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+        : price >= 1 ? price.toFixed(2)
+        : price >= 0.01 ? price.toFixed(4) : price.toFixed(8));
+      if (flashCls) { liveEl.classList.add(flashCls); setTimeout(() => liveEl.classList.remove(flashCls), 800); }
     }
-    // Update the ticker badge in topbar
+    // Topbar WS badge
     const badge = document.getElementById('fh-ws-live-badge');
-    if (badge) badge.textContent = fmt(price);
+    if (badge) badge.textContent = '$' + price.toFixed(2);
   }
 }
 
