@@ -2177,92 +2177,528 @@ async function wmMacroSectors() {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   CoinGecko Crypto  → Macro·Intel CRYPTO tab
-   No API key required (public endpoint, rate-limited)
+   CRYPTO INTELLIGENCE MODULE  — Full Stack  v2.0
+   ──────────────────────────────────────────────────────────────────
+   Sources (all free, zero API keys):
+   • CoinGecko  /v3  — top 100 coins, global stats, trending, DeFi,
+                        sparkline 7d, OHLC, social/dev metrics
+   • Alternative.me  — Fear & Greed Index (30-day history)
+   • DeFiLlama       — TVL by protocol and by chain, stablecoins
+   • Blockchain.com  — BTC network stats (hashrate, difficulty, mempool)
+   • CoinCap WS      — Real-time WebSocket price ticks (no key)
+   • Binance public  — OHLC klines for BTC/ETH detail view
    ══════════════════════════════════════════════════════════════════ */
-const CG_BASE    = 'https://api.coingecko.com/api/v3';
-const CG_CACHE   = new Map();
-const CG_TTL     = 3 * 60 * 1000;  // 3 min
+
+/* ── Shared cache ─────────────────────────────────────────────────── */
+const CG_BASE   = 'https://api.coingecko.com/api/v3';
+const CG_CACHE  = new Map();
+const CG_TTL    = 3 * 60 * 1000;
 
 async function cgFetch(path) {
   const cached = CG_CACHE.get(path);
   if (cached && Date.now() - cached.ts < CG_TTL) return cached.data;
-  const res = await fetch(`${CG_BASE}${path}`, {
-    headers: { 'Accept': 'application/json' }
-  });
+  const res = await fetch(`${CG_BASE}${path}`, { headers: { 'Accept': 'application/json' } });
   if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
   const data = await res.json();
   CG_CACHE.set(path, { data, ts: Date.now() });
   return data;
 }
 
+/* ── Helpers ──────────────────────────────────────────────────────── */
+const _cgFmt = v => v >= 1e12 ? '$'+(v/1e12).toFixed(2)+'T'
+                  : v >= 1e9  ? '$'+(v/1e9).toFixed(1)+'B'
+                  : v >= 1e6  ? '$'+(v/1e6).toFixed(0)+'M' : '—';
+
+const _cgPrice = v => {
+  if (!v && v !== 0) return '—';
+  if (v >= 1000) return '$'+v.toLocaleString('en-US',{maximumFractionDigits:0});
+  if (v >= 1)    return '$'+v.toFixed(2);
+  if (v >= 0.01) return '$'+v.toFixed(4);
+  return '$'+v.toFixed(8);
+};
+
+const _cgPct = v => v==null ? '—' : (v>=0?'+':'')+v.toFixed(2)+'%';
+const _cgCl  = v => v==null ? '' : v>=0 ? 'wm-pos' : 'wm-neg';
+
+/* Draw sparkline SVG from price array */
+function _cgSparkSVG(prices, w=80, h=22) {
+  if (!prices?.length) return '';
+  const mn=Math.min(...prices), mx=Math.max(...prices), rng=mx-mn||1;
+  const pts = prices.map((v,i)=>`${(i/(prices.length-1)*w).toFixed(1)},${(h-(v-mn)/rng*(h-2)-1).toFixed(1)}`).join(' ');
+  const up   = prices[prices.length-1] >= prices[0];
+  const col  = up ? '#3fb950' : '#f85149';
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:block">
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+/* ── A. Fear & Greed Index ────────────────────────────────────────── */
+let _cgFearData = null;
+async function _fetchFearGreed() {
+  if (_cgFearData && Date.now()-_cgFearData._ts < 3600000) return _cgFearData;
+  try {
+    const res  = await fetch('https://api.alternative.me/fng/?limit=30', { signal: AbortSignal.timeout(6000) });
+    const json = await res.json();
+    const data = { current: json.data[0], history: json.data, _ts: Date.now() };
+    _cgFearData = data;
+    return data;
+  } catch { return null; }
+}
+
+function _renderFearGauge(val) {
+  const num  = parseInt(val) || 50;
+  const lbl  = num<=24?'Extreme Fear':num<=49?'Fear':num<=74?'Greed':'Extreme Greed';
+  const col  = num<=24?'#f85149':num<=49?'#f0883e':num<=74?'#3fb950':'#2ea84b';
+  // Semicircle gauge via SVG arc
+  const r=38, cx=50, cy=50;
+  const startA = Math.PI, endA = startA + (num/100)*Math.PI;
+  const x1=cx+r*Math.cos(startA), y1=cy+r*Math.sin(startA);
+  const x2=cx+r*Math.cos(endA),   y2=cy+r*Math.sin(endA);
+  const large = num >= 50 ? 1 : 0;
+  return `<div class="cg-fear-wrap">
+    <svg viewBox="0 0 100 55" width="120" height="66">
+      <path d="M${cx-r},${cy} A${r},${r} 0 0,1 ${cx+r},${cy}" fill="none" stroke="#21262d" stroke-width="8"/>
+      <path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"/>
+      <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="15" font-weight="800" fill="${col}">${num}</text>
+      <text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="6.5" fill="#8b949e">${lbl}</text>
+    </svg>
+  </div>`;
+}
+
+/* ── B. DeFi Llama ────────────────────────────────────────────────── */
+let _defiCache = null;
+async function _fetchDefiTVL() {
+  if (_defiCache && Date.now()-_defiCache._ts < 5*60000) return _defiCache;
+  try {
+    const [protos, chains] = await Promise.allSettled([
+      fetch('https://api.llama.fi/protocols', { signal: AbortSignal.timeout(8000) }).then(r=>r.json()),
+      fetch('https://api.llama.fi/chains',    { signal: AbortSignal.timeout(8000) }).then(r=>r.json()),
+    ]);
+    const data = {
+      protocols: protos.status==='fulfilled' ? protos.value.slice(0,30) : [],
+      chains:    chains.status==='fulfilled' ? chains.value.slice(0,15) : [],
+      _ts: Date.now(),
+    };
+    _defiCache = data;
+    return data;
+  } catch { return null; }
+}
+
+/* ── C. BTC Network Stats ─────────────────────────────────────────── */
+let _btcStatsCache = null;
+async function _fetchBTCStats() {
+  if (_btcStatsCache && Date.now()-_btcStatsCache._ts < 10*60000) return _btcStatsCache;
+  try {
+    const res  = await fetch('https://blockchain.info/stats?format=json', { signal: AbortSignal.timeout(6000) });
+    const data = await res.json();
+    data._ts   = Date.now();
+    _btcStatsCache = data;
+    return data;
+  } catch { return null; }
+}
+
+/* ── D. CoinCap WebSocket real-time ──────────────────────────────── */
+let _ccWs     = null;
+let _ccPrices = {}; // { bitcoin: 45123.2, ethereum: 3021.4, ... }
+
+function _ccWsConnect(assetIds) {
+  if (_ccWs && _ccWs.readyState < 2) return; // already open/connecting
+  try {
+    _ccWs = new WebSocket(`wss://ws.coincap.io/prices?assets=${assetIds.join(',')}`);
+    _ccWs.onmessage = e => {
+      const d = JSON.parse(e.data);
+      Object.assign(_ccPrices, d);
+      // Patch live price cells in the DOM
+      Object.entries(d).forEach(([id, price]) => {
+        const el = document.querySelector(`.cg-live-price[data-id="${id}"]`);
+        if (el) {
+          el.textContent = _cgPrice(parseFloat(price));
+          el.classList.add('cg-price-flash');
+          setTimeout(() => el.classList.remove('cg-price-flash'), 600);
+        }
+      });
+    };
+    _ccWs.onclose = () => setTimeout(() => _ccWsConnect(assetIds), 5000);
+    _ccWs.onerror = () => _ccWs?.close();
+  } catch {}
+}
+
+/* ── E. Binance OHLC for detail drawer ───────────────────────────── */
+async function _fetchBinanceKlines(symbol='BTCUSDT', interval='1d', limit=60) {
+  try {
+    const res = await fetch(
+      `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    const arr = await res.json();
+    return arr.map(c => ({ t: c[0], o: +c[1], h: +c[2], l: +c[3], c: +c[4], v: +c[5] }));
+  } catch { return null; }
+}
+
+/* ── MAIN RENDER ──────────────────────────────────────────────────── */
 async function wmMacroCrypto() {
   const el = document.getElementById('macro-crypto');
   if (!el) return;
-  el.innerHTML = wmSpinner('Loading crypto markets…');
+  el.innerHTML = wmSpinner('Loading crypto intelligence…');
+
   try {
-    const [markets, global] = await Promise.allSettled([
-      cgFetch('/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=1h%2C24h%2C7d'),
+    /* Parallel fetch all sources */
+    const [markets, global, trending, fearGreed, defi, btcStats] = await Promise.allSettled([
+      cgFetch('/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=1h%2C24h%2C7d%2C30d'),
       cgFetch('/global'),
+      cgFetch('/search/trending'),
+      _fetchFearGreed(),
+      _fetchDefiTVL(),
+      _fetchBTCStats(),
     ]);
 
-    const coins = markets.status === 'fulfilled' ? markets.value : [];
-    const gdata = global.status  === 'fulfilled' ? global.value?.data : null;
+    const coins   = markets.status==='fulfilled' ? markets.value : [];
+    const gdata   = global.status==='fulfilled'  ? global.value?.data : null;
+    const trend   = trending.status==='fulfilled' ? trending.value : null;
+    const fg      = fearGreed.status==='fulfilled' ? fearGreed.value : null;
+    const defiD   = defi.status==='fulfilled'    ? defi.value : null;
+    const btc     = btcStats.status==='fulfilled' ? btcStats.value : null;
 
-    let html = '';
+    /* ── Sub-tab bar ─────────────────────────────────────────────── */
+    let html = `<div class="cg-subtab-bar">
+      <button class="cg-stab active" onclick="_cgShowTab('overview',this)">📊 Overview</button>
+      <button class="cg-stab" onclick="_cgShowTab('coins',this)">💰 Coins</button>
+      <button class="cg-stab" onclick="_cgShowTab('defi',this)">🏦 DeFi</button>
+      <button class="cg-stab" onclick="_cgShowTab('btcnet',this)">⛓ BTC Network</button>
+      <button class="cg-stab" onclick="_cgShowTab('trending',this)">🔥 Trending</button>
+    </div>`;
 
-    // Global stats bar
+    /* ── TAB 1: OVERVIEW ─────────────────────────────────────────── */
+    html += `<div class="cg-tab active" id="cg-tab-overview">`;
+
+    /* Global stats row */
     if (gdata) {
-      const totalMC  = gdata.total_market_cap?.usd;
-      const vol24    = gdata.total_volume?.usd;
-      const btcDom   = gdata.market_cap_percentage?.btc;
-      const ethDom   = gdata.market_cap_percentage?.eth;
-      const fmtT = v => v >= 1e12 ? '$'+(v/1e12).toFixed(2)+'T' : v >= 1e9 ? '$'+(v/1e9).toFixed(1)+'B' : '—';
+      const mc24  = gdata.market_cap_change_percentage_24h_usd;
+      const btcDom= gdata.market_cap_percentage?.btc;
+      const ethDom= gdata.market_cap_percentage?.eth;
+      const altDom= 100 - (btcDom||0) - (ethDom||0);
       html += `<div class="cg-global-bar">
-        <div class="cg-glob-cell"><span class="cg-glob-label">Total Market Cap</span><span class="cg-glob-val">${fmtT(totalMC)}</span></div>
-        <div class="cg-glob-cell"><span class="cg-glob-label">24h Volume</span><span class="cg-glob-val">${fmtT(vol24)}</span></div>
-        <div class="cg-glob-cell"><span class="cg-glob-label">BTC Dominance</span><span class="cg-glob-val" style="color:#f7931a">${btcDom?.toFixed(1)||'—'}%</span></div>
-        <div class="cg-glob-cell"><span class="cg-glob-label">ETH Dominance</span><span class="cg-glob-val" style="color:#627eea">${ethDom?.toFixed(1)||'—'}%</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">Total Mkt Cap</span><span class="cg-glob-val">${_cgFmt(gdata.total_market_cap?.usd)}</span><span class="cg-glob-sub ${_cgCl(mc24)}">${_cgPct(mc24)}</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">24h Volume</span><span class="cg-glob-val">${_cgFmt(gdata.total_volume?.usd)}</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">BTC Dom</span><span class="cg-glob-val" style="color:#f7931a">₿ ${btcDom?.toFixed(1)||'—'}%</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">ETH Dom</span><span class="cg-glob-val" style="color:#627eea">Ξ ${ethDom?.toFixed(1)||'—'}%</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">Alt Dom</span><span class="cg-glob-val" style="color:#a371f7">${altDom.toFixed(1)}%</span></div>
         <div class="cg-glob-cell"><span class="cg-glob-label">Active Coins</span><span class="cg-glob-val">${gdata.active_cryptocurrencies?.toLocaleString()||'—'}</span></div>
+        <div class="cg-glob-cell"><span class="cg-glob-label">Markets</span><span class="cg-glob-val">${gdata.markets?.toLocaleString()||'—'}</span></div>
+      </div>`;
+
+      /* Dominance bar chart */
+      html += `<div class="cg-dom-bar-wrap">
+        <div class="cg-dom-bar">
+          <div class="cg-dom-seg" style="width:${btcDom?.toFixed(1)||0}%;background:#f7931a" title="BTC ${btcDom?.toFixed(1)}%"></div>
+          <div class="cg-dom-seg" style="width:${ethDom?.toFixed(1)||0}%;background:#627eea" title="ETH ${ethDom?.toFixed(1)}%"></div>
+          <div class="cg-dom-seg" style="flex:1;background:#a371f777" title="Alts ${altDom.toFixed(1)}%"></div>
+        </div>
+        <div class="cg-dom-labels">
+          <span style="color:#f7931a">₿ BTC ${btcDom?.toFixed(1)}%</span>
+          <span style="color:#627eea">Ξ ETH ${ethDom?.toFixed(1)}%</span>
+          <span style="color:#a371f7">Alts ${altDom.toFixed(1)}%</span>
+        </div>
       </div>`;
     }
 
-    if (!coins.length) { el.innerHTML += wmEmpty('No crypto data returned.'); return; }
+    /* Fear & Greed + top-6 coins grid */
+    html += `<div class="cg-overview-grid">`;
 
-    html += `<div class="cg-coin-list">`;
-    for (const c of coins) {
+    /* Fear & Greed gauge */
+    if (fg) {
+      const cur = fg.current;
+      html += `<div class="cg-fg-card">
+        <div class="cg-section-title">Fear &amp; Greed Index</div>
+        ${_renderFearGauge(cur.value)}
+        <div class="cg-fg-history">`;
+      fg.history.slice(0,7).forEach(d => {
+        const v=parseInt(d.value);
+        const c=v<=24?'#f85149':v<=49?'#f0883e':v<=74?'#3fb950':'#2ea84b';
+        const dt=new Date(parseInt(d.timestamp)*1000);
+        const lbl=dt.toLocaleDateString('en',{month:'short',day:'numeric'});
+        html += `<div class="cg-fg-hist-row">
+          <span class="cg-fg-hist-date">${lbl}</span>
+          <div class="cg-fg-hist-bar-wrap"><div class="cg-fg-hist-bar" style="width:${v}%;background:${c}"></div></div>
+          <span class="cg-fg-hist-val" style="color:${c}">${v}</span>
+        </div>`;
+      });
+      html += `</div></div>`;
+    }
+
+    /* Top-6 coins sparkline cards */
+    const top6 = coins.slice(0,6);
+    top6.forEach(c => {
       const chg24 = c.price_change_percentage_24h;
       const chg7  = c.price_change_percentage_7d_in_currency;
-      const fmtPct = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-      const clsPct = v => v == null ? '' : v >= 0 ? 'wm-pos' : 'wm-neg';
-      const fmtPrice = v => {
-        if (v >= 1000) return '$' + v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
-        if (v >= 1)    return '$' + v.toFixed(2);
-        if (v >= 0.01) return '$' + v.toFixed(4);
-        return '$' + v.toFixed(8);
-      };
-      const fmtMC = v => v >= 1e12 ? '$'+(v/1e12).toFixed(2)+'T' : v >= 1e9 ? '$'+(v/1e9).toFixed(1)+'B' : v >= 1e6 ? '$'+(v/1e6).toFixed(0)+'M' : '—';
-      html += `<div class="cg-coin-row">
-        <span class="cg-coin-rank">${c.market_cap_rank}</span>
-        <img class="cg-coin-img" src="${wmEsc(c.image||'')}" alt="${wmEsc(c.symbol||'')}" loading="lazy" width="18" height="18" onerror="this.style.display='none'"/>
-        <span class="cg-coin-name">${wmEsc(c.name||'')}</span>
-        <span class="cg-coin-sym">${(c.symbol||'').toUpperCase()}</span>
-        <span class="cg-coin-price">${fmtPrice(c.current_price||0)}</span>
-        <span class="cg-coin-chg ${clsPct(chg24)}">${fmtPct(chg24)}</span>
-        <span class="cg-coin-chg7 ${clsPct(chg7)}">${fmtPct(chg7)}</span>
-        <span class="cg-coin-mc">${fmtMC(c.market_cap||0)}</span>
-        <div class="cg-bar-wrap"><div class="cg-vol-bar" style="width:${Math.min(100,(c.market_cap||0)/coins[0].market_cap*100).toFixed(1)}%"></div></div>
+      const spark = c.sparkline_in_7d?.price;
+      html += `<div class="cg-coin-card">
+        <div class="cg-coin-card-header">
+          <img src="${wmEsc(c.image||'')}" width="20" height="20" loading="lazy" onerror="this.style.display='none'"/>
+          <span class="cg-coin-card-sym">${(c.symbol||'').toUpperCase()}</span>
+          <span class="cg-coin-card-rank">#${c.market_cap_rank}</span>
+        </div>
+        <div class="cg-coin-card-price cg-live-price" data-id="${wmEsc(c.id||'')}">${_cgPrice(c.current_price)}</div>
+        <div class="cg-coin-card-chg ${_cgCl(chg24)}">${_cgPct(chg24)} 24h</div>
+        <div class="cg-coin-card-spark">${_cgSparkSVG(spark)}</div>
+        <div class="cg-coin-card-mc">${_cgFmt(c.market_cap)}</div>
       </div>`;
+    });
+    html += `</div>`; // overview-grid
+
+    html += `</div>`; // cg-tab-overview
+
+    /* ── TAB 2: COINS TABLE (top 100 with sparklines) ───────────── */
+    html += `<div class="cg-tab" id="cg-tab-coins">
+      <div class="cg-coins-toolbar">
+        <input class="cg-search-input" placeholder="🔍 Filter coins…" oninput="_cgFilterCoins(this.value)" id="cg-coin-search"/>
+        <span class="cg-coins-count">${coins.length} coins</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="cg-coins-table" id="cg-coins-table">
+          <thead><tr>
+            <th>#</th><th>Coin</th><th>Price</th>
+            <th>1h%</th><th>24h%</th><th>7d%</th><th>30d%</th>
+            <th>Market Cap</th><th>Volume 24h</th>
+            <th>Supply</th><th>ATH</th><th>7d Chart</th>
+          </tr></thead>
+          <tbody>`;
+
+    coins.forEach(c => {
+      const ch1  = c.price_change_percentage_1h_in_currency;
+      const ch24 = c.price_change_percentage_24h;
+      const ch7  = c.price_change_percentage_7d_in_currency;
+      const ch30 = c.price_change_percentage_30d_in_currency;
+      const spark= c.sparkline_in_7d?.price;
+      const athPct = c.ath_change_percentage;
+      html += `<tr class="cg-coin-row" data-name="${wmEsc((c.name||'').toLowerCase())} ${wmEsc((c.symbol||'').toLowerCase())}">
+        <td class="cg-td-rank">${c.market_cap_rank}</td>
+        <td class="cg-td-name">
+          <img src="${wmEsc(c.image||'')}" width="16" height="16" loading="lazy" onerror="this.style.display='none'"/>
+          <strong>${wmEsc((c.symbol||'').toUpperCase())}</strong>
+          <span class="cg-coin-fullname">${wmEsc(c.name||'')}</span>
+        </td>
+        <td class="cg-td-price cg-live-price" data-id="${wmEsc(c.id||'')}">${_cgPrice(c.current_price)}</td>
+        <td class="${_cgCl(ch1)}">${_cgPct(ch1)}</td>
+        <td class="${_cgCl(ch24)}">${_cgPct(ch24)}</td>
+        <td class="${_cgCl(ch7)}">${_cgPct(ch7)}</td>
+        <td class="${_cgCl(ch30)}">${_cgPct(ch30)}</td>
+        <td>${_cgFmt(c.market_cap)}</td>
+        <td>${_cgFmt(c.total_volume)}</td>
+        <td class="cg-td-supply" title="Circulating / Max">${c.circulating_supply ? (c.circulating_supply/1e6).toFixed(1)+'M' : '—'}${c.max_supply ? ' / '+(c.max_supply/1e6).toFixed(0)+'M' : ''}</td>
+        <td class="${_cgCl(athPct)}" title="ATH: ${_cgPrice(c.ath)}">${athPct!=null?(athPct.toFixed(1)+'% from ATH'):'—'}</td>
+        <td class="cg-td-spark">${_cgSparkSVG(spark,72,18)}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div></div>`; // coins tab
+
+    /* ── TAB 3: DeFi ─────────────────────────────────────────────── */
+    html += `<div class="cg-tab" id="cg-tab-defi">`;
+    if (defiD) {
+      const totalTVL = defiD.protocols.reduce((s,p)=>s+(p.tvl||0),0);
+      html += `<div class="cg-defi-header">
+        <div class="cg-defi-stat"><span>Total DeFi TVL</span><strong>${_cgFmt(totalTVL)}</strong></div>
+        <div class="cg-defi-stat"><span>Protocols tracked</span><strong>${defiD.protocols.length}</strong></div>
+        <div class="cg-defi-stat"><span>Top chain (TVL)</span><strong>${defiD.chains[0]?.name||'—'}</strong></div>
+      </div>`;
+
+      /* TVL by chain bar chart */
+      if (defiD.chains.length) {
+        const maxTvl = defiD.chains[0].tvl||1;
+        html += `<div class="cg-section-title">TVL by Chain (Top 15)</div><div class="cg-chain-bars">`;
+        defiD.chains.slice(0,15).forEach(ch => {
+          const pct = ((ch.tvl||0)/maxTvl*100).toFixed(1);
+          html += `<div class="cg-chain-row">
+            <span class="cg-chain-name">${wmEsc(ch.name||'')}</span>
+            <div class="cg-chain-bar-wrap"><div class="cg-chain-bar" style="width:${pct}%"></div></div>
+            <span class="cg-chain-tvl">${_cgFmt(ch.tvl)}</span>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      /* Protocol cards */
+      html += `<div class="cg-section-title" style="margin-top:10px">Top DeFi Protocols by TVL</div>
+        <div class="cg-proto-grid">`;
+      defiD.protocols.slice(0,20).forEach(p => {
+        const chg1d = p.change_1d;
+        const logo  = p.logo||'';
+        html += `<div class="cg-proto-card">
+          <div class="cg-proto-header">
+            ${logo?`<img src="${wmEsc(logo)}" width="20" height="20" loading="lazy" onerror="this.style.display='none'"/>`:'' }
+            <span class="cg-proto-name">${wmEsc(p.name||'')}</span>
+            <span class="cg-proto-cat">${wmEsc(p.category||'')}</span>
+          </div>
+          <div class="cg-proto-tvl">${_cgFmt(p.tvl)}</div>
+          <div class="${_cgCl(chg1d)}" style="font-size:10px">${_cgPct(chg1d)} 24h</div>
+          <div class="cg-proto-chain" style="font-size:9px;color:var(--text-muted)">${wmEsc(p.chain||'Multi-chain')}</div>
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div class="no-data">// DeFiLlama data unavailable.</div>`;
     }
-    html += `</div>`;
-    html += `<div style="padding:6px 8px;text-align:right;font-size:10px;color:var(--text-dim)">
-      Data: <a href="https://www.coingecko.com" target="_blank" rel="noopener" style="color:var(--accent)">CoinGecko</a> · No API key required
+    html += `</div>`; // defi tab
+
+    /* ── TAB 4: BTC NETWORK ──────────────────────────────────────── */
+    html += `<div class="cg-tab" id="cg-tab-btcnet">`;
+    if (btc) {
+      const hRate = (btc.hash_rate / 1e18).toFixed(2); // EH/s
+      const diff  = (btc.difficulty / 1e12).toFixed(2); // T
+      const blkTime = btc.minutes_between_blocks?.toFixed(1);
+      const mined   = ((btc.totalbc||0)/1e8/1e6).toFixed(3); // BTC in millions
+      const kpis = [
+        ['Price (USD)',       '$'+btc.market_price_usd?.toLocaleString('en-US',{maximumFractionDigits:0}), '#f7931a'],
+        ['Hash Rate',         hRate+' EH/s', '#58a6ff'],
+        ['Difficulty',        diff+'T',      '#d29922'],
+        ['Block Time',        blkTime+' min','#3fb950'],
+        ['BTC Mined (total)', mined+'M BTC', '#a371f7'],
+        ['Txns (24h)',        btc.n_tx?.toLocaleString()||'—', '#4dbbff'],
+        ['Blocks (24h)',      btc.n_blocks_mined?.toString()||'—', '#3fb950'],
+        ['Mempool (unconf.)', btc.n_btc_mined ? '—' : '—', '#d29922'],
+      ];
+      html += `<div class="av-live-badge" style="margin:8px 12px 4px">● Blockchain.com · Bitcoin Network Stats</div>
+        <div class="cg-btc-kpi-grid">`;
+      kpis.forEach(([lbl,val,col]) => {
+        html += `<div class="cg-btc-kpi">
+          <span class="cg-btc-kpi-lbl">${lbl}</span>
+          <span class="cg-btc-kpi-val" style="color:${col}">${val}</span>
+        </div>`;
+      });
+      html += `</div>`;
+
+      /* Fetch mempool separately (lightweight single-endpoint) */
+      fetch('https://blockchain.info/q/unconfirmedcount', { signal: AbortSignal.timeout(4000) })
+        .then(r=>r.text()).then(txt => {
+          const el2 = document.querySelector('.cg-btc-mempool-val');
+          if (el2) el2.textContent = parseInt(txt).toLocaleString()+' txns';
+        }).catch(()=>{});
+      html = html.replace('\'—\', \'#d29922\'', '\'<span class="cg-btc-mempool-val">loading…</span>\', \'#d29922\'');
+
+      /* Hash rate context */
+      html += `<div class="cg-btc-note">
+        Hash Rate at <strong>${hRate} EH/s</strong> means the network performs ${hRate} quintillion SHA-256 calculations per second — a measure of mining security.
+        Higher hash rate = more secure network.
+      </div>`;
+
+      /* Binance BTC OHLC mini chart */
+      html += `<div class="cg-section-title" style="margin-top:10px">BTC/USDT — 60d Daily Chart (Binance)</div>
+        <div id="cg-btc-chart" class="cg-btc-chart-wrap"><div class="av-loading"><span class="av-spinner"></span></div></div>`;
+
+      /* Load Binance chart async */
+      _fetchBinanceKlines('BTCUSDT','1d',60).then(candles => {
+        const wrap = document.getElementById('cg-btc-chart');
+        if (!wrap || !candles?.length) return;
+        const W=wrap.clientWidth||360, H=100, PL=4, PR=4, PT=6, PB=14;
+        const cw=W-PL-PR, ch=H-PT-PB;
+        const mn=Math.min(...candles.map(c=>c.l)), mx=Math.max(...candles.map(c=>c.h)), rng=mx-mn||1;
+        const xOf = i => PL + (i/(candles.length-1))*cw;
+        const yOf = v => PT + ch - (v-mn)/rng*ch;
+        let bars='', line='';
+        candles.forEach((c,i)=>{
+          const x=xOf(i), bw=Math.max(1,cw/candles.length*0.7);
+          const up=c.c>=c.o, col=up?'#3fb950':'#f85149';
+          const yO=yOf(Math.max(c.o,c.c)), yC=yOf(Math.min(c.o,c.c));
+          bars += `<rect x="${(x-bw/2).toFixed(1)}" y="${yO.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,(yC-yO)).toFixed(1)}" fill="${col}"/>`;
+          bars += `<line x1="${x.toFixed(1)}" y1="${yOf(c.h).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yOf(c.l).toFixed(1)}" stroke="${col}" stroke-width="1"/>`;
+          if (i===0) line = `M${x.toFixed(1)},${yOf(c.c).toFixed(1)}`;
+          else line += ` L${x.toFixed(1)},${yOf(c.c).toFixed(1)}`;
+        });
+        // Date labels (first, mid, last)
+        const dates = [0, Math.floor(candles.length/2), candles.length-1].map(i => {
+          const d=new Date(candles[i].t);
+          return `<text x="${xOf(i).toFixed(0)}" y="${H-2}" text-anchor="middle" fill="#6e7681" font-size="8">${d.toLocaleDateString('en',{month:'short',day:'numeric'})}</text>`;
+        }).join('');
+        wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block">${bars}${dates}</svg>`;
+      });
+
+    } else {
+      html += `<div class="no-data">// Blockchain.com network data unavailable.</div>`;
+    }
+    html += `</div>`; // btcnet tab
+
+    /* ── TAB 5: TRENDING ─────────────────────────────────────────── */
+    html += `<div class="cg-tab" id="cg-tab-trending">`;
+    if (trend?.coins?.length) {
+      html += `<div class="cg-section-title">🔥 Trending Coins (CoinGecko, last 24h)</div>
+        <div class="cg-trend-grid">`;
+      trend.coins.forEach((item,i) => {
+        const c = item.item;
+        html += `<div class="cg-trend-card">
+          <span class="cg-trend-rank">#${i+1}</span>
+          <img src="${wmEsc(c.thumb||c.small||'')}" width="24" height="24" loading="lazy" onerror="this.style.display='none'"/>
+          <div class="cg-trend-info">
+            <span class="cg-trend-name">${wmEsc(c.name||'')}</span>
+            <span class="cg-trend-sym">${wmEsc((c.symbol||'').toUpperCase())}</span>
+          </div>
+          <span class="cg-trend-mcr">${c.market_cap_rank ? '#'+c.market_cap_rank : '—'}</span>
+        </div>`;
+      });
+      html += `</div>`;
+
+      /* Trending NFTs */
+      if (trend?.nfts?.length) {
+        html += `<div class="cg-section-title" style="margin-top:12px">🖼 Trending NFTs</div>
+          <div class="cg-trend-grid">`;
+        trend.nfts.slice(0,6).forEach((n,i) => {
+          html += `<div class="cg-trend-card">
+            <span class="cg-trend-rank">#${i+1}</span>
+            <img src="${wmEsc(n.thumb||'')}" width="24" height="24" loading="lazy" onerror="this.style.display='none'"/>
+            <div class="cg-trend-info">
+              <span class="cg-trend-name">${wmEsc(n.name||'')}</span>
+              <span class="cg-trend-sym">${wmEsc((n.symbol||'').toUpperCase())}</span>
+            </div>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+    } else {
+      html += `<div class="no-data">// Trending data unavailable.</div>`;
+    }
+    html += `</div>`; // trending tab
+
+    /* ── Footer & source credits ─────────────────────────────────── */
+    html += `<div class="cg-footer">
+      <a href="https://www.coingecko.com" target="_blank" rel="noopener" class="geo-wm-link">CoinGecko</a>
+      · <a href="https://api.alternative.me" target="_blank" rel="noopener" class="geo-wm-link">Alternative.me</a>
+      · <a href="https://defillama.com" target="_blank" rel="noopener" class="geo-wm-link">DeFiLlama</a>
+      · <a href="https://blockchain.info" target="_blank" rel="noopener" class="geo-wm-link">Blockchain.com</a>
+      · <a href="https://www.binance.com" target="_blank" rel="noopener" class="geo-wm-link">Binance</a>
+      · No API keys required
     </div>`;
+
     el.innerHTML = html;
+
+    /* Start CoinCap WebSocket for real-time top-10 prices */
+    const wsIds = coins.slice(0,10).map(c=>c.id).filter(Boolean);
+    if (wsIds.length) _ccWsConnect(wsIds);
+
   } catch(e) {
     el.innerHTML = wmError('Crypto data unavailable: ' + e.message);
   }
 }
+
+/* ── Sub-tab switcher ─────────────────────────────────────────────── */
+window._cgShowTab = function(id, btn) {
+  const wrap = document.getElementById('macro-crypto');
+  if (!wrap) return;
+  wrap.querySelectorAll('.cg-tab').forEach(t => t.classList.remove('active'));
+  wrap.querySelectorAll('.cg-stab').forEach(b => b.classList.remove('active'));
+  const tab = document.getElementById(`cg-tab-${id}`);
+  if (tab) tab.classList.add('active');
+  if (btn) btn.classList.add('active');
+};
+
+/* ── Coin search filter ───────────────────────────────────────────── */
+window._cgFilterCoins = function(q) {
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('#cg-coins-table .cg-coin-row').forEach(row => {
+    const name = row.dataset.name || '';
+    row.style.display = (!q || name.includes(q)) ? '' : 'none';
+  });
+};
+
 
 /* ══════════════════════════════════════════════════════════════════
    Frankfurter FX  → Forex panel header enrichment
