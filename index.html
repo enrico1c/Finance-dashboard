@@ -442,9 +442,9 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars')">WARS</button>
-        <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources')">RESOURCES</button>
-        <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes')">ROUTES</button>
+        <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars');if(typeof georiskLoadWars==='function'&&!document.getElementById('georisk-wars-content')?.dataset?.loaded){document.getElementById('georisk-wars-content').dataset.loaded='1';georiskLoadWars()}">WARS</button>
+        <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources');if(typeof georiskLoadResources==='function'&&!document.getElementById('georisk-resources-content')?.dataset?.loaded){document.getElementById('georisk-resources-content').dataset.loaded='1';georiskLoadResources()}">RESOURCES</button>
+        <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes');if(typeof georiskLoadRoutes==='function'&&!document.getElementById('georisk-routes-content')?.dataset?.loaded){document.getElementById('georisk-routes-content').dataset.loaded='1';georiskLoadRoutes()}">ROUTES</button>
         <button class="tab-btn"        data-tab="intel"     onclick="switchTab('geopolitical','intel');wmGeoIntel()">INTEL</button>
         <button class="tab-btn"        data-tab="signals"   onclick="switchTab('geopolitical','signals');wmGeoSignals()">SIGNALS</button>
         <button class="tab-btn"        data-tab="quakes"    onclick="switchTab('geopolitical','quakes');wmGeoQuakes()">QUAKES</button>
