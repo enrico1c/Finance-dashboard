@@ -5775,3 +5775,36 @@ body.panel-dragging iframe, body.panel-resizing iframe {
    ══════════════════════════════════════════════════════════════════ */
 .pwa-install-banner { display:none; position:fixed; bottom:16px; right:16px; background:var(--bg-panel); border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:11px; z-index:9999; box-shadow:0 4px 16px rgba(0,0,0,.4); gap:10px; align-items:center; }
 .pwa-install-banner.visible { display:flex; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Geo·Risk — Wars / Resources / Routes tabs
+   ══════════════════════════════════════════════════════════════════ */
+.georisk-crises-grid    { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:5px; padding:6px 10px; }
+.georisk-crisis-card    { padding:7px 9px; border-radius:4px; background:var(--bg-input,#161b22); border:1px solid var(--border); }
+.georisk-crisis-header  { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+.georisk-crisis-icon    { font-size:14px; flex-shrink:0; }
+.georisk-crisis-name    { font-size:10px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.georisk-crisis-meta    { display:flex; gap:6px; font-size:9px; color:var(--text-muted); flex-wrap:wrap; }
+.georisk-crisis-country { font-weight:600; }
+.georisk-crisis-type    { color:var(--text-muted); }
+.georisk-crisis-date    { font-family:var(--font-mono); }
+.georisk-section-head   { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:700; padding:6px 10px 3px; border-top:1px solid var(--border); margin-top:4px; }
+
+.georisk-commodity-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:4px; padding:6px 10px; }
+.georisk-commodity-card { background:var(--bg-input,#161b22); border:1px solid var(--border); border-radius:4px; padding:7px 8px; display:flex; flex-direction:column; gap:2px; }
+.georisk-commodity-name { font-size:9px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
+.georisk-commodity-price{ font-size:14px; font-weight:800; color:var(--text); font-family:var(--font-mono); }
+.georisk-commodity-unit { font-size:8px; color:var(--text-muted); }
+.georisk-commodity-date { font-size:8px; color:var(--text-muted); font-family:var(--font-mono); }
+
+.georisk-choke-grid     { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:5px; padding:6px 10px; }
+.georisk-choke-card     { padding:8px 10px; border-radius:4px; background:var(--bg-input,#161b22); border:1px solid var(--border); }
+.georisk-choke-header   { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.georisk-choke-icon     { font-size:14px; flex-shrink:0; }
+.georisk-choke-name     { font-size:11px; font-weight:700; color:var(--text); flex:1; }
+.georisk-choke-risk     { font-size:8px; font-weight:800; letter-spacing:.04em; }
+.georisk-choke-region   { font-size:9px; color:var(--text-muted); margin-bottom:2px; }
+.georisk-choke-pct      { font-size:9px; color:var(--accent); font-family:var(--font-mono); }
+.georisk-choke-threat   { font-size:9px; color:var(--text-muted); margin-top:2px; line-height:1.4; }
+.georisk-alert-row      { display:flex; justify-content:space-between; align-items:center; padding:4px 10px; border-bottom:1px solid var(--border); gap:8px; }
+.georisk-alerts-list    { max-height:150px; overflow-y:auto; }
