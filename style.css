@@ -5615,3 +5615,39 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 
 /* Transaction actions */
 .port-tx-actions { display:flex; gap:8px; padding:8px 10px; border-top:1px solid var(--border); }
+
+/* ══════════════════════════════════════════════════════════════════
+   SCREENER MODULE v2 — Preset bar + Advanced results
+   ══════════════════════════════════════════════════════════════════ */
+
+.scr-preset-bar {
+  display: flex; flex-wrap: wrap; gap: 3px;
+  padding: 6px 8px; background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.scr-preset-btn {
+  flex: 0 0 auto;
+  background: var(--bg-input,#161b22); border: 1px solid var(--border);
+  color: var(--text-muted); font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  transition: all .12s; white-space: nowrap;
+}
+.scr-preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+.scr-preset-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+.scr-preset-custom { border-color: #d29922; color: #d29922; }
+.scr-preset-custom:hover, .scr-preset-custom.active { background: #d29922; color: #000; }
+
+.scr-results-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 10px; border-bottom: 1px solid var(--border);
+}
+.scr-results-actions { display: flex; gap: 6px; }
+
+.scr-table td { padding: 3px 5px; font-size: 10px; font-family: var(--font-mono); }
+.scr-table th { font-size: 8px; white-space: nowrap; }
+
+.scr-footer {
+  font-size: 9px; color: var(--text-muted);
+  padding: 5px 10px; border-top: 1px solid var(--border);
+}
