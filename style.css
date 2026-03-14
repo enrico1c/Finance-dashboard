@@ -5456,3 +5456,114 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 
 /* Footer */
 .opt-footer { font-size: 9px; color: var(--text-muted); padding: 6px 12px; border-top: 1px solid var(--border); }
+
+/* ══════════════════════════════════════════════════════════════════
+   CRYPTO MODULE v2 — Full Intelligence Dashboard
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Sub-tab bar */
+.cg-subtab-bar  { display:flex; gap:2px; padding:6px 8px; background:var(--bg-panel); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.cg-stab        { background:transparent; border:1px solid var(--border); color:var(--text-muted); font-size:10px; font-weight:600; padding:3px 9px; border-radius:4px; cursor:pointer; transition:all .12s; white-space:nowrap; }
+.cg-stab:hover  { border-color:var(--accent); color:var(--accent); }
+.cg-stab.active { background:var(--accent); border-color:var(--accent); color:#000; }
+
+/* Tab panes */
+.cg-tab         { display:none; }
+.cg-tab.active  { display:block; }
+
+/* ── Global stats bar ── */
+.cg-global-bar  { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:1px; background:var(--border); border-bottom:1px solid var(--border); }
+.cg-glob-cell   { background:var(--bg-panel); padding:7px 10px; display:flex; flex-direction:column; gap:1px; }
+.cg-glob-label  { font-size:8px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:700; }
+.cg-glob-val    { font-size:13px; font-weight:800; color:var(--text); font-family:var(--font-mono); }
+.cg-glob-sub    { font-size:9px; font-family:var(--font-mono); }
+
+/* ── Dominance bar ── */
+.cg-dom-bar-wrap{ padding:6px 12px 4px; border-bottom:1px solid var(--border); }
+.cg-dom-bar     { display:flex; height:8px; border-radius:4px; overflow:hidden; gap:1px; }
+.cg-dom-seg     { height:100%; border-radius:2px; transition:width .4s; }
+.cg-dom-labels  { display:flex; gap:12px; font-size:9px; margin-top:4px; font-family:var(--font-mono); }
+
+/* ── Overview grid ── */
+.cg-overview-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:6px; padding:8px; }
+
+/* ── Fear & Greed card ── */
+.cg-fg-card     { background:var(--bg-input,#161b22); border:1px solid var(--border); border-radius:6px; padding:8px; grid-column:span 2; }
+.cg-fg-card .cg-section-title { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:700; margin-bottom:6px; }
+.cg-fear-wrap   { display:flex; justify-content:center; }
+.cg-fg-history  { display:flex; flex-direction:column; gap:3px; margin-top:4px; }
+.cg-fg-hist-row { display:grid; grid-template-columns:52px 1fr 28px; gap:4px; align-items:center; }
+.cg-fg-hist-date{ font-size:8px; color:var(--text-muted); font-family:var(--font-mono); }
+.cg-fg-hist-bar-wrap{ height:5px; background:var(--border); border-radius:2px; overflow:hidden; }
+.cg-fg-hist-bar { height:100%; border-radius:2px; }
+.cg-fg-hist-val { font-size:9px; font-weight:700; font-family:var(--font-mono); text-align:right; }
+
+/* ── Coin cards (overview) ── */
+.cg-coin-card   { background:var(--bg-input,#161b22); border:1px solid var(--border); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:3px; cursor:pointer; transition:border-color .12s; }
+.cg-coin-card:hover { border-color:var(--accent); }
+.cg-coin-card-header{ display:flex; align-items:center; gap:5px; }
+.cg-coin-card-sym { font-size:11px; font-weight:800; color:var(--text); }
+.cg-coin-card-rank{ font-size:8px; color:var(--text-muted); margin-left:auto; }
+.cg-coin-card-price{ font-size:13px; font-weight:700; color:var(--text); font-family:var(--font-mono); }
+.cg-coin-card-chg { font-size:9px; font-family:var(--font-mono); }
+.cg-coin-card-spark{ height:22px; margin:2px 0; }
+.cg-coin-card-mc{ font-size:9px; color:var(--text-muted); }
+
+/* Real-time price flash */
+.cg-price-flash { animation:cgFlash .6s ease; }
+@keyframes cgFlash { 0%,100%{background:transparent} 30%{background:rgba(88,166,255,.25)} }
+
+/* ── Coins table ── */
+.cg-coins-toolbar{ display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid var(--border); }
+.cg-search-input { background:var(--bg-input,#161b22); border:1px solid var(--border); color:var(--text); font-size:11px; padding:4px 8px; border-radius:4px; flex:1; max-width:220px; }
+.cg-coins-count  { font-size:9px; color:var(--text-muted); }
+.cg-coins-table  { width:100%; border-collapse:collapse; font-size:10px; white-space:nowrap; }
+.cg-coins-table th { padding:4px 6px; border-bottom:1px solid var(--border); font-size:8px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); background:var(--bg-panel); position:sticky; top:0; z-index:3; }
+.cg-coins-table td { padding:3px 6px; border-bottom:1px solid var(--border); font-family:var(--font-mono); }
+.cg-coins-table tr:hover td { background:rgba(255,255,255,.025); }
+.cg-td-name     { display:flex; align-items:center; gap:5px; min-width:130px; font-family:var(--font-sans,sans-serif); }
+.cg-coin-fullname{ color:var(--text-muted); font-size:9px; overflow:hidden; text-overflow:ellipsis; max-width:80px; }
+.cg-td-rank     { color:var(--text-muted); min-width:26px; }
+.cg-td-price    { color:var(--text); font-weight:700; }
+.cg-td-supply   { font-size:9px; color:var(--text-muted); }
+.cg-td-spark    { min-width:74px; }
+
+/* ── DeFi tab ── */
+.cg-defi-header { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); border-bottom:1px solid var(--border); }
+.cg-defi-stat   { background:var(--bg-panel); padding:8px 12px; display:flex; flex-direction:column; gap:2px; }
+.cg-defi-stat span { font-size:9px; color:var(--text-muted); text-transform:uppercase; }
+.cg-defi-stat strong { font-size:14px; font-family:var(--font-mono); color:var(--text); }
+.cg-section-title{ font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:700; padding:6px 12px 3px; }
+.cg-chain-bars  { padding:0 12px 8px; display:flex; flex-direction:column; gap:4px; }
+.cg-chain-row   { display:grid; grid-template-columns:80px 1fr 60px; gap:6px; align-items:center; }
+.cg-chain-name  { font-size:10px; color:var(--text); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cg-chain-bar-wrap{ height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.cg-chain-bar   { height:100%; background:var(--accent); border-radius:3px; transition:width .4s; }
+.cg-chain-tvl   { font-size:10px; font-family:var(--font-mono); color:var(--text-muted); text-align:right; }
+.cg-proto-grid  { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:6px; padding:4px 12px 8px; }
+.cg-proto-card  { background:var(--bg-input,#161b22); border:1px solid var(--border); border-radius:5px; padding:8px; }
+.cg-proto-header{ display:flex; align-items:center; gap:5px; margin-bottom:5px; overflow:hidden; }
+.cg-proto-name  { font-size:11px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cg-proto-cat   { font-size:8px; color:var(--text-muted); display:block; }
+.cg-proto-tvl   { font-size:13px; font-weight:800; color:var(--accent); font-family:var(--font-mono); }
+.cg-proto-chain { margin-top:2px; }
+
+/* ── BTC Network tab ── */
+.cg-btc-kpi-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:1px; background:var(--border); border-bottom:1px solid var(--border); }
+.cg-btc-kpi     { background:var(--bg-panel); padding:8px 12px; display:flex; flex-direction:column; gap:3px; }
+.cg-btc-kpi-lbl { font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); font-weight:700; }
+.cg-btc-kpi-val { font-size:15px; font-weight:800; font-family:var(--font-mono); }
+.cg-btc-note    { font-size:10px; color:var(--text-muted); padding:8px 12px; line-height:1.5; border-bottom:1px solid var(--border); }
+.cg-btc-chart-wrap { padding:6px 12px 10px; min-height:80px; }
+
+/* ── Trending tab ── */
+.cg-trend-grid  { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:6px; padding:6px 12px; }
+.cg-trend-card  { display:flex; align-items:center; gap:8px; padding:7px 10px; background:var(--bg-input,#161b22); border:1px solid var(--border); border-radius:5px; }
+.cg-trend-rank  { font-size:11px; font-weight:800; color:var(--text-muted); font-family:var(--font-mono); min-width:22px; }
+.cg-trend-info  { display:flex; flex-direction:column; gap:1px; flex:1; overflow:hidden; }
+.cg-trend-name  { font-size:11px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cg-trend-sym   { font-size:9px; color:var(--text-muted); }
+.cg-trend-mcr   { font-size:9px; color:var(--text-muted); font-family:var(--font-mono); }
+
+/* ── Footer ── */
+.cg-footer      { font-size:9px; color:var(--text-muted); padding:6px 12px; border-top:1px solid var(--border); display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
