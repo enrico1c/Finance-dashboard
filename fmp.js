@@ -499,6 +499,37 @@ function fmpRenderRatios(sym, r) {
   if (currentValSym === sym && typeof renderValuation === "function") {
     renderValuation(currentValTicker);
   }
+
+  // Update WACC tab with live beta + D/E from FMP ratios
+  const wc = document.getElementById("fund-wacc");
+  if (wc) {
+    const beta    = parseFloat(r?.beta   || 1.0);
+    const debtEq  = parseFloat(r?.debtEq || 0.3);
+    const rf=4.5, erp=5.5;
+    const ke      = (rf + beta * erp).toFixed(2);
+    const kd=5.5, tax=21;
+    const eqW     = Math.max(20, Math.round(100/(1+debtEq)));
+    const dW      = 100 - eqW;
+    const wacc    = (eqW/100*parseFloat(ke) + dW/100*kd*(1-tax/100)).toFixed(2);
+    wc.dataset.loaded = "fmp";
+    wc.innerHTML = `
+      <div class="av-live-badge">● WACC · ${fmpEsc(sym)} · FMP live data</div>
+      <div class="section-head">WACC Inputs</div>
+      ${mRow("Beta (levered)",         beta.toFixed(2))}
+      ${mRow("D/E Ratio",              debtEq.toFixed(2))}
+      ${mRow("Risk-Free Rate (10Y)",   rf+"%")}
+      ${mRow("Equity Risk Premium",    erp+"%")}
+      ${mRow("Cost of Equity (Ke)",    ke+"%")}
+      ${mRow("Pre-Tax Cost of Debt",   kd+"%")}
+      ${mRow("Tax Rate",               tax+"%")}
+      ${mRow("Equity Weight",          eqW+"%")}
+      ${mRow("Debt Weight",            dW+"%")}
+      <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
+      ${r.roe    != null ? mRow("ROE",          r.roe.toFixed(1)+"%")    : ""}
+      ${r.roa    != null ? mRow("ROA",          r.roa.toFixed(1)+"%")    : ""}
+      ${r.netMgn != null ? mRow("Net Margin",   r.netMgn.toFixed(1)+"%") : ""}
+      <div class="av-note">// Beta & D/E from FMP TTM · Rf 4.5% · ERP 5.5%</div>`;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
