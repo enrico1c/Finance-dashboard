@@ -1101,31 +1101,63 @@ function renderValuation(ticker) {
 const panelLayout={};
 
 function computeDefaultLayout(){
-  const canvas=document.getElementById("dashboardCanvas");
-  const W=canvas.clientWidth, H=canvas.clientHeight, G=8;
-  const cW=Math.round(W*0.52), cH=Math.round(H*0.57), rW=W-cW-G;
-  const bH=H-cH-G, col=Math.round((W-G*3)/4);
+  const canvas = document.getElementById("dashboardCanvas");
+  const W = canvas.clientWidth, H = canvas.clientHeight, G = 6;
 
-  panelLayout.chart        ={x:0,       y:0,     w:cW, h:cH};
-  panelLayout.fundamentals ={x:cW+G,    y:0,     w:rW, h:Math.round(cH*0.55)};
-  panelLayout.news         ={x:cW+G,    y:Math.round(cH*0.55)+G, w:rW, h:cH-Math.round(cH*0.55)-G};
-  panelLayout.analysts     ={x:0,        y:cH+G,  w:col,h:bH};
-  panelLayout.ownership    ={x:col+G,    y:cH+G,  w:col,h:bH};
-  panelLayout.comparables  ={x:(col+G)*2, y:cH+G, w:col,h:bH};
-  panelLayout.webhooks     ={x:(col+G)*3, y:cH+G, w:col,h:bH};
-  panelLayout.notes        ={x:Math.round(W*0.25),y:Math.round(H*0.15),w:Math.round(W*0.3),h:Math.round(H*0.4)};
-  // Watchlist + Valuation: placed at bottom-left, side by side
-  const wlW=Math.round(W*0.28), valW=Math.round(W*0.36);
-  panelLayout.watchlist    ={x:0,      y:cH+G, w:wlW,  h:bH};
+  /* ── Screenshot-faithful layout ──────────────────────────────
+     Col widths (left→right across full width):
+       Chart  ≈31%  |  Fundamentals/News ≈23%  |  Analysts/WL ≈22%  |  Geo/News ≈24%
+     Row heights:
+       Top row  ≈56%  (chart | fund+news | analysts | geo)
+       Bot row  ≈44%  (ownership/comp/webhooks | watchlist | supply | macro | intel)
+  ──────────────────────────────────────────────────────────────── */
 
-  // Geo/Supply/Alert/Macro/Intel: stacked on the right side, below the main row
-  const geoW=Math.round(W*0.38), geoH=Math.round(H*0.48);
-  const sideCol=Math.round(W*0.32);
-  panelLayout.geopolitical ={x:W-geoW,              y:0,           w:geoW, h:geoH};
-  panelLayout.supply       ={x:W-geoW,              y:geoH+G,      w:geoW, h:H-geoH-G};
-  panelLayout.alert        ={x:W-geoW-sideCol-G,    y:0,           w:sideCol, h:Math.round(H*0.45)};
-  panelLayout.macro        ={x:W-geoW-sideCol-G,    y:Math.round(H*0.45)+G, w:sideCol, h:H-Math.round(H*0.45)-G};
-  panelLayout.intel        ={x:0,                   y:cH+G,        w:Math.round(W*0.42), h:bH};
+  const colA = Math.round(W * 0.31);   // Chart col
+  const colB = Math.round(W * 0.23);   // Fundamentals col
+  const colC = Math.round(W * 0.22);   // Analysts col
+  const colD = W - colA - colB - colC - G*3; // Geo/News col (rest)
+
+  const rowT = Math.round(H * 0.56);   // Top row height
+  const rowB = H - rowT - G;           // Bottom row height
+
+  // ── TOP ROW ────────────────────────────────────────────────
+  // Chart (large left)
+  panelLayout.chart        = {x: 0,                       y: 0, w: colA,          h: rowT};
+  // Fundamentals (top of center-left col)
+  panelLayout.fundamentals = {x: colA+G,                  y: 0, w: colB,          h: Math.round(rowT * 0.58)};
+  // News (bottom of center-left col — tight below fundamentals)
+  panelLayout.news         = {x: colA+G,                  y: Math.round(rowT*0.58)+G, w: colB, h: rowT - Math.round(rowT*0.58) - G};
+  // Analysts (center-right col, full top row)
+  panelLayout.analysts     = {x: colA+colB+G*2,           y: 0, w: colC,          h: rowT};
+  // Geo Risk (right col, full top row)
+  panelLayout.geopolitical = {x: colA+colB+colC+G*3,      y: 0, w: colD,          h: rowT};
+
+  // ── BOTTOM ROW ─────────────────────────────────────────────
+  // Each bottom panel gets roughly equal width across 5 slots
+  const botSlots = 5;
+  const botW = Math.round((W - G*(botSlots-1)) / botSlots);
+  const botY = rowT + G;
+
+  // Ownership (slot 0)
+  panelLayout.ownership    = {x: 0,                       y: botY, w: botW,        h: rowB};
+  // Comparables (slot 1)
+  panelLayout.comparables  = {x: botW+G,                  y: botY, w: botW,        h: rowB};
+  // Webhooks / Alerts (slot 2 — Price Alerts & Webhooks)
+  panelLayout.webhooks     = {x: (botW+G)*2,              y: botY, w: botW,        h: rowB};
+  // Alert Feed (slot 3)
+  panelLayout.alert        = {x: (botW+G)*3,              y: botY, w: botW,        h: rowB};
+  // Supply Chain (slot 4)
+  panelLayout.supply       = {x: (botW+G)*4,              y: botY, w: botW,        h: rowB};
+
+  // ── SECONDARY (initially hidden or floating) ───────────────
+  // Watchlist (floats over bottom-left when shown)
+  panelLayout.watchlist    = {x: 0,                       y: botY, w: Math.round(W*0.25), h: rowB};
+  // Intel Feed (center, shown over bottom row)
+  panelLayout.intel        = {x: botW+G,                  y: botY, w: Math.round(W*0.35), h: rowB};
+  // Macro Intel (right side of bottom)
+  panelLayout.macro        = {x: (botW+G)*3,              y: botY, w: Math.round(W*0.26), h: rowB};
+  // Notes (floating center)
+  panelLayout.notes        = {x: Math.round(W*0.3),       y: Math.round(H*0.2),  w: Math.round(W*0.28), h: Math.round(H*0.45)};
 }
 
 function applyPanelPosition(id){
@@ -1135,7 +1167,27 @@ function applyPanelPosition(id){
   const safeY=Math.max(minY, l.y);
   Object.assign(el.style,{left:l.x+"px",top:safeY+"px",width:l.w+"px",height:l.h+"px"});
 }
-function initLayout(){ computeDefaultLayout(); Object.keys(panelLayout).forEach(applyPanelPosition); }
+function initLayout(){
+  computeDefaultLayout();
+  Object.keys(panelLayout).forEach(applyPanelPosition);
+  // Apply startup visibility matching screenshot:
+  //   Visible: chart, fundamentals, news, analysts, ownership, comparables,
+  //            geopolitical, supply, alert, macro, intel, webhooks, watchlist
+  //   Hidden by default: notes
+  const startVisible = ["chart","fundamentals","news","analysts","ownership",
+    "comparables","geopolitical","supply","alert","macro","intel","webhooks","watchlist"];
+  const startHidden  = ["notes"];
+  startVisible.forEach(id => {
+    const el = document.getElementById("panel-"+id);
+    if(el) el.classList.remove("hidden");
+    document.querySelectorAll(`.panel-toggle[data-panel="${id}"]`).forEach(cb => cb.checked = true);
+  });
+  startHidden.forEach(id => {
+    const el = document.getElementById("panel-"+id);
+    if(el) el.classList.add("hidden");
+    document.querySelectorAll(`.panel-toggle[data-panel="${id}"]`).forEach(cb => cb.checked = false);
+  });
+}
 
 /* ══════════════════════════════════════════════════════════════════
    DRAG
@@ -1160,12 +1212,14 @@ function getTopbarGuard() {
 const SNAP=8; let dragState=null;
 function initDrag(panel){
   panel.querySelector(".panel-head")?.addEventListener("mousedown",e=>{
-    if(e.target.closest("button,input,select,textarea,.tab-btn")) return;
+    if(e.target.closest("button,input,select,textarea,.tab-btn,.wm-intel-tab,.wm-filter-btn,.wm-toggle,.lsb-preset-btn")) return;
     e.preventDefault();
+    document.body.style.userSelect = "none";
     const canvas=document.getElementById("dashboardCanvas");
     const r=panel.getBoundingClientRect(), c=canvas.getBoundingClientRect();
     dragState={panel,startMouseX:e.clientX,startMouseY:e.clientY,startPanelX:r.left-c.left,startPanelY:r.top-c.top};
     panel.classList.add("dragging"); bringToFront(panel); panel.style.zIndex=1000;
+    document.body.classList.add("panel-dragging");
     document.getElementById("snapOverlay")?.classList.add("visible");
   });
 }
@@ -1173,18 +1227,25 @@ document.addEventListener("mousemove",e=>{
   if(!dragState) return;
   const c=document.getElementById("dashboardCanvas").getBoundingClientRect();
   const minY=getTopbarGuard();
-  let x=Math.round((dragState.startPanelX+e.clientX-dragState.startMouseX)/SNAP)*SNAP;
-  let y=Math.round((dragState.startPanelY+e.clientY-dragState.startMouseY)/SNAP)*SNAP;
-  x=Math.max(0,Math.min(x,c.width-dragState.panel.offsetWidth));
-  y=Math.max(minY,Math.min(y,c.height-dragState.panel.offsetHeight));
+  const pw=dragState.panel.offsetWidth, ph=dragState.panel.offsetHeight;
+  let x=dragState.startPanelX+(e.clientX-dragState.startMouseX);
+  let y=dragState.startPanelY+(e.clientY-dragState.startMouseY);
+  // Snap to grid
+  x=Math.round(x/SNAP)*SNAP;
+  y=Math.round(y/SNAP)*SNAP;
+  // Clamp: left/right (keep at least 60px visible), top guard
+  x=Math.max(-pw+60, Math.min(x, c.width-60));
+  y=Math.max(minY, y);   // no bottom clamp — allow panels to extend below fold
   dragState.panel.style.left=x+"px"; dragState.panel.style.top=y+"px";
   const pid=dragState.panel.dataset.panel;
   if(panelLayout[pid]){panelLayout[pid].x=x;panelLayout[pid].y=y;}
 });
 document.addEventListener("mouseup",()=>{
+  document.body.style.userSelect = "";
   if(!dragState) return;
   dragState.panel.classList.remove("dragging"); dragState.panel.style.zIndex="";
-  document.getElementById("snapOverlay")?.classList.remove("visible"); dragState=null;
+  document.getElementById("snapOverlay")?.classList.remove("visible");
+  document.body.classList.remove("panel-dragging"); dragState=null;
 });
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1195,40 +1256,60 @@ function initResize(panel){
   panel.querySelectorAll(".resize-handle").forEach(h=>{
     h.addEventListener("mousedown",e=>{
       e.preventDefault(); e.stopPropagation();
+      document.body.style.userSelect = "none";  // prevent text selection
       const canvas=document.getElementById("dashboardCanvas");
-      const r=panel.getBoundingClientRect(),c=canvas.getBoundingClientRect();
+      const r=panel.getBoundingClientRect(), c=canvas.getBoundingClientRect();
       resizeState={panel,dir:h.dataset.dir,mouseX:e.clientX,mouseY:e.clientY,
-        startX:r.left-c.left,startY:r.top-c.top,startW:r.width,startH:r.height};
+        startX:r.left-c.left, startY:r.top-c.top, startW:r.width, startH:r.height};
       panel.classList.add("resizing"); bringToFront(panel);
+      document.body.classList.add("panel-resizing");
     });
   });
 }
 document.addEventListener("mousemove",e=>{
   if(!resizeState) return;
-  const s=resizeState,dx=e.clientX-s.mouseX,dy=e.clientY-s.mouseY;
+  e.preventDefault();
+  const s=resizeState;
+  const dx=e.clientX-s.mouseX, dy=e.clientY-s.mouseY;
   const minY=getTopbarGuard();
-  let x=s.startX,y=s.startY,w=s.startW,h=s.startH;
-  if(s.dir.includes("e"))w=Math.max(MIN_W,s.startW+dx);
-  if(s.dir.includes("s"))h=Math.max(MIN_H,s.startH+dy);
-  if(s.dir.includes("w")){w=Math.max(MIN_W,s.startW-dx);x=s.startX+s.startW-w;}
-  if(s.dir.includes("n")){h=Math.max(MIN_H,s.startH-dy);y=s.startY+s.startH-h;}
-  w=Math.round(w/SNAP)*SNAP;h=Math.round(h/SNAP)*SNAP;
-  x=Math.max(0,Math.round(x/SNAP)*SNAP);
-  y=Math.max(minY,Math.round(y/SNAP)*SNAP);
-  // If clamped at top, shrink height accordingly so bottom doesn't move
-  if(s.dir.includes("n") && y===minY) h=Math.max(MIN_H,(s.startY+s.startH)-minY);
-  Object.assign(s.panel.style,{left:x+"px",top:y+"px",width:w+"px",height:h+"px"});
-  const pid=s.panel.dataset.panel;
-  const tt=document.getElementById(`tooltip-${pid}`);
-  if(tt) tt.textContent=`${w}×${h}`;
-  if(panelLayout[pid]) Object.assign(panelLayout[pid],{x,y,w,h});
+  let x=s.startX, y=s.startY, w=s.startW, h=s.startH;
+
+  // East / West (width)
+  if(s.dir.includes("e")) w = Math.max(MIN_W, s.startW + dx);
+  if(s.dir.includes("w")) { w = Math.max(MIN_W, s.startW - dx); x = s.startX + s.startW - w; }
+
+  // South (grow downward — no canvas bottom clamp)
+  if(s.dir.includes("s")) h = Math.max(MIN_H, s.startH + dy);
+
+  // North (grow upward — anchor bottom, move top)
+  if(s.dir.includes("n")) {
+    const newH = Math.max(MIN_H, s.startH - dy);
+    const newY = s.startY + s.startH - newH;
+    // Clamp top to topbar guard
+    if(newY >= minY) { h = newH; y = newY; }
+    else             { y = minY; h = Math.max(MIN_H, s.startY + s.startH - minY); }
+  }
+
+  // Snap
+  w = Math.round(w/SNAP)*SNAP;
+  h = Math.round(h/SNAP)*SNAP;
+  x = Math.max(-w+60, Math.round(x/SNAP)*SNAP);  // allow partial off-screen left
+  y = Math.max(minY,  Math.round(y/SNAP)*SNAP);
+
+  Object.assign(s.panel.style, {left:x+"px", top:y+"px", width:w+"px", height:h+"px"});
+
+  const pid = s.panel.dataset.panel;
+  const tt  = document.getElementById("tooltip-"+pid);
+  if(tt) tt.textContent = w+"×"+h;
+  if(panelLayout[pid]) Object.assign(panelLayout[pid], {x,y,w,h});
 });
 document.addEventListener("mouseup",()=>{
+  document.body.style.userSelect = "";  // always restore
   if(!resizeState) return;
   resizeState.panel.classList.remove("resizing");
+  document.body.classList.remove("panel-resizing");
   const pid=resizeState.panel.dataset.panel;
   if(pid==="chart") setTimeout(()=>loadChart(resolveSymbol(currentTicker)),120);
-  if(pid==="forex") setTimeout(()=>loadForexChart(),120);
   resizeState=null;
 });
 
@@ -1557,8 +1638,9 @@ function renderScorecard(ticker) {
 
   // ── Technical signal (simplified from AV tech cache) ────────────
   let techSignal = '—', techColor = 'var(--text-muted)';
-  if (typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.rsi) {
-    const rsi = avLiveCache[sym].rsi;
+  const _techRsi = (typeof techGetRsi === 'function') ? techGetRsi(sym) : null;
+  if (_techRsi != null || (typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.rsi)) {
+    const rsi = _techRsi ?? avLiveCache[sym].rsi;
     if (rsi < 30)      { techSignal = 'Strong Buy';  techColor = '#3fb950'; }
     else if (rsi < 45) { techSignal = 'Buy';         techColor = '#58a6ff'; }
     else if (rsi > 70) { techSignal = 'Strong Sell'; techColor = '#f85149'; }
@@ -2048,6 +2130,8 @@ const PANEL_META = {
   macro:         { label:'Macro·Intel',  icon:'📡' },
   intel:         { label:'Intel·Feed',   icon:'🧠' },
   webhooks:      { label:'Webhooks',     icon:'🔔' },
+  portfolio:     { label:'Portfolio',    icon:'💼' },
+  screener:      { label:'Screener',     icon:'🔍' },
 };
 
 function initLayoutSidebar() {
