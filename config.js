@@ -62,12 +62,17 @@ const setKey = (id, v) => { localStorage.setItem(lsId(id), v); window._KEYS[id] 
 const delKey = id => { localStorage.removeItem(lsId(id)); delete window._KEYS[id]; };
 const mask   = v  => v.length > 8 ? v.slice(0,4)+"••••••"+v.slice(-4) : "••••••••";
 
-function getAvKey()     { return getKey("av");      }
-function getFmpKey()    { return getKey("fmp");     }
-function getYahooKey()  { return getKey("yahoo");   }
-function getNinjasKey() { return getKey("ninjas");  }
-function getOpenAQKey() { return getKey("openaq");  }
-function getFinnhubKey(){ return getKey("finnhub"); }
+function getAvKey()          { return getKey("av");           }
+function getFmpKey()         { return getKey("fmp");          }
+function getYahooKey()       { return getKey("yahoo");        }
+function getNinjasKey()      { return getKey("ninjas");       }
+function getOpenAQKey()      { return getKey("openaq");       }
+function getFinnhubKey()     { return getKey("finnhub");      }
+function getFredKey()        { return getKey("fred");         }
+function getOpenExchangeKey(){ return getKey("openexchange"); }
+function getEodhdKey()       { return getKey("eodhd");        }
+function getApitubeKey()     { return getKey("apitube");      }
+function getMassiveKey()     { return getKey("massive");      }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
