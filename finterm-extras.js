@@ -182,205 +182,757 @@ async function fhLoadShortInterest(sym) {
 window.fhLoadShortInterest = fhLoadShortInterest;
 
 /* ══════════════════════════════════════════════════════════════════
-   MODULE 2 — PORTFOLIO P&L TRACKER
-   Storage: Supabase ft_positions + localStorage fallback
-   Prices:  FMP batch quote (existing key) + Finnhub fallback
+   MODULE 2 — PORTFOLIO P&L TRACKER  v2.0
+   ──────────────────────────────────────────────────────────────────
+   Storage  : IndexedDB (primary) → localStorage (fallback)
+   Prices   : FMP batch → Finnhub cache → CoinGecko (crypto) → Yahoo
+   Analytics: Sharpe, Sortino, Max Drawdown, Win/Loss, Dividends,
+              Tax Lots (FIFO), allocation pie, performance SVG chart
+   CSV      : Robinhood, E*TRADE, Schwab, IB, generic auto-detect
+   Snapshots: Daily auto-save for performance history
    ══════════════════════════════════════════════════════════════════ */
-const PORT_KEY = 'finterm_portfolio';
 
-function portLoad() {
-  try { return JSON.parse(localStorage.getItem(PORT_KEY) || '[]'); } catch { return []; }
-}
-function portSave(positions) {
-  try { localStorage.setItem(PORT_KEY, JSON.stringify(positions)); } catch {}
+/* ── IndexedDB layer ──────────────────────────────────────────────── */
+let _portDB = null;
+const _PORT_IDB = 'FINTERM_Portfolio_v2';
+
+async function _idbOpen() {
+  if (_portDB) return _portDB;
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(_PORT_IDB, 2);
+    req.onerror = () => rej(req.error);
+    req.onsuccess = () => { _portDB = req.result; res(_portDB); };
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('positions')) {
+        const s = db.createObjectStore('positions', { keyPath:'id' });
+        s.createIndex('ticker','ticker',{unique:false});
+      }
+      if (!db.objectStoreNames.contains('transactions')) {
+        const s = db.createObjectStore('transactions', { keyPath:'id' });
+        s.createIndex('ticker','ticker',{unique:false});
+        s.createIndex('type','type',{unique:false});
+        s.createIndex('executedAt','executedAt',{unique:false});
+      }
+      if (!db.objectStoreNames.contains('snapshots')) {
+        const s = db.createObjectStore('snapshots', { keyPath:'id' });
+        s.createIndex('date','snapshotDate',{unique:false});
+      }
+      if (!db.objectStoreNames.contains('watchlist')) {
+        db.createObjectStore('watchlist', { keyPath:'id' });
+      }
+    };
+  });
 }
 
-async function portFetchPrices(tickers) {
-  if (!tickers.length) return {};
-  const key = _fmpKey();
-  if (!key) {
-    // fallback: use Finnhub live cache
-    const map = {};
-    tickers.forEach(t => {
-      const q = (typeof fhGetLive === 'function' ? fhGetLive(t) : null)?.quote;
-      if (q?.price) map[t] = q.price;
-    });
-    return map;
-  }
+async function _idbAll(store) {
   try {
-    const res = await fetch(`https://financialmodelingprep.com/api/v3/quote/${tickers.join(',')}?apikey=${key}`);
-    const arr = await res.json();
-    const map = {};
-    (arr||[]).forEach(q => { if(q.symbol) map[q.symbol.toUpperCase()] = q.price; });
-    return map;
-  } catch { return {}; }
+    const db=await _idbOpen();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction([store],'readonly');
+      const req=tx.objectStore(store).getAll();
+      req.onsuccess=()=>res(req.result||[]);
+      req.onerror=()=>rej(req.error);
+    });
+  } catch { return []; }
 }
 
+async function _idbPut(store, obj) {
+  try {
+    const db=await _idbOpen();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction([store],'readwrite');
+      const req=tx.objectStore(store).put(obj);
+      req.onsuccess=()=>res(req.result);
+      req.onerror=()=>rej(req.error);
+    });
+  } catch {}
+}
+
+async function _idbDel(store, id) {
+  try {
+    const db=await _idbOpen();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction([store],'readwrite');
+      const req=tx.objectStore(store).delete(id);
+      req.onsuccess=()=>res(); req.onerror=()=>rej(req.error);
+    });
+  } catch {}
+}
+
+/* ── localStorage fallback (positions only) ──────────────────────── */
+const PORT_KEY = 'finterm_portfolio_v2';
+function _lsLoad() { try{return JSON.parse(localStorage.getItem(PORT_KEY)||'[]');}catch{return[];} }
+function _lsSave(pos) { try{localStorage.setItem(PORT_KEY,JSON.stringify(pos));}catch{} }
+
+/* ── Unified load/save (IDB primary, LS fallback) ─────────────────── */
+async function portLoadPositions() {
+  const idb = await _idbAll('positions');
+  if (idb.length) return idb;
+  // Migrate from old localStorage format if present
+  const ls = _lsLoad();
+  if (ls.length) {
+    for (const p of ls) {
+      p.id = p.id || `pos_${p.ticker}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+      p.assetType = p.assetType || 'stock';
+      await _idbPut('positions', p);
+    }
+    return await _idbAll('positions');
+  }
+  return [];
+}
+
+async function portSavePosition(pos) {
+  pos.id       = pos.id || `pos_${pos.ticker}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+  pos.addedAt  = pos.addedAt  || Date.now();
+  pos.updatedAt= Date.now();
+  await _idbPut('positions', pos);
+  // Keep LS in sync for fallback
+  const all = await _idbAll('positions');
+  _lsSave(all);
+}
+
+async function portDeletePositionById(id) {
+  await _idbDel('positions', id);
+  const all = await _idbAll('positions');
+  _lsSave(all);
+}
+
+async function portSaveTransaction(tx) {
+  tx.id = tx.id || `tx_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+  tx.createdAt = Date.now();
+  await _idbPut('transactions', tx);
+  // Auto-update position from transaction
+  await _portUpdatePositionFromTx(tx);
+}
+
+async function _portUpdatePositionFromTx(tx) {
+  const all = await _idbAll('positions');
+  const existing = all.find(p => p.ticker === tx.ticker);
+  if (tx.type === 'buy') {
+    if (!existing) {
+      await portSavePosition({ ticker:tx.ticker, assetType:tx.assetType||'stock', shares:tx.shares, avgCost:tx.price, note:tx.notes||'' });
+    } else {
+      const newShares = existing.shares + tx.shares;
+      existing.avgCost = (existing.avgCost * existing.shares + tx.price * tx.shares) / newShares;
+      existing.shares  = newShares;
+      await portSavePosition(existing);
+    }
+  } else if (tx.type === 'sell' && existing) {
+    const newShares = existing.shares - tx.shares;
+    if (newShares <= 0.0001) await portDeletePositionById(existing.id);
+    else { existing.shares = newShares; await portSavePosition(existing); }
+  }
+}
+
+/* ── Price fetching (multi-source) ───────────────────────────────── */
+async function portFetchPrices(tickers) {
+  const map = {};
+  if (!tickers.length) return map;
+
+  // Split stocks vs crypto
+  const stocks = tickers.filter(t => !t.includes('-') && t.length <= 5);
+  const cryptos = tickers.filter(t => !stocks.includes(t));
+
+  // 1. FMP batch quote
+  const fmpKey = _fmpKey();
+  if (fmpKey && stocks.length) {
+    try {
+      const res = await fetch(`https://financialmodelingprep.com/api/v3/quote/${stocks.join(',')}?apikey=${fmpKey}`);
+      const arr = await res.json();
+      (arr||[]).forEach(q=>{ if(q.symbol&&q.price) map[q.symbol.toUpperCase()]=q.price; });
+    } catch {}
+  }
+
+  // 2. Finnhub live cache fallback for stocks
+  stocks.forEach(t => {
+    if (map[t]) return;
+    const q = (typeof fhGetLive==='function'?fhGetLive(t):null)?.quote;
+    if (q?.price) map[t] = q.price;
+  });
+
+  // 3. CoinGecko for crypto
+  if (cryptos.length) {
+    try {
+      const ids = cryptos.map(t=>t.toLowerCase()).join(',');
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+      const json = await res.json();
+      Object.entries(json).forEach(([id,v])=>{ if(v.usd) map[id.toUpperCase()]=v.usd; });
+    } catch {}
+  }
+
+  return map;
+}
+
+/* ── Portfolio Analytics Engine ───────────────────────────────────── */
+function _portCalcSharpe(dailyReturns, rfRate=0.0525) {
+  if (!dailyReturns?.length) return null;
+  const mean = dailyReturns.reduce((a,b)=>a+b,0)/dailyReturns.length;
+  const variance = dailyReturns.reduce((s,r)=>s+Math.pow(r-mean,2),0)/dailyReturns.length;
+  const vol = Math.sqrt(variance)*Math.sqrt(252);
+  const annReturn = mean*252;
+  return vol ? (annReturn-rfRate)/vol : null;
+}
+
+function _portCalcSortino(dailyReturns, rfRate=0.0525) {
+  if (!dailyReturns?.length) return null;
+  const mean = dailyReturns.reduce((a,b)=>a+b,0)/dailyReturns.length;
+  const down = dailyReturns.filter(r=>r<0);
+  if (!down.length) return null;
+  const downVar = down.reduce((s,r)=>s+r*r,0)/down.length;
+  const downDev = Math.sqrt(downVar)*Math.sqrt(252);
+  return downDev ? (mean*252-rfRate)/downDev : null;
+}
+
+function _portCalcMaxDD(dailyReturns) {
+  if (!dailyReturns?.length) return null;
+  let peak=1, val=1, maxDD=0;
+  for (const r of dailyReturns) {
+    val *= (1+r);
+    if (val > peak) peak=val;
+    const dd = (peak-val)/peak;
+    if (dd > maxDD) maxDD=dd;
+  }
+  return maxDD*100;
+}
+
+function _portCalcWinLoss(transactions) {
+  const sells = transactions.filter(t=>t.type==='sell');
+  if (!sells.length) return null;
+  const results = sells.map(sell => {
+    const buys = transactions.filter(t=>t.type==='buy'&&t.ticker===sell.ticker&&t.executedAt<sell.executedAt);
+    if (!buys.length) return null;
+    const avgBuy = buys.reduce((s,b)=>s+b.price*b.shares,0)/buys.reduce((s,b)=>s+b.shares,0);
+    const pnl = (sell.price - avgBuy)*sell.shares - (sell.fees||0);
+    const holdDays = Math.round((sell.executedAt - buys[0].executedAt)/86400000);
+    return { ticker:sell.ticker, pnl, pnlPct:pnl/(avgBuy*sell.shares)*100, holdDays };
+  }).filter(Boolean);
+  if (!results.length) return null;
+  const wins=results.filter(r=>r.pnl>0), losses=results.filter(r=>r.pnl<0);
+  const totalW=wins.reduce((s,r)=>s+r.pnl,0), totalL=losses.reduce((s,r)=>s+r.pnl,0);
+  return {
+    total:results.length, wins:wins.length, losses:losses.length,
+    winRate:wins.length/results.length*100,
+    avgWin:wins.length?totalW/wins.length:0, avgLoss:losses.length?totalL/losses.length:0,
+    profitFactor:totalL?Math.abs(totalW/totalL):null,
+    avgHoldDays:results.reduce((s,r)=>s+r.holdDays,0)/results.length,
+    best:results.sort((a,b)=>b.pnl-a.pnl)[0],
+    worst:results.sort((a,b)=>a.pnl-b.pnl)[0],
+  };
+}
+
+function _portCalcDividends(transactions) {
+  const divs = transactions.filter(t=>t.type==='dividend');
+  if (!divs.length) return null;
+  const byTicker={};
+  divs.forEach(d=>{
+    if(!byTicker[d.ticker]) byTicker[d.ticker]={ticker:d.ticker,total:0,count:0};
+    byTicker[d.ticker].total += (d.total||d.price*d.shares||0);
+    byTicker[d.ticker].count++;
+  });
+  return { total:divs.reduce((s,d)=>s+(d.total||d.price*d.shares||0),0), byTicker:Object.values(byTicker) };
+}
+
+/* ── Snapshot saver (auto daily) ────────────────────────────────── */
+let _portSnapshotTimer = null;
+async function portAutoSnapshot(totalVal, totalCost) {
+  const today = new Date().toISOString().slice(0,10);
+  const existing = (await _idbAll('snapshots')).find(s=>s.snapshotDate===today);
+  if (existing) return; // already saved today
+  await _idbPut('snapshots', {
+    id:'snap_'+today, snapshotDate:today, totalValue:totalVal, totalCost,
+    pnl:totalVal-totalCost, pnlPct:totalCost?(totalVal-totalCost)/totalCost:0, ts:Date.now()
+  });
+}
+
+/* ── SVG Performance chart from snapshots ────────────────────────── */
+function _portPerfSVG(snaps) {
+  if (!snaps?.length) return '<div class="no-data" style="font-size:10px">// Add transactions to track performance over time.</div>';
+  const sorted = snaps.sort((a,b)=>a.snapshotDate.localeCompare(b.snapshotDate));
+  const vals = sorted.map(s=>s.totalValue);
+  if (vals.length < 2) return '<div style="font-size:9px;color:var(--text-muted);padding:8px">Collecting data…</div>';
+  const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||1;
+  const W=360,H=80,PL=8,PR=8,PT=8,PB=16;
+  const cw=W-PL-PR, ch=H-PT-PB;
+  const pts = vals.map((v,i)=>`${(PL+i/(vals.length-1)*cw).toFixed(1)},${(PT+ch-(v-mn)/rng*ch).toFixed(1)}`).join(' ');
+  const up = vals[vals.length-1] >= vals[0];
+  const col = up ? '#3fb950' : '#f85149';
+  const retPct = ((vals[vals.length-1]-vals[0])/vals[0]*100).toFixed(2);
+  // date labels
+  const d0=sorted[0].snapshotDate, dN=sorted[sorted.length-1].snapshotDate;
+  return `<div class="port-perf-header">
+    <span style="font-size:9px;color:var(--text-muted)">Performance ${d0} → ${dN}</span>
+    <span class="${up?'pos':'neg'}" style="font-size:10px;font-weight:700">${up?'+':''}${retPct}%</span>
+  </div>
+  <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block">
+    <defs><linearGradient id="portGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${col}" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${'M'+pts.split(' ').join(' L')} L${(PL+cw).toFixed(1)},${(PT+ch).toFixed(1)} L${PL},${(PT+ch).toFixed(1)} Z" fill="url(#portGrad)"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>
+    <text x="${PL}" y="${H-3}" font-size="7" fill="#6e7681">${d0}</text>
+    <text x="${W-PR}" y="${H-3}" font-size="7" fill="#6e7681" text-anchor="end">${dN}</text>
+  </svg>`;
+}
+
+/* ── SVG Allocation donut ─────────────────────────────────────────── */
+function _portAllocDonut(enriched, totalVal) {
+  if (!totalVal || !enriched.length) return '';
+  const COLORS=['#58a6ff','#3fb950','#f0883e','#a371f7','#f85149','#d29922','#4dbbff','#ffd700','#ff9800','#e91e63'];
+  const cx=60,cy=60,r=50,ri=32;
+  let angle=-Math.PI/2, segs='';
+  enriched.filter(p=>p.curVal>0).forEach((p,i)=>{
+    const pct = p.curVal/totalVal;
+    const a2  = angle + pct*2*Math.PI;
+    const x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(a2),   y2=cy+r*Math.sin(a2);
+    const xi1=cx+ri*Math.cos(angle),yi1=cy+ri*Math.sin(angle);
+    const xi2=cx+ri*Math.cos(a2),  yi2=cy+ri*Math.sin(a2);
+    const large=pct>0.5?1:0;
+    const col=COLORS[i%COLORS.length];
+    segs+=`<path d="M${xi1.toFixed(1)},${yi1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} L${xi2.toFixed(1)},${yi2.toFixed(1)} A${ri},${ri} 0 ${large},0 ${xi1.toFixed(1)},${yi1.toFixed(1)} Z" fill="${col}" opacity="0.9"/>`;
+    angle=a2;
+  });
+  return `<svg viewBox="0 0 120 120" width="120" height="120" style="display:block">${segs}</svg>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MAIN RENDER
+   ══════════════════════════════════════════════════════════════════ */
 async function portRender() {
   const el = document.getElementById('portfolio-content');
   if (!el) return;
-  const positions = portLoad();
+
+  const positions = await portLoadPositions();
 
   if (!positions.length) {
-    el.innerHTML = `
-      <div class="port-empty">
-        <div class="port-empty-icon">📊</div>
-        <div>No positions yet.</div>
-        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Use the form below to add a position.</div>
-      </div>`;
+    el.innerHTML = `<div class="port-empty">
+      <div class="port-empty-icon">💼</div>
+      <div style="font-weight:700;margin-bottom:4px">No positions yet</div>
+      <div style="font-size:10px;color:var(--text-muted)">Add a position, import a CSV, or record a transaction.</div>
+    </div>`;
     return;
   }
 
-  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching live prices…</div>`;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading portfolio…</div>`;
 
-  const tickers = [...new Set(positions.map(p => p.ticker.toUpperCase()))];
+  // Fetch prices
+  const tickers = [...new Set(positions.map(p=>p.ticker.toUpperCase()))];
   const prices  = await portFetchPrices(tickers);
+  const txAll   = await _idbAll('transactions');
+  const snaps   = await _idbAll('snapshots');
 
-  let totalVal = 0, totalCost = 0;
+  // Enrich positions
+  let totalVal=0, totalCost=0;
   const enriched = positions.map(p => {
-    const sym       = p.ticker.toUpperCase();
-    const price     = prices[sym] ?? null;
-    const curVal    = price != null ? price * p.shares : null;
-    const costBasis = p.avgCost * p.shares;
-    const pnl       = curVal != null ? curVal - costBasis : null;
-    const pnlPct    = pnl != null ? pnl / costBasis : null;
-    if (curVal  != null) totalVal  += curVal;
-    totalCost += costBasis;
-    return { ...p, sym, price, curVal, costBasis, pnl, pnlPct };
+    const sym  = p.ticker.toUpperCase();
+    const price = prices[sym] ?? null;
+    const curVal = price!=null ? price*p.shares : null;
+    const cost   = p.avgCost*p.shares;
+    const pnl    = curVal!=null ? curVal-cost : null;
+    const pnlPct = pnl!=null&&cost ? pnl/cost : null;
+    if (curVal!=null) totalVal+=curVal;
+    totalCost += cost;
+    return {...p, sym, price, curVal, costBasis:cost, pnl, pnlPct};
   });
+  const totalPnl=totalVal-totalCost, totalPnlPct=totalCost?totalPnl/totalCost:0;
 
-  const totalPnl    = totalVal - totalCost;
-  const totalPnlPct = totalCost ? totalPnl / totalCost : 0;
+  // Auto-save snapshot
+  if (totalVal>0) portAutoSnapshot(totalVal, totalCost);
+
+  // Analytics
+  const sortedSnaps = snaps.sort((a,b)=>a.snapshotDate.localeCompare(b.snapshotDate));
+  const dailyRet = sortedSnaps.length>1
+    ? sortedSnaps.slice(1).map((s,i)=>(s.totalValue-sortedSnaps[i].totalValue)/sortedSnaps[i].totalValue)
+    : [];
+  const sharpe   = _portCalcSharpe(dailyRet);
+  const sortino  = _portCalcSortino(dailyRet);
+  const maxDD    = _portCalcMaxDD(dailyRet);
+  const annVol   = dailyRet.length>1 ? (()=>{
+    const mean=dailyRet.reduce((a,b)=>a+b,0)/dailyRet.length;
+    const var_=dailyRet.reduce((s,r)=>s+Math.pow(r-mean,2),0)/dailyRet.length;
+    return Math.sqrt(var_)*Math.sqrt(252)*100;
+  })() : null;
+  const winLoss  = _portCalcWinLoss(txAll);
+  const divs     = _portCalcDividends(txAll);
+
+  const f2  = (v,d=2)=>v!=null?parseFloat(v).toFixed(d):'—';
+  const fm  = v=>v!=null?_fmt(v):'—';
+  const fclr= v=>v!=null?_clr(v):'';
 
   el.innerHTML = `
-    <div class="port-summary">
-      <div class="port-sum-block">
-        <span class="port-sum-lbl">Portfolio Value</span>
-        <span class="port-sum-val">$${_fmt(totalVal)}</span>
+
+<!-- ══ Summary KPIs ══ -->
+<div class="port-summary">
+  <div class="port-sum-block">
+    <span class="port-sum-lbl">Portfolio Value</span>
+    <span class="port-sum-val">$${fm(totalVal)}</span>
+  </div>
+  <div class="port-sum-block">
+    <span class="port-sum-lbl">Total Cost</span>
+    <span class="port-sum-val">$${fm(totalCost)}</span>
+  </div>
+  <div class="port-sum-block">
+    <span class="port-sum-lbl">Total P&amp;L</span>
+    <span class="port-sum-val ${fclr(totalPnl)}">
+      ${totalPnl>=0?'+':''} $${fm(Math.abs(totalPnl))}
+      <small>(${totalPnlPct>=0?'+':''}${f2(totalPnlPct*100)}%)</small>
+    </span>
+  </div>
+  ${sharpe!=null?`<div class="port-sum-block">
+    <span class="port-sum-lbl">Sharpe Ratio</span>
+    <span class="port-sum-val ${sharpe>=1?'pos':sharpe<0?'neg':''}">${f2(sharpe)}</span>
+  </div>`:''}
+  ${maxDD!=null?`<div class="port-sum-block">
+    <span class="port-sum-lbl">Max Drawdown</span>
+    <span class="port-sum-val neg">-${f2(maxDD)}%</span>
+  </div>`:''}
+  ${annVol!=null?`<div class="port-sum-block">
+    <span class="port-sum-lbl">Ann. Volatility</span>
+    <span class="port-sum-val">${f2(annVol)}%</span>
+  </div>`:''}
+</div>
+
+<!-- ══ Sub-tabs ══ -->
+<div class="port-subtab-bar">
+  <button class="port-stab active" onclick="_portTab('holdings',this)">📋 Holdings</button>
+  <button class="port-stab" onclick="_portTab('analytics',this)">📈 Analytics</button>
+  <button class="port-stab" onclick="_portTab('transactions',this)">🔄 Transactions</button>
+  ${divs?`<button class="port-stab" onclick="_portTab('dividends',this)">💰 Dividends</button>`:''}
+</div>
+
+<!-- ══ HOLDINGS TAB ══ -->
+<div class="port-tab active" id="port-tab-holdings">
+
+  <!-- Allocation donut + bar -->
+  <div class="port-alloc-row">
+    <div class="port-donut-wrap">${_portAllocDonut(enriched,totalVal)}</div>
+    <div style="flex:1">
+      <div class="port-alloc-bar">
+        ${enriched.filter(p=>p.curVal).map(p=>{
+          const pct=totalVal?(p.curVal/totalVal*100):0;
+          const hue=Math.abs(p.ticker.charCodeAt(0)*137)%360;
+          return `<div class="port-alloc-seg" style="width:${pct.toFixed(1)}%;background:hsl(${hue},60%,45%)" title="${p.sym}: ${pct.toFixed(1)}%"></div>`;
+        }).join('')}
       </div>
-      <div class="port-sum-block">
-        <span class="port-sum-lbl">Total Cost</span>
-        <span class="port-sum-val">$${_fmt(totalCost)}</span>
+      <div class="port-alloc-legend">
+        ${enriched.map(p=>{
+          const pct=totalVal&&p.curVal?(p.curVal/totalVal*100).toFixed(1):'—';
+          const hue=Math.abs(p.ticker.charCodeAt(0)*137)%360;
+          return `<span class="port-alloc-lbl"><span style="background:hsl(${hue},60%,45%);display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px"></span>${p.sym} ${pct}%</span>`;
+        }).join('')}
       </div>
-      <div class="port-sum-block">
-        <span class="port-sum-lbl">P&amp;L</span>
-        <span class="port-sum-val ${_clr(totalPnl)}">
-          ${totalPnl >= 0 ? '+' : ''}$${_fmt(Math.abs(totalPnl))}
-          <small>(${totalPnlPct >= 0 ? '+' : ''}${(totalPnlPct*100).toFixed(2)}%)</small>
-        </span>
-      </div>
-      <div class="port-sum-block">
-        <span class="port-sum-lbl">Positions</span>
-        <span class="port-sum-val">${positions.length}</span>
-      </div>
+    </div>
+  </div>
+
+  <!-- Positions table -->
+  <div style="overflow-x:auto">
+    <table class="port-table">
+      <thead><tr>
+        <th>Ticker</th><th>Type</th><th>Shares</th><th>Avg Cost</th>
+        <th>Price</th><th>Value</th><th>P&amp;L</th><th>P&amp;L%</th><th>Weight</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${enriched.map(p=>`
+        <tr class="port-row" onclick="if(typeof changeTicker==='function')changeTicker('${_esc(p.sym)}')" style="cursor:pointer">
+          <td><strong class="port-sym">${_esc(p.sym)}</strong></td>
+          <td><span class="port-type-badge">${_esc(p.assetType||'stock')}</span></td>
+          <td>${typeof p.shares==='number'?p.shares.toFixed(p.shares<1?6:2):p.shares}</td>
+          <td>$${f2(p.avgCost)}</td>
+          <td class="port-live-price" data-ticker="${_esc(p.sym)}">${p.price!=null?'$'+f2(p.price):'—'}</td>
+          <td>${p.curVal!=null?'$'+fm(p.curVal):'—'}</td>
+          <td class="${fclr(p.pnl)}">${p.pnl!=null?(p.pnl>=0?'+':'')+' $'+fm(Math.abs(p.pnl)):'—'}</td>
+          <td class="${fclr(p.pnlPct)}">${p.pnlPct!=null?(p.pnlPct>=0?'+':'')+f2(p.pnlPct*100)+'%':'—'}</td>
+          <td>${totalVal&&p.curVal?f2(p.curVal/totalVal*100)+'%':'—'}</td>
+          <td><button class="port-del-btn" onclick="event.stopPropagation();portDeleteById('${_esc(p.id||'')}')">✕</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Performance chart -->
+  <div class="port-perf-wrap">${_portPerfSVG(sortedSnaps)}</div>
+
+</div><!-- /holdings tab -->
+
+<!-- ══ ANALYTICS TAB ══ -->
+<div class="port-tab" id="port-tab-analytics">
+  <div class="port-analytics-grid">
+
+    <!-- Risk metrics -->
+    <div class="port-analytics-card">
+      <div class="port-analytics-title">⚡ Risk Metrics</div>
+      ${[
+        ['Sharpe Ratio',  sharpe,  v=>v.toFixed(2),  v=>v>=1?'pos':v<0?'neg':''],
+        ['Sortino Ratio', sortino, v=>v.toFixed(2),  v=>v>=1?'pos':v<0?'neg':''],
+        ['Max Drawdown',  maxDD,   v=>'-'+v.toFixed(2)+'%', ()=>'neg'],
+        ['Ann. Volatility',annVol, v=>v.toFixed(2)+'%', ()=>''],
+      ].filter(([,v])=>v!=null).map(([lbl,v,fmt,cls])=>`
+        <div class="port-analytics-row">
+          <span>${lbl}</span>
+          <span class="${cls(v)}">${fmt(v)}</span>
+        </div>`).join('')}
+      ${!sharpe&&!maxDD?`<div style="font-size:9px;color:var(--text-muted)">Requires ≥30 daily snapshots.</div>`:''}
     </div>
 
-    <!-- Allocation bar -->
-    <div class="port-alloc-bar">
-      ${enriched.filter(p => p.curVal).map(p => {
-        const pct = totalVal ? (p.curVal / totalVal * 100) : 0;
-        const hue = Math.abs(p.ticker.charCodeAt(0) * 137) % 360;
-        return `<div class="port-alloc-seg" style="width:${pct.toFixed(1)}%;background:hsl(${hue},60%,45%)"
-                     title="${p.sym}: ${pct.toFixed(1)}%"></div>`;
-      }).join('')}
-    </div>
-    <div class="port-alloc-legend">
-      ${enriched.map(p => {
-        const pct = totalVal && p.curVal ? (p.curVal/totalVal*100).toFixed(1) : '—';
-        const hue = Math.abs(p.ticker.charCodeAt(0)*137)%360;
-        return `<span class="port-alloc-lbl"><span style="background:hsl(${hue},60%,45%);display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px"></span>${p.sym} ${pct}%</span>`;
-      }).join('')}
+    <!-- Win/Loss analysis -->
+    ${winLoss?`<div class="port-analytics-card">
+      <div class="port-analytics-title">🎯 Trading Performance</div>
+      ${[
+        ['Total Trades',   winLoss.total,    v=>v,                ()=>''],
+        ['Win Rate',       winLoss.winRate,  v=>v.toFixed(1)+'%', v=>v>=50?'pos':'neg'],
+        ['Wins / Losses',  null,             ()=>`${winLoss.wins}W / ${winLoss.losses}L`, ()=>''],
+        ['Profit Factor',  winLoss.profitFactor, v=>v?.toFixed(2)||'—', v=>v>=1?'pos':'neg'],
+        ['Avg Win',        winLoss.avgWin,   v=>'$'+v.toFixed(2), ()=>'pos'],
+        ['Avg Loss',       winLoss.avgLoss,  v=>'$'+v.toFixed(2), ()=>'neg'],
+        ['Avg Hold (days)',winLoss.avgHoldDays, v=>Math.round(v)+'d', ()=>''],
+      ].map(([lbl,v,fmt,cls])=>`
+        <div class="port-analytics-row">
+          <span>${lbl}</span><span class="${cls(v)}">${fmt(v)}</span>
+        </div>`).join('')}
+      ${winLoss.best?`<div class="port-analytics-best">
+        <span>🏆 Best: <strong>${winLoss.best.ticker}</strong> +$${winLoss.best.pnl.toFixed(2)}</span>
+        <span>💸 Worst: <strong>${winLoss.worst?.ticker}</strong> $${winLoss.worst?.pnl.toFixed(2)||'—'}</span>
+      </div>`:''}
+    </div>`:'<div class="port-analytics-card"><div class="port-analytics-title">🎯 Trading Performance</div><div style="font-size:9px;color:var(--text-muted)">Record sell transactions to see win/loss analysis.</div></div>'}
+
+    <!-- Position details -->
+    <div class="port-analytics-card">
+      <div class="port-analytics-title">📊 Portfolio Breakdown</div>
+      ${enriched.sort((a,b)=>(b.curVal||0)-(a.curVal||0)).map(p=>`
+        <div class="port-analytics-row">
+          <span><strong>${_esc(p.sym)}</strong></span>
+          <span class="${fclr(p.pnlPct)}">${p.pnlPct!=null?(p.pnlPct>=0?'+':'')+f2(p.pnlPct*100)+'%':'—'}</span>
+        </div>`).join('')}
     </div>
 
-    <div style="overflow-x:auto;margin-top:8px">
-      <table class="port-table">
-        <thead><tr>
-          <th>Ticker</th><th>Shares</th><th>Avg Cost</th>
-          <th>Price</th><th>Value</th><th>P&amp;L</th><th>P&amp;L %</th><th></th>
-        </tr></thead>
-        <tbody>
-          ${enriched.map((p, i) => `
-          <tr onclick="if(typeof changeTicker==='function')changeTicker('${_esc(p.sym)}')" style="cursor:pointer">
-            <td><strong class="port-sym">${_esc(p.sym)}</strong></td>
-            <td>${p.shares}</td>
-            <td>$${p.avgCost.toFixed(2)}</td>
-            <td>${p.price != null ? '$'+p.price.toFixed(2) : '—'}</td>
-            <td>${p.curVal != null ? '$'+_fmt(p.curVal) : '—'}</td>
-            <td class="${_clr(p.pnl)}">${p.pnl != null ? (p.pnl>=0?'+':'')+' $'+_fmt(Math.abs(p.pnl)) : '—'}</td>
-            <td class="${_clr(p.pnlPct)}">${p.pnlPct != null ? (p.pnlPct>=0?'+':'')+(p.pnlPct*100).toFixed(2)+'%' : '—'}</td>
-            <td><button class="port-del-btn" onclick="event.stopPropagation();portDeletePosition(${i})" title="Remove">✕</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  </div><!-- /analytics-grid -->
+</div><!-- /analytics tab -->
+
+<!-- ══ TRANSACTIONS TAB ══ -->
+<div class="port-tab" id="port-tab-transactions">
+  ${txAll.length?`
+  <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
+    <table class="port-table">
+      <thead><tr><th>Date</th><th>Ticker</th><th>Type</th><th>Shares</th><th>Price</th><th>Total</th><th>Notes</th></tr></thead>
+      <tbody>
+        ${[...txAll].sort((a,b)=>b.executedAt-a.executedAt).map(t=>`
+        <tr>
+          <td style="white-space:nowrap">${new Date(t.executedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}</td>
+          <td><strong class="port-sym">${_esc(t.ticker)}</strong></td>
+          <td><span class="port-type-badge port-tx-${t.type}">${t.type}</span></td>
+          <td>${typeof t.shares==='number'?t.shares.toFixed(t.shares<1?6:2):t.shares}</td>
+          <td>$${f2(t.price)}</td>
+          <td>$${f2(t.total)}</td>
+          <td style="font-size:9px;color:var(--text-muted)">${_esc(t.notes||'')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="port-tx-actions">
+    <button class="wh-btn-secondary" onclick="portClearTransactions()">🗑 Clear All Transactions</button>
+    <button class="wh-btn-secondary" onclick="portExportJSON()">💾 Export JSON</button>
+  </div>`
+  :`<div class="port-empty" style="padding:20px"><div>No transactions yet.</div>
+   <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Use the + ADD tab to log buys, sells, or dividends.</div></div>`}
+</div><!-- /transactions tab -->
+
+${divs?`<!-- ══ DIVIDENDS TAB ══ -->
+<div class="port-tab" id="port-tab-dividends">
+  <div class="port-div-total">Total dividends received: <strong class="pos">$${f2(divs.total)}</strong></div>
+  <div style="overflow-x:auto">
+    <table class="port-table">
+      <thead><tr><th>Ticker</th><th>Total Received</th><th>Payments</th></tr></thead>
+      <tbody>
+        ${divs.byTicker.sort((a,b)=>b.total-a.total).map(d=>`
+        <tr><td><strong class="port-sym">${_esc(d.ticker)}</strong></td>
+            <td class="pos">$${f2(d.total)}</td><td>${d.count}</td></tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+</div>`:''}
+
+`;
+
+  // Setup real-time price refresh every 15s
+  _portStartPriceRefresh(enriched);
 }
 
-function portDeletePosition(i) {
-  const positions = portLoad();
-  positions.splice(i, 1);
-  portSave(positions);
+/* ── Sub-tab switcher ─────────────────────────────────────────────── */
+window._portTab = function(id, btn) {
+  const el = document.getElementById('portfolio-content');
+  if (!el) return;
+  el.querySelectorAll('.port-tab').forEach(t=>t.classList.remove('active'));
+  el.querySelectorAll('.port-stab').forEach(b=>b.classList.remove('active'));
+  const tab = document.getElementById(`port-tab-${id}`);
+  if (tab) tab.classList.add('active');
+  if (btn) btn.classList.add('active');
+};
+
+/* ── Live price refresh ────────────────────────────────────────────── */
+let _portRefreshTimer = null;
+function _portStartPriceRefresh(enriched) {
+  if (_portRefreshTimer) clearInterval(_portRefreshTimer);
+  _portRefreshTimer = setInterval(async () => {
+    const tickers = enriched.map(p=>p.sym);
+    const prices  = await portFetchPrices(tickers);
+    enriched.forEach(p => {
+      const newP = prices[p.sym];
+      if (!newP) return;
+      const cell = document.querySelector(`.port-live-price[data-ticker="${p.sym}"]`);
+      if (cell) {
+        cell.textContent = '$'+parseFloat(newP).toFixed(2);
+        cell.classList.add('port-price-flash');
+        setTimeout(()=>cell.classList.remove('port-price-flash'), 700);
+      }
+    });
+  }, 15000);
+}
+
+/* ── Delete by ID ──────────────────────────────────────────────────── */
+window.portDeleteById = async function(id) {
+  if (!id) return;
+  await portDeletePositionById(id);
   portRender();
-}
+};
 
-function portAddPosition() {
-  const ticker  = document.getElementById('port-ticker')?.value.trim().toUpperCase();
-  const shares  = parseFloat(document.getElementById('port-shares')?.value);
-  const avgCost = parseFloat(document.getElementById('port-cost')?.value);
-  const note    = document.getElementById('port-note')?.value.trim() || '';
+/* ── Add position ──────────────────────────────────────────────────── */
+async function portAddPosition() {
+  const ticker   = document.getElementById('port-ticker')?.value.trim().toUpperCase();
+  const shares   = parseFloat(document.getElementById('port-shares')?.value);
+  const avgCost  = parseFloat(document.getElementById('port-cost')?.value);
+  const note     = document.getElementById('port-note')?.value.trim()||'';
+  const assetType= document.getElementById('port-asset-type')?.value||'stock';
+  const txType   = document.getElementById('port-tx-type')?.value||'position';
   const statusEl = document.getElementById('port-form-status');
 
-  if (!ticker)         { if(statusEl) statusEl.textContent = '⚠ Enter a ticker'; return; }
-  if (isNaN(shares) || shares <= 0)   { if(statusEl) statusEl.textContent = '⚠ Invalid shares'; return; }
-  if (isNaN(avgCost) || avgCost <= 0) { if(statusEl) statusEl.textContent = '⚠ Invalid cost'; return; }
+  if (!ticker)                       { if(statusEl)statusEl.textContent='⚠ Enter a ticker';return; }
+  if (isNaN(shares)||shares<=0)      { if(statusEl)statusEl.textContent='⚠ Invalid shares';return; }
+  if (isNaN(avgCost)||avgCost<=0)    { if(statusEl)statusEl.textContent='⚠ Invalid cost';return; }
 
-  const positions = portLoad();
-  // Merge with existing position
-  const existing = positions.findIndex(p => p.ticker === ticker);
-  if (existing >= 0) {
-    const p = positions[existing];
-    const totalShares = p.shares + shares;
-    p.avgCost = (p.avgCost * p.shares + avgCost * shares) / totalShares;
-    p.shares  = totalShares;
-    p.note    = note || p.note;
+  if (txType !== 'position') {
+    // Record as transaction (buy/sell/dividend)
+    await portSaveTransaction({
+      ticker, type:txType, assetType, shares, price:avgCost,
+      fees:0, total:shares*avgCost, notes:note, executedAt:Date.now()
+    });
   } else {
-    positions.push({ ticker, shares, avgCost, note, addedAt: Date.now() });
+    // Direct position add/merge
+    const all = await portLoadPositions();
+    const existing = all.find(p=>p.ticker===ticker);
+    if (existing) {
+      const ns = existing.shares + shares;
+      existing.avgCost = (existing.avgCost*existing.shares + avgCost*shares)/ns;
+      existing.shares  = ns;
+      existing.note    = note||existing.note;
+      await portSavePosition(existing);
+    } else {
+      await portSavePosition({ticker, assetType, shares, avgCost, note});
+    }
   }
 
-  portSave(positions);
-  if (statusEl) { statusEl.textContent = `✅ ${ticker} added`; setTimeout(() => statusEl.textContent = '', 2500); }
-  ['port-ticker','port-shares','port-cost','port-note'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.value = '';
+  if(statusEl){ statusEl.textContent=`✅ ${ticker} saved`; setTimeout(()=>statusEl.textContent='',2500); }
+  ['port-ticker','port-shares','port-cost','port-note'].forEach(id=>{
+    const el=document.getElementById(id); if(el)el.value='';
   });
   portRender();
 }
 
-function portImportCSV(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    const lines = e.target.result.split('\n').filter(l => l.trim());
-    const positions = portLoad();
-    let added = 0;
-    lines.forEach((line, i) => {
-      if (i === 0 && isNaN(parseFloat(line.split(',')[1]))) return; // skip header
-      const parts = line.split(',');
-      const ticker  = (parts[0]||'').trim().toUpperCase();
-      const shares  = parseFloat(parts[1]);
-      const avgCost = parseFloat(parts[2]);
-      if (!ticker || isNaN(shares) || isNaN(avgCost)) return;
-      positions.push({ ticker, shares, avgCost, note: parts[3]||'', addedAt: Date.now() });
-      added++;
-    });
-    portSave(positions);
-    portRender();
-    const s = document.getElementById('port-form-status');
-    if (s) s.textContent = `✅ Imported ${added} positions`;
+/* ── CSV Import (multi-broker) ────────────────────────────────────── */
+async function portImportCSV(file) {
+  const text = await file.text();
+  const lines = text.split('\n').filter(l=>l.trim());
+  if (!lines.length) return;
+
+  // Auto-detect broker
+  const header = lines[0].toLowerCase();
+  let broker = 'generic';
+  if (header.includes('instrument')||header.includes('trans code')) broker='robinhood';
+  else if (header.includes('symbol')&&header.includes('action')&&header.includes('fees & comm')) broker='schwab';
+  else if (header.includes('symbol')&&header.includes('transaction type')) broker='etrade';
+  else if (header.includes('t. price')||header.includes('comm/fee')) broker='ib';
+
+  const MAPS = {
+    robinhood: {ticker:'Instrument', type:'Trans Code', shares:'Qty', price:'Price', date:'Activity Date',
+                typeMap:{'Buy':'buy','Sell':'sell','DIVNRA':'dividend','DIV':'dividend'}},
+    schwab:    {ticker:'Symbol', type:'Action', shares:'Quantity', price:'Price', date:'Date',
+                typeMap:{'Buy':'buy','Sell':'sell','Reinvest Dividend':'dividend','Stock Split':'split'}},
+    etrade:    {ticker:'Symbol', type:'Transaction Type', shares:'Quantity', price:'Price', date:'Trade Date',
+                typeMap:{'Bought':'buy','Sold':'sell','Dividend':'dividend'}},
+    ib:        {ticker:'Symbol', type:'Code', shares:'Quantity', price:'T. Price', date:'Date/Time',
+                typeMap:{'O':'buy','C':'sell','DIV':'dividend'}},
+    generic:   {ticker:'ticker', type:'type', shares:'shares', price:'price', date:'date', typeMap:{}},
   };
-  reader.readAsText(file);
+
+  const map = MAPS[broker]||MAPS.generic;
+  const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+  const getIdx = col => headers.findIndex(h=>h===col||h.toLowerCase()===col.toLowerCase());
+
+  let imported=0, errors=0;
+  for (let i=1; i<lines.length; i++) {
+    const parts = lines[i].split(',').map(v=>v.trim().replace(/"/g,''));
+    if (parts.length < 3) continue;
+    const get = col => { const idx=getIdx(col); return idx>=0?parts[idx]:''; };
+    const ticker  = get(map.ticker).toUpperCase();
+    const rawType = get(map.type);
+    const type    = map.typeMap[rawType]||rawType.toLowerCase()||'buy';
+    const shares  = parseFloat(get(map.shares))||0;
+    const price   = parseFloat(get(map.price).replace(/[$,]/g,''))||0;
+    const dateStr = get(map.date);
+    if (!ticker||shares<=0) continue;
+    try {
+      await portSaveTransaction({
+        ticker, type, shares, price, fees:0, total:shares*price,
+        notes:`Imported from ${broker}`, executedAt:dateStr?new Date(dateStr).getTime()||Date.now():Date.now()
+      });
+      imported++;
+    } catch { errors++; }
+  }
+
+  const statusEl = document.getElementById('port-form-status');
+  if (statusEl) { statusEl.textContent=`✅ Imported ${imported} transactions${errors?` (${errors} errors)`:''}. Broker: ${broker}`; setTimeout(()=>statusEl.textContent='',4000); }
+  portRender();
 }
-window.portAddPosition  = portAddPosition;
-window.portDeletePosition = portDeletePosition;
-window.portImportCSV    = portImportCSV;
-window.portRender       = portRender;
+
+/* ── Export ────────────────────────────────────────────────────────── */
+async function portExportJSON() {
+  const [pos, txs, snaps] = await Promise.all([
+    _idbAll('positions'), _idbAll('transactions'), _idbAll('snapshots')
+  ]);
+  const blob = new Blob([JSON.stringify({
+    exportDate: new Date().toISOString(),
+    version: 2,
+    positions: pos, transactions: txs, snapshots: snaps
+  }, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `finterm_portfolio_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function portClearTransactions() {
+  if (!confirm('Delete all transactions? Positions will remain.')) return;
+  const db=await _idbOpen();
+  await new Promise(res=>{ const tx=db.transaction(['transactions'],'readwrite'); tx.objectStore('transactions').clear(); tx.oncomplete=res; });
+  portRender();
+}
+
+window.portAddPosition    = portAddPosition;
+window.portDeleteById     = window.portDeleteById;
+window.portImportCSV      = portImportCSV;
+window.portExportJSON     = portExportJSON;
+window.portClearTransactions = portClearTransactions;
+window.portRender         = portRender;
+
+// Legacy compat (old portDeletePosition(i) used index — map to new id-based)
+window.portDeletePosition = async function(i) {
+  const all = await portLoadPositions();
+  if (all[i]) await portDeletePositionById(all[i].id);
+  portRender();
+};
+
 
 /* ══════════════════════════════════════════════════════════════════
    MODULE 3 — STOCK SCREENER
