@@ -582,13 +582,15 @@ function avRenderWACC(sym, ov) {
   const wc = document.getElementById("fund-wacc");
   if (!wc) return;
 
-  // Estimate WACC components from available data
+  // Estimate WACC components — use live 10Y yield from Treasury Direct cache
   const beta        = ov.beta || 1.0;
-  const riskFree    = 4.2;   // US 10Y approx
-  const erp         = 5.8;
+  // Try live 10Y from Treasury Direct (fredLoadTreasuryDirect caches it)
+  const _td = typeof window._treasuryYields !== 'undefined' ? window._treasuryYields : null;
+  const riskFree    = _td?.['10Y'] ?? 4.5;  // Live US 10Y yield
+  const erp         = 5.5;  // Damodaran ERP estimate
   const ke          = riskFree + beta * erp;
-  const kd          = 4.5;   // assumed cost of debt
-  const taxRate     = 21;    // US corporate
+  const kd          = _td?.['2Y'] ? (_td['2Y'] + 1.5) : 5.5;  // 2Y + credit spread
+  const taxRate     = 21;    // US corporate tax rate
   const mktCap      = ov.mktCap || 0;
   const totalDebt   = 0;     // AV doesn't expose directly in OVERVIEW
   const totalVal    = mktCap + totalDebt;
