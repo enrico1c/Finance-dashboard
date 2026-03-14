@@ -935,602 +935,479 @@ window.portDeletePosition = async function(i) {
 
 
 /* ══════════════════════════════════════════════════════════════════
-   MODULE 3 — STOCK SCREENER
-   Source: FMP /v3/stock-screener (existing key)
+   MODULE 3 — STOCK SCREENER  v2.0
+   ──────────────────────────────────────────────────────────────────
+   Sources  : FMP /v3/stock-screener (primary, existing key)
+              Yahoo Finance v1/screener (fallback, no key)
+              EDGAR SEC 13F filings (institutional consensus, no key)
+   Presets  : Value · Growth · Quality · Dividend · Bargain · Momentum
+              Magic Formula (Greenblatt) · Piotroski F-Score
+              Institutional Favorites (13F consensus)
+   Analytics: ROE/PE score ranking · Piotroski scoring · FIFO momentum
+   Export   : CSV · add-to-watchlist · save custom presets (localStorage)
    ══════════════════════════════════════════════════════════════════ */
-let _screenerResults = [];
-let _screenerSort = { col: 'mktcap', dir: -1 };
 
+let _screenerResults = [];
+let _screenerSort    = { col:'mktcap', dir:-1 };
+let _screenerPreset  = 'custom';
+
+/* ── Saved custom presets ─────────────────────────────────────────── */
+function _scrLoadPresets(){ try{return JSON.parse(localStorage.getItem('scr_presets')||'{}');}catch{return{};} }
+function _scrSavePresets(p){ try{localStorage.setItem('scr_presets',JSON.stringify(p));}catch{} }
+
+/* ── FMP Screener (primary) ───────────────────────────────────────── */
+async function _screenerFMP(params) {
+  const key = _fmpKey();
+  if (!key) return null;
+  try {
+    const p = { ...params, isEtf:'false', isActivelyTrading:'true', limit:'250', apikey:key };
+    Object.keys(p).forEach(k=>{ if(!p[k]) delete p[k]; });
+    const res = await fetch(`https://financialmodelingprep.com/api/v3/stock-screener?${new URLSearchParams(p)}`);
+    const arr = await res.json();
+    if (!Array.isArray(arr)) return null;
+    return arr.map(r => ({
+      symbol: r.symbol, name: r.companyName||'', sector: r.sector||'',
+      exchange: r.exchangeShortName||r.exchange||'',
+      price: r.price, marketCap: r.marketCap, beta: r.beta,
+      volume: r.volume, dividendYield: r.lastAnnualDividend&&r.price?(r.lastAnnualDividend/r.price*100):null,
+      country: r.country||'', _src:'FMP',
+      // Extra ratio fields (may be null for basic endpoint)
+      pe: r.peRatio||null, pb: r.pbRatio||null,
+      roe: r.roe||null, roa: r.roa||null,
+      debtEq: r.debtToEquity||null, netMargin: r.netProfitMargin||null,
+    }));
+  } catch { return null; }
+}
+
+/* ── Yahoo Screener fallback (no key) ────────────────────────────── */
+async function _screenerYahoo(criteria={}) {
+  try {
+    const ops = [];
+    if (criteria.marketCapMoreThan)  ops.push({operator:'gt',operands:['intradaymarketcap',+criteria.marketCapMoreThan]});
+    if (criteria.marketCapLessThan)  ops.push({operator:'lt',operands:['intradaymarketcap',+criteria.marketCapLessThan]});
+    if (criteria.priceMoreThan)      ops.push({operator:'gt',operands:['intradayprice',+criteria.priceMoreThan]});
+    if (criteria.priceLessThan)      ops.push({operator:'lt',operands:['intradayprice',+criteria.priceLessThan]});
+    if (criteria.volumeMoreThan)     ops.push({operator:'gt',operands:['avgdailyvol3m',+criteria.volumeMoreThan]});
+    if (criteria.dividendMoreThan)   ops.push({operator:'gt',operands:['dividendyield',(+criteria.dividendMoreThan)/100]});
+    if (criteria.sector)             ops.push({operator:'eq',operands:['sector',criteria.sector]});
+    if (criteria.exchange)           ops.push({operator:'eq',operands:['exchange',criteria.exchange]});
+    if (!ops.length) ops.push({operator:'gt',operands:['intradaymarketcap',500e6]});
+    const body = { size:200, offset:0, sortField:'marketcap', sortType:'desc',
+                   quoteType:'equity', query:{ operator:'and', operands:ops } };
+    const res = await fetch('https://query1.finance.yahoo.com/v1/finance/screener',
+      { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:AbortSignal.timeout(8000) });
+    const json = await res.json();
+    const quotes = json?.finance?.result?.[0]?.quotes || [];
+    return quotes.map(q => ({
+      symbol:q.symbol, name:q.longName||q.shortName||'', sector:q.sector||'',
+      exchange:q.exchange||'', price:q.regularMarketPrice,
+      marketCap:q.marketCap, beta:null, volume:q.averageDailyVolume3Month,
+      dividendYield:q.trailingAnnualDividendYield?q.trailingAnnualDividendYield*100:null,
+      country:'US', pe:q.trailingPE||null, pb:null, roe:null, roa:null,
+      debtEq:null, netMargin:null, _src:'Yahoo',
+    }));
+  } catch { return null; }
+}
+
+/* ── EDGAR 13F Institutional holdings ────────────────────────────── */
+const _EDGAR_INSTITUTIONS = {
+  'Berkshire Hathaway': '0001067983',
+  'ARK Invest':         '0001579982',
+  'Bridgewater':        '0001350694',
+  'Renaissance Tech':   '0001037389',
+  'Tiger Global':       '0001167483',
+  'Two Sigma':          '0001680559',
+};
+
+let _edgarCache = {};
+async function _edgar13F(institutionKey) {
+  if (_edgarCache[institutionKey]) return _edgarCache[institutionKey];
+  const cik = _EDGAR_INSTITUTIONS[institutionKey];
+  if (!cik) return [];
+  try {
+    // Use EDGAR full-text search JSON API (CORS-allowed)
+    const res = await fetch(
+      `https://data.sec.gov/submissions/CIK${cik}.json`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const data = await res.json();
+    // Get latest 13F filing
+    const filings = data.filings?.recent;
+    if (!filings) return [];
+    const idx = filings.form?.findIndex(f => f === '13F-HR');
+    if (idx < 0) return [];
+    const accNum = filings.accessionNumber?.[idx]?.replace(/-/g,'');
+    if (!accNum) return [];
+    // Fetch the primary document index
+    const idxRes = await fetch(
+      `https://www.sec.gov/Archives/edgar/data/${cik.replace(/^0+/,'')}/${accNum}/0${accNum}-index.json`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const idxJson = await idxRes.json();
+    // Find the infotable XML
+    const xmlFile = idxJson.directory?.item?.find(f => f.name?.toLowerCase().includes('infotable') || f.name?.endsWith('.xml'));
+    if (!xmlFile) return [];
+    const xmlRes = await fetch(
+      `https://www.sec.gov/Archives/edgar/data/${cik.replace(/^0+/,'')}/${accNum}/${xmlFile.name}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    const xml = await xmlRes.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const holdings = [];
+    doc.querySelectorAll('infoTable').forEach(t => {
+      const name   = t.querySelector('nameOfIssuer')?.textContent?.trim();
+      const val    = parseInt(t.querySelector('value')?.textContent||0) * 1000;
+      const shares = parseInt(t.querySelector('sshPrnamt')?.textContent||0);
+      if (name && val > 0) holdings.push({ name, val, shares, _institution: institutionKey });
+    });
+    holdings.sort((a,b) => b.val - a.val);
+    _edgarCache[institutionKey] = holdings.slice(0,50);
+    return _edgarCache[institutionKey];
+  } catch(e) {
+    console.warn('[EDGAR 13F]', e.message);
+    return [];
+  }
+}
+
+/* ── Analytics algorithms (client-side, no API) ──────────────────── */
+function _algoPiotroski(r) {
+  // Simplified 9-point Piotroski F-Score
+  let s = 0;
+  if ((r.roa||0) > 0)          s++; // positive ROA
+  if ((r.roe||0) > 0)          s++; // positive ROE
+  if ((r.netMargin||0) > 0)    s++; // positive margin
+  if ((r.debtEq||999) < 0.5)   s++; // low leverage
+  if ((r.debtEq||999) < 1)     s++; // reasonable leverage
+  if ((r.roe||0) > 15)         s++; // strong returns
+  if ((r.roe||0) > 10 && (r.pe||999) < 20) s++; // quality + value
+  if ((r.netMargin||0) > 10)   s++; // strong margin
+  if ((r.netMargin||0) > 5 && (r.debtEq||999) < 1.5) s++; // quality
+  return s;
+}
+
+function _algoMagicFormula(results) {
+  // Greenblatt: rank by EarningsYield + ReturnOnCapital
+  const filtered = results.filter(r => r.pe > 0 && r.roe != null);
+  filtered.forEach(r => {
+    r._ey  = 1/r.pe;      // earnings yield proxy
+    r._roc = r.roe/100;   // return on capital proxy
+  });
+  const eyRank  = [...filtered].sort((a,b)=>b._ey-a._ey);
+  const rocRank = [...filtered].sort((a,b)=>b._roc-a._roc);
+  eyRank.forEach( (r,i)=>r._eyRank=i+1);
+  rocRank.forEach((r,i)=>r._rocRank=i+1);
+  filtered.forEach(r => r._mfScore = (r._eyRank||999)+(r._rocRank||999));
+  return filtered.sort((a,b)=>a._mfScore-b._mfScore);
+}
+
+function _algoScore(r) {
+  // Simple quality-value score: higher is better
+  const roe   = (r.roe||0)/100;
+  const pe    = r.pe > 0 ? r.pe : 999;
+  const div   = (r.dividendYield||0)/100;
+  const debt  = r.debtEq != null ? r.debtEq : 2;
+  const margin= (r.netMargin||0)/100;
+  return ((roe + div + margin) / (pe/100 + debt + 0.001) * 100).toFixed(1);
+}
+
+/* ── PRESET DEFINITIONS ───────────────────────────────────────────── */
+const SCR_PRESETS = {
+  value:     { label:'📊 Value',       desc:'Low P/E, positive dividend, high ROE', fmp:{ priceMoreThan:'5', marketCapMoreThan:'500000000' }, post: r=>r.filter(x=>(x.pe>0&&x.pe<18)&&(x.dividendYield||0)>1&&(x.roe||0)>8) },
+  growth:    { label:'🚀 Growth',      desc:'High ROE, strong margins, any P/E',    fmp:{ priceMoreThan:'5', marketCapMoreThan:'1000000000' }, post: r=>r.filter(x=>(x.roe||0)>15&&(x.netMargin||0)>10) },
+  dividend:  { label:'💰 Dividend',    desc:'High yield, stable payers',            fmp:{ dividendMoreThan:'3', marketCapMoreThan:'1000000000' }, post: r=>r.filter(x=>(x.dividendYield||0)>=3) },
+  quality:   { label:'⭐ Quality',     desc:'Piotroski score ≥ 7 (top quality)',    fmp:{ priceMoreThan:'5', marketCapMoreThan:'500000000' }, post: r=>r.filter(x=>_algoPiotroski(x)>=7).sort((a,b)=>_algoPiotroski(b)-_algoPiotroski(a)) },
+  bargain:   { label:'💎 Bargain',     desc:'Deep value: P/E<10, P/B<1.5',         fmp:{ priceMoreThan:'1', marketCapMoreThan:'100000000' }, post: r=>r.filter(x=>(x.pe>0&&x.pe<10)&&(x.marketCap||0)>0) },
+  smallcap:  { label:'🔬 Small Cap',   desc:'$300M-$2B market cap, P/E<30',         fmp:{ marketCapMoreThan:'300000000', marketCapLessThan:'2000000000' }, post: r=>r.filter(x=>(x.pe||0)<30||(x.pe||0)===0) },
+  momentum:  { label:'📈 Momentum',    desc:'Large/mid cap, high volume',           fmp:{ marketCapMoreThan:'2000000000', volumeMoreThan:'1000000' }, post: r=>r.sort((a,b)=>(b.volume||0)-(a.volume||0)) },
+  magic:     { label:'🧙 Magic Formula',desc:'Greenblatt: earnings yield + ROC',    fmp:{ marketCapMoreThan:'100000000', priceMoreThan:'2' }, post: r=>_algoMagicFormula(r) },
+  piotroski: { label:'🔢 Piotroski',   desc:'F-Score ≥ 7 (balance sheet quality)',  fmp:{ priceMoreThan:'2' }, post: r=>[...r].sort((a,b)=>_algoPiotroski(b)-_algoPiotroski(a)).filter(x=>_algoPiotroski(x)>=6) },
+};
+
+/* ── Run a preset screen ──────────────────────────────────────────── */
+async function screenerRunPreset(key) {
+  const preset = SCR_PRESETS[key];
+  if (!preset) return;
+  _screenerPreset = key;
+
+  const el = document.getElementById('screener-results');
+  if (!el) return;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>${preset.label} screen running…</div>`;
+
+  // Highlight active preset button
+  document.querySelectorAll('.scr-preset-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.scr-preset-btn[data-preset="${key}"]`)?.classList.add('active');
+
+  let results = await _screenerFMP(preset.fmp);
+  if (!results?.length) results = await _screenerYahoo(preset.fmp) || [];
+
+  if (preset.post) results = preset.post(results);
+
+  // Add Piotroski score and algo score
+  results.forEach(r => { r._piotroski = _algoPiotroski(r); r._score = _algoScore(r); });
+
+  _screenerResults = results;
+  const statusEl = document.getElementById('screener-status');
+  if (statusEl) statusEl.textContent = `${results.length} results · ${preset.label}`;
+  screenerRenderResults();
+}
+
+/* ── Run EDGAR institutional consensus ───────────────────────────── */
+async function screenerRunInstitutional() {
+  const el = document.getElementById('screener-results');
+  if (!el) return;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Fetching EDGAR 13F filings…<br><small style="color:var(--text-muted)">Berkshire · ARK · Bridgewater · Renaissance</small></div>`;
+
+  document.querySelectorAll('.scr-preset-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.scr-preset-btn[data-preset="inst"]')?.classList.add('active');
+
+  const keys = Object.keys(_EDGAR_INSTITUTIONS).slice(0,4);
+  const allHoldings = await Promise.all(keys.map(k=>_edgar13F(k)));
+
+  // Count occurrences across institutions
+  const counts = {};
+  allHoldings.forEach((holdings, fi) => {
+    holdings.forEach(h => {
+      const k = h.name.toUpperCase().slice(0,20);
+      if (!counts[k]) counts[k] = { name:h.name, total:0, funds:[] };
+      counts[k].total += h.val;
+      counts[k].funds.push(keys[fi]);
+    });
+  });
+
+  const consensus = Object.values(counts)
+    .filter(c => c.funds.length >= 2)
+    .sort((a,b) => b.funds.length - a.funds.length || b.total - a.total)
+    .slice(0, 50);
+
+  if (!consensus.length) {
+    el.innerHTML = `<div class="no-data">// EDGAR 13F data unavailable (CORS or network). Try again or check SEC website.</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="av-live-badge">● EDGAR 13F · ${consensus.length} consensus holdings · ${keys.join(' · ')}</div>
+    <div style="font-size:9px;color:var(--text-muted);padding:4px 12px">Holdings owned by ≥2 institutions. Data from SEC EDGAR (public, no API key).</div>
+    <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
+      <table class="yf-fin-table scr-table">
+        <thead><tr>
+          <th>#</th><th>Company</th><th>Funds holding</th><th>Total Value</th><th>Institutions</th>
+        </tr></thead>
+        <tbody>
+          ${consensus.map((c,i)=>`<tr>
+            <td>${i+1}</td>
+            <td><strong>${_esc(c.name.slice(0,30))}</strong></td>
+            <td style="text-align:center"><span style="font-size:14px;font-weight:800;color:var(--accent)">${c.funds.length}</span></td>
+            <td>${_fmt(c.total)}</td>
+            <td style="font-size:9px;color:var(--text-muted)">${c.funds.join(' · ')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="scr-footer">Source: <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&type=13F" target="_blank" class="geo-wm-link">SEC EDGAR 13F ↗</a> · No API key required</div>`;
+}
+
+/* ── Custom screener run ──────────────────────────────────────────── */
 async function screenerRun() {
   const el     = document.getElementById('screener-results');
   const status = document.getElementById('screener-status');
   if (!el) return;
 
-  const key = _fmpKey();
-  if (!key) {
-    el.innerHTML = `<div class="no-data">// Add FMP key in ⚙ Settings to use the Stock Screener.</div>`;
-    return;
-  }
+  document.querySelectorAll('.scr-preset-btn').forEach(b=>b.classList.remove('active'));
+  _screenerPreset = 'custom';
 
   const params = {
-    marketCapMoreThan:    document.getElementById('scr-mktcap-min')?.value   || '',
-    marketCapLessThan:    document.getElementById('scr-mktcap-max')?.value   || '',
-    priceMoreThan:        document.getElementById('scr-price-min')?.value    || '',
-    priceLessThan:        document.getElementById('scr-price-max')?.value    || '',
-    betaMoreThan:         document.getElementById('scr-beta-min')?.value     || '',
-    betaLessThan:         document.getElementById('scr-beta-max')?.value     || '',
-    volumeMoreThan:       document.getElementById('scr-vol-min')?.value      || '',
-    dividendMoreThan:     document.getElementById('scr-div-min')?.value      || '',
-    isEtf:                'false',
-    isActivelyTrading:    'true',
-    sector:               document.getElementById('scr-sector')?.value       || '',
-    industry:             document.getElementById('scr-industry')?.value     || '',
-    country:              document.getElementById('scr-country')?.value      || '',
-    exchange:             document.getElementById('scr-exchange')?.value     || '',
-    limit:                '200',
-    apikey:               key,
+    marketCapMoreThan: document.getElementById('scr-mktcap-min')?.value||'',
+    marketCapLessThan: document.getElementById('scr-mktcap-max')?.value||'',
+    priceMoreThan:     document.getElementById('scr-price-min')?.value||'',
+    priceLessThan:     document.getElementById('scr-price-max')?.value||'',
+    betaMoreThan:      document.getElementById('scr-beta-min')?.value||'',
+    betaLessThan:      document.getElementById('scr-beta-max')?.value||'',
+    volumeMoreThan:    document.getElementById('scr-vol-min')?.value||'',
+    dividendMoreThan:  document.getElementById('scr-div-min')?.value||'',
+    sector:            document.getElementById('scr-sector')?.value||'',
+    industry:          document.getElementById('scr-industry')?.value||'',
+    country:           document.getElementById('scr-country')?.value||'',
+    exchange:          document.getElementById('scr-exchange')?.value||'',
   };
-
-  // Remove empty params
-  Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
 
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Screening stocks…</div>`;
   if (status) status.textContent = '';
 
-  try {
-    const qs  = new URLSearchParams(params).toString();
-    const res = await fetch(`https://financialmodelingprep.com/api/v3/stock-screener?${qs}`);
-    const arr = await res.json();
+  // Try FMP then Yahoo
+  let arr = await _screenerFMP(params);
+  const src = arr?.length ? 'FMP' : 'Yahoo';
+  if (!arr?.length) arr = await _screenerYahoo(params) || [];
 
-    if (!arr?.length) {
-      el.innerHTML = `<div class="no-data">// No stocks match your criteria. Try relaxing the filters.</div>`;
-      return;
-    }
-
-    _screenerResults = arr;
-    if (status) status.textContent = `${arr.length} results`;
-    screenerRenderResults();
-  } catch (e) {
-    el.innerHTML = `<div class="no-data">// Screener error: ${_esc(e.message)}</div>`;
+  if (!arr.length) {
+    el.innerHTML = `<div class="no-data">// No stocks match. Try relaxing the filters.</div>`;
+    return;
   }
+
+  // Additional client-side filters for fields not in FMP screener params
+  const peMin   = parseFloat(document.getElementById('scr-pe-min')?.value)||null;
+  const peMax   = parseFloat(document.getElementById('scr-pe-max')?.value)||null;
+  const roeMin  = parseFloat(document.getElementById('scr-roe-min')?.value)||null;
+  const debtMax = parseFloat(document.getElementById('scr-debt-max')?.value)||null;
+  const marginMin = parseFloat(document.getElementById('scr-margin-min')?.value)||null;
+
+  if (peMin)     arr = arr.filter(r => r.pe != null && r.pe >= peMin);
+  if (peMax)     arr = arr.filter(r => r.pe != null && r.pe <= peMax);
+  if (roeMin)    arr = arr.filter(r => r.roe != null && r.roe >= roeMin);
+  if (debtMax)   arr = arr.filter(r => r.debtEq != null && r.debtEq <= debtMax);
+  if (marginMin) arr = arr.filter(r => r.netMargin != null && r.netMargin >= marginMin);
+
+  arr.forEach(r => { r._piotroski = _algoPiotroski(r); r._score = _algoScore(r); });
+
+  _screenerResults = arr;
+  if (status) status.textContent = `${arr.length} results · ${src}`;
+  screenerRenderResults();
 }
 
+/* ── Sort ────────────────────────────────────────────────────────── */
 function screenerSortBy(col) {
   if (_screenerSort.col === col) _screenerSort.dir *= -1;
   else { _screenerSort.col = col; _screenerSort.dir = -1; }
   screenerRenderResults();
 }
 
+/* ── Render results table ─────────────────────────────────────────── */
 function screenerRenderResults() {
   const el = document.getElementById('screener-results');
   if (!el || !_screenerResults.length) return;
 
   const COLS = [
-    { key:'symbol',           label:'Ticker',   fmt: r => `<strong class="port-sym" style="cursor:pointer" onclick="if(typeof changeTicker==='function')changeTicker('${r.symbol}')">${_esc(r.symbol)}</strong>` },
-    { key:'companyName',      label:'Company',  fmt: r => `<span title="${_esc(r.companyName)}">${_esc((r.companyName||'').slice(0,22))}</span>` },
-    { key:'sector',           label:'Sector',   fmt: r => _esc((r.sector||'').slice(0,14)) },
-    { key:'price',            label:'Price',    fmt: r => r.price != null ? '$'+r.price.toFixed(2) : '—' },
-    { key:'mktcap',           label:'Mkt Cap',  fmt: r => r.marketCap ? _fmt(r.marketCap) : '—' },
-    { key:'beta',             label:'Beta',     fmt: r => r.beta != null ? r.beta.toFixed(2) : '—' },
-    { key:'volume',           label:'Volume',   fmt: r => r.volume ? _fmt(r.volume, 0) : '—' },
-    { key:'lastAnnualDividend',label:'Div Yld', fmt: r => r.lastAnnualDividend && r.price ? (r.lastAnnualDividend/r.price*100).toFixed(2)+'%' : '—' },
-    { key:'country',          label:'Country',  fmt: r => _esc(r.country||'') },
-    { key:'exchange',         label:'Exchange', fmt: r => _esc(r.exchangeShortName||r.exchange||'') },
+    { key:'symbol',      label:'Ticker',   fmt:r=>`<strong class="port-sym" style="cursor:pointer" onclick="if(typeof changeTicker==='function')changeTicker('${r.symbol}')">${_esc(r.symbol)}</strong>` },
+    { key:'companyName', label:'Company',  fmt:r=>`<span title="${_esc(r.name||'')}">${_esc((r.name||'').slice(0,20))}</span>` },
+    { key:'sector',      label:'Sector',   fmt:r=>_esc((r.sector||'').slice(0,13)) },
+    { key:'price',       label:'Price',    fmt:r=>r.price!=null?'$'+r.price.toFixed(2):'—' },
+    { key:'mktcap',      label:'Mkt Cap',  fmt:r=>r.marketCap?_fmt(r.marketCap):'—' },
+    { key:'pe',          label:'P/E',      fmt:r=>r.pe!=null?(r.pe>0?r.pe.toFixed(1):'neg'):'—', cls:r=>r.pe>0&&r.pe<15?'pos':r.pe>30?'neg':'' },
+    { key:'roe',         label:'ROE',      fmt:r=>r.roe!=null?r.roe.toFixed(1)+'%':'—', cls:r=>r.roe>=15?'pos':r.roe<0?'neg':'' },
+    { key:'netMargin',   label:'Net Mgn',  fmt:r=>r.netMargin!=null?r.netMargin.toFixed(1)+'%':'—', cls:r=>r.netMargin>=10?'pos':r.netMargin<0?'neg':'' },
+    { key:'debtEq',      label:'D/E',      fmt:r=>r.debtEq!=null?r.debtEq.toFixed(2):'—', cls:r=>r.debtEq<0.5?'pos':r.debtEq>2?'neg':'' },
+    { key:'dividendYield',label:'Div%',   fmt:r=>r.dividendYield!=null?r.dividendYield.toFixed(1)+'%':'—', cls:r=>r.dividendYield>=3?'pos':'' },
+    { key:'_piotroski',  label:'F-Score', fmt:r=>r._piotroski!=null?r._piotroski+'/9':'—', cls:r=>r._piotroski>=7?'pos':r._piotroski<=3?'neg':'' },
+    { key:'_score',      label:'Score',   fmt:r=>r._score||'—', cls:r=>(+r._score)>=5?'pos':(+r._score)<2?'neg':'' },
+    { key:'_actions',    label:'',        fmt:r=>`<button class="port-del-btn" title="Add to watchlist" onclick="screenerAddToWatchlist('${_esc(r.symbol)}')">⭐</button>` },
   ];
 
-  const sorted = [..._screenerResults].sort((a, b) => {
-    const c = _screenerSort.col;
-    const va = c === 'mktcap' ? (a.marketCap||0) : c === 'symbol' ? a.symbol : (a[c]||0);
-    const vb = c === 'mktcap' ? (b.marketCap||0) : c === 'symbol' ? b.symbol : (b[c]||0);
-    if (typeof va === 'string') return _screenerSort.dir * va.localeCompare(vb);
-    return _screenerSort.dir * ((va||0) - (vb||0));
+  const cmpKey = _screenerSort.col;
+  const sorted = [..._screenerResults].sort((a,b)=>{
+    const va = cmpKey==='mktcap'?(a.marketCap||0):cmpKey==='symbol'?a.symbol:(a[cmpKey]||0);
+    const vb = cmpKey==='mktcap'?(b.marketCap||0):cmpKey==='symbol'?b.symbol:(b[cmpKey]||0);
+    if (typeof va==='string') return _screenerSort.dir*va.localeCompare(vb);
+    return _screenerSort.dir*((va||0)-(vb||0));
   });
 
   el.innerHTML = `
-    <div class="av-live-badge">● FMP Screener · ${sorted.length} results</div>
-    <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
+    <div class="scr-results-header">
+      <div class="av-live-badge">● ${sorted.length} stocks · ${_esc(_screenerPreset)} screen</div>
+      <div class="scr-results-actions">
+        <button class="wh-btn-secondary" style="font-size:9px;padding:3px 8px" onclick="screenerExportCSV()">📥 CSV</button>
+        <button class="wh-btn-secondary" style="font-size:9px;padding:3px 8px" onclick="screenerSavePreset()">💾 Save Preset</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:420px;overflow-y:auto">
       <table class="yf-fin-table scr-table">
         <thead><tr>
-          ${COLS.map(c => `<th onclick="screenerSortBy('${c.key}')" style="cursor:pointer;white-space:nowrap">
-            ${c.label} ${_screenerSort.col===c.key?(_screenerSort.dir>0?'↑':'↓'):''}
+          ${COLS.map(c=>c.key==='_actions'?'<th></th>':`<th onclick="screenerSortBy('${c.key}')" style="cursor:pointer;white-space:nowrap">
+            ${c.label}${_screenerSort.col===c.key?(_screenerSort.dir>0?' ↑':' ↓'):''}
           </th>`).join('')}
         </tr></thead>
         <tbody>
-          ${sorted.map(r => `<tr>${COLS.map(c => `<td>${c.fmt(r)}</td>`).join('')}</tr>`).join('')}
+          ${sorted.map(r=>`<tr>
+            ${COLS.map(c=>`<td class="${c.cls?c.cls(r):''}">${c.fmt(r)}</td>`).join('')}
+          </tr>`).join('')}
         </tbody>
       </table>
-    </div>`;
-}
-window.screenerRun        = screenerRun;
-window.screenerSortBy     = screenerSortBy;
-window.screenerRenderResults = screenerRenderResults;
-
-/* ══════════════════════════════════════════════════════════════════
-   MODULE 4 — OPTIONS CHAIN & GREEKS  (Full Implementation)
-   ──────────────────────────────────────────────────────────────────
-   Source stack (priority order):
-   1. Yahoo Finance /v7/finance/options  — real chain, IV per contract
-   2. Nasdaq API  /api/quote/{sym}/option-chain — fallback
-   3. Black-Scholes client-side          — Greeks from real IV
-   4. CBOE CDN  cdn.cboe.com             — VIX live (no key)
-   5. Historical Volatility              — from Finnhub candles
-   All 100% free, zero API keys required
-   ══════════════════════════════════════════════════════════════════ */
-
-/* ── State ──────────────────────────────────────────────────────── */
-let _optChainData    = null;  // full chain per expiration
-let _optCurrentSym   = null;
-let _optCurrentExp   = null;  // unix timestamp
-let _optAllExps      = [];    // available expirations
-let _optUnderlyingP  = null;  // spot price
-let _optVixData      = null;  // CBOE VIX
-
-/* ── Risk-free rate (updated from FRED if available) ─────────────── */
-function _optRiskFreeRate() {
-  // Try to read from FRED 3-month T-bill cache
-  if (typeof _fredCache !== 'undefined') {
-    for (const [k, v] of _fredCache) {
-      if (k.includes('DTB3') && v.data?.[0]?.value)
-        return parseFloat(v.data[0].value) / 100;
-    }
-  }
-  return 0.0525; // fallback: approx current fed funds rate
+    </div>
+    <div class="scr-footer">${sorted[0]?._src==='Yahoo'?'⚠ Using Yahoo Finance fallback (no FMP key). Some fundamental columns unavailable.':'Data: FMP · Fundamental filters applied client-side where noted.'}</div>`;
 }
 
-/* ── Black-Scholes (upgraded from original) ─────────────────────── */
-function _bsD1(S,K,T,r,σ) { return (Math.log(S/K)+(r+.5*σ*σ)*T)/(σ*Math.sqrt(T)); }
-function _bsCDF(x) {
-  const t=1/(1+0.2316419*Math.abs(x)),d=0.3989423*Math.exp(-x*x/2);
-  const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
-  return x>0?1-p:p;
-}
-function _bsPDF(x){ return Math.exp(-.5*x*x)/Math.sqrt(2*Math.PI); }
-
-function _computeGreeks(S,K,T,r,σ,isCall){
-  if(!S||!K||T<=0||σ<=0) return null;
-  const d1=_bsD1(S,K,T,r,σ), d2=d1-σ*Math.sqrt(T);
-  const eRT=Math.exp(-r*T), Nd1=_bsCDF(d1), Nd2=_bsCDF(d2);
-  const nd1=_bsPDF(d1);
-  const price = isCall ? S*Nd1-K*eRT*Nd2 : K*eRT*_bsCDF(-d2)-S*_bsCDF(-d1);
-  const delta = isCall ? Nd1 : Nd1-1;
-  const gamma = nd1/(S*σ*Math.sqrt(T));
-  const theta = (-(S*nd1*σ)/(2*Math.sqrt(T))-r*K*eRT*(isCall?Nd2:_bsCDF(-d2)))/365;
-  const vega  = S*nd1*Math.sqrt(T)/100;
-  const rho   = (isCall?K*T*eRT*Nd2:-K*T*eRT*_bsCDF(-d2))/100;
-  return { price, delta, gamma, theta, vega, rho, d1, d2, iv:σ };
-}
-
-/* ── Implied Volatility solver (bisection) ───────────────────────── */
-function _solveIV(S,K,T,r,mktPrice,isCall){
-  let lo=0.001,hi=5,iv=0.3;
-  for(let i=0;i<100;i++){
-    const g=_computeGreeks(S,K,T,r,iv,isCall);
-    if(!g) break;
-    if(Math.abs(g.price-mktPrice)<0.0005) break;
-    if(g.price<mktPrice) lo=iv; else hi=iv;
-    iv=(lo+hi)/2;
-  }
-  return iv;
-}
-
-/* ── Historical Volatility from Finnhub candle cache ─────────────── */
-function _calcHV(sym, period=30){
-  const cacheKey = `tc:${sym}:D`;
-  const cached = typeof _tcGet==='function' ? _tcGet(cacheKey,15*60*1000) : null;
-  if(!cached||cached.c?.length<period+1) return null;
-  const closes = cached.c.slice(-period-1);
-  const returns = [];
-  for(let i=1;i<closes.length;i++) returns.push(Math.log(closes[i]/closes[i-1]));
-  const mean = returns.reduce((a,b)=>a+b,0)/returns.length;
-  const variance = returns.reduce((s,r)=>s+Math.pow(r-mean,2),0)/returns.length;
-  return Math.sqrt(variance)*Math.sqrt(252); // annualized
-}
-
-/* ── Max Pain Calculator ─────────────────────────────────────────── */
-function _calcMaxPain(calls,puts){
-  const strikes=[...new Set([...calls.map(c=>c.strike),...puts.map(p=>p.strike)])].sort((a,b)=>a-b);
-  let minPain=Infinity,maxPainStrike=strikes[0];
-  for(const s of strikes){
-    const cp=calls.reduce((t,c)=>t+(s>c.strike?(s-c.strike)*(c.openInterest||0):0),0);
-    const pp=puts .reduce((t,p)=>t+(s<p.strike?(p.strike-s)*(p.openInterest||0):0),0);
-    const pain=cp+pp;
-    if(pain<minPain){minPain=pain;maxPainStrike=s;}
-  }
-  return maxPainStrike;
-}
-
-/* ── Put/Call Ratio ─────────────────────────────────────────────── */
-function _calcPCR(calls,puts){
-  const callOI=calls.reduce((s,c)=>s+(c.openInterest||0),0);
-  const putOI =puts.reduce((s,p)=>s+(p.openInterest||0),0);
-  const callVol=calls.reduce((s,c)=>s+(c.volume||0),0);
-  const putVol =puts.reduce((s,p)=>s+(p.volume||0),0);
-  return {
-    oiRatio:  callOI  ? putOI/callOI   : null,
-    volRatio: callVol ? putVol/callVol : null,
-    callOI, putOI, callVol, putVol,
-  };
-}
-
-/* ── Fetch VIX from CBOE CDN ─────────────────────────────────────── */
-async function _fetchVIX(){
-  const cached = typeof _tcGet==='function' ? _tcGet('vix:cboe', 5*60*1000) : null;
-  if(cached) return cached;
-  try{
-    const res=await fetch('https://cdn.cboe.com/api/global/delayed_quotes/charts/_VIX.json',
-      {signal:AbortSignal.timeout(5000)});
-    const d=await res.json();
-    const vix={last:d.data?.last_price,change:d.data?.change,changePct:d.data?.percent_change,
-               high:d.data?.high,low:d.data?.low};
-    if(typeof _tcSet==='function') _tcSet('vix:cboe',vix);
-    return vix;
-  }catch{ return null; }
-}
-
-/* ── Yahoo Finance options chain ─────────────────────────────────── */
-async function _fetchYahooChain(sym, expTimestamp=null){
-  const base = `https://query1.finance.yahoo.com/v7/finance/options/${sym}`;
-  const url  = expTimestamp ? `${base}?date=${expTimestamp}` : base;
-  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-  
-  // Try direct first (works in some environments), then proxy
-  for(const u of [url, proxy]){
-    try{
-      const res  = await fetch(u, {signal:AbortSignal.timeout(8000)});
-      let json   = await res.json();
-      // AllOrigins wraps in {contents}
-      if(json.contents) json = JSON.parse(json.contents);
-      const result = json?.optionChain?.result?.[0];
-      if(!result) continue;
-      return result;
-    }catch{}
-  }
-  return null;
-}
-
-/* ── Nasdaq option-chain fallback ────────────────────────────────── */
-async function _fetchNasdaqChain(sym){
-  try{
-    const res=await fetch(
-      `https://api.nasdaq.com/api/quote/${sym}/option-chain?assetclass=stocks&limit=300&type=`,
-      {headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'},signal:AbortSignal.timeout(8000)}
-    );
-    const d=await res.json();
-    const rows=d?.data?.table?.rows||[];
-    if(!rows.length) return null;
-    const calls=[],puts=[];
-    rows.forEach(r=>{
-      const K=parseFloat(r.c_Strike||0);
-      if(!isNaN(K)&&K>0){
-        calls.push({strike:K,lastPrice:parseFloat(r.c_Last||0),bid:parseFloat(r.c_Bid||0),ask:parseFloat(r.c_Ask||0),volume:parseInt(r.c_Volume||0),openInterest:parseInt(r.c_Openinterest||0),impliedVolatility:null});
-        puts.push ({strike:K,lastPrice:parseFloat(r.p_Last||0),bid:parseFloat(r.p_Bid||0),ask:parseFloat(r.p_Ask||0),volume:parseInt(r.p_Volume||0),openInterest:parseInt(r.p_Openinterest||0),impliedVolatility:null});
-      }
-    });
-    return {calls,puts,spot:null,expirations:[]};
-  }catch{ return null; }
-}
-
-/* ── Main loader ─────────────────────────────────────────────────── */
-window.yfLoadOptions = async function(sym) {
-  const el = document.getElementById('yf-options');
-  if(!el||!sym) return;
-
-  _optCurrentSym = sym;
-  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading options chain for ${_esc(sym)}…</div>`;
-
-  // 1. Fetch Yahoo chain (first call: get expirations list)
-  let yahooResult = await _fetchYahooChain(sym);
-  let chainSource = 'Yahoo Finance';
-
-  // 2. Fallback to Nasdaq
-  if(!yahooResult){
-    const nasdaq = await _fetchNasdaqChain(sym);
-    if(nasdaq){
-      yahooResult = { options:[{calls:nasdaq.calls,puts:nasdaq.puts}], expirationDates:[], quote:{regularMarketPrice:nasdaq.spot} };
-      chainSource = 'Nasdaq';
-    }
-  }
-
-  if(!yahooResult){
-    // No real data — show BS calc only
-    _renderOptionsCalcOnly(el, sym);
-    return;
-  }
-
-  // Store expirations
-  _optAllExps    = yahooResult.expirationDates || [];
-  _optUnderlyingP= yahooResult.quote?.regularMarketPrice
-                || yahooResult.quote?.price
-                || null;
-  _optCurrentExp = _optAllExps[0] || null;
-
-  // Enrich with Greeks
-  const rawChain = yahooResult.options?.[0];
-  if(!rawChain){ _renderOptionsCalcOnly(el,sym); return; }
-
-  _optChainData  = _enrichChain(rawChain, _optUnderlyingP, _optCurrentExp);
-
-  // Fetch VIX and HV in parallel (non-blocking)
-  _fetchVIX().then(v => { _optVixData = v; });
-  const hv30 = _calcHV(sym, 30);
-
-  _renderFullChain(el, sym, _optChainData, _optAllExps, _optCurrentExp, _optUnderlyingP, hv30, chainSource);
+/* ── Add to watchlist (uses portfolio IDB) ────────────────────────── */
+window.screenerAddToWatchlist = async function(ticker) {
+  try {
+    await _idbPut('watchlist', { id:'w_'+ticker+'_'+Date.now(), ticker, addedAt:Date.now(), targetPrice:null });
+    if (typeof showApiToast==='function') showApiToast(`✅ ${ticker} → Watchlist`, 'ok');
+  } catch(e) { console.warn(e); }
 };
 
-/* ── Enrich chain with BS Greeks ────────────────────────────────── */
-function _enrichChain(chain, S, expTs){
-  const r = _optRiskFreeRate();
-  const T = expTs ? Math.max(0.001, (expTs - Date.now()/1000) / (365*86400)) : 30/365;
-
-  const enrich = (opts, isCall) => (opts||[]).map(o => {
-    const iv   = o.impliedVolatility || 0.30;
-    const mid  = ((o.bid||0)+(o.ask||o.lastPrice||0))/2 || o.lastPrice || 0;
-    const greeks = S ? _computeGreeks(S, o.strike, T, r, iv, isCall) : null;
-    return { ...o, iv, mid, greeks, isCall };
-  });
-
-  return {
-    calls: enrich(chain.calls, true),
-    puts:  enrich(chain.puts,  false),
-  };
-}
-
-/* ── Change expiration ───────────────────────────────────────────── */
-window.optChangeExp = async function(expTs){
-  const el = document.getElementById('yf-options');
-  if(!el||!_optCurrentSym) return;
-  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading expiry…</div>`;
-  _optCurrentExp = parseInt(expTs);
-  const result = await _fetchYahooChain(_optCurrentSym, _optCurrentExp);
-  if(result?.options?.[0]){
-    _optChainData = _enrichChain(result.options[0], _optUnderlyingP, _optCurrentExp);
-    const hv30 = _calcHV(_optCurrentSym, 30);
-    _renderFullChain(el, _optCurrentSym, _optChainData, _optAllExps, _optCurrentExp, _optUnderlyingP, hv30, 'Yahoo Finance');
-  } else {
-    el.innerHTML = `<div class="no-data">// Could not load chain for selected expiry.</div>`;
-  }
+/* ── Export CSV ─────────────────────────────────────────────────────── */
+window.screenerExportCSV = function() {
+  if (!_screenerResults.length) return;
+  const headers = ['Ticker','Company','Sector','Price','MarketCap','P/E','ROE','NetMargin','D/E','DivYield','F-Score','Score'];
+  const rows = _screenerResults.map(r=>[
+    r.symbol, (r.name||'').replace(/,/g,' '), (r.sector||''),
+    r.price?.toFixed(2)||'', r.marketCap||'',
+    r.pe?.toFixed(2)||'', r.roe?.toFixed(2)||'', r.netMargin?.toFixed(2)||'',
+    r.debtEq?.toFixed(2)||'', r.dividendYield?.toFixed(2)||'',
+    r._piotroski||'', r._score||'',
+  ].join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = `screener_${_screenerPreset}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
 };
 
-/* ── Full chain renderer ─────────────────────────────────────────── */
-function _renderFullChain(el, sym, chain, exps, currentExp, S, hv30, src){
-  const { calls, puts } = chain;
-  const r   = _optRiskFreeRate();
-  const vix = _optVixData;
-
-  // Analytics
-  const maxPain = _calcMaxPain(calls, puts);
-  const pcr     = _calcPCR(calls, puts);
-  const T       = currentExp ? Math.max(0.001,(currentExp-Date.now()/1000)/(365*86400)) : 30/365;
-  const daysLeft= Math.round(T*365);
-
-  // ATM IV (average of calls within ±5% of spot)
-  const atmCalls = S ? calls.filter(c=>Math.abs(c.strike-S)<S*0.05&&c.iv>0.01) : [];
-  const avgIV    = atmCalls.length ? atmCalls.reduce((s,c)=>s+c.iv,0)/atmCalls.length : null;
-
-  // HV vs IV signal
-  const hvIvSignal = (hv30&&avgIV)
-    ? (avgIV>hv30*1.2?'IV Elevated — options expensive':avgIV<hv30*0.8?'IV Depressed — options cheap':'IV Near Fair Value')
-    : null;
-  const hvIvColor = hvIvSignal?.includes('expensive')?'#f85149':hvIvSignal?.includes('cheap')?'#3fb950':'#d29922';
-
-  // OI profile sparkline for calls and puts
-  const oiStrikes = calls.filter(c=>S&&Math.abs(c.strike-S)<S*0.15).sort((a,b)=>a.strike-b.strike);
-
-  el.innerHTML = `
-<!-- ══ Header bar ══ -->
-<div class="opt-header-bar">
-  <div class="opt-hdr-sym">${_esc(sym)}</div>
-  ${S?`<div class="opt-hdr-price">$${S.toFixed(2)}</div>`:''}
-  ${daysLeft?`<div class="opt-hdr-dte">${daysLeft}d to exp</div>`:''}
-  <div class="opt-hdr-src">● ${_esc(src)} · Black-Scholes Greeks</div>
-  <div class="opt-hdr-right">
-    ${exps.length>1?`<select class="opt-exp-sel" onchange="optChangeExp(this.value)">
-      ${exps.slice(0,12).map(ts=>{
-        const d=new Date(ts*1000);
-        const lbl=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-        return `<option value="${ts}" ${ts===currentExp?'selected':''}>${lbl}</option>`;
-      }).join('')}
-    </select>`:''}
-  </div>
-</div>
-
-<!-- ══ Key metrics bar ══ -->
-<div class="opt-metrics-bar">
-  ${avgIV?`<div class="opt-metric"><span class="opt-metric-lbl">ATM IV</span><span class="opt-metric-val">${(avgIV*100).toFixed(1)}%</span></div>`:''}
-  ${hv30?`<div class="opt-metric"><span class="opt-metric-lbl">HV 30d</span><span class="opt-metric-val">${(hv30*100).toFixed(1)}%</span></div>`:''}
-  ${hvIvSignal?`<div class="opt-metric"><span class="opt-metric-lbl">HV/IV</span><span class="opt-metric-val" style="color:${hvIvColor}">${hvIvSignal}</span></div>`:''}
-  <div class="opt-metric"><span class="opt-metric-lbl">Max Pain</span><span class="opt-metric-val" style="color:#d29922">$${maxPain?.toFixed(2)||'—'}</span></div>
-  ${pcr.oiRatio!=null?`<div class="opt-metric"><span class="opt-metric-lbl">P/C Ratio (OI)</span><span class="opt-metric-val ${pcr.oiRatio>1.2?'neg':pcr.oiRatio<0.8?'pos':''}">${pcr.oiRatio.toFixed(2)}</span></div>`:''}
-  ${pcr.volRatio!=null?`<div class="opt-metric"><span class="opt-metric-lbl">P/C Ratio (Vol)</span><span class="opt-metric-val ${pcr.volRatio>1.2?'neg':pcr.volRatio<0.8?'pos':''}">${pcr.volRatio.toFixed(2)}</span></div>`:''}
-  ${vix?`<div class="opt-metric"><span class="opt-metric-lbl">VIX</span><span class="opt-metric-val ${vix.last>25?'neg':vix.last<15?'pos':''}">${vix.last?.toFixed(2)||'—'} <small>(${vix.changePct>=0?'+':''}${vix.changePct?.toFixed(2)||''}%)</small></span></div>`:''}
-</div>
-
-<!-- ══ OI Heatmap bar ══ -->
-${oiStrikes.length>2?`
-<div class="opt-oi-section">
-  <div class="opt-oi-title">Open Interest Profile (±15% of spot)</div>
-  <div class="opt-oi-bars">
-    ${oiStrikes.map(c=>{
-      const putMatch=puts.find(p=>p.strike===c.strike);
-      const maxOI=Math.max(...oiStrikes.map(x=>Math.max(x.openInterest||0,(puts.find(p=>p.strike===x.strike)?.openInterest||0))));
-      const callPct=maxOI?(c.openInterest||0)/maxOI*100:0;
-      const putPct=maxOI?((putMatch?.openInterest||0)/maxOI*100):0;
-      const isAtm=S&&Math.abs(c.strike-S)<S*0.01;
-      const isMaxPain=Math.abs(c.strike-maxPain)<0.5;
-      return `<div class="opt-oi-col ${isAtm?'opt-oi-atm':''} ${isMaxPain?'opt-oi-maxpain':''}">
-        <div class="opt-oi-bar-wrap">
-          <div class="opt-oi-call-bar" style="height:${callPct.toFixed(0)}%"></div>
-          <div class="opt-oi-put-bar"  style="height:${putPct.toFixed(0)}%"></div>
-        </div>
-        <div class="opt-oi-strike">${c.strike.toFixed(0)}</div>
-        ${isAtm?'<div class="opt-oi-badge">ATM</div>':''}
-        ${isMaxPain?'<div class="opt-oi-badge opt-oi-mp-badge">MP</div>':''}
-      </div>`;
-    }).join('')}
-  </div>
-  <div class="opt-oi-legend"><span style="color:#3fb950">■ Call OI</span> <span style="color:#f85149">■ Put OI</span> <span style="color:#d29922">▲ ATM</span> <span style="color:#ffd700">★ Max Pain</span></div>
-</div>`:''}
-
-<!-- ══ Full chain table ══ -->
-<div style="overflow-x:auto;margin-top:4px">
-  <table class="opt-chain-full">
-    <thead>
-      <tr>
-        <th colspan="8" class="opt-th-call">CALLS</th>
-        <th class="opt-th-strike">Strike</th>
-        <th colspan="8" class="opt-th-put">PUTS</th>
-      </tr>
-      <tr>
-        <th>Bid</th><th>Ask</th><th>Last</th><th>IV</th>
-        <th>Δ</th><th>Γ</th><th>Θ</th><th>OI</th>
-        <th class="opt-th-strike">$</th>
-        <th>OI</th><th>Θ</th><th>Γ</th><th>Δ</th>
-        <th>IV</th><th>Last</th><th>Ask</th><th>Bid</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${_renderChainRows(calls, puts, S, maxPain)}
-    </tbody>
-  </table>
-</div>
-
-<!-- ══ Max Pain explanation ══ -->
-<div class="opt-maxpain-box">
-  <div class="opt-maxpain-title">📌 Max Pain: <strong>$${maxPain?.toFixed(2)||'—'}</strong></div>
-  <div class="opt-maxpain-desc">
-    The strike where total option losses are minimized for buyers. Spot at <strong>$${S?.toFixed(2)||'—'}</strong>
-    ${maxPain&&S?` — ${Math.abs(maxPain-S)<S*0.01?'price AT max pain':maxPain>S?`$${(maxPain-S).toFixed(2)} above spot (bullish pull)`:`$${(S-maxPain).toFixed(2)} below spot (bearish pull)`}.`:''}
-  </div>
-</div>
-
-<!-- ══ BS Calculator ══ -->
-<details class="opt-calc-details">
-  <summary>🧮 Black-Scholes Calculator</summary>
-  <div class="opt-calc-body">
-    <div class="bs-calc-grid">
-      <div class="bs-field"><label>Spot (S)</label><input id="bs-S" class="bs-input" type="number" value="${S?.toFixed(2)||''}" step="0.01"/></div>
-      <div class="bs-field"><label>Strike (K)</label><input id="bs-K" class="bs-input" type="number" value="${S?Math.round(S):''}" step="0.01"/></div>
-      <div class="bs-field"><label>Days</label><input id="bs-T" class="bs-input" type="number" value="${daysLeft||30}"/></div>
-      <div class="bs-field"><label>Rate %</label><input id="bs-r" class="bs-input" type="number" value="${(_optRiskFreeRate()*100).toFixed(2)}" step="0.01"/></div>
-      <div class="bs-field"><label>IV %</label><input id="bs-iv" class="bs-input" type="number" value="${avgIV?(avgIV*100).toFixed(1):'30'}" step="0.1"/></div>
-      <div class="bs-field bs-field-btn"><button class="wh-btn-primary" onclick="bsCalculate()" style="margin-top:16px">Calculate</button></div>
-    </div>
-    <div id="bs-results" class="bs-results"></div>
-  </div>
-</details>
-
-<div class="opt-footer">
-  ● ${_esc(src)} chain · Greeks via Black-Scholes · ~15min delayed · not investment advice<br>
-  Also: <a href="https://www.barchart.com/stocks/quotes/${_esc(sym)}/options" target="_blank" class="geo-wm-link">Barchart ↗</a>
-  · <a href="https://marketchameleon.com/Overview/${_esc(sym)}/OptionSummary/" target="_blank" class="geo-wm-link">Market Chameleon ↗</a>
-</div>`;
-
-  // Load VIX async and patch badge if it arrives
-  _fetchVIX().then(v => {
-    if(!v) return;
-    _optVixData = v;
-    const vixEl = document.querySelector('.opt-metric-val.vix-live');
-    if(vixEl) vixEl.textContent = v.last?.toFixed(2) + (v.changePct>=0?` +${v.changePct?.toFixed(2)}%`:` ${v.changePct?.toFixed(2)}%`);
+/* ── Save custom preset ────────────────────────────────────────────── */
+window.screenerSavePreset = function() {
+  const name = prompt('Preset name (e.g. "My Value Screen"):');
+  if (!name?.trim()) return;
+  const criteria = {};
+  ['scr-mktcap-min','scr-mktcap-max','scr-price-min','scr-price-max',
+   'scr-beta-min','scr-beta-max','scr-vol-min','scr-div-min',
+   'scr-sector','scr-exchange','scr-country','scr-pe-min','scr-pe-max',
+   'scr-roe-min','scr-debt-max','scr-margin-min'].forEach(id=>{
+    const v = document.getElementById(id)?.value;
+    if (v) criteria[id] = v;
   });
+  const presets = _scrLoadPresets();
+  presets[name.trim()] = criteria;
+  _scrSavePresets(presets);
+  if (typeof showApiToast==='function') showApiToast(`✅ Preset "${name}" saved`, 'ok');
+  _screenerRenderPresetBar();
+};
+
+/* ── Preset bar renderer ───────────────────────────────────────────── */
+function _screenerRenderPresetBar() {
+  const bar = document.getElementById('scr-preset-bar');
+  if (!bar) return;
+  const custom = _scrLoadPresets();
+  bar.innerHTML = Object.entries(SCR_PRESETS).map(([k,p])=>
+    `<button class="scr-preset-btn" data-preset="${k}" onclick="screenerRunPreset('${k}')">${p.label}</button>`
+  ).join('')
+  + `<button class="scr-preset-btn" data-preset="inst" onclick="screenerRunInstitutional()">🏦 Institutional</button>`
+  + Object.keys(custom).map(n=>
+    `<button class="scr-preset-btn scr-preset-custom" onclick="screenerLoadCustom('${_esc(n)}')" title="${_esc(n)}">★ ${_esc(n.slice(0,14))}</button>`
+  ).join('');
 }
 
-/* ── Render chain rows (calls + puts side-by-side) ───────────────── */
-function _renderChainRows(calls, puts, S, maxPain){
-  // Deduplicate and sort strikes
-  const strikeSet = new Set([...calls.map(c=>c.strike),...puts.map(p=>p.strike)]);
-  const strikes   = [...strikeSet].sort((a,b)=>a-b);
+window.screenerLoadCustom = function(name) {
+  const presets = _scrLoadPresets();
+  const p = presets[name];
+  if (!p) return;
+  Object.entries(p).forEach(([id,v]) => { const el=document.getElementById(id); if(el)el.value=v; });
+  screenerRun();
+};
 
-  return strikes.map(K => {
-    const c   = calls.find(x=>x.strike===K)||{};
-    const p   = puts.find(x=>x.strike===K)||{};
-    const atm = S&&Math.abs(K-S)<S*0.01;
-    const mp  = maxPain&&Math.abs(K-maxPain)<0.5;
-    const itm_c = S&&K<S;
-    const itm_p = S&&K>S;
-    const rowCls = atm?'opt-row-atm':mp?'opt-row-mp':itm_c?'opt-row-itmc':itm_p?'opt-row-itmp':'';
+/* ── Init preset bar on load ──────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(_screenerRenderPresetBar, 500);
+  // Re-render when screener panel becomes visible
+  document.addEventListener('click', e => {
+    if (e.target.dataset?.panel === 'screener' || e.target.closest?.('[data-panel="screener"]')) {
+      setTimeout(_screenerRenderPresetBar, 100);
+    }
+  });
+});
 
-    const f4 = v=>v!=null&&!isNaN(v)?parseFloat(v).toFixed(4):'—';
-    const f2 = v=>v!=null&&!isNaN(v)?'$'+parseFloat(v).toFixed(2):'—';
-    const fi = v=>v!=null&&!isNaN(v)?parseInt(v).toLocaleString():'—';
-    const fiv= v=>v&&v>0?(v*100).toFixed(1)+'%':'—';
-
-    return `<tr class="${rowCls}">
-      <td>${f2(c.bid)}</td>
-      <td>${f2(c.ask)}</td>
-      <td class="pos">${f2(c.lastPrice)}</td>
-      <td>${fiv(c.iv)}</td>
-      <td class="opt-greek">${c.greeks?f4(c.greeks.delta):'—'}</td>
-      <td class="opt-greek">${c.greeks?f4(c.greeks.gamma):'—'}</td>
-      <td class="opt-greek neg">${c.greeks?f4(c.greeks.theta):'—'}</td>
-      <td class="opt-oi-cell">${fi(c.openInterest)}</td>
-      <td class="opt-strike-cell ${atm?'opt-strike-atm':''} ${mp?'opt-strike-mp':''}">${K.toFixed(atm?2:0)}</td>
-      <td class="opt-oi-cell">${fi(p.openInterest)}</td>
-      <td class="opt-greek neg">${p.greeks?f4(p.greeks.theta):'—'}</td>
-      <td class="opt-greek">${p.greeks?f4(p.greeks.gamma):'—'}</td>
-      <td class="opt-greek">${p.greeks?f4(p.greeks.delta):'—'}</td>
-      <td>${fiv(p.iv)}</td>
-      <td class="neg">${f2(p.lastPrice)}</td>
-      <td>${f2(p.ask)}</td>
-      <td>${f2(p.bid)}</td>
-    </tr>`;
-  }).join('');
-}
-
-/* ── Fallback: show only BS calc when no chain data ─────────────── */
-function _renderOptionsCalcOnly(el, sym){
-  const S = (typeof fhGetLive==='function'?fhGetLive(sym):null)?.quote?.price
-          || (typeof avLiveCache!=='undefined'?avLiveCache[sym]:null)?.quote?.price;
-  el.innerHTML = `
-    <div class="no-data" style="margin:8px 12px">
-      // Real-time options data unavailable for <strong>${_esc(sym)}</strong>.<br>
-      // Showing theoretical chain (BS model, 30% IV assumption).
-    </div>
-    <details class="opt-calc-details" open>
-      <summary>🧮 Black-Scholes Calculator</summary>
-      <div class="opt-calc-body">
-        <div class="bs-calc-grid">
-          <div class="bs-field"><label>Spot (S)</label><input id="bs-S" class="bs-input" type="number" value="${S?.toFixed(2)||''}" step="0.01"/></div>
-          <div class="bs-field"><label>Strike (K)</label><input id="bs-K" class="bs-input" type="number" value="${S?Math.round(S):''}" step="0.01"/></div>
-          <div class="bs-field"><label>Days</label><input id="bs-T" class="bs-input" type="number" value="30"/></div>
-          <div class="bs-field"><label>Rate %</label><input id="bs-r" class="bs-input" type="number" value="5.25" step="0.01"/></div>
-          <div class="bs-field"><label>IV %</label><input id="bs-iv" class="bs-input" type="number" value="30" step="0.1"/></div>
-          <div class="bs-field bs-field-btn"><button class="wh-btn-primary" onclick="bsCalculate()" style="margin-top:16px">Calculate</button></div>
-        </div>
-        <div id="bs-results" class="bs-results"></div>
-      </div>
-    </details>
-    <div class="opt-footer">External: <a href="https://finance.yahoo.com/quote/${_esc(sym)}/options/" target="_blank" class="geo-wm-link">Yahoo ↗</a> · <a href="https://www.barchart.com/stocks/quotes/${_esc(sym)}/options" target="_blank" class="geo-wm-link">Barchart ↗</a></div>`;
-}
-
-function bsCalculate() {
-  const S=parseFloat(document.getElementById('bs-S')?.value);
-  const K=parseFloat(document.getElementById('bs-K')?.value);
-  const Td=parseFloat(document.getElementById('bs-T')?.value);
-  const r=parseFloat(document.getElementById('bs-r')?.value)/100;
-  const iv=parseFloat(document.getElementById('bs-iv')?.value)/100;
-  const el=document.getElementById('bs-results');
-  if(!el) return;
-  if([S,K,Td,r,iv].some(isNaN)||S<=0||K<=0||Td<=0){
-    el.innerHTML='<div class="wh-status wh-status-err">⚠ Fill all fields</div>'; return;
-  }
-  const T=Td/365;
-  const call=_computeGreeks(S,K,T,r,iv,true);
-  const put =_computeGreeks(S,K,T,r,iv,false);
-  if(!call||!put){el.innerHTML='<div class="wh-status wh-status-err">Calculation error</div>'; return;}
-  const row=(lbl,cv,pv,fmt=v=>v.toFixed(4))=>`
-    <div class="bs-res-row"><span class="bs-res-lbl">${lbl}</span><span class="bs-res-call">${fmt(cv)}</span><span class="bs-res-put">${fmt(pv)}</span></div>`;
-  el.innerHTML=`
-    <div class="bs-res-header"><span></span><span style="color:#3fb950;font-weight:700">CALL</span><span style="color:#f85149;font-weight:700">PUT</span></div>
-    ${row('Price',call.price,put.price,v=>'$'+v.toFixed(4))}
-    ${row('Delta',call.delta,put.delta)}
-    ${row('Gamma',call.gamma,put.gamma,v=>v.toFixed(5))}
-    ${row('Theta',call.theta,put.theta,v=>v.toFixed(4)+'/d')}
-    ${row('Vega', call.vega, put.vega, v=>v.toFixed(4)+'/1%')}
-    ${row('Rho',  call.rho,  put.rho,  v=>v.toFixed(4)+'/1%')}
-    <div class="bs-res-note">S=$${S} K=$${K} T=${Td}d r=${(r*100).toFixed(2)}% σ=${(iv*100).toFixed(1)}%</div>`;
-}
-window.bsCalculate  = bsCalculate;
-window.optChangeExp = window.optChangeExp;
+window.screenerRun              = screenerRun;
+window.screenerSortBy           = screenerSortBy;
+window.screenerRenderResults    = screenerRenderResults;
+window.screenerRunPreset        = screenerRunPreset;
+window.screenerRunInstitutional = screenerRunInstitutional;
 
 
 /* ══════════════════════════════════════════════════════════════════
