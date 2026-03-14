@@ -327,6 +327,13 @@ function renderFundamentals(ticker){
       <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Year</th><th>Total Assets</th><th>Total Liab.</th><th>Equity</th><th>Cash</th><th>Debt</th></tr></thead><tbody>${balR}</tbody></table></div>
       ${sHead("Cash Flow (USD)")}
       <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Year</th><th>Operating CF</th><th>CapEx</th><th>Free CF</th><th>Dividends</th></tr></thead><tbody>${cfR}</tbody></table></div>`;
+    // Append EDGAR XBRL ratios as enrichment if FMP ratios are available
+    if(typeof faEnrichWithXBRL === "function") faEnrichWithXBRL(ticker, fa);
+  } else if(fa) {
+    // No AV data — try SEC EDGAR XBRL directly (no key)
+    fa.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading financials from SEC EDGAR…</div>`;
+    if(typeof faLoadEdgarXBRL === "function") faLoadEdgarXBRL(ticker, fa);
+    else fa.innerHTML = `<div class="no-data">// Add AV or FMP key for financial statements. <br>// <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Add Alpha Vantage key ↗</a></div>`;
   }
 
   /* ERN */
@@ -830,7 +837,7 @@ function renderWatchlistRows() {
           <span class="wl-name">${escapeHtml(String(s.name||""))}</span>
           <span class="wl-sector-tag">${escapeHtml(String(s.sector||""))}</span>
         </div>
-        <span class="wl-price">${priceStr}</span>
+        <span class="wl-price fh-ws-price" data-ticker="${escapeHtml(String(s.ticker||'').replace(/.*:/,'').toUpperCase())}">${priceStr}</span>
         <span class="wl-chg ${chgCls}">${chgStr}</span>
         <span class="wl-mcap">${escapeHtml(mcapStr)}</span>
         <span class="wl-pe">${peStr}</span>
@@ -1380,7 +1387,10 @@ function changeTicker(){
   const at = activeFundTab?.dataset.tab;
   if(at === "div"     && typeof fmpLoadDividends      === "function") fmpLoadDividends(sym);
   if(at === "filings" && typeof fmpLoadSecFilings     === "function") fmpLoadSecFilings(sym);
-  if(at === "tech"    && typeof avLoadTech            === "function") avLoadTech(sym);
+  if(at === "tech") {
+    if(typeof techLoadFull === "function") techLoadFull(sym);
+    else if(typeof avLoadTech === "function") avLoadTech(sym);
+  }
   if(at === "short"   && typeof fhLoadShortInterest   === "function") fhLoadShortInterest(sym);
   if(at === "seg"     && typeof fmpLoadSegmentation   === "function") fmpLoadSegmentation(sym);
   if(at === "trans"   && typeof fmpLoadTranscript     === "function") fmpLoadTranscript(sym);
@@ -1395,6 +1405,18 @@ function changeTicker(){
   renderScorecard(ticker);
   // Enrich watchlist rows with Yahoo live prices
   if(typeof yfEnrichWatchlist === "function") setTimeout(() => yfEnrichWatchlist(), 1500);
+  // Technical panel — load if visible, else mark stale
+  if(typeof techLoadFull === "function") {
+    const techEl = document.getElementById("fund-tech");
+    if (techEl) { techEl.dataset.techSym = sym; techEl.dataset.loaded = ""; }
+    const activeFund = document.querySelector("#panel-fundamentals .tab-btn.active");
+    if (activeFund?.dataset.tab === "tech") techLoadFull(sym);
+  }
+  // Subscribe ticker to Finnhub WebSocket
+  if(typeof fhWsSubscribe === "function") fhWsSubscribe(sym);
+  // Update quote-qr price element for WS patches
+  const qrPrice = document.querySelector("#quote-qr .wl-price, #quote-qr span[data-live]");
+  if (qrPrice) qrPrice.dataset.ticker = sym;
   // Reset comparables comp tab
   const compComp = document.getElementById("comp-comp");
   if(compComp) { compComp.innerHTML = ""; compComp.dataset.loaded = ""; }
