@@ -5808,3 +5808,91 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 .georisk-choke-threat   { font-size:9px; color:var(--text-muted); margin-top:2px; line-height:1.4; }
 .georisk-alert-row      { display:flex; justify-content:space-between; align-items:center; padding:4px 10px; border-bottom:1px solid var(--border); gap:8px; }
 .georisk-alerts-list    { max-height:150px; overflow-y:auto; }
+
+/* ══════════════════════════════════════════════════════════════════
+   API Quick-Setup Banners  (TRANS tab / AIR tab)
+   ══════════════════════════════════════════════════════════════════ */
+.api-quicksetup-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(88,166,255,.08) 0%, rgba(88,166,255,.04) 100%);
+  border: 1px solid rgba(88,166,255,.25);
+  border-left: 3px solid var(--accent, #58a6ff);
+  border-radius: 6px;
+  position: relative;
+}
+
+.api-qs-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  filter: drop-shadow(0 0 4px rgba(88,166,255,.3));
+}
+
+.api-qs-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.api-qs-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text, #e6edf3);
+  margin-bottom: 4px;
+  letter-spacing: .01em;
+}
+
+.api-qs-desc {
+  font-size: 10px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.5;
+  margin-bottom: 9px;
+}
+
+.api-qs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.api-qs-btn-primary {
+  padding: 5px 12px;
+  background: var(--accent, #58a6ff);
+  color: #0d1117;
+  border: none;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.api-qs-btn-primary:hover { opacity: .85; transform: translateY(-1px); }
+
+.api-qs-btn-link {
+  font-size: 10px;
+  color: var(--accent, #58a6ff);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.api-qs-btn-link:hover { text-decoration: underline; }
+
+.api-qs-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted, #8b949e);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 3px;
+  opacity: .7;
+}
+.api-qs-dismiss:hover { opacity: 1; background: var(--border, #30363d); }
