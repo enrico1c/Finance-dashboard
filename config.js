@@ -17,7 +17,30 @@ const KNOWN_PROVIDERS = [
     desc:"Analyst Ratings · Targets · Estimates · Holders · Insiders · Management · Events · Ratios",
     limit:"250 req/day (free)", docsUrl:"https://financialmodelingprep.com/developer/docs/",
     sessionKey:"fmp_call_count", limitWarn:200, limitMax:250 },
-
+  { id:"finnhub", name:"Finnhub", badge:"FH",
+    desc:"Quote · Analyst Consensus · Price Targets · Upgrades/Downgrades · Insider Transactions · Institutional Holders · Company News · Peers · Economic Calendar · WebSocket prezzi live",
+    limit:"60 req/min (free)", docsUrl:"https://finnhub.io/docs/api",
+    sessionKey:"fh_call_count", limitWarn:50, limitMax:60 },
+  { id:"ninjas", name:"API Ninjas — Earnings Transcripts", badge:"NJA",
+    desc:"Earnings Call Transcripts — testo integrale con speaker labels (CEO, CFO, Analyst) · ~10K req/mese free · Fallback automatico a FMP /earning_call_transcript · Usato dal tab TRANS in Fundamentals",
+    limit:"~10,000 req/mese (free)", docsUrl:"https://api-ninjas.com/api/earningscalltranscript",
+    sessionKey:"ninjas_call_count", limitWarn:9000, limitMax:10000 },
+  { id:"openaq", name:"OpenAQ v3 — Air Quality", badge:"AQI",
+    desc:"Qualità aria in tempo reale · PM2.5, PM10, NO2, O3, CO, SO2 da 30.000+ stazioni in 100+ paesi · Collegato automaticamente all'HQ dell'azienda caricata · Usato dal tab 💨 AIR in Geo·Risk",
+    limit:"Generoso free tier — nessun limite fisso", docsUrl:"https://api.openaq.org/",
+    sessionKey:"openaq_call_count", limitWarn:null, limitMax:null },
+  { id:"fred", name:"FRED (St. Louis Fed)", badge:"FRD",
+    desc:"840K+ economic series: Yield Curve (DGS1M–DGS30) · CPI · GDP · Unemployment · Fed Funds Rate · Inflation Breakeven · HY Spreads · Tassi BCE/BoE/BoJ",
+    limit:"Unlimited (free)", docsUrl:"https://fred.stlouisfed.org/docs/api/fred/",
+    sessionKey:"fred_call_count", limitWarn:null, limitMax:null },
+  { id:"openexchange", name:"Open Exchange Rates", badge:"OER",
+    desc:"200+ currency pairs · Forex rates live + historical · Currency converter · Exotic pairs (VND, NGN, KES, IDR…) · 1K req/month free",
+    limit:"1,000 req/month (free)", docsUrl:"https://openexchangerates.org/account/app-ids",
+    sessionKey:"oer_call_count", limitWarn:900, limitMax:1000 },
+  { id:"yahoo", name:"Yahoo Finance (RapidAPI)", badge:"YHO",
+    desc:"Options chain · Income statement · Institutional holders · Trending tickers · Analyst consensus · Peer comparison · 52W price history — Optional: all features fall back to FMP/AV when key is absent",
+    limit:"500 req/month (free tier)", docsUrl:"https://rapidapi.com/search/yahoo+finance",
+    sessionKey:"yf_call_count", limitWarn:450, limitMax:500 },
   { id:"eodhd", name:"EODHD", badge:"EOD",
     desc:"Quote live/EOD · Fondamentali globali (150K+ ticker) · News · Dividendi · Earnings Calendar · Screener · 70+ borse",
     limit:"20 req/day (free) — illimitato sui piani paid", docsUrl:"https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis",
@@ -30,22 +53,6 @@ const KNOWN_PROVIDERS = [
     desc:"Alternative data · Macro indicators · Institutional flow · Economic calendar · Sentiment crowd",
     limit:"Varia per piano", docsUrl:"https://massive.io/",
     sessionKey:"massive_call_count", limitWarn:null, limitMax:null },
-  { id:"finnhub", name:"Finnhub", badge:"FH",
-    desc:"Quote · Analyst Consensus · Price Targets · Upgrades/Downgrades · Insider Transactions · Institutional Holders · Company News · Peers · Economic Calendar",
-    limit:"60 req/min (free)", docsUrl:"https://finnhub.io/docs/api",
-    sessionKey:"fh_call_count", limitWarn:50, limitMax:60 },
-  { id:"fred", name:"FRED (St. Louis Fed)", badge:"FRD",
-    desc:"840K+ economic series: Yield Curve (DGS1M–DGS30) · CPI · GDP · Unemployment · Fed Funds Rate · Inflation Breakeven · HY Spreads",
-    limit:"Unlimited (free)", docsUrl:"https://fred.stlouisfed.org/docs/api/fred/",
-    sessionKey:"fred_call_count", limitWarn:null, limitMax:null },
-  { id:"openexchange", name:"Open Exchange Rates", badge:"OER",
-    desc:"200+ currency pairs · Forex rates live + historical · Currency converter · Exotic pairs (VND, NGN, KES, IDR…) · 1K req/month free",
-    limit:"1,000 req/month (free)", docsUrl:"https://openexchangerates.org/account/app-ids",
-    sessionKey:"oer_call_count", limitWarn:900, limitMax:1000 },
-  { id:"yahoo", name:"Yahoo Finance (RapidAPI)", badge:"YHO",
-    desc:"Options chain · Income statement · Institutional holders · Trending tickers · Analyst consensus · Peer comparison · 52W price history — Optional: all features fall back to FMP/AV when key is absent",
-    limit:"500 req/month (free tier)", docsUrl:"https://rapidapi.com/search/yahoo+finance",
-    sessionKey:"yf_call_count", limitWarn:450, limitMax:500 },
 ];
 
 window._KEYS = {};
@@ -55,9 +62,12 @@ const setKey = (id, v) => { localStorage.setItem(lsId(id), v); window._KEYS[id] 
 const delKey = id => { localStorage.removeItem(lsId(id)); delete window._KEYS[id]; };
 const mask   = v  => v.length > 8 ? v.slice(0,4)+"••••••"+v.slice(-4) : "••••••••";
 
-function getAvKey()  { return getKey("av");  }
-function getFmpKey() { return getKey("fmp"); }
-function getYahooKey() { return getKey("yahoo"); }
+function getAvKey()     { return getKey("av");      }
+function getFmpKey()    { return getKey("fmp");     }
+function getYahooKey()  { return getKey("yahoo");   }
+function getNinjasKey() { return getKey("ninjas");  }
+function getOpenAQKey() { return getKey("openaq");  }
+function getFinnhubKey(){ return getKey("finnhub"); }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
@@ -215,14 +225,24 @@ function saveKey(id) {
   const ticker = (typeof currentTicker !== "undefined") ? currentTicker.replace(/.*:/,"").toUpperCase() : null;
   if (!ticker) return;
   if (id === "av"  && typeof avLoadAll      === "function") setTimeout(() => avLoadAll(ticker), 200);
-  if (id === "fmp" && typeof fmpLoadAll     === "function") setTimeout(() => fmpLoadAll(ticker), 200);
-  if (id === "finnhub" && typeof finnhubLoadAll === "function") setTimeout(() => finnhubLoadAll(ticker), 200);
+  if (id === "fmp"     && typeof fmpLoadAll      === "function") setTimeout(() => fmpLoadAll(ticker), 200);
+  if (id === "finnhub" && typeof finnhubLoadAll  === "function") setTimeout(() => finnhubLoadAll(ticker), 200);
+  if (id === "finnhub" && typeof fhWsReconnect   === "function") setTimeout(() => fhWsReconnect(), 500);
+  if (id === "openaq"  && typeof openaqLoadCity   === "function") setTimeout(() => openaqLoadCity(), 500);
   if (id === "eodhd"   && typeof eodhdLoadAll   === "function") setTimeout(() => eodhdLoadAll(ticker), 200);
   if (id === "apitube" && typeof apitubeLoadAll  === "function") setTimeout(() => apitubeLoadAll(ticker), 200);
   if (id === "massive" && typeof massiveLoadAll  === "function") setTimeout(() => massiveLoadAll(ticker), 200);
   if (id === "fred"         && typeof fredInitAll       === "function") setTimeout(() => fredInitAll(), 200);
   if (id === "openexchange" && typeof oerLoadRates      === "function") setTimeout(() => { oerLoadRates(); oerLoadCurrencyList(); }, 200);
   if (id === "yahoo"        && typeof yfLoadTrending    === "function") setTimeout(() => yfLoadTrending(), 200);
+  if (id === "ninjas" && typeof fmpLoadTranscript === "function") setTimeout(() => fmpLoadTranscript(ticker), 300);
+
+  // Hide setup banners when key is configured
+  const bannerMap = { ninjas: "trans-setup-banner", openaq: "airqual-setup-banner" };
+  if (bannerMap[id]) {
+    const b = document.getElementById(bannerMap[id]);
+    if (b) b.style.display = "none";
+  }
 }
 
 function clearKey(id) {
