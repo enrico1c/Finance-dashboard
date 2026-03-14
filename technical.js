@@ -43,7 +43,11 @@ async function techFetchCandles(sym, resolution = 'D', bars = 300) {
   if (cached) return cached;
 
   const key = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
-  if (!key) return _techFallbackAV(sym);
+  if (!key) {
+    // Try AV first (key required), then Stooq (no key)
+    const avResult = await _techFallbackAV(sym);
+    return avResult || _techFallbackStooq(sym);
+  }
 
   const now  = Math.floor(Date.now() / 1000);
   const days = resolution === 'D' ? bars * 1.5 : resolution === 'W' ? bars * 7 * 1.5 : bars * 400;
@@ -54,7 +58,7 @@ async function techFetchCandles(sym, resolution = 'D', bars = 300) {
     const res  = await fetch(url);
     const json = await res.json();
 
-    if (json.s !== 'ok' || !json.c?.length) return _techFallbackAV(sym);
+    if (json.s !== 'ok' || !json.c?.length) { const av = await _techFallbackAV(sym); return av || _techFallbackStooq(sym); }
 
     const candles = {
       t: json.t, o: json.o, h: json.h, l: json.l, c: json.c, v: json.v,
@@ -63,7 +67,10 @@ async function techFetchCandles(sym, resolution = 'D', bars = 300) {
     _tcSet(cacheKey, candles);
     return candles;
   } catch {
-    return _techFallbackAV(sym);
+    // Try AV then Stooq
+    const av = await _techFallbackAV(sym);
+    if (av) return av;
+    return _techFallbackStooq(sym);
   }
 }
 
@@ -79,7 +86,7 @@ async function _techFallbackAV(sym) {
     const res  = await fetch(url);
     const json = await res.json();
     const ts   = json['Time Series (Daily)'];
-    if (!ts) return null;
+    if (!ts) return _techFallbackStooq(sym);
     const entries = Object.entries(ts).sort(([a],[b]) => a < b ? -1 : 1).slice(-300);
     const candles = {
       t: entries.map(([d]) => Math.floor(new Date(d).getTime()/1000)),
@@ -88,11 +95,70 @@ async function _techFallbackAV(sym) {
       l: entries.map(([,v]) => parseFloat(v['3. low'])),
       c: entries.map(([,v]) => parseFloat(v['5. adjusted close'])),
       v: entries.map(([,v]) => parseFloat(v['6. volume'])),
-      sym, resolution: 'D',
+      sym, resolution: 'D', _src: 'Alpha Vantage',
     };
     _tcSet(cacheKey, candles);
     return candles;
-  } catch { return null; }
+  } catch { return _techFallbackStooq(sym); }
+}
+
+
+/* ── Stooq.com fallback (no key, EOD CSV, global markets) ────────── */
+async function _techFallbackStooq(sym) {
+  /* Stooq provides free EOD OHLCV CSV for 5000+ global tickers.
+     URL: https://stooq.com/q/d/l/?s={sym}.US&i=d
+     Supports: US equities (.US), indices (^SPX), forex, etc.  */
+  const cacheKey = `tc_stooq:${sym}`;
+  const cached   = _tcGet(cacheKey, 30*60*1000);
+  if (cached) return cached;
+
+  // Try several Stooq suffix conventions
+  const suffixes = ['.US', '.UK', '', '^'+sym]; // US equities, UK, no suffix, index
+  const base = sym.replace(/^\^/,''); // strip ^ from indices
+
+  for (const sfx of suffixes) {
+    const ticker = sfx.startsWith('^') ? sfx : (base + sfx);
+    try {
+      // Use AllOrigins proxy to avoid CORS
+      const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(ticker.toLowerCase())}&i=d`;
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`;
+      const res      = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      const text     = await res.text();
+      if (!text || text.includes('No data') || text.trim().length < 50) continue;
+
+      // Parse CSV: Date,Open,High,Low,Close,Volume
+      const lines   = text.trim().split('\n');
+      const header  = lines[0].toLowerCase();
+      if (!header.includes('close')) continue;
+
+      const rows = lines.slice(1)
+        .filter(l => l.trim())
+        .map(l => l.split(','))
+        .filter(r => r.length >= 5 && r[0].match(/^\d{4}-\d{2}-\d{2}$/))
+        .sort((a, b) => a[0] < b[0] ? -1 : 1)
+        .slice(-300);
+
+      if (rows.length < 30) continue;
+
+      const candles = {
+        t: rows.map(r => Math.floor(new Date(r[0]).getTime()/1000)),
+        o: rows.map(r => parseFloat(r[1])),
+        h: rows.map(r => parseFloat(r[2])),
+        l: rows.map(r => parseFloat(r[3])),
+        c: rows.map(r => parseFloat(r[4])),
+        v: rows.map(r => parseFloat(r[5] || 0)),
+        sym, resolution: 'D', _src: 'Stooq',
+      };
+
+      // Validate: reject if NaN-heavy
+      const validC = candles.c.filter(v => !isNaN(v) && v > 0);
+      if (validC.length < 20) continue;
+
+      _tcSet(cacheKey, candles);
+      return candles;
+    } catch { continue; }
+  }
+  return null;
 }
 
 /* ══════════════════════════════════════════════════════════════════
