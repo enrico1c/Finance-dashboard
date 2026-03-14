@@ -453,6 +453,7 @@ function avRenderOverview(sym, ov, quote) {
    ══════════════════════════════════════════════════════════════════ */
 function avRenderEarnings(sym, earn) {
   const ern = document.getElementById("fund-ern");
+  if (ern) ern.dataset.loaded = "av";
   if (ern && earn.quarterly.length) {
     const rows = earn.quarterly.map(q => {
       const sc  = (q.surprisePct ?? 0) >= 0 ? "pos" : "neg";
@@ -499,8 +500,9 @@ function avRenderEarnings(sym, earn) {
 function avRenderFA(sym, income, balance, cashflow) {
   const fa = document.getElementById("fund-fa");
   if (!fa) return;
+  fa.dataset.loaded = "av"; // Mark as loaded by AV so EDGAR doesn't overwrite
 
-  let html = `<div class="av-live-badge">● LIVE</div>`;
+  let html = `<div class="av-live-badge">● Financial Statements · Alpha Vantage</div>`;
 
   if (income?.length) {
     const rows = income.map(r => `<tr>
@@ -806,3 +808,11 @@ async function avLoadTech(sym) {
 
   </div>`;
 }
+
+/* ── Global exports — allow inline onclick handlers to access AV cache ── */
+window.avLiveCache        = avLiveCache;
+window.avRenderFA         = avRenderFA;
+window.avRenderEarnings   = avRenderEarnings;
+window.avRenderOverview   = avRenderOverview;
+window.avRenderWACC       = avRenderWACC;
+window.avRenderQuote      = avRenderQuote;
