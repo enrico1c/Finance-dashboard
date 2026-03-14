@@ -1392,3 +1392,409 @@ async function fhLoadInsiderTransactions(sym) {
     el.innerHTML = `<div class="no-data">// Insider transactions error: ${e.message}</div>`;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   FA TAB — Live Financial Statements
+   ──────────────────────────────────────────────────────────────────
+   Sources:
+   1. FMP /income-statement + /balance-sheet-statement + /cash-flow-statement
+   2. SEC EDGAR XBRL /companyfacts/{CIK}.json  (no key fallback)
+   Called from: tab click, or changeTicker when FA tab active
+   ══════════════════════════════════════════════════════════════════ */
+
+async function fmpLoadFATab(sym) {
+  const el = document.getElementById('fund-fa');
+  if (!el) return;
+  if (el.dataset.faSym === sym && el.dataset.loaded === '1') return;
+
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading financials for ${fmpEsc(sym)}…</div>`;
+  el.dataset.faSym  = sym;
+  el.dataset.loaded = '0';
+
+  const key   = (typeof getFmpKey==='function') ? getFmpKey() : '';
+  const fmtB  = v => { if(v==null||isNaN(v)) return '—'; const a=Math.abs(v); return (v<0?'(':'')+( a>=1e12?'$'+(a/1e12).toFixed(2)+'T' : a>=1e9?'$'+(a/1e9).toFixed(1)+'B' : a>=1e6?'$'+(a/1e6).toFixed(0)+'M' : '$'+a.toLocaleString())+(v<0?')':''); };
+  const fmtPct= v => v==null?'—':(v*100).toFixed(1)+'%';
+  const posClr= v => v==null?'':v>=0?'wm-pos':'wm-neg';
+  const sHead = t => `<div class="fa-section-head">${t}</div>`;
+
+  let html = '', src = '';
+
+  // ── 1. FMP (primary) ─────────────────────────────────────────────
+  if (key) {
+    try {
+      const [inc, bal, cf] = await Promise.all([
+        fetch(`https://financialmodelingprep.com/api/v3/income-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/api/v3/balance-sheet-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/api/v3/cash-flow-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+      ]);
+
+      if (Array.isArray(inc) && inc.length) {
+        src = 'FMP';
+        // Income statement
+        const years = inc.map(r=>r.calendarYear||r.date?.slice(0,4)||'');
+        html += sHead('📊 Income Statement (USD)');
+        html += `<div class="fa-table-wrap"><table class="fa-table"><thead><tr>
+          <th>Year</th><th>Revenue</th><th>Gross Profit</th><th>Gross Margin</th>
+          <th>EBITDA</th><th>EBIT</th><th>Net Income</th><th>EPS</th><th>Net Margin</th>
+        </tr></thead><tbody>${inc.map(r=>`<tr>
+          <td class="fa-year">${fmpEsc(r.calendarYear||r.date?.slice(0,4)||'')}</td>
+          <td>${fmtB(r.revenue)}</td>
+          <td>${fmtB(r.grossProfit)}</td>
+          <td class="${posClr(r.grossProfitRatio)}">${fmtPct(r.grossProfitRatio)}</td>
+          <td>${fmtB(r.ebitda)}</td>
+          <td>${fmtB(r.operatingIncome)}</td>
+          <td class="${posClr(r.netIncome)}">${fmtB(r.netIncome)}</td>
+          <td>$${r.eps!=null?r.eps.toFixed(2):'—'}</td>
+          <td class="${posClr(r.netIncomeRatio)}">${fmtPct(r.netIncomeRatio)}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+
+        // Balance sheet
+        if (Array.isArray(bal) && bal.length) {
+          html += sHead('🏦 Balance Sheet (USD)');
+          html += `<div class="fa-table-wrap"><table class="fa-table"><thead><tr>
+            <th>Year</th><th>Total Assets</th><th>Total Liabilities</th>
+            <th>Equity</th><th>Cash</th><th>Total Debt</th><th>D/E Ratio</th>
+          </tr></thead><tbody>${bal.map(r=>`<tr>
+            <td class="fa-year">${fmpEsc(r.calendarYear||r.date?.slice(0,4)||'')}</td>
+            <td>${fmtB(r.totalAssets)}</td>
+            <td>${fmtB(r.totalLiabilities)}</td>
+            <td class="${posClr(r.totalStockholdersEquity)}">${fmtB(r.totalStockholdersEquity)}</td>
+            <td>${fmtB(r.cashAndCashEquivalents)}</td>
+            <td>${fmtB(r.totalDebt)}</td>
+            <td class="${r.totalDebt&&r.totalStockholdersEquity?posClr(-r.totalDebt/r.totalStockholdersEquity):''}">
+              ${r.totalDebt&&r.totalStockholdersEquity?(r.totalDebt/r.totalStockholdersEquity).toFixed(2):'—'}
+            </td>
+          </tr>`).join('')}</tbody></table></div>`;
+        }
+
+        // Cash flow
+        if (Array.isArray(cf) && cf.length) {
+          html += sHead('💵 Cash Flow (USD)');
+          html += `<div class="fa-table-wrap"><table class="fa-table"><thead><tr>
+            <th>Year</th><th>Operating CF</th><th>CapEx</th><th>Free CF</th>
+            <th>Dividends</th><th>Share Buybacks</th><th>FCF Margin</th>
+          </tr></thead><tbody>${cf.map((r,i)=>`<tr>
+            <td class="fa-year">${fmpEsc(r.calendarYear||r.date?.slice(0,4)||'')}</td>
+            <td class="${posClr(r.operatingCashFlow)}">${fmtB(r.operatingCashFlow)}</td>
+            <td>${fmtB(r.capitalExpenditure)}</td>
+            <td class="${posClr(r.freeCashFlow)}">${fmtB(r.freeCashFlow)}</td>
+            <td>${fmtB(r.dividendsPaid)}</td>
+            <td>${fmtB(r.commonStockRepurchased)}</td>
+            <td class="${inc[i]?.revenue&&r.freeCashFlow?posClr(r.freeCashFlow/inc[i].revenue):''}">
+              ${inc[i]?.revenue&&r.freeCashFlow!=null?fmtPct(r.freeCashFlow/inc[i].revenue):'—'}
+            </td>
+          </tr>`).join('')}</tbody></table></div>`;
+        }
+
+        html += `<div class="fa-source-note">Source: FMP (Financial Modeling Prep)</div>`;
+      }
+    } catch(e) { console.warn('[FA FMP]', e.message); }
+  }
+
+  // ── 2. SEC EDGAR XBRL fallback (no key) ──────────────────────────
+  if (!html) {
+    try {
+      const cik = await secGetCik(sym);
+      if (cik) {
+        const xbrlRes = await fetch(
+          `https://data.sec.gov/api/xbrl/companyfacts/CIK${String(cik).padStart(10,'0')}.json`,
+          { headers:{'User-Agent':'FINTERM dashboard@finterm.io','Accept':'application/json'}, signal:AbortSignal.timeout(10000) }
+        );
+        const xbrl = await xbrlRes.json();
+        src = 'SEC EDGAR XBRL';
+
+        // Extract key concepts
+        const getXbrl = (concept, tag='us-gaap') => {
+          const units = xbrl.facts?.[tag]?.[concept]?.units;
+          if (!units) return [];
+          const usd = units.USD || units.shares || Object.values(units)[0] || [];
+          return usd.filter(e=>e.form==='10-K'&&e.val!=null).sort((a,b)=>b.end?.localeCompare(a.end)||0).slice(0,5);
+        };
+
+        const revenues   = getXbrl('RevenueFromContractWithCustomerExcludingAssessedTax') || getXbrl('Revenues') || getXbrl('SalesRevenueNet');
+        const netIncomes = getXbrl('NetIncomeLoss');
+        const assets     = getXbrl('Assets');
+        const equity     = getXbrl('StockholdersEquity');
+        const opCF       = getXbrl('NetCashProvidedByUsedInOperatingActivities');
+
+        if (revenues.length || netIncomes.length) {
+          html += sHead('📊 Key Financials from SEC EDGAR XBRL');
+          html += `<div class="fa-table-wrap"><table class="fa-table"><thead><tr>
+            <th>Period</th><th>Revenue</th><th>Net Income</th><th>Total Assets</th><th>Equity</th><th>Operating CF</th>
+          </tr></thead><tbody>`;
+
+          const periods = [...new Set([
+            ...revenues.map(r=>r.end?.slice(0,4)),
+            ...netIncomes.map(r=>r.end?.slice(0,4)),
+          ])].filter(Boolean).sort().reverse().slice(0,5);
+
+          periods.forEach(yr => {
+            const rev = revenues.find(r=>r.end?.startsWith(yr));
+            const ni  = netIncomes.find(r=>r.end?.startsWith(yr));
+            const ast = assets.find(r=>r.end?.startsWith(yr));
+            const eq  = equity.find(r=>r.end?.startsWith(yr));
+            const ocf = opCF.find(r=>r.end?.startsWith(yr));
+            html += `<tr>
+              <td class="fa-year">${fmpEsc(yr)}</td>
+              <td>${fmtB(rev?.val)}</td>
+              <td class="${posClr(ni?.val)}">${fmtB(ni?.val)}</td>
+              <td>${fmtB(ast?.val)}</td>
+              <td class="${posClr(eq?.val)}">${fmtB(eq?.val)}</td>
+              <td class="${posClr(ocf?.val)}">${fmtB(ocf?.val)}</td>
+            </tr>`;
+          });
+
+          html += `</tbody></table></div>`;
+          html += `<div class="fa-source-note">Source: SEC EDGAR XBRL (no API key) · <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${fmpEsc(String(cik))}&type=10-K" target="_blank" class="geo-wm-link">10-K Filings ↗</a></div>`;
+        } else {
+          html = `<div class="no-data">// SEC EDGAR XBRL data not found for ${fmpEsc(sym)}.</div>`;
+        }
+      }
+    } catch(e) {
+      console.warn('[FA EDGAR XBRL]', e.message);
+    }
+  }
+
+  // ── No data ───────────────────────────────────────────────────────
+  if (!html) {
+    html = `<div class="no-data" style="line-height:1.9">
+      // Financial statements not available for <strong>${fmpEsc(sym)}</strong>.<br>
+      // <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">Add FMP key</a> for full income/balance/cashflow statements.<br>
+      // <a href="https://www.sec.gov/cgi-bin/browse-edgar?company=${fmpEsc(sym)}&action=getcompany&type=10-K" target="_blank" class="geo-wm-link">SEC EDGAR 10-K ↗</a>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+  el.dataset.loaded = '1';
+}
+
+window.fmpLoadFATab = fmpLoadFATab;
+
+/* ══════════════════════════════════════════════════════════════════
+   FA TAB — SEC EDGAR XBRL fallback (no API key)
+   ──────────────────────────────────────────────────────────────────
+   data.sec.gov/api/xbrl/companyfacts/CIK{10d}.json
+   Extracts: Revenue, NetIncome, Assets, Liabilities, Equity,
+             OperatingCashFlow, CapEx, EPS  — last 5 annual filings
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Enrich existing FA tab with XBRL key ratios (called when AV data present) */
+async function faEnrichWithXBRL(sym, el) {
+  if (!sym || !el) return;
+  const ratios = await _xbrlGetRatios(sym);
+  if (!ratios) return;
+  const existing = el.querySelector('.xbrl-enrichment');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.className = 'xbrl-enrichment';
+  div.innerHTML = `<div class="av-live-badge" style="margin-top:8px">📊 Key Ratios · SEC EDGAR XBRL (no key)</div>
+    <div class="xbrl-kpi-row">
+      ${ratios.map(r=>`<div class="xbrl-kpi">
+        <span class="xbrl-kpi-label">${fmpEsc(r.label)}</span>
+        <span class="xbrl-kpi-val">${fmpEsc(r.value)}</span>
+        <span class="xbrl-kpi-date">${fmpEsc(r.date||'')}</span>
+      </div>`).join('')}
+    </div>`;
+  el.appendChild(div);
+}
+
+/* Load entire FA tab from EDGAR XBRL when no AV key */
+async function faLoadEdgarXBRL(sym, el) {
+  if (!sym || !el) return;
+  try {
+    // Step 1: get CIK from SEC EDGAR ticker lookup
+    const tickerRes = await fetch(
+      `https://data.sec.gov/submissions/CIK${String(0).padStart(10,'0')}.json`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    // Actually use the ticker-to-CIK lookup endpoint
+    const mapRes = await fetch(
+      'https://data.sec.gov/files/company_tickers.json',
+      { headers: { 'User-Agent': 'FINTERM research@finterm.io' },
+        signal: AbortSignal.timeout(8000) }
+    );
+    const mapJson = await mapRes.json();
+
+    // Find CIK for ticker
+    let cik = null;
+    for (const [, entry] of Object.entries(mapJson)) {
+      if ((entry.ticker || '').toUpperCase() === sym.toUpperCase()) {
+        cik = entry.cik_str;
+        break;
+      }
+    }
+
+    if (!cik) {
+      el.innerHTML = `<div class="no-data">// Ticker "${fmpEsc(sym)}" not found in SEC EDGAR.
+        <br>// Add <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a>
+        or <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP key</a> for full financial statements.</div>`;
+      return;
+    }
+
+    // Step 2: Fetch companyfacts JSON
+    const factsRes = await fetch(
+      `https://data.sec.gov/api/xbrl/companyfacts/CIK${String(cik).padStart(10,'0')}.json`,
+      { headers: { 'User-Agent': 'FINTERM research@finterm.io' },
+        signal: AbortSignal.timeout(12000) }
+    );
+    const facts = await factsRes.json();
+    const usgaap = facts.facts?.['us-gaap'] || {};
+
+    // Helper: get last N annual values for a concept
+    const getAnnual = (concept, N=5) => {
+      const data = usgaap[concept]?.units?.USD || usgaap[concept]?.units?.shares || [];
+      const annual = data
+        .filter(d => d.form === '10-K' && d.val != null)
+        .sort((a,b) => (b.end||b.filed||'').localeCompare(a.end||a.filed||''));
+      // Deduplicate by year
+      const seen = new Set();
+      return annual.filter(d => {
+        const yr = (d.end||'').slice(0,4);
+        if (seen.has(yr)) return false;
+        seen.add(yr); return true;
+      }).slice(0,N).reverse();
+    };
+
+    const fmt3 = v => {
+      const n = typeof v === 'number' ? v : parseFloat(v);
+      if (isNaN(n)) return '—';
+      if (Math.abs(n) >= 1e12) return (n/1e12).toFixed(2)+'T';
+      if (Math.abs(n) >= 1e9)  return (n/1e9).toFixed(2)+'B';
+      if (Math.abs(n) >= 1e6)  return (n/1e6).toFixed(1)+'M';
+      return n.toLocaleString();
+    };
+
+    // Extract key financial series
+    const revenue  = getAnnual('Revenues') || getAnnual('RevenueFromContractWithCustomerExcludingAssessedTax');
+    const netInc   = getAnnual('NetIncomeLoss');
+    const assets   = getAnnual('Assets');
+    const liab     = getAnnual('Liabilities');
+    const equity   = getAnnual('StockholdersEquity') || getAnnual('StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest');
+    const opCF     = getAnnual('NetCashProvidedByUsedInOperatingActivities');
+    const capex    = getAnnual('PaymentsToAcquirePropertyPlantAndEquipment');
+    const eps      = getAnnual('EarningsPerShareDiluted');
+
+    if (!revenue.length && !netInc.length) {
+      el.innerHTML = `<div class="no-data">// EDGAR XBRL data not available for ${fmpEsc(sym)}.
+        <br>// Add <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP key</a> for full financial statements.</div>`;
+      return;
+    }
+
+    const years = [...new Set([
+      ...revenue.map(d=>d.end?.slice(0,4)),
+      ...netInc.map(d=>d.end?.slice(0,4)),
+    ].filter(Boolean))].sort();
+
+    const getVal = (arr, yr) => {
+      const row = arr.find(d => d.end?.startsWith(yr));
+      return row ? fmt3(row.val) : '—';
+    };
+
+    // Render tables
+    const incRows = years.map(yr => `<tr>
+      <td>${yr}</td>
+      <td>${getVal(revenue,yr)}</td>
+      <td>—</td>
+      <td>—</td>
+      <td>${getVal(netInc,yr)}</td>
+      <td>${getVal(eps,yr)}</td>
+    </tr>`).join('');
+
+    const balRows = years.map(yr => `<tr>
+      <td>${yr}</td>
+      <td>${getVal(assets,yr)}</td>
+      <td>${getVal(liab,yr)}</td>
+      <td>${getVal(equity,yr)}</td>
+      <td>—</td><td>—</td>
+    </tr>`).join('');
+
+    const cfRows = years.map(yr => `<tr>
+      <td>${yr}</td>
+      <td>${getVal(opCF,yr)}</td>
+      <td>${getVal(capex,yr)}</td>
+      <td>—</td><td>—</td>
+    </tr>`).join('');
+
+    const sHead = t => `<div class="av-section-head" style="margin-top:10px">${t}</div>`;
+
+    el.innerHTML = `
+      <div class="av-live-badge">● SEC EDGAR XBRL · ${fmpEsc(sym)} · No API key</div>
+      ${sHead('Income Statement')}
+      <div class="fin-table-wrap"><table class="fin-table">
+        <thead><tr><th>Year</th><th>Revenue</th><th>Gross Profit</th><th>EBIT</th><th>Net Income</th><th>EPS</th></tr></thead>
+        <tbody>${incRows}</tbody>
+      </table></div>
+      ${sHead('Balance Sheet')}
+      <div class="fin-table-wrap"><table class="fin-table">
+        <thead><tr><th>Year</th><th>Total Assets</th><th>Total Liab.</th><th>Equity</th><th>Cash</th><th>Debt</th></tr></thead>
+        <tbody>${balRows}</tbody>
+      </table></div>
+      ${sHead('Cash Flow')}
+      <div class="fin-table-wrap"><table class="fin-table">
+        <thead><tr><th>Year</th><th>Operating CF</th><th>CapEx</th><th>Free CF</th><th>Dividends</th></tr></thead>
+        <tbody>${cfRows}</tbody>
+      </table></div>
+      <div style="font-size:9px;color:var(--text-muted);padding:5px 0">
+        Source: <a href="https://data.sec.gov" target="_blank" class="geo-wm-link">SEC EDGAR XBRL ↗</a> · 10-K filings only · No API key required
+      </div>`;
+
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// EDGAR XBRL error: ${fmpEsc(e.message)}
+      <br>// Add <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a>
+      or <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP key</a> for financial statements.</div>`;
+  }
+}
+
+/* Helper: get key ratios from XBRL for enrichment */
+async function _xbrlGetRatios(sym) {
+  try {
+    const mapRes = await fetch('https://data.sec.gov/files/company_tickers.json', {
+      headers:{'User-Agent':'FINTERM research@finterm.io'}, signal:AbortSignal.timeout(6000)
+    });
+    const map = await mapRes.json();
+    let cik = null;
+    for(const [,e] of Object.entries(map)) {
+      if((e.ticker||'').toUpperCase()===sym.toUpperCase()){cik=e.cik_str;break;}
+    }
+    if(!cik) return null;
+
+    const factsRes = await fetch(
+      `https://data.sec.gov/api/xbrl/companyfacts/CIK${String(cik).padStart(10,'0')}.json`,
+      {headers:{'User-Agent':'FINTERM research@finterm.io'},signal:AbortSignal.timeout(10000)}
+    );
+    const facts = await factsRes.json();
+    const g = facts.facts?.['us-gaap']||{};
+
+    const latestAnnual = (concept) => {
+      const arr = (g[concept]?.units?.USD||g[concept]?.units?.shares||[])
+        .filter(d=>d.form==='10-K'&&d.val!=null)
+        .sort((a,b)=>(b.end||'').localeCompare(a.end||''));
+      return arr[0]||null;
+    };
+
+    const fmt3 = v => {
+      if(v==null)return'—';
+      if(Math.abs(v)>=1e12)return(v/1e12).toFixed(2)+'T';
+      if(Math.abs(v)>=1e9) return(v/1e9).toFixed(2)+'B';
+      if(Math.abs(v)>=1e6) return(v/1e6).toFixed(1)+'M';
+      return v.toLocaleString();
+    };
+
+    const ratioList = [
+      {label:'Revenue',   concept:'Revenues'},
+      {label:'Net Income',concept:'NetIncomeLoss'},
+      {label:'EPS Diluted',concept:'EarningsPerShareDiluted'},
+      {label:'Total Assets',concept:'Assets'},
+      {label:'Equity',    concept:'StockholdersEquity'},
+      {label:'Op. CF',    concept:'NetCashProvidedByUsedInOperatingActivities'},
+    ];
+
+    return ratioList.map(r => {
+      const row = latestAnnual(r.concept)||latestAnnual(r.concept+'ExcludingAssessedTax');
+      return { label:r.label, value:row?fmt3(row.val):'—', date:row?.end?.slice(0,7)||'' };
+    });
+  } catch { return null; }
+}
+
+window.faLoadEdgarXBRL  = faLoadEdgarXBRL;
+window.faEnrichWithXBRL = faEnrichWithXBRL;
