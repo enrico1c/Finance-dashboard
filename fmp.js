@@ -505,7 +505,8 @@ function fmpRenderRatios(sym, r) {
   if (wc) {
     const beta    = parseFloat(r?.beta   || 1.0);
     const debtEq  = parseFloat(r?.debtEq || 0.3);
-    const rf=4.5, erp=5.5;
+    const _ty2 = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
+    const rf=_ty2['10Y']??4.5, erp=5.5;
     const ke      = (rf + beta * erp).toFixed(2);
     const kd=5.5, tax=21;
     const eqW     = Math.max(20, Math.round(100/(1+debtEq)));
