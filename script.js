@@ -238,6 +238,88 @@ const DB = {
 
 function getTickerData(ticker){ return DB[ticker.toUpperCase().replace(/.*:/,"")]||null; }
 
+/* Refresh DB prices with live data — called once on init and on key setup */
+async function refreshDBPrices() {
+  const tickers = Object.keys(DB).join(',');
+  if (!tickers) return;
+
+  // Try FMP batch quote
+  const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  if (fmpKey) {
+    try {
+      const res  = await fetch(`https://financialmodelingprep.com/api/v3/quote/${tickers}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(8000)});
+      const data = await res.json();
+      (Array.isArray(data) ? data : []).forEach(q => {
+        const sym = q.symbol?.toUpperCase();
+        if (DB[sym] && q.price) {
+          DB[sym].price     = q.price;
+          DB[sym].change    = q.changesPercentage;
+          DB[sym].mktCap    = q.marketCap || DB[sym].mktCap;
+          DB[sym].pe        = q.pe || DB[sym].pe;
+          DB[sym].eps       = q.eps || DB[sym].eps;
+          DB[sym].week52High= q.yearHigh || DB[sym].week52High;
+          DB[sym].week52Low = q.yearLow  || DB[sym].week52Low;
+          DB[sym].avgVol    = q.avgVolume ? (q.avgVolume/1e6).toFixed(1)+'M' : DB[sym].avgVol;
+        }
+      });
+      console.info('[DB] Prices refreshed from FMP');
+      return;
+    } catch {}
+  }
+
+  // Fallback: Finnhub batch
+  const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+  if (fhKey) {
+    await Promise.allSettled(Object.keys(DB).map(async sym => {
+      try {
+        const res  = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${fhKey}`, {signal:AbortSignal.timeout(5000)});
+        const q    = await res.json();
+        if (q?.c) {
+          DB[sym].price  = q.c;
+          DB[sym].high   = q.h;
+          DB[sym].low    = q.l;
+          DB[sym].open   = q.o;
+          DB[sym].prevClose = q.pc;
+        }
+      } catch {}
+    }));
+    console.info('[DB] Prices refreshed from Finnhub');
+  }
+}
+
+/* Also refresh sectorDB stock prices with live data */
+async function refreshSectorDBPrices() {
+  const allTickers = [];
+  Object.values(sectorDB).forEach(sector => {
+    sector.stocks.forEach(s => allTickers.push(s.ticker.replace(/.*:/,'')));
+  });
+  const unique = [...new Set(allTickers)];
+  if (!unique.length) return;
+
+  const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  if (!fmpKey) return;
+
+  try {
+    // Batch in chunks of 50
+    for (let i = 0; i < unique.length; i += 50) {
+      const chunk = unique.slice(i, i+50);
+      const res   = await fetch(`https://financialmodelingprep.com/api/v3/quote-short/${chunk.join(',')}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(8000)});
+      const data  = await res.json();
+      (Array.isArray(data) ? data : []).forEach(q => {
+        const sym = q.symbol?.toUpperCase();
+        Object.values(sectorDB).forEach(sector => {
+          const s = sector.stocks.find(st => st.ticker.replace(/.*:/,'').toUpperCase() === sym);
+          if (s && q.price) {
+            s.price  = q.price;
+            s.change = q.changesPercentage || s.change;
+          }
+        });
+      });
+    }
+    console.info('[sectorDB] Prices refreshed from FMP');
+  } catch {}
+}
+
 /* ══════════════════════════════════════════════════════════════════
    TAB SYSTEM
    ══════════════════════════════════════════════════════════════════ */
@@ -715,6 +797,15 @@ function reloadAllPanels(ticker){
   renderComparables(ticker);
 }
 
+/* Auto-load geo-wars when geopolitical panel becomes visible */
+function _autoLoadGeoPanel() {
+  const warsEl = document.getElementById('georisk-wars-content');
+  if (warsEl && !warsEl.dataset.loaded && typeof georiskLoadWars === 'function') {
+    warsEl.dataset.loaded = '1';
+    georiskLoadWars();
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════
    SECTOR WATCHLIST DATA
    ══════════════════════════════════════════════════════════════════ */
@@ -1011,11 +1102,48 @@ function renderValuation(ticker) {
     stock = window.yfValData[sym];
   }
 
-  // 3. Try sectorDB
+  // 3. Try sectorDB (stale prices — always trigger live refresh after)
   if (!stock) {
     for (const key in sectorDB) {
       stock = sectorDB[key].stocks.find(s => s.ticker === ticker || s.ticker.endsWith(":"+ticker));
       if (stock) break;
+    }
+    if (stock) {
+      // Mark prices as stale and refresh with live data
+      stock = { ...stock, _stalePrice: true };
+      // Trigger async live price refresh — will re-render valuation when done
+      setTimeout(async () => {
+        const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+        if (fmpKey) {
+          try {
+            const res  = await fetch(`https://financialmodelingprep.com/api/v3/quote-short/${sym}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(5000)});
+            const data = await res.json();
+            const q    = Array.isArray(data) ? data[0] : data;
+            if (q?.price) {
+              // Update sectorDB stock in place with live price
+              for (const key in sectorDB) {
+                const s = sectorDB[key].stocks.find(st => st.ticker === ticker || st.ticker.endsWith(":"+ticker));
+                if (s) {
+                  s.price  = q.price;
+                  s.change = q.changesPercentage;
+                  s.mktCap = q.marketCap ? (q.marketCap >= 1e12 ? (q.marketCap/1e12).toFixed(2)+"T" : (q.marketCap/1e9).toFixed(1)+"B") : s.mktCap;
+                }
+              }
+              // Re-render valuation with fresh price
+              if (typeof renderValuation === 'function') renderValuation(ticker);
+            }
+          } catch {}
+        } else if (typeof fhGetLive === 'function') {
+          const fhQ = fhGetLive(sym)?.quote;
+          if (fhQ?.price) {
+            for (const key in sectorDB) {
+              const s = sectorDB[key].stocks.find(st => st.ticker === ticker || st.ticker.endsWith(":"+ticker));
+              if (s) s.price = fhQ.price;
+            }
+            if (typeof renderValuation === 'function') renderValuation(ticker);
+          }
+        }
+      }, 200);
     }
   }
 
@@ -1563,6 +1691,7 @@ function hidePanel(id){
 function showPanel(id){
   const el=document.getElementById(`panel-${id}`); if(!el) return;
   el.classList.remove("hidden"); applyPanelPosition(id); bringToFront(el);
+  if(id==="geopolitical") setTimeout(_autoLoadGeoPanel, 300);
   if(id==="chart") setTimeout(()=>loadChart(resolveSymbol(currentTicker)),80);
   if(id==="forex") setTimeout(()=>loadForexChart(),80);
 }
@@ -2367,6 +2496,14 @@ function hideAllPanels() {
 }
 
 // Keep sidebar panel checkboxes in sync when topbar toggles change
+/* Refresh stale DB and sectorDB prices on load */
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    refreshDBPrices();
+    refreshSectorDBPrices();
+  }, 2000); // After API keys are loaded from localStorage
+});
+
 document.addEventListener('change', e => {
   if (e.target.classList.contains('panel-toggle')) {
     const id = e.target.dataset.panel;
