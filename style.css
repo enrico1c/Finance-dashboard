@@ -5899,3 +5899,37 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 
 /* ── Technical sub-charts (RSI, MACD) ──────────────────────────── */
 .tech-sub-chart-wrap { width:100%;overflow:hidden;background:var(--bg-panel);position:relative; }
+
+/* ═══════════════════════════════════════════════════════════════
+   COMMODITIES.JS — Strategic Resource & Commodity Panel CSS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Commodity sub-tab bar */
+.comm-subtab-bar         { display:flex;gap:2px;padding:4px 8px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg-panel) }
+.comm-stab               { font-size:9px;padding:3px 8px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--border);color:var(--text);transition:all .15s }
+.comm-stab:hover         { background:var(--border-bright) }
+.comm-stab.active        { background:var(--accent);color:#000;border-color:var(--accent);font-weight:700 }
+
+/* Mineral cards grid */
+.comm-mineral-card       { background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:8px;transition:border-color .15s }
+.comm-mineral-card:hover { border-color:var(--border-bright) }
+
+/* Energy grid */
+.comm-energy-grid        { display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px;border-bottom:1px solid var(--border) }
+
+/* IMF / WB commodity grid */
+.comm-imf-grid           { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px }
+.comm-imf-card           { background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;padding:6px;font-size:10px }
+
+/* COT positioning bars */
+.comm-cot-bar-wrap       { height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:2px 0 }
+.comm-cot-long           { height:100%;background:#3fb950;float:left }
+.comm-cot-short          { height:100%;background:#f85149;float:right }
+
+/* Georisk resources extended grid */
+.georisk-commodity-grid  { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px;padding:4px 8px 8px }
+.georisk-commodity-card  { background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:7px }
+.georisk-section-head    { font-size:10px;font-weight:700;color:var(--text);padding:6px 10px 3px;border-bottom:1px solid var(--border);background:var(--bg-panel) }
+
+/* FAO / Agri panel */
+.comm-agri-grid          { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px;padding:6px }
