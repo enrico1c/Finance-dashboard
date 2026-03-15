@@ -4346,12 +4346,7 @@ textarea::placeholder { color:var(--text-muted); }
    ALERT FEED — WM filter bar (hidden when NOAA/EONET tab active)
    ══════════════════════════════════════════════════════════════════ */
 #alert-wm-filters { transition: max-height .2s ease, opacity .2s ease; }
-#alert-wm-filters.hidden {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
+#alert-wm-filters/* .hidden uses display:none !important — see above */
 
 /* Tab pane inside alert feed panel */
 #panel-alert .tab-pane { display: none; }
