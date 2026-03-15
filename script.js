@@ -1431,33 +1431,55 @@ function computeDefaultLayout(){
   panelLayout.macro        = {x: (botW+G)*3,              y: botY, w: Math.round(W*0.26), h: rowB};
   // Notes (floating center)
   panelLayout.notes        = {x: Math.round(W*0.3),       y: Math.round(H*0.2),  w: Math.round(W*0.28), h: Math.round(H*0.45)};
+  // Portfolio (floating large panel, center)
+  panelLayout.portfolio    = {x: Math.round(W*0.1),       y: Math.round(H*0.05), w: Math.round(W*0.80), h: Math.round(H*0.88)};
+  // Screener (large panel, center — slightly inset)
+  panelLayout.screener     = {x: Math.round(W*0.05),      y: Math.round(H*0.04), w: Math.round(W*0.90), h: Math.round(H*0.90)};
 }
 
 function applyPanelPosition(id){
   const el=document.getElementById(`panel-${id}`); if(!el) return;
-  const l=panelLayout[id]; if(!l) return;
+  let l=panelLayout[id];
+  if(!l){
+    // Fallback: center panel on canvas with reasonable default size
+    const canvas=document.getElementById("dashboardCanvas");
+    const cw=canvas?.clientWidth||window.innerWidth;
+    const ch=canvas?.clientHeight||window.innerHeight;
+    const w=Math.min(860, Math.round(cw*0.60));
+    const h=Math.min(700, Math.round(ch*0.82));
+    l={x:Math.round((cw-w)/2), y:Math.round((ch-h)/2), w, h};
+    panelLayout[id]=l;
+  }
   const minY=getTopbarGuard();
   const safeY=Math.max(minY, l.y);
   Object.assign(el.style,{left:l.x+"px",top:safeY+"px",width:l.w+"px",height:l.h+"px"});
 }
 function initLayout(){
   computeDefaultLayout();
+
+  // 1. Apply ALL panel positions FIRST (while still hidden → no flash)
   Object.keys(panelLayout).forEach(applyPanelPosition);
-  // Apply startup visibility matching screenshot:
-  //   Visible: chart, fundamentals, news, analysts, ownership, comparables,
-  //            geopolitical, supply, alert, macro, intel, webhooks, watchlist
-  //   Hidden by default: notes
+
+  // 2. Then set visibility:
+  //    Visible at startup: chart, fundamentals, news, analysts, ownership,
+  //                        comparables, geopolitical, supply, alert, macro,
+  //                        intel, webhooks, watchlist
+  //    Hidden by default: notes, portfolio, screener
   const startVisible = ["chart","fundamentals","news","analysts","ownership",
     "comparables","geopolitical","supply","alert","macro","intel","webhooks","watchlist"];
-  const startHidden  = ["notes"];
+  const startHidden  = ["notes","portfolio","screener"];
+
   startVisible.forEach(id => {
     const el = document.getElementById("panel-"+id);
-    if(el) el.classList.remove("hidden");
+    if(!el) return;
+    applyPanelPosition(id);            // re-apply in case canvas was 0 on first pass
+    el.classList.remove("hidden");
     document.querySelectorAll(`.panel-toggle[data-panel="${id}"]`).forEach(cb => cb.checked = true);
   });
   startHidden.forEach(id => {
     const el = document.getElementById("panel-"+id);
-    if(el) el.classList.add("hidden");
+    if(!el) return;
+    el.classList.add("hidden");
     document.querySelectorAll(`.panel-toggle[data-panel="${id}"]`).forEach(cb => cb.checked = false);
   });
 }
@@ -1834,7 +1856,8 @@ window.addEventListener("load",()=>{
   document.getElementById("forexPairInput")?.addEventListener("keydown",e=>{if(e.key==="Enter")changeForexPair();});
   updateExchangeHint();
 
-  requestAnimationFrame(()=>{
+  // Double rAF ensures dashboardCanvas has computed dimensions before layout
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
     initLayout();
     initLayoutSidebar();
     whRenderAlerts();
@@ -1847,7 +1870,7 @@ window.addEventListener("load",()=>{
     if(typeof finnhubLoadAll === "function") finnhubLoadAll(initSym);
     if(typeof updateApiStatus  === "function") updateApiStatus();
     if(typeof updateFmpStatus  === "function") updateFmpStatus();
-  });
+  }));
 });
 
 window.addEventListener("resize",()=>{
