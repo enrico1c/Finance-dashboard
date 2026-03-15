@@ -5896,3 +5896,6 @@ body.panel-dragging iframe, body.panel-resizing iframe {
   opacity: .7;
 }
 .api-qs-dismiss:hover { opacity: 1; background: var(--border, #30363d); }
+
+/* ── Technical sub-charts (RSI, MACD) ──────────────────────────── */
+.tech-sub-chart-wrap { width:100%;overflow:hidden;background:var(--bg-panel);position:relative; }
