@@ -2297,6 +2297,144 @@ async function _fetchBTCStats() {
   } catch { return null; }
 }
 
+/* ── E. Binance WebSocket real-time (no key) ────────────────────── */
+// wss://stream.binance.com:9443/ws/{symbol}@ticker
+// Replaces polling for crypto — tick-by-tick, zero auth
+
+let _bnWsMap = {};     // { 'btcusdt': WebSocket }
+let _bnPrices = {};    // { 'btcusdt': 45123.20 }
+
+function _bnWsConnect(binanceSymbol) {
+  // binanceSymbol = lowercase pair e.g. 'btcusdt', 'ethusdt'
+  const sym = binanceSymbol.toLowerCase();
+  if (_bnWsMap[sym]?.readyState < 2) return; // already open/connecting
+
+  try {
+    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@ticker`);
+    _bnWsMap[sym] = ws;
+
+    ws.onmessage = e => {
+      try {
+        const d = JSON.parse(e.data);
+        // Binance 24hr ticker: { s: symbol, c: lastPrice, P: priceChangePct, v: volume, h: high, l: low, ... }
+        const price = parseFloat(d.c);
+        if (!price) return;
+        _bnPrices[sym] = price;
+
+        // Map to CoinGecko-style IDs for DOM patching
+        const cgId = _bnSymToCgId(sym);
+        if (cgId) {
+          const el = document.querySelector(`.cg-live-price[data-id="${cgId}"]`);
+          if (el) {
+            const prev = parseFloat(el.dataset.prev || price);
+            el.dataset.prev = price;
+            el.textContent = _cgPrice(price);
+            const cls = price > prev ? 'cg-price-flash' : price < prev ? 'cg-price-flash' : '';
+            if (cls) { el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 600); }
+          }
+        }
+
+        // Also patch Finnhub WS live price cells by crypto ticker
+        const ticker = sym.replace('usdt','').toUpperCase();
+        const fhEl = document.querySelector(`.fh-ws-price[data-ticker="${ticker}"]`);
+        if (fhEl) fhEl.textContent = _cgPrice(price);
+
+        // Update Binance card status
+        const statusEl = document.getElementById(`cg-bn-status-${sym}`);
+        if (statusEl) { statusEl.textContent = '● live'; statusEl.style.color='#3fb950'; }
+
+        // Flash the binance card
+        const bnCard = document.getElementById(`cg-bn-${sym}`);
+        if (bnCard) {
+          const prev = parseFloat(bnCard.dataset.prev || price);
+          bnCard.dataset.prev = price;
+          if (price !== prev) {
+            const flashCls = price > prev ? 'cg-price-flash' : 'cg-price-flash';
+            bnCard.classList.add(flashCls);
+            setTimeout(() => bnCard.classList.remove(flashCls), 500);
+          }
+        }
+
+      } catch {}
+    };
+
+    ws.onclose = () => {
+      delete _bnWsMap[sym];
+      // Reconnect after 5s
+      setTimeout(() => _bnWsConnect(sym), 5000);
+    };
+    ws.onerror = () => ws.close();
+  } catch {}
+}
+
+function _bnSymToCgId(binanceSymbol) {
+  const MAP = {
+    'btcusdt': 'bitcoin', 'ethusdt': 'ethereum', 'bnbusdt': 'binancecoin',
+    'solusdt': 'solana',  'xrpusdt': 'ripple',   'adausdt': 'cardano',
+    'dogeusdt':'dogecoin','avaxusdt':'avalanche-2','maticusdt':'matic-network',
+    'dotusdt': 'polkadot','linkusdt':'chainlink',  'uniusdt': 'uniswap',
+    'ltcusdt': 'litecoin','etcusdt': 'ethereum-classic','xlmusdt':'stellar',
+    'atomusdt':'cosmos',  'nearusdt':'near',        'ftmusdt': 'fantom',
+  };
+  return MAP[binanceSymbol.toLowerCase()] || null;
+}
+
+// Connect to top coins
+const _BN_DEFAULT_PAIRS = [
+  'btcusdt','ethusdt','bnbusdt','solusdt','xrpusdt',
+  'adausdt','dogeusdt','avaxusdt','linkusdt','maticusdt',
+  'dotusdt','uniusdt',
+];
+
+// User-configurable pairs — persisted in localStorage
+function _bnLoadUserPairs() {
+  try {
+    const saved = localStorage.getItem('finterm_bn_pairs');
+    return saved ? JSON.parse(saved) : null;
+  } catch { return null; }
+}
+function _bnSaveUserPairs(pairs) {
+  try { localStorage.setItem('finterm_bn_pairs', JSON.stringify(pairs)); } catch {}
+}
+function _bnGetActivePairs() {
+  return _bnLoadUserPairs() || _BN_DEFAULT_PAIRS;
+}
+
+// Public API: add/remove pairs dynamically
+window.bnAddPair = function(symbol) {
+  const sym = symbol.toLowerCase().replace(/\s/g,'');
+  if (!sym.endsWith('usdt')) { console.warn('[Binance] Only USDT pairs supported'); return; }
+  const pairs = _bnGetActivePairs();
+  if (!pairs.includes(sym)) {
+    pairs.push(sym);
+    _bnSaveUserPairs(pairs);
+    _bnWsConnect(sym);
+    console.log('[Binance] Added pair:', sym);
+  }
+};
+window.bnRemovePair = function(symbol) {
+  const sym = symbol.toLowerCase();
+  const pairs = _bnGetActivePairs().filter(p => p !== sym);
+  _bnSaveUserPairs(pairs);
+  if (_bnWsMap[sym]) { try { _bnWsMap[sym].close(1000); } catch {} delete _bnWsMap[sym]; }
+  console.log('[Binance] Removed pair:', sym);
+};
+window.bnGetPairs = function() { return _bnGetActivePairs(); };
+
+function _bnWsConnectAll(pairs) {
+  (_bnGetActivePairs()).forEach(sym => _bnWsConnect(sym));
+}
+
+function _bnWsDisconnectAll() {
+  Object.values(_bnWsMap).forEach(ws => { try { ws.close(1000); } catch {} });
+  _bnWsMap = {};
+}
+
+window._bnWsConnect    = _bnWsConnect;
+window._bnWsConnectAll = _bnWsConnectAll;
+window._bnPrices       = _bnPrices;
+
+
 /* ── D. CoinCap WebSocket real-time ──────────────────────────────── */
 let _ccWs     = null;
 let _ccPrices = {}; // { bitcoin: 45123.2, ethereum: 3021.4, ... }
@@ -2366,6 +2504,7 @@ async function wmMacroCrypto() {
       <button class="cg-stab" onclick="_cgShowTab('defi',this)">🏦 DeFi</button>
       <button class="cg-stab" onclick="_cgShowTab('btcnet',this)">⛓ BTC Network</button>
       <button class="cg-stab" onclick="_cgShowTab('trending',this)">🔥 Trending</button>
+      <button class="cg-stab" onclick="_cgShowTab('binance',this)">⚡ Live WS</button>
     </div>`;
 
     /* ── TAB 1: OVERVIEW ─────────────────────────────────────────── */
@@ -2658,6 +2797,39 @@ async function wmMacroCrypto() {
     }
     html += `</div>`; // trending tab
 
+  /* ── TAB 6: BINANCE LIVE WS ────────────────────────────────────── */
+  const _bnPairsData = [
+    { sym:'btcusdt',  label:'BTC/USDT', cgId:'bitcoin'     },
+    { sym:'ethusdt',  label:'ETH/USDT', cgId:'ethereum'    },
+    { sym:'bnbusdt',  label:'BNB/USDT', cgId:'binancecoin' },
+    { sym:'solusdt',  label:'SOL/USDT', cgId:'solana'      },
+    { sym:'xrpusdt',  label:'XRP/USDT', cgId:'ripple'      },
+    { sym:'adausdt',  label:'ADA/USDT', cgId:'cardano'     },
+    { sym:'dogeusdt', label:'DOGE/USDT',cgId:'dogecoin'    },
+    { sym:'avaxusdt', label:'AVAX/USDT',cgId:'avalanche-2' },
+    { sym:'dotusdt',  label:'DOT/USDT', cgId:'polkadot'    },
+    { sym:'linkusdt', label:'LINK/USDT',cgId:'chainlink'   },
+    { sym:'ltcusdt',  label:'LTC/USDT', cgId:'litecoin'    },
+    { sym:'uniusdt',  label:'UNI/USDT', cgId:'uniswap'     },
+  ];
+
+  html += `<div class="cg-tab" id="cg-tab-binance">
+    <div class="av-live-badge" style="margin:6px 8px 2px">⚡ Binance WebSocket · Tick-by-tick · No API key</div>
+    <div style="font-size:9px;color:var(--text-muted);padding:2px 10px 8px">Real-time prices via wss://stream.binance.com — reconnects automatically.</div>
+    <div class="cg-bn-grid">
+      ${_bnPairsData.map(p=>`
+      <div class="cg-bn-card" id="cg-bn-${p.sym}" data-prev="">
+        <span class="cg-bn-label">${p.label}</span>
+        <span class="cg-bn-price cg-live-price" data-id="${p.cgId}">—</span>
+        <span class="cg-bn-status" id="cg-bn-status-${p.sym}" style="color:#6e7681">○ connecting</span>
+      </div>`).join('')}
+    </div>
+    <div style="font-size:9px;color:var(--text-muted);padding:6px 10px;border-top:1px solid var(--border)">
+      Source: <a href="https://www.binance.com" target="_blank" rel="noopener" class="geo-wm-link">Binance ↗</a> ·
+      Spot market USDT pairs · Updates on every trade
+    </div>
+  </div>`;
+
     /* ── Footer & source credits ─────────────────────────────────── */
     html += `<div class="cg-footer">
       <a href="https://www.coingecko.com" target="_blank" rel="noopener" class="geo-wm-link">CoinGecko</a>
@@ -2673,6 +2845,13 @@ async function wmMacroCrypto() {
     /* Start CoinCap WebSocket for real-time top-10 prices */
     const wsIds = coins.slice(0,10).map(c=>c.id).filter(Boolean);
     if (wsIds.length) _ccWsConnect(wsIds);
+
+    /* Also start Binance WebSocket for tick-by-tick updates (no key) */
+    const bnPairs = coins.slice(0,7).map(c => {
+      const sym = (c.symbol||'').toLowerCase();
+      return sym && sym !== 'usdt' ? sym+'usdt' : null;
+    }).filter(Boolean);
+    _bnWsConnectAll(bnPairs.length ? bnPairs : undefined);
 
   } catch(e) {
     el.innerHTML = wmError('Crypto data unavailable: ' + e.message);
@@ -2821,3 +3000,18 @@ async function frankfurterHistory(base, target, days = 90) {
     }, 3 * 60 * 1000);  // 3 min for crypto + fast-moving data
   });
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   GLOBAL EXPORTS — allow external modules to call worldmonitor.js
+   functions by name (finterm-modules.js, script.js, etc.)
+   ══════════════════════════════════════════════════════════════════ */
+window.wmMacroCrypto      = wmMacroCrypto;        // Macro panel → Crypto tab
+window.wmLoadCryptoGlobal = wmMacroCrypto;         // Alias for finterm-modules.js compat
+window.wmFetch            = wmFetch;               // Shared fetch with CORS/timeout
+window.wmBootstrap        = wmBootstrap;           // Full WorldMonitor bootstrap
+window.wmSupplyInit       = wmSupplyInit;          // Supply chain panel init
+window.wmSupplyLoad       = wmSupplyLoad;          // Supply chain tab loader
+
+// CoinGecko panel helpers
+if (typeof _cgShowTab === 'function')   window.cgShowTab   = _cgShowTab;
+if (typeof _cgFilterCoins === 'function') window.cgFilterCoins = _cgFilterCoins;
