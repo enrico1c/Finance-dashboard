@@ -663,24 +663,56 @@ function niCard(id, {headline, source, ts, sentiment, category, summary, url, im
 /* Quick-search links to sources that don't need an API key */
 function niSourceLinks(sym) {
   const q = encodeURIComponent(sym);
+
+  // Detect if ticker maps to a commodity / resource sector for extra links
+  const isCommodity = /^(GC|SI|CL|NG|HG|PL|PA|ZC|ZS|ZW|KC|SB|CT|CC|LBS|UX|ALI|BTC)/i.test(sym)
+    || /(?:gold|silver|copper|oil|gas|coal|wheat|corn|soy|coffee|sugar|lithium|cobalt|nickel|aluminum|zinc|iron|rare.?earth|mineral|commodity|resource)/i.test(sym);
+
   const sources = [
-    { name:"Reuters",        url:`https://www.reuters.com/site-search/?query=${q}` },
-    { name:"Bloomberg",      url:`https://www.bloomberg.com/search?query=${q}` },
-    { name:"FT",             url:`https://www.ft.com/search?q=${q}` },
-    { name:"WSJ",            url:`https://www.wsj.com/search?query=${q}` },
-    { name:"CNBC",           url:`https://www.cnbc.com/search/?query=${q}` },
-    { name:"SeekingAlpha",   url:`https://seekingalpha.com/search#q=${q}&tab=news` },
-    { name:"MarketWatch",    url:`https://www.marketwatch.com/search?q=${q}&ts=0&tab=All%20News` },
-    { name:"Yahoo Finance",  url:`https://finance.yahoo.com/quote/${q}/news/` },
-    { name:"Google News",    url:`https://news.google.com/search?q=${q}` },
-    { name:"The Economist",  url:`https://www.economist.com/search?q=${q}` },
+    { name:"Reuters",        url:`https://www.reuters.com/site-search/?query=${q}`,                 cat:'general' },
+    { name:"Bloomberg",      url:`https://www.bloomberg.com/search?query=${q}`,                     cat:'general' },
+    { name:"FT",             url:`https://www.ft.com/search?q=${q}`,                               cat:'general' },
+    { name:"WSJ",            url:`https://www.wsj.com/search?query=${q}`,                           cat:'general' },
+    { name:"CNBC",           url:`https://www.cnbc.com/search/?query=${q}`,                         cat:'general' },
+    { name:"SeekingAlpha",   url:`https://seekingalpha.com/search#q=${q}&tab=news`,                 cat:'general' },
+    { name:"MarketWatch",    url:`https://www.marketwatch.com/search?q=${q}&ts=0&tab=All%20News`,   cat:'general' },
+    { name:"Yahoo Finance",  url:`https://finance.yahoo.com/quote/${q}/news/`,                      cat:'general' },
+    { name:"Google News",    url:`https://news.google.com/search?q=${q}`,                           cat:'general' },
+    { name:"The Economist",  url:`https://www.economist.com/search?q=${q}`,                         cat:'general' },
+    // Commodity & resource-specific sources (always shown for relevant tickers, toggleable for others)
+    { name:"Reuters Commodities", url:`https://www.reuters.com/markets/commodities/?q=${q}`,           cat:'commodity' },
+    { name:"Bloomberg Commodities",url:`https://www.bloomberg.com/markets/commodities`,                cat:'commodity' },
+    { name:"Mining.com",     url:`https://www.mining.com/?s=${q}`,                                  cat:'commodity' },
+    { name:"Fastmarkets",    url:`https://www.fastmarkets.com/search/?q=${q}`,                      cat:'commodity' },
+    { name:"Argus Media",    url:`https://www.argusmedia.com/en/search?q=${q}`,                     cat:'commodity' },
+    { name:"Platts (OPIS)",  url:`https://www.spglobal.com/commodityinsights/en/market-insights/latest-news/commodities/${q}`, cat:'commodity' },
+    { name:"Metal Bulletin", url:`https://www.metalbulletin.com/Article/Search?q=${q}`,             cat:'commodity' },
+    { name:"World Bank Blogs",url:`https://blogs.worldbank.org/search?search_api_views_fulltext=${q}&filter_topic=All`, cat:'commodity' },
+    { name:"USGS Minerals",  url:`https://pubs.usgs.gov/search/?q=${q}`,                            cat:'commodity' },
+    { name:"EIA News",       url:`https://www.eia.gov/pressroom/releases/`,                         cat:'energy' },
+    { name:"OPEC Newsroom",  url:`https://www.opec.org/opec_web/en/press_room/1893.htm`,            cat:'energy' },
+    { name:"IEA News",       url:`https://www.iea.org/news`,                                        cat:'energy' },
+    { name:"Rare Earth Exchanges",url:`https://rareearthexchanges.com`,                             cat:'commodity' },
+    { name:"Supply Chain Dive",url:`https://www.supplychaindive.com/search/?q=${q}`,                cat:'supply' },
+    { name:"GDELT Supply",   url:`https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q+' commodity supply')}&mode=artlist&maxrecords=10&format=json&timespan=3d`, cat:'gdelt' },
   ];
-  return `<div class="ni-sources-wrap">
-    <div class="ni-sources-label">// Search without API key</div>
+
+  // Show general + commodity if commodity detected, else just general
+  const shown  = isCommodity ? sources : sources.filter(s => s.cat === 'general');
+  const hidden = isCommodity ? [] : sources.filter(s => s.cat !== 'general');
+
+  const toggleId = \`ni-more-${sym.replace(/[^a-z0-9]/gi,'')}\`;
+
+  return \`<div class="ni-sources-wrap">
+    <div class="ni-sources-label">// Search without API key${isCommodity ? ' · Commodity mode' : ''}</div>
     <div class="ni-sources-list">
-      ${sources.map(s => `<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn">${escapeHtml(s.name)}</a>`).join("")}
+      \${shown.filter(s=>s.cat!=='gdelt').map(s => \`<a href="\${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn\${s.cat==='commodity'?' ni-src-comm':s.cat==='energy'?' ni-src-energy':s.cat==='supply'?' ni-src-supply':''}">\${escapeHtml(s.name)}</a>\`).join("")}
     </div>
-  </div>`;
+    \${!isCommodity ? \`<button onclick="document.getElementById('\${toggleId}').style.display=document.getElementById('\${toggleId}').style.display==='none'?'flex':'none'" class="ni-comm-toggle" style="font-size:9px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0">▶ Show commodity &amp; resource news sources</button>
+    <div id="\${toggleId}" style="display:none;flex-wrap:wrap;gap:3px;margin-top:4px">
+      \${sources.filter(s=>s.cat!=='general'&&s.cat!=='gdelt').map(s=>\`<a href="\${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn ni-src-comm">\${escapeHtml(s.name)}</a>\`).join("")}
+    </div>\` : ''}
+  </div>\`;
 }
 
 /* Central render function — ALL API providers call this */
