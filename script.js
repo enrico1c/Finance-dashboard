@@ -560,7 +560,8 @@ function renderFundamentals(ticker) {
       const rf       = _ty['10Y'] ?? 4.5;  // Live US 10Y
       const erp      = 5.5;  // Damodaran implied ERP
       const ke       = (rf + beta * erp).toFixed(2);
-      const kd       = 5.5;
+      // Cost of debt: live 2Y Treasury + credit spread (grade-dependent)
+      const kd       = _ty['2Y'] ? parseFloat((_ty['2Y'] + (beta > 1.5 ? 2.5 : beta > 1 ? 2.0 : 1.5)).toFixed(2)) : 5.5;
       const tax      = 21;
       const eqW      = Math.max(20, Math.round(100 / (1 + debtEq)));
       const debtW    = 100 - eqW;
@@ -1643,7 +1644,7 @@ function changeTicker(){
   // Always refresh Yahoo quote on ticker change if key is set
   if(typeof yfLoadAll === "function") yfLoadAll(sym);
   loadComparables(sym);
-  renderScorecard(ticker);
+  renderScorecard(sym);
   // Enrich watchlist rows with Yahoo live prices
   if(typeof yfEnrichWatchlist === "function") setTimeout(() => yfEnrichWatchlist(), 1500);
   // Technical panel — load if visible, else mark stale
