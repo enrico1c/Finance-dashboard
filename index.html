@@ -781,7 +781,9 @@
         <button class="tab-btn"        data-tab="minerals" onclick="switchTab('supply','minerals')">MINERALS</button>
         <button class="tab-btn"        data-tab="flights" onclick="switchTab('supply','flights')">FLIGHTS</button>
         <button class="tab-btn"        data-tab="energy"  onclick="switchTab('supply','energy')">ENERGY</button>
-        <button class="tab-btn"        data-tab="weather" onclick="switchTab('supply','weather');if(typeof meteoLoadSupplyWeather==='function')meteoLoadSupplyWeather()">WEATHER</button>
+        <button class="tab-btn"        data-tab="weather"  onclick="switchTab('supply','weather');if(typeof meteoLoadSupplyWeather==='function')meteoLoadSupplyWeather()">WEATHER</button>
+        <button class="tab-btn"        data-tab="agri"    onclick="switchTab('supply','agri');if(typeof commRenderAgri==='function'&&!document.getElementById('supply-agri')?.dataset?.loaded){document.getElementById('supply-agri').dataset.loaded='1';commRenderAgri()}">🌾 AGRI</button>
+        <button class="tab-btn"        data-tab="cot"     onclick="switchTab('supply','cot');if(typeof commRenderCOT==='function'&&!document.getElementById('supply-cot')?.dataset?.loaded){document.getElementById('supply-cot').dataset.loaded='1';commRenderCOT()}">📊 COT</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="choke"    id="supply-choke"></div>
       <div class="tab-pane        panel-content" data-tab="ship"     id="supply-ship"></div>
@@ -789,6 +791,8 @@
       <div class="tab-pane        panel-content" data-tab="flights"  id="supply-flights"></div>
       <div class="tab-pane        panel-content" data-tab="energy"   id="supply-energy"></div>
       <div class="tab-pane        panel-content" data-tab="weather"  id="supply-weather"></div>
+      <div class="tab-pane        panel-content" data-tab="agri"     id="supply-agri"></div>
+      <div class="tab-pane        panel-content" data-tab="cot"      id="supply-cot"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -845,7 +849,7 @@
       </div>
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="signals" onclick="switchTab('macro','signals')">SIGNALS</button>
-        <button class="tab-btn"        data-tab="comm"    onclick="switchTab('macro','comm')">COMMODITIES</button>
+        <button class="tab-btn"        data-tab="comm"    onclick="switchTab('macro','comm');if(typeof commRenderIMFComm==='function'&&!document.getElementById('macro-comm')?.dataset?.commLoaded){document.getElementById('macro-comm').dataset.commLoaded='1';commRenderIMFComm()}">COMMODITIES</button>
         <button class="tab-btn"        data-tab="risk"    onclick="switchTab('macro','risk')">RISK</button>
         <button class="tab-btn"        data-tab="pred"    onclick="switchTab('macro','pred')">PREDICTIONS</button>
         <button class="tab-btn"        data-tab="yield"   onclick="switchTab('macro','yield');if(typeof fredLazyYield==='function')fredLazyYield()">YIELD</button>
@@ -1080,6 +1084,7 @@
 <script src="geointel.js"></script>
 <script src="macroglobal.js"></script>
   <script src="finterm-modules.js"></script>
+  <script src="commodities.js"></script>
 <script>
 /* Intel Feed — OREF / TELEGRAM sub-panel switcher */
 function wmIntelShowOref() {
