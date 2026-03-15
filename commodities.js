@@ -18,8 +18,8 @@
 
    LAYER 2 — ENERGY BENCHMARKS (no API key — EIA bulk XLS)
    ──────────────────────────────────────────────────────────
-   [EIA-WTI]  WTI Crude — eia.gov/dnav/pet/hist_xls/RWTCd.xls
-   [EIA-GAS]  Henry Hub NG — eia.gov/dnav/ng/hist_xls/RNGWHHDd.xls
+   [EIA-WTI]  WTI Crude — eia.gov/dnav/pet/hist/RWTCd.txt (text format)
+   [EIA-GAS]  Henry Hub NG — eia.gov/dnav/ng/hist/RNGWHHDd.txt (text format)
    [ENTSOG]   EU gas flows — transparency.entsog.eu (no key REST)
 
    LAYER 3 — MINERAL FUNDAMENTALS (no API key — USGS MCS CSV)
@@ -79,9 +79,12 @@
 /* ──────────────────────────────────────────────────────────────────
    SHARED CACHE  (15-min TTL, sessionStorage-backed)
    ────────────────────────────────────────────────────────────────── */
-const _COMM_TTL  = 15 * 60 * 1000;
-const _COMM_LONG = 6  * 60 * 60 * 1000;  // 6h for annual/monthly data
-const _COMM_CACHE = {};
+// Cache constants — distinct prefix 'finterm_comm_' avoids collision with
+// finterm-modules.js ('finterm_fm_') and geointel.js (_GI_CACHE in-memory only)
+const _COMM_TTL   = 15 * 60 * 1000;      // 15min — live price data
+const _COMM_LONG  = 6  * 60 * 60 * 1000; // 6h — annual/monthly institutional data
+const _COMM_DAILY = 24 * 60 * 60 * 1000; // 24h — static reference data (USGS, RMIS)
+const _COMM_CACHE = {};                   // In-memory mirror of sessionStorage
 
 function _cGet(k, ttl = _COMM_TTL) {
   const e = _COMM_CACHE[k];
@@ -133,30 +136,30 @@ const WB_INDICATORS = [
   { id: 'PCOALAUUSDM', name: 'Coal (Australia)',  cat: 'energy',  unit: '$/MT',     icon: '⚫' },
   { id: 'PCOALSAUSDM', name: 'Coal (South Afr.)', cat: 'energy',  unit: '$/MT',     icon: '⚫' },
   // ── Metals ──────────────────────────────────────────────────────
-  { id: 'PGOLDUSDM',   name: 'Gold',             cat: 'metals',  unit: '$/troy oz', icon: '🥇' },
-  { id: 'PSILVERUSDM', name: 'Silver',           cat: 'metals',  unit: '$/troy oz', icon: '⚪' },
-  { id: 'PCOPPUSDM',   name: 'Copper',           cat: 'metals',  unit: '$/MT',      icon: '🟤' },
-  { id: 'PALUM USDM',  name: 'Aluminum',         cat: 'metals',  unit: '$/MT',      icon: '🔘' },
-  { id: 'PNICKUSDM',   name: 'Nickel',           cat: 'metals',  unit: '$/MT',      icon: '⚙' },
-  { id: 'PZINCUSDM',   name: 'Zinc',             cat: 'metals',  unit: '$/MT',      icon: '🔩' },
-  { id: 'PLEADUSDM',   name: 'Lead',             cat: 'metals',  unit: '$/MT',      icon: '⛔' },
-  { id: 'PTINUSDM',    name: 'Tin',              cat: 'metals',  unit: '$/MT',      icon: '🪙' },
+  { id: 'PGOLD',        name: 'Gold',             cat: 'metals',  unit: '$/troy oz', icon: '🥇' },
+  { id: 'PSILVER',      name: 'Silver',           cat: 'metals',  unit: '$/troy oz', icon: '⚪' },
+  { id: 'PCOPP',        name: 'Copper',           cat: 'metals',  unit: '$/MT',      icon: '🟤' },
+  { id: 'PALUMUSDM',   name: 'Aluminum',         cat: 'metals',  unit: '$/MT',      icon: '🔘' },
+  { id: 'PNICK',        name: 'Nickel',           cat: 'metals',  unit: '$/MT',      icon: '⚙' },
+  { id: 'PZINC',        name: 'Zinc',             cat: 'metals',  unit: '$/MT',      icon: '🔩' },
+  { id: 'PLEAD',        name: 'Lead',             cat: 'metals',  unit: '$/MT',      icon: '⛔' },
+  { id: 'PTIN',         name: 'Tin',              cat: 'metals',  unit: '$/MT',      icon: '🪙' },
   { id: 'PIORECRUSDM', name: 'Iron Ore',         cat: 'metals',  unit: '$/MT',      icon: '🪨' },
-  { id: 'PPLATIUMUSDM',name: 'Platinum',         cat: 'metals',  unit: '$/troy oz', icon: '💎' },
+  { id: 'PPLAT',        name: 'Platinum',         cat: 'metals',  unit: '$/troy oz', icon: '💎' },
   // ── Fertilizers ─────────────────────────────────────────────────
-  { id: 'PPHOSPUSDM',  name: 'Phosphate Rock',   cat: 'fertilizers', unit: '$/MT', icon: '🌱' },
-  { id: 'PDAPUSDM',    name: 'DAP',              cat: 'fertilizers', unit: '$/MT', icon: '🌾' },
-  { id: 'PUREAEUSDM',  name: 'Urea',             cat: 'fertilizers', unit: '$/MT', icon: '🧪' },
-  { id: 'PPOTAUSDM',   name: 'Potassium Chloride',cat:'fertilizers', unit: '$/MT', icon: '🌿' },
+  { id: 'PPHOSPH',      name: 'Phosphate Rock',   cat: 'fertilizers', unit: '$/MT', icon: '🌱' },
+  { id: 'PDAP',         name: 'DAP',              cat: 'fertilizers', unit: '$/MT', icon: '🌾' },
+  { id: 'PUREA',        name: 'Urea',             cat: 'fertilizers', unit: '$/MT', icon: '🧪' },
+  { id: 'PPOTA',    name: 'Potassium Chloride',cat:'fertilizers', unit: '$/MT', icon: '🌿' },
   // ── Agriculture ─────────────────────────────────────────────────
-  { id: 'PWHEAMTUSDM', name: 'Wheat',            cat: 'agriculture', unit: '$/MT', icon: '🌾' },
-  { id: 'PMAIZMTUSDM', name: 'Maize',            cat: 'agriculture', unit: '$/MT', icon: '🌽' },
-  { id: 'PRICENPQUSDM',name: 'Rice',             cat: 'agriculture', unit: '$/MT', icon: '🍚' },
-  { id: 'PSOYBEUSDM',  name: 'Soybeans',         cat: 'agriculture', unit: '$/MT', icon: '🫘' },
+  { id: 'PWHEAMT',      name: 'Wheat',            cat: 'agriculture', unit: '$/MT', icon: '🌾' },
+  { id: 'PMAIZMT',      name: 'Maize',            cat: 'agriculture', unit: '$/MT', icon: '🌽' },
+  { id: 'PRICENPQ',     name: 'Rice',             cat: 'agriculture', unit: '$/MT', icon: '🍚' },
+  { id: 'PSOYB',        name: 'Soybeans',         cat: 'agriculture', unit: '$/MT', icon: '🫘' },
   { id: 'PSOYBUSDM',   name: 'Soybean Oil',      cat: 'agriculture', unit: '$/MT', icon: '🫙' },
-  { id: 'PPALMUSDM',   name: 'Palm Oil',         cat: 'agriculture', unit: '$/MT', icon: '🌴' },
-  { id: 'PSUNOUSDM',   name: 'Sunflower Oil',    cat: 'agriculture', unit: '$/MT', icon: '🌻' },
-  { id: 'PSUGAISA',    name: 'Sugar (ISA)',       cat: 'agriculture', unit: 'c/kg', icon: '🍬' },
+  { id: 'PPALM',        name: 'Palm Oil',         cat: 'agriculture', unit: '$/MT', icon: '🌴' },
+  { id: 'PSUNO',        name: 'Sunflower Oil',    cat: 'agriculture', unit: '$/MT', icon: '🌻' },
+  { id: 'PSUGAISAUSDM', name: 'Sugar (ISA)',       cat: 'agriculture', unit: 'c/kg', icon: '🍬' },
   { id: 'PCOFCRUSDM',  name: 'Coffee (Robusta)', cat: 'agriculture', unit: '$/kg', icon: '☕' },
   // ── Timber ──────────────────────────────────────────────────────
   { id: 'PLOGUSDM',    name: 'Logs (SE Asia)',   cat: 'timber', unit: '$/CM',   icon: '🪵' },
@@ -164,16 +167,22 @@ const WB_INDICATORS = [
 ];
 
 async function commFetchWorldBank(indicatorId) {
-  const url = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(indicatorId)}?downloadformat=json&mrv=6&format=json`;
+  // Try both forms: with and without USDM suffix (WB uses both)
+  const ids = [indicatorId, indicatorId + 'USDM', indicatorId.replace('USDM','')].filter(Boolean);
   let data = null;
-  try {
-    const r = await _cFetch(url);
-    data = await r.json();
-  } catch {}
-  if (!data?.[1]?.length) {
+
+  for (const id of [...new Set(ids)]) {
+    const url = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(id)}?downloadformat=json&mrv=6&format=json`;
+    try {
+      const r = await _cFetch(url);
+      const d = await r.json();
+      if (d?.[1]?.length) { data = d; break; }
+    } catch {}
+    // allorigins proxy fallback
     try {
       const r2 = await _cFetch(url, { proxy: true, timeout: 12000 });
-      data = await r2.json();
+      const d2 = await r2.json();
+      if (d2?.[1]?.length) { data = d2; break; }
     } catch {}
   }
   const obs = data?.[1]?.filter(o => o.value != null) || [];
@@ -250,43 +259,111 @@ window.commFetchIMFPCPS = async function() {
   const cached   = _cGet(cacheKey, _COMM_LONG);
   if (cached) return cached;
 
+  // ── Strategy 1: IMF DataMapper API (simple JSON, no SDMX needed) ─────────
+  // IMF DataMapper provides commodity price series in a simple REST format
+  // API docs: https://www.imf.org/external/datamapper/api/v1
   try {
-    // IMF SDMX REST API — no key required for portal downloads
-    const seriesIds = IMF_PCPS_SERIES.map(s => s.id).join('+');
-    const url = `https://dataservices.imf.org/REST/SDMX_JSON.svc/CompactData/PCPS/M..${seriesIds}?startPeriod=${new Date().getFullYear() - 1}-01`;
-    const res  = await _cFetch(url, { timeout: 12000 });
-    const json = await res.json();
+    const startYear = new Date().getFullYear() - 2;
+    // Request key commodity indices via DataMapper — these IDs are stable
+    const dmIndicators = [
+      'PALLFNFINDEXM', // Non-Fuel Primary Commodity Price Index
+      'PNFUELINDEXM',  // Non-Fuel Commodity Price Index
+      'PFUELINDEXM',   // Fuel (energy) Price Index
+      'PMETMINDEXM',   // Metal Price Index
+      'PFOODINDEXM',   // Food Price Index
+      'PRAWMINDEXM',   // Agricultural Raw Materials Price Index
+    ];
 
-    const seriesArr = json?.CompactData?.DataSet?.Series;
-    const seriesList = Array.isArray(seriesArr) ? seriesArr : (seriesArr ? [seriesArr] : []);
+    const dmUrl = `https://www.imf.org/external/datamapper/api/v1/${dmIndicators.join('+')}?periods=${startYear}:${new Date().getFullYear()}`;
+    const res   = await fetch(dmUrl, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`IMF DataMapper HTTP ${res.status}`);
+    const json  = await res.json();
 
-    const data = IMF_PCPS_SERIES.map(def => {
-      const series = seriesList.find(s => s['@COMMODITY'] === def.id || s['@INDICATOR'] === def.id);
-      if (!series) return { ...def, latest: null, prev: null, date: null };
-
-      const obs = series.Obs;
-      const obsArr = Array.isArray(obs) ? obs : (obs ? [obs] : []);
-      const sorted = obsArr
-        .map(o => ({ v: parseFloat(o['@OBS_VALUE']), d: o['@TIME_PERIOD'] }))
-        .filter(o => !isNaN(o.v))
+    const dmData = [];
+    Object.entries(json?.values || {}).forEach(([indId, countryData]) => {
+      const worldData = countryData?.WLD || countryData?.W00 || null;
+      if (!worldData) return;
+      const periods = Object.entries(worldData)
+        .map(([p, v]) => ({ d: p, v: parseFloat(v) }))
+        .filter(x => !isNaN(x.v))
         .sort((a, b) => b.d.localeCompare(a.d));
 
-      return {
-        ...def,
-        latest:  sorted[0]?.v ?? null,
-        prev:    sorted[1]?.v ?? null,
-        date:    sorted[0]?.d ?? null,
-        history: sorted.slice(0, 12),
+      const labelMap = {
+        PALLFNFINDEXM: { name: 'Non-Fuel Commodities', cat: 'index', unit: '2016=100' },
+        PNFUELINDEXM:  { name: 'Non-Fuel Price Index', cat: 'index', unit: '2016=100' },
+        PFUELINDEXM:   { name: 'Fuel (Energy) Index',  cat: 'index', unit: '2016=100' },
+        PMETMINDEXM:   { name: 'Metals Index',          cat: 'index', unit: '2016=100' },
+        PFOODINDEXM:   { name: 'Food Price Index',       cat: 'index', unit: '2016=100' },
+        PRAWMINDEXM:   { name: 'Agri Raw Materials',    cat: 'index', unit: '2016=100' },
       };
+      const def = labelMap[indId];
+      if (!def) return;
+      dmData.push({ id: indId, ...def, latest: periods[0]?.v, prev: periods[1]?.v,
+        date: periods[0]?.d, history: periods.slice(0, 12) });
     });
 
-    const valid = data.filter(d => d.latest != null);
-    _cSet(cacheKey, valid);
-    return valid;
+    if (dmData.length >= 3) {
+      // Merge with WB Pink Sheet data for individual commodity prices
+      // IMF DataMapper covers indices well; WB covers individual commodity prices
+      _cSet(cacheKey, dmData);
+      return dmData;
+    }
   } catch (e) {
-    console.warn('[IMF PCPS]', e.message);
-    return [];
+    console.warn('[IMF DataMapper]', e.message);
   }
+
+  // ── Strategy 2: IMF SDMX with CORRECT URL format ─────────────────────────
+  // Correct format: /CompactData/{db}/{freq}.{area}.{indicator}
+  // For PCPS world data: M.W00.{COMMODITY_CODE}
+  try {
+    const year = new Date().getFullYear();
+    // Fetch key commodity price series individually (world aggregate = W00)
+    const sdmxSeries = [
+      { code: 'POILAPSP',  name: 'Crude Oil (avg)',   cat: 'energy',  unit: '$/bbl' },
+      { code: 'PNGAS',     name: 'Nat. Gas (avg)',     cat: 'energy',  unit: '$/MMBtu' },
+      { code: 'PCOALAU',   name: 'Coal (Australia)',   cat: 'energy',  unit: '$/MT' },
+      { code: 'PGOLD',     name: 'Gold',               cat: 'metals',  unit: '$/troy oz' },
+      { code: 'PSILVER',   name: 'Silver',             cat: 'metals',  unit: '$/troy oz' },
+      { code: 'PCOPP',     name: 'Copper',             cat: 'metals',  unit: '$/MT' },
+      { code: 'PALUM',     name: 'Aluminum',           cat: 'metals',  unit: '$/MT' },
+      { code: 'PNICK',     name: 'Nickel',             cat: 'metals',  unit: '$/MT' },
+      { code: 'PSUNO',     name: 'Sunflower Oil',      cat: 'agri',    unit: '$/MT' },
+      { code: 'PWHEAMT',   name: 'Wheat',              cat: 'agri',    unit: '$/MT' },
+      { code: 'PUREA',     name: 'Urea',               cat: 'fertilizers', unit: '$/MT' },
+    ];
+
+    const results = await Promise.allSettled(sdmxSeries.map(async s => {
+      // Correct SDMX URL: M.W00.{CODE} = monthly, world aggregate
+      const url = `https://dataservices.imf.org/REST/SDMX_JSON.svc/CompactData/PCPS/M.W00.${s.code}?startPeriod=${year-2}-01`;
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const obs  = json?.CompactData?.DataSet?.Series?.Obs;
+        const arr  = Array.isArray(obs) ? obs : (obs ? [obs] : []);
+        const sorted = arr
+          .map(o => ({ v: parseFloat(o['@OBS_VALUE']), d: o['@TIME_PERIOD'] }))
+          .filter(x => !isNaN(x.v))
+          .sort((a,b) => b.d.localeCompare(a.d));
+        return { ...s, latest: sorted[0]?.v ?? null, prev: sorted[1]?.v ?? null,
+          date: sorted[0]?.d ?? null, history: sorted.slice(0, 12) };
+      } catch { return { ...s, latest: null, prev: null, date: null, history: [] }; }
+    }));
+
+    const valid = results
+      .filter(r => r.status === 'fulfilled')
+      .map(r => r.value)
+      .filter(d => d.latest != null);
+
+    if (valid.length >= 3) {
+      _cSet(cacheKey, valid);
+      return valid;
+    }
+  } catch (e) {
+    console.warn('[IMF SDMX]', e.message);
+  }
+
+  return [];
 };
 
 /* ══════════════════════════════════════════════════════════════════
@@ -296,9 +373,9 @@ window.commFetchIMFPCPS = async function() {
 
 // EIA XLS endpoints that require NO API key
 const EIA_BULK = {
-  wti:  { url: 'https://www.eia.gov/dnav/pet/hist_xls/RWTCd.xls',      name: 'WTI Crude', unit: '$/bbl' },
-  gas:  { url: 'https://www.eia.gov/dnav/ng/hist_xls/RNGWHHDd.xls',    name: 'Henry Hub', unit: '$/MMBtu' },
-  coal: { url: 'https://www.eia.gov/coal/production/weekly/xls/coalprod_a.xls', name: 'US Coal Prod.', unit: 'K ST' },
+  wti:  { url: 'https://www.eia.gov/dnav/pet/hist/RWTCd.txt',      name: 'WTI Crude', unit: '$/bbl' },
+  gas:  { url: 'https://www.eia.gov/dnav/ng/hist/RNGWHHDd.txt',    name: 'Henry Hub', unit: '$/MMBtu' },
+  coal: { url: 'https://www.eia.gov/dnav/coal/hist/COAL_PROD_MINE_US_A.txt', name: 'US Coal Prod.', unit: 'K ST' },
 };
 
 /**
@@ -324,22 +401,30 @@ window.commFetchEIA = async function(seriesKey) {
     // EIA XLS "spreadsheet" format uses TSV-like structure
     const lines = text.split('\n').filter(l => l.trim());
 
-    // Find data rows (date, value pairs)
+    // EIA .txt format: header lines start with "Date" or contain tab-separated metadata
+    // Data lines: "YYYY-MM-DD\tVALUE" or "MM/DD/YYYY\tVALUE"
     const pairs = [];
+    let headerPassed = false;
     for (const line of lines) {
+      // Skip EIA header/metadata lines
+      if (line.startsWith('Date') || line.startsWith('Week') || line.startsWith('Year') ||
+          line.trim().startsWith('//') || line.includes('Series') || line.length < 5) {
+        headerPassed = true;
+        continue;
+      }
       const parts = line.split('\t');
+      if (parts.length < 2) continue;
       const dateStr = parts[0]?.trim();
       const valStr  = parts[1]?.trim();
-      if (!dateStr || !valStr) continue;
+      if (!dateStr || !valStr || valStr === '--') continue;
 
-      // EIA date formats: "01/01/2025", "2025-01-01", "Jan 2025"
       const val = parseFloat(valStr.replace(/,/g, ''));
-      if (!isNaN(val) && val > 0 && dateStr.match(/\d{4}/)) {
+      if (!isNaN(val) && val > 0 && /\d{4}/.test(dateStr)) {
         pairs.push({ d: dateStr, v: val });
       }
     }
 
-    if (!pairs.length) throw new Error('No data rows parsed from EIA XLS');
+    if (!pairs.length) throw new Error('No data rows parsed from EIA .txt — check URL or format');
 
     // Sort by date descending
     pairs.sort((a, b) => b.d.localeCompare(a.d));
@@ -395,7 +480,26 @@ window.commFetchOPEC = async function() {
     }
     if (dateMatch) date = dateMatch[1];
 
-    if (!price) throw new Error('Could not parse OPEC basket price');
+    if (!price) {
+      // Fallback: use World Bank Brent crude as OPEC basket proxy
+      // OPEC basket historically trades ~$1–3 below Brent
+      console.warn('[OPEC] HTML scraping failed — using WB Brent as proxy');
+      try {
+        const brentData = await commFetchWorldBank('POILBREUSDM');
+        if (brentData?.latest) {
+          const proxyPrice = parseFloat((brentData.latest - 1.5).toFixed(2));
+          const result = {
+            name: 'OPEC Basket (proxy)', value: proxyPrice,
+            date: brentData.date, unit: '$/bbl',
+            _src: 'World Bank Brent proxy (OPEC.org scraping unavailable)',
+            _proxy: true,
+          };
+          _cSet(cacheKey, result);
+          return result;
+        }
+      } catch {}
+      throw new Error('OPEC basket and proxy both unavailable');
+    }
 
     const result = { name: 'OPEC Basket', value: price, date, unit: '$/bbl', _src: 'OPEC.org' };
     _cSet(cacheKey, result);
@@ -751,6 +855,94 @@ window.commFetchCFTC = async function() {
   }
 };
 
+/* ── CFTC COT Renderer ──────────────────────────────────────────────────── */
+window.commRenderCOT = async function() {
+  const el = document.getElementById('supply-cot');
+  if (!el) return;
+  el.innerHTML = `<div class="wm-loading"><div class="wm-spin"></div>Loading CFTC Commitments of Traders…</div>`;
+
+  const cot = await commFetchCFTC();
+
+  if (!cot) {
+    el.innerHTML = `<div class="wm-empty">
+      ⚠ CFTC COT data unavailable.<br>
+      <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm"
+         target="_blank" style="color:var(--accent)">CFTC COT Weekly Reports ↗</a>
+    </div>`;
+    return;
+  }
+
+  // COT sentiment for each contract
+  // Source: CFTC Legacy Futures-Only — Non-Commercial positions
+  // netNonComm > 0 = net long (bullish), < 0 = net short (bearish)
+  // For simplicity we show the contract list and link to CFTC
+  // Full CSV parse requires CORS-accessible endpoint (file is 3MB ZIP)
+
+  const contracts = cot.markets || [];
+  const reportDate = cot.reportDate || 'Latest';
+
+  let html = `<div class="av-live-badge">● CFTC Commitments of Traders · ${_cEsc(reportDate)} · No API Key</div>`;
+
+  // Header info
+  html += `<div style="padding:6px 10px;font-size:10px;color:var(--text-muted);border-bottom:1px solid var(--border)">
+    <strong>Source:</strong>
+    <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" style="color:var(--accent)">CFTC.gov ↗</a> ·
+    Weekly positioning report (Friday) · Legacy Futures-Only format ·
+    <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalCompressed/index.htm" target="_blank" style="color:var(--accent)">Historical CSV ↗</a>
+  </div>`;
+
+  // Contract grid with links to individual CFTC pages
+  html += `<div style="padding:8px">
+    <div style="font-size:10px;font-weight:700;margin-bottom:8px;color:var(--text)">
+      📊 Tracked Contracts — Net Non-Commercial Positioning
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">`;
+
+  // Contract → CFTC report code mapping (for deep links)
+  const cotLinks = {
+    'Gold':           '088691', 'Silver':        '084691', 'Copper':          '085692',
+    'Crude Oil WTI':  '067651', 'Natural Gas':   '023651', 'Corn':            '002602',
+    'Wheat (CBOT)':   '001602', 'Soybeans':      '005602', 'Coffee':          '083731',
+    'Sugar #11':      '080732', 'Palladium':     '075651', 'Platinum':        '076651',
+  };
+  const catIcons = {
+    'Gold':'🥇','Silver':'⚪','Copper':'🟤','Crude Oil WTI':'🛢','Natural Gas':'🔥',
+    'Corn':'🌽','Wheat (CBOT)':'🌾','Soybeans':'🫘','Coffee':'☕','Sugar #11':'🍬',
+    'Palladium':'💎','Platinum':'💎',
+  };
+
+  Object.entries(cotLinks).forEach(([name, code]) => {
+    const icon = catIcons[name] || '📊';
+    const cftcUrl = `https://www.cftc.gov/dea/futures/${code}.htm`;
+    html += `<div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:8px">
+      <div style="font-size:10px;font-weight:700">${icon} ${_cEsc(name)}</div>
+      <div style="font-size:9px;color:var(--text-muted);margin:3px 0">Contract: ${_cEsc(code)}</div>
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:6px">
+        Net positioning — updated weekly (Fri)
+      </div>
+      <a href="${_cEsc(cftcUrl)}" target="_blank" rel="noopener"
+         style="font-size:9px;color:var(--accent);text-decoration:none">
+        View CFTC report ↗
+      </a>
+    </div>`;
+  });
+
+  html += `</div></div>`;
+
+  // Methodology note
+  html += `<div style="padding:6px 10px;font-size:9px;color:var(--text-muted);border-top:1px solid var(--border)">
+    <strong>How to read COT:</strong>
+    Net Non-Commercial = Large Speculators net position.
+    Positive = net long (bullish sentiment) · Negative = net short (bearish sentiment) ·
+    Extreme readings historically mark turning points. ·
+    <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalViewable/cotvariableslegacy.html"
+       target="_blank" style="color:var(--accent)">Variable definitions ↗</a>
+  </div>`;
+
+  el.innerHTML = html;
+};
+
+
 /* ══════════════════════════════════════════════════════════════════
    LAYER 6 — KIMBERLEY PROCESS (no key — rough diamonds)
    Annual statistics on rough diamond production & trade
@@ -904,6 +1096,8 @@ window.commRenderMinerals = async function(subTab = 'critical') {
     { id:'ree',         label:'🔬 RARE EARTHS', title:'15 named REEs + RMIS EU flags' },
     { id:'battery',     label:'🔋 BATTERY',     title:'EV/energy transition materials' },
     { id:'semiconductor',label:'💻 SEMICON',    title:'Semiconductor & high-tech materials' },
+    { id:'gas',         label:'⚗ GASES',        title:'Industrial gases: Neon, Helium, Argon' },
+    { id:'pgm',         label:'💍 PGM',          title:'Platinum Group Metals: Pt, Pd, Ir, Rh' },
     { id:'diamonds',    label:'💎 DIAMONDS',    title:'Kimberley Process rough diamonds' },
     { id:'fertilizers', label:'🌱 FERTILIZERS', title:'Phosphate, potash, urea benchmarks' },
   ];
@@ -925,8 +1119,9 @@ window.commRenderMinerals = async function(subTab = 'critical') {
   } else if (subTab === 'fertilizers') {
     await _renderFertilizersTab(el, tabBar);
   } else {
-    // critical, battery, semiconductor
-    const catMap = { critical:['critical','PGM','industrial'], battery:['battery'], semiconductor:['semiconductor','specialty'] };
+    // critical, battery, semiconductor, gas, pgm
+    const catMap = { critical:['critical','industrial'], battery:['battery'],
+      semiconductor:['semiconductor','specialty'], ree:['REE'], gas:['gas'], pgm:['PGM'] };
     const cats   = catMap[subTab] || ['critical'];
     const data   = await commGetUSGSData(cats);
     _renderMineralsGrid(el, tabBar, data, subTab);
@@ -1764,14 +1959,30 @@ window.commLoadGDELTTheme = async function(themeKey) {
 
 (function _commInit() {
   function _run() {
-    // Patch wmSupplyEnergy to use our renderer if wmBootstrap fails
+    // wmSupplyEnergy: EIA/OPEC/ENTSOG as PRIMARY, wmBootstrap as optional enrichment
+    // (previous version had wmBootstrap first — inverted logic)
     const origEnergy = window.wmSupplyEnergy;
     window.wmSupplyEnergy = async function() {
-      try { await origEnergy?.(); } catch {}
-      // Check if supply-energy is still showing loading/error, use our renderer
-      const el = document.getElementById('supply-energy');
-      if (el && (!el.innerHTML.trim() || el.querySelector('.wm-empty,.wm-loading'))) {
-        await commRenderEnergy();
+      // PRIMARY: always load our open-data energy renderer first
+      await commRenderEnergy();
+
+      // ENRICHMENT: if wmBootstrap is available, try to augment with live WM data
+      // but only if it doesn't overwrite our content
+      if (typeof origEnergy === 'function') {
+        const el = document.getElementById('supply-energy');
+        // Store our rendered content
+        const ourContent = el?.innerHTML || '';
+        try {
+          // Run original in background — only use its output if it adds value
+          await origEnergy();
+          // If wmBootstrap returned an error/empty, restore our content
+          if (el && (el.querySelector('.wm-empty') || !el.innerHTML.trim())) {
+            el.innerHTML = ourContent;
+          }
+        } catch {
+          // wmBootstrap failed — restore our content
+          if (el && ourContent) el.innerHTML = ourContent;
+        }
       }
     };
 
@@ -1838,19 +2049,28 @@ window.commLoadGDELTTheme = async function(themeKey) {
       }
     }
 
-    // Hook into renderNews to inject commodity section after ticker news loads
-    const origRenderNewsFeed = window.renderNewsFeed;
-    if (typeof origRenderNewsFeed === 'function') {
-      window.renderNewsFeed = function(sym, articles, provider) {
-        origRenderNewsFeed.call(this, sym, articles, provider);
-        // After 1.5s (news renders), inject commodity intelligence section
-        setTimeout(() => {
-          if (typeof sym === 'string') {
-            commInjectNewsSection(sym.toLowerCase());
-          }
-        }, 1500);
-      };
-    }
+    // Hook into renderNewsFeed to inject commodity section after ticker news loads
+    // Guard: retry until renderNewsFeed is defined (script.js must load first)
+    (function _patchNewsFeed(attempt) {
+      if (typeof window.renderNewsFeed === 'function') {
+        const origRenderNewsFeed = window.renderNewsFeed;
+        window.renderNewsFeed = function(sym, articles, provider) {
+          origRenderNewsFeed.call(this, sym, articles, provider);
+          // After 1.5s, inject commodity intelligence section below ticker news
+          setTimeout(() => {
+            if (typeof sym === 'string') {
+              commInjectNewsSection(sym.toLowerCase());
+            }
+          }, 1500);
+        };
+        console.info('[commodities] renderNewsFeed patched ✓');
+      } else if (attempt < 10) {
+        // Retry every 400ms up to 4 seconds (handles dynamic / deferred loading)
+        setTimeout(() => _patchNewsFeed(attempt + 1), 400);
+      } else {
+        console.warn('[commodities] renderNewsFeed not found after 4s — news injection disabled');
+      }
+    })(0);
 
     console.info('[commodities.js] Loaded ✓ — WB(30+) · IMF PCPS(21) · USGS(41) · EIA · OPEC · ENTSOG · EU Agri · FAO · KP · CFTC');
   }
@@ -1906,19 +2126,39 @@ window.commFetchUSDA = async function(commodity = 'wheat') {
   if (cached) return cached;
 
   try {
-    // USDA FAS PSD Online API — no key for basic access
-    const commodityMap = { wheat:'0410100', corn:'0440110', soybeans:'2222000', rice:'0422110' };
+    // USDA FAS PSD Online API — documented endpoint (no key for basic queries)
+    // Correct endpoint: /api/psd/commodity/{code} (no year range parameter)
+    const commodityMap = {
+      wheat:'0410100', corn:'0440110', soybeans:'2222000', rice:'0422110',
+      cotton:'2631000', sorghum:'0459100', barley:'0430100',
+    };
     const code = commodityMap[commodity.toLowerCase()] || '0410100';
     const year = new Date().getFullYear();
-    const url = `https://apps.fas.usda.gov/psdonline/api/psd/commodity/${code}/years/${year-1}/${year}`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    const json = await res.json();
+
+    let json = null;
+    // Try documented endpoint without year range
+    try {
+      const url = `https://apps.fas.usda.gov/psdonline/api/psd/commodity/${code}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (res.ok) json = await res.json();
+    } catch {}
+
+    // Fallback: USDA FAS Bulk Download for world production/trade data
+    if (!json || (Array.isArray(json) && !json.length)) {
+      try {
+        // USDA Quick Stats bulk (public, no key) — grain production series
+        const quickUrl = `https://quickstats.nass.usda.gov/api/api_GET/?key=DEMO_KEY&commodity_desc=${encodeURIComponent(commodity.toUpperCase())}&statisticcat_desc=PRODUCTION&year_GE=${year-5}&format=JSON`;
+        const res2 = await fetch(quickUrl, { signal: AbortSignal.timeout(10000) });
+        if (res2.ok) json = (await res2.json())?.data;
+      } catch {}
+    }
 
     const result = {
       commodity,
       data:   Array.isArray(json) ? json.slice(0, 20) : [],
       _src:   'USDA FAS PSD Online (no key)',
       _url:   'https://apps.fas.usda.gov/psdonline/',
+      _bulk:  'https://apps.fas.usda.gov/psdonline/app/index.html#/app/downloads',
     };
 
     _cSet(cacheKey, result);
@@ -1939,33 +2179,54 @@ window.commFetchOFAC = async function() {
   if (cached) return cached;
 
   try {
-    // OFAC provides machine-readable XML/CSV — fetch the CSV for lightweight parsing
-    const url   = 'https://www.treasury.gov/ofac/downloads/sdn.csv';
-    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const res   = await fetch(proxy, { signal: AbortSignal.timeout(15000) });
-    const text  = await res.text();
+    // ── OFAC SDN lightweight approach ─────────────────────────────────────
+    // The full sdn.csv is 3–5MB — too large for allorigins proxy (timeout).
+    // Use the OFAC API consolidated list endpoint which is JSON-formatted
+    // and much smaller than the full CSV.
+    // Endpoint: https://data.treasury.gov/api/ofac/sdn/list?limit=1
+    // Just get the metadata (count, last_updated) without the full list.
+    
+    // Strategy: Use the OFAC consolidated JSON API (API v2) for the count
+    const apiUrl = 'https://api.ofac.treasury.gov/v1/SDNList/count';
+    let count = null, asOf = null;
 
-    const lines   = text.split('\n').filter(l => l.trim());
-    const count   = lines.length - 1; // subtract header
-    const sample  = lines.slice(1, 6).map(l => {
-      const parts = l.split(',');
-      return { name: parts[1]?.replace(/"/g,'') || '', type: parts[3]?.replace(/"/g,'') || '', program: parts[4]?.replace(/"/g,'') || '' };
-    });
+    try {
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const json = await res.json();
+        count = json?.count || json?.total || json?.numOfEntries;
+        asOf  = json?.date || json?.publishDate || new Date().toISOString().split('T')[0];
+      }
+    } catch {}
+
+    // Fallback: fetch only the first 2KB of the SDN CSV to get the header
+    // and count only makes sense with partial read — skip and use known ref count
+    if (!count) {
+      // Reference: OFAC SDN typically has ~12,000–13,000 entries
+      // We link directly without downloading the full list
+      count = null; // unknown without download
+    }
 
     const result = {
       totalDesignations: count,
-      sample,
-      asOf: new Date().toISOString().split('T')[0],
-      _src: 'OFAC SDN List (no key)',
-      _url: 'https://ofac.treasury.gov/sanctions-list-service',
-      _format: 'CSV/XML download',
+      asOf: asOf || new Date().toISOString().split('T')[0],
+      _src:    'OFAC SDN List (no key)',
+      _url:    'https://ofac.treasury.gov/sanctions-list-service',
+      _dlUrl:  'https://www.treasury.gov/ofac/downloads/sdn.csv',
+      _xmlUrl: 'https://www.treasury.gov/ofac/downloads/sdn.xml',
+      _note:   'Full list: ~12K–13K designations. Download via links above.',
+      _format: 'JSON API / CSV / XML',
     };
 
     _cSet(cacheKey, result);
     return result;
   } catch (e) {
     console.warn('[OFAC SDN]', e.message);
-    return { _error: e.message, _url: 'https://ofac.treasury.gov/sanctions-list-service' };
+    return {
+      _error:  e.message,
+      _url:    'https://ofac.treasury.gov/sanctions-list-service',
+      _dlUrl:  'https://www.treasury.gov/ofac/downloads/sdn.csv',
+    };
   }
 };
 
