@@ -1413,10 +1413,16 @@ window.RateLimiter = RateLimiter;
       });
       obs.observe(macroPanel, { attributes: true, attributeFilter: ['class', 'style'] });
 
-      // Also hook into switchTab if macro-econ tab is switched to
-      const origSwitch = window.switchTab;
-      if (typeof origSwitch === 'function') {
-        window.switchTab = function(panel, tab) {
+      // Hook into switchTab — add typeof guard + retry if not yet defined
+      function _hookSwitchTab() {
+        if (typeof window.switchTab !== 'function') {
+          setTimeout(_hookSwitchTab, 300); // retry until script.js defines switchTab
+          return;
+        }
+        const origSwitch = window.switchTab;
+        // Don't double-patch if already wrapped
+        if (origSwitch._commVixPatched) return;
+        const patched = function(panel, tab) {
           origSwitch.apply(this, arguments);
           if (panel === 'macro' && tab === 'econ' && !document.getElementById('vix-widget-root')) {
             setTimeout(_injectVixWidget, 100);
@@ -1431,7 +1437,10 @@ window.RateLimiter = RateLimiter;
             }
           }
         };
+        patched._commVixPatched = true;
+        window.switchTab = patched;
       }
+      _hookSwitchTab();
     })();
 
     // 5. Add "Plotly" button to the tech tab bar in fundamentals
