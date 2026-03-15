@@ -66,10 +66,22 @@ function fredEsc(s) {
 function fredSpinner() {
   return '<div class="av-loading"><span class="av-spinner"></span>Loading FRED data…</div>';
 }
-function fredNoKey() {
-  return `<div class="no-data">// FRED key not configured.<br>
-    // <a href="#" onclick="openApiConfig('fred');return false" style="color:var(--accent)">
-    Add your free FRED key →</a></div>`;
+function fredNoKey(context) {
+  const noKeyMsg = {
+    'yield': 'Treasury Direct (no key) loaded above. FRED key unlocks historical yield data.',
+    'econ':  'Credit spreads, Fed Funds, CPI series require a free FRED key.',
+    'bonds': 'IG/HY spreads (BAML series) require a free FRED key.',
+  };
+  const note = context && noKeyMsg[context] ? `<br><span style="color:var(--text-muted);font-size:10px">${noKeyMsg[context]}</span>` : '';
+  return `<div class="no-data" style="padding:12px">
+    // FRED key not configured.${note}<br><br>
+    // <a href="#" onclick="if(typeof toggleApiSidebar==='function')toggleApiSidebar();return false"
+       style="color:var(--accent);font-weight:700">⚙ Configure free FRED key →</a>
+    &nbsp;·&nbsp;
+    <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank"
+       rel="noopener" style="color:var(--text-muted);font-size:10px">Get free key</a><br><br>
+    // No-key data still available: US Treasury yield curve (Treasury Direct)
+  </div>`;
 }
 function fredError(msg) {
   return `<div class="no-data">// FRED error: ${fredEsc(msg)}</div>`;
@@ -219,7 +231,7 @@ const FRED_MACRO_SERIES = [
 async function fredLoadMacroIndicators() {
   const el = document.getElementById('macro-econ');
   if (!el) return;
-  if (!getFredKey()) { el.innerHTML = fredNoKey(); return; }
+  if (!getFredKey()) { el.innerHTML = fredNoKey('econ'); return; }
   el.innerHTML = fredSpinner();
   try {
     const results = await Promise.allSettled(
