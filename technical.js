@@ -716,10 +716,10 @@ async function techLoadFull(sym, resolution) {
 <div id="techChartWrap" class="tech-chart-wrap"></div>
 
 <!-- ══ RSI sub-chart ══ -->
-<div id="techRsiWrap" class="tech-sub-chart-wrap" style="height:70px;border-top:1px solid var(--border)"></div>
+<div id="techRsiWrap" class="tech-sub-chart-wrap" style="height:var(--sub-chart-h,80px);min-height:60px;border-top:1px solid var(--border)"></div>
 
 <!-- ══ MACD sub-chart ══ -->
-<div id="techMacdWrap" class="tech-sub-chart-wrap" style="height:70px;border-top:1px solid var(--border)"></div>
+<div id="techMacdWrap" class="tech-sub-chart-wrap" style="height:var(--sub-chart-h,80px);min-height:60px;border-top:1px solid var(--border)"></div>
 
 <!-- ══ Aggregate signal ══ -->
 <div class="tech-signal-bar">
