@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v4-2025';
+const CACHE_VERSION  = 'finterm-v5-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -29,6 +29,13 @@ const APP_SHELL = [
   '/geointel.js',
   '/api.js',
   '/sbcache.js',
+  '/energy.js',
+  '/commodities.js',
+  '/minerals.js',
+  '/agriculture.js',
+  '/tradeflows.js',
+  '/positioning.js',
+  '/intel.js',
 ];
 
 /* API hosts to cache with network-first strategy */
@@ -45,6 +52,15 @@ const API_HOSTS = [
   'api.allorigins.win',
   'air-quality-api.open-meteo.com',
   'api.waqi.info',
+  'www.eia.gov',
+  'agsi.gie.eu',
+  'transparency.entsog.eu',
+  'agridata.ec.europa.eu',
+  'fenixservices.fao.org',
+  'comtradeapi.un.org',
+  'api.bls.gov',
+  'api.gdeltproject.org',
+  'www.federalregister.gov',
 ];
 
 /* ── Install: pre-cache app shell ────────────────────────────────── */
