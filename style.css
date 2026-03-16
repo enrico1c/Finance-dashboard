@@ -6267,3 +6267,375 @@ body.panel-dragging iframe, body.panel-resizing iframe {
    PROVIDER badge label  (news feed header — ni-badge-apitube)
    ══════════════════════════════════════════════════════════════════ */
 .ni-badge-apitube{background:rgba(163,113,247,.15);color:#a371f7;border:1px solid rgba(163,113,247,.3)}
+/* ══════════════════════════════════════════════════════════════════
+   phase1_styles.css — CSS additions for Phase 1 Identity modules
+   Append this to the end of style.css
+   Covers: openfigi.js · nasdaqdir.js · gleif.js
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   SHARED — Identity & Reference section head badge
+   ───────────────────────────────────────────────────────────────── */
+.gleif-head,
+.of-id-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gleif-src-badge,
+.of-id-src {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6e7681);
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   OPENFIGI — Identifiers block in #fund-des
+   ───────────────────────────────────────────────────────────────── */
+.of-identifiers-block {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #58a6ff;
+  border-radius: 0 6px 6px 0;
+}
+
+.of-id-grid {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.of-id-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.of-id-label {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.of-id-value {
+  font-size: 11px;
+  color: var(--color-text-primary, #e6edf3);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.of-id-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.of-id-link {
+  font-size: 10px;
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.of-id-link:hover { text-decoration: underline; }
+
+/* ─────────────────────────────────────────────────────────────────
+   NASDAQ DIRECTORY — DES listing block
+   ───────────────────────────────────────────────────────────────── */
+.ndq-dir-block {
+  margin: 8px 0 6px;
+  padding: 8px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #3fb950;
+  border-radius: 0 6px 6px 0;
+}
+
+.ndq-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ndq-dir-label {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+.ndq-dir-vals {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.ndq-type-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.4px;
+}
+.ndq-etf    { background: rgba(88,166,255,0.15); color: #58a6ff; border: 0.5px solid rgba(88,166,255,0.35); }
+.ndq-mf     { background: rgba(162,94,247,0.15); color: #a371f7; border: 0.5px solid rgba(162,94,247,0.35); }
+.ndq-equity { background: rgba(63,185,80,0.12);  color: #3fb950; border: 0.5px solid rgba(63,185,80,0.3);  }
+
+.ndq-exch-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #8b949e);
+  background: var(--color-border, #21262d);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.ndq-cat-badge,
+.ndq-fund-fam,
+.ndq-fund-cat {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  background: rgba(110,118,129,0.1);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+/* Action / corp-action banners inside DES */
+.ndq-action-alert {
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.ndq-delist  { background: rgba(248,81,73,0.1);   border: 0.5px solid rgba(248,81,73,0.3);   color: #f85149; }
+.ndq-rename  { background: rgba(210,153,34,0.1);  border: 0.5px solid rgba(210,153,34,0.3);  color: #d29922; }
+.ndq-action  { background: rgba(63,185,80,0.08);  border: 0.5px solid rgba(63,185,80,0.25);  color: #3fb950; }
+
+/* ─────────────────────────────────────────────────────────────────
+   NASDAQ CORP ACTIONS TAB in Alert panel
+   ───────────────────────────────────────────────────────────────── */
+.ndq-ca-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 0.5px solid var(--color-border, #21262d);
+  flex-wrap: wrap;
+}
+.ndq-ca-row:last-child { border-bottom: none; }
+
+.ndq-ca-add  { border-left: 2px solid #3fb950; }
+.ndq-ca-del  { border-left: 2px solid #f85149; }
+.ndq-ca-rename { border-left: 2px solid #d29922; }
+
+.ndq-ca-sym {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  color: var(--color-accent, #58a6ff);
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.ndq-ca-name {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8b949e);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ndq-ca-date {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  font-variant-numeric: tabular-nums;
+}
+
+.ndq-ca-reason {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  font-style: italic;
+}
+
+.ndq-ca-tag {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+.ndq-tag-add    { background: rgba(63,185,80,0.15);  color: #3fb950; border: 0.5px solid rgba(63,185,80,0.3);  }
+.ndq-tag-del    { background: rgba(248,81,73,0.12);  color: #f85149; border: 0.5px solid rgba(248,81,73,0.3);  }
+.ndq-tag-rename { background: rgba(210,153,34,0.12); color: #d29922; border: 0.5px solid rgba(210,153,34,0.3); }
+
+/* ─────────────────────────────────────────────────────────────────
+   GLEIF — Global Identity block in #fund-des
+   ───────────────────────────────────────────────────────────────── */
+.gleif-identity-block {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #a371f7;
+  border-radius: 0 6px 6px 0;
+}
+
+.gleif-id-grid {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.gleif-id-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.gleif-id-label {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.gleif-id-value {
+  font-size: 11px;
+  color: var(--color-text-primary, #e6edf3);
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gleif-lei-code {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: #a371f7;
+  background: rgba(162,94,247,0.1);
+  border: 0.5px solid rgba(162,94,247,0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  letter-spacing: 0.5px;
+}
+.gleif-lei-sm { font-size: 9px; padding: 0 4px; }
+
+.gleif-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted, #6e7681);
+  font-size: 11px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.gleif-copy-btn:hover { color: var(--color-accent, #58a6ff); }
+
+.gleif-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.gleif-ext-link {
+  font-size: 10px;
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.gleif-ext-link:hover { text-decoration: underline; }
+
+/* ─────────────────────────────────────────────────────────────────
+   GLEIF — Corporate Structure block in #own-mgmt
+   ───────────────────────────────────────────────────────────────── */
+.gleif-structure-block {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #a371f7;
+  border-radius: 0 6px 6px 0;
+}
+
+.gleif-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.gleif-parent-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--color-background, #0d1117);
+  border: 0.5px solid var(--color-border, #21262d);
+  border-radius: 6px;
+  transition: border-color 0.15s;
+}
+.gleif-parent-card:hover { border-color: rgba(162,94,247,0.4); }
+
+.gleif-parent-icon {
+  font-size: 18px;
+  line-height: 1;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.gleif-parent-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.gleif-parent-label {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
+}
+
+.gleif-parent-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, #e6edf3);
+  word-break: break-word;
+}
+
+.gleif-parent-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+}
