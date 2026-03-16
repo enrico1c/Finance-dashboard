@@ -688,8 +688,16 @@ function renderNewsFeed(sym, articles, provider) {
   if (!feed) return;
   if (!articles || !articles.length) return;
 
-  const badgeCls = provider === "fh" ? "ni-badge-fh" : provider === "av" ? "ni-badge-av" : "ni-badge-eod";
-  const badgeLbl = provider === "fh" ? "Finnhub" : provider === "av" ? "Alpha Vantage" : provider.toUpperCase();
+  const PROVIDER_LABELS = {
+    fh:       { cls:"ni-badge-fh",      lbl:"Finnhub"         },
+    av:       { cls:"ni-badge-av",      lbl:"Alpha Vantage"   },
+    eod:      { cls:"ni-badge-eod",     lbl:"EODHD"           },
+    apitube:  { cls:"ni-badge-apitube", lbl:"APITube"         },
+    finnhub:  { cls:"ni-badge-fh",      lbl:"Finnhub"         },
+  };
+  const provMeta = PROVIDER_LABELS[provider] || { cls:"ni-badge-eod", lbl: provider.toUpperCase() };
+  const badgeCls = provMeta.cls;
+  const badgeLbl = provMeta.lbl;
 
   const cards = articles.map((a, i) => niCard(`ni-${provider}-${i}`, {
     headline:  a.headline || a.title,
