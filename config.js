@@ -38,7 +38,7 @@ const KNOWN_PROVIDERS = [
 
   /* ── NEWS & ALTERNATIVE DATA ─────────────────────────────────── */
   { id:"apitube", name:"APITube", badge:"APT", group:"News & Alt Data",
-    desc:"Financial News real-time · YouTube/Video news · Sentiment NLP · 500K+ fonti · Filtro ticker / settore / lingua",
+    desc:"Financial News real-time · YouTube/Video news · Sentiment NLP · 500K+ fonti · Filtro ticker / settore / lingua · Popola il pannello News",
     limit:"Varia per piano (free tier disponibile)", docsUrl:"https://apitube.io/en-it/blog/post/how-to-get-started-with-apitube-news-api-a-step-by-step-guide",
     sessionKey:"apitube_call_count", limitWarn:80, limitMax:100 },
   { id:"ninjas", name:"API Ninjas — Transcripts", badge:"NJA", group:"News & Alt Data",
@@ -52,26 +52,26 @@ const KNOWN_PROVIDERS = [
 
   /* ── MACRO & ECONOMIC ─────────────────────────────────────────── */
   { id:"fred", name:"FRED — St. Louis Fed", badge:"FRD", group:"Macro & Economic",
-    desc:"840K+ economic series: Yield Curve · CPI · GDP · Unemployment · Fed Funds Rate · HY Spreads · Inflation Breakeven",
+    desc:"840K+ economic series: Yield Curve · CPI · GDP · Unemployment · Fed Funds Rate · HY Spreads · Inflation Breakeven · Macro·Intel YIELD + ECON tabs",
     limit:"Unlimited (free)", docsUrl:"https://fred.stlouisfed.org/docs/api/fred/",
     sessionKey:"fred_call_count", limitWarn:null, limitMax:null },
   { id:"eia", name:"EIA — U.S. Energy Info Admin", badge:"EIA", group:"Macro & Economic",
-    desc:"Henry Hub gas · WTI crude · Coal production · Weekly storage report · Petroleum inventories · Tab Macro·Energy",
+    desc:"Henry Hub gas · WTI crude · Coal production · Weekly storage report · Petroleum inventories · Macro·Intel ⚡ ENERGY tab",
     limit:"Unlimited (free key)", docsUrl:"https://www.eia.gov/opendata/register.php",
     sessionKey:"eia_call_count", limitWarn:null, limitMax:null },
   { id:"bls", name:"BLS — Bureau of Labor Statistics", badge:"BLS", group:"Macro & Economic",
-    desc:"CPI · PPI · Producer Price Indices per categoria commodity · Inflazione legata alle materie prime · API v2",
+    desc:"CPI · PPI · Producer Price Indices per commodity category · Inflazione materie prime · Macro·Intel ECON tab",
     limit:"500 req/day (free, v2)", docsUrl:"https://www.bls.gov/developers/home.htm",
     sessionKey:"bls_call_count", limitWarn:400, limitMax:500 },
 
   /* ── COMMODITIES & SUPPLY CHAIN ──────────────────────────────── */
   { id:"comtrade", name:"UN Comtrade+", badge:"CMT", group:"Commodities & Supply Chain",
-    desc:"Flussi commerciali bilaterali per codice HS · Critical minerals · Gas industriali · Tungsteno · Terre rare · 200 paesi · Tab Supply·Chain > Trade Flows",
+    desc:"Flussi commerciali bilaterali per codice HS · Critical minerals · Gas industriali · Tungsteno · Terre rare · Supply·Chain > Trade Flows",
     limit:"500 req/day (free key)", docsUrl:"https://comtradeplus.un.org/",
     sessionKey:"comtrade_call_count", limitWarn:400, limitMax:500 },
   { id:"gie", name:"GIE — Gas Infrastructure Europe", badge:"GIE", group:"Commodities & Supply Chain",
-    desc:"AGSI: stoccaggio gas UE giornaliero per paese/operatore · ALSI: inventari LNG · Tab Macro·Energy > EU Storage",
-    limit:"Unlimited (free key)", docsUrl:"https://www.gie.eu/transparency-platform/",
+    desc:"AGSI: stoccaggio gas UE giornaliero per paese/operatore · ALSI: inventari LNG · Macro·Intel ⚡ ENERGY tab > EU Storage",
+    limit:"Unlimited (free key)", docsUrl:"https://agsi.gie.eu/",
     sessionKey:"gie_call_count", limitWarn:null, limitMax:null },
 
   /* ── ENVIRONMENT & GEO ────────────────────────────────────────── */
@@ -99,10 +99,11 @@ function getOpenExchangeKey(){ return getKey("openexchange"); }
 function getEodhdKey()       { return getKey("eodhd");        }
 function getApitubeKey()     { return getKey("apitube");      }
 function getMassiveKey()     { return getKey("massive");      }
-function getEiaKey()         { return getKey("eia");          }
-function getBlsKey()         { return getKey("bls");          }
-function getComtradeKey()    { return getKey("comtrade");     }
-function getGieKey()         { return getKey("gie");          }
+/* New providers — Phase 1-5 */
+function getEiaKey()         { return getKey("eia");           }
+function getBlsKey()         { return getKey("bls");           }
+function getComtradeKey()    { return getKey("comtrade");      }
+function getGieKey()         { return getKey("gie");           }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
@@ -117,7 +118,7 @@ function saveCustom(list) { localStorage.setItem(LS_CUSTOM, JSON.stringify(list)
 function allProviders() { return [...KNOWN_PROVIDERS, ...getCustom()]; }
 
 /* ══════════════════════════════════════════════════════════════════
-   TOPBAR BADGES — removed. Status lives in the left API sidebar.
+   TOPBAR BADGES — removed from topbar. Status lives in left sidebar.
    Stubs keep legacy callers from throwing.
    ══════════════════════════════════════════════════════════════════ */
 function renderTopbarBadges() { renderApiStatusSidebar(); }
@@ -148,53 +149,31 @@ function closeApiStatus() {
 function renderApiStatusSidebar() {
   const box = document.getElementById("apiStatusList");
   if (!box) return;
-
   const providers = allProviders();
-
-  // Group by .group field
   const groups = {};
-  providers.forEach(p => {
-    const g = p.group || "Other";
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(p);
-  });
+  providers.forEach(p => { const g = p.group||"Other"; if(!groups[g])groups[g]=[]; groups[g].push(p); });
 
   let html = "";
   Object.entries(groups).forEach(([groupName, items]) => {
     html += `<div class="aps-group-label">${cfgEsc(groupName)}</div>`;
     items.forEach(p => {
       const key = getKey(p.id);
-      const n   = parseInt(sessionStorage.getItem(p.sessionKey || "") || "0");
-
-      const dot = !key
-        ? "#484f58"
+      const n   = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
+      const dot = !key ? "#484f58"
         : p.limitMax && n >= p.limitMax   ? "#f85149"
-        : p.limitWarn && n >= p.limitWarn ? "#d29922"
-        : "#3fb950";
-
+        : p.limitWarn && n >= p.limitWarn ? "#d29922" : "#3fb950";
       const statusLabel = !key ? "NOT SET"
-        : p.limitMax && n >= p.limitMax   ? "LIMIT"
-        : p.limitWarn && n >= p.limitWarn ? "WARN"
-        : "OK";
-
+        : p.limitMax && n >= p.limitMax ? "LIMIT" : p.limitWarn && n >= p.limitWarn ? "WARN" : "OK";
       const barHtml = (key && p.limitMax)
         ? (() => {
-            const pct    = Math.min(100, (n / p.limitMax) * 100);
-            const barCol = pct >= 100 ? "#f85149" : pct >= 80 ? "#d29922" : "#3fb950";
-            return `<div class="aps-bar-wrap">
-              <div class="aps-bar-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div>
-            </div>
-            <span class="aps-count">${n} / ${p.limitMax}</span>`;
+            const pct = Math.min(100,(n/p.limitMax)*100);
+            const bc  = pct>=100?"#f85149":pct>=80?"#d29922":"#3fb950";
+            return `<div class="aps-bar-wrap"><div class="aps-bar-fill" style="width:${pct.toFixed(1)}%;background:${bc}"></div></div><span class="aps-count">${n}/${p.limitMax}</span>`;
           })()
-        : key
-          ? `<span class="aps-unlimited">&#8734; no limit</span>`
-          : `<span class="aps-nokey">no key set</span>`;
-
-      const resetBtn = (key && p.sessionKey && n > 0)
-        ? `<button class="aps-reset-btn" onclick="event.stopPropagation();resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')" title="Reset counter">&#8635;</button>`
-        : "";
-
-      html += `<div class="aps-row" onclick="openApiConfig('${cfgEsc(p.id)}')" title="${cfgEsc(p.name)} — click to configure">
+        : key ? `<span class="aps-unlimited">&#8734; no limit</span>` : `<span class="aps-nokey">no key set</span>`;
+      const resetBtn = (key&&p.sessionKey&&n>0)
+        ? `<button class="aps-reset-btn" onclick="event.stopPropagation();resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')" title="Reset">&#8635;</button>` : "";
+      html += `<div class="aps-row" onclick="openApiConfig('${cfgEsc(p.id)}')" title="${cfgEsc(p.name)}">
         <div class="aps-row-top">
           <span class="aps-dot" style="background:${dot}"></span>
           <span class="aps-badge">${cfgEsc(p.badge)}</span>
@@ -203,30 +182,23 @@ function renderApiStatusSidebar() {
           ${resetBtn}
         </div>
         <div class="aps-row-bottom">${barHtml}</div>
-        ${key && p.limit ? `<div class="aps-limit-note">${cfgEsc(p.limit)}</div>` : ""}
+        ${key&&p.limit?`<div class="aps-limit-note">${cfgEsc(p.limit)}</div>`:""}
       </div>`;
     });
   });
   box.innerHTML = html;
-
   const footer = document.getElementById("apiStatusFooter");
   if (footer) {
-    const configured = providers.filter(p => !!getKey(p.id)).length;
-    const cacheN = Object.keys(sessionStorage)
-      .filter(k => providers.some(p =>
-        k.startsWith(p.id + "_") || k.startsWith("av_") || k.startsWith("fmp_")
-      )).length;
-    footer.innerHTML = `
-      <span>${configured} / ${providers.length} configured &middot; ${cacheN} cached</span>
-      <button class="aps-clear-btn" onclick="clearAllCache()">Clear cache</button>`;
+    const configured = providers.filter(p=>!!getKey(p.id)).length;
+    const cacheN = Object.keys(sessionStorage).filter(k=>providers.some(p=>k.startsWith(p.id+"_")||k.startsWith("av_")||k.startsWith("fmp_"))).length;
+    footer.innerHTML = `<span>${configured}/${providers.length} configured &middot; ${cacheN} cached</span><button class="aps-clear-btn" onclick="clearAllCache()">Clear cache</button>`;
   }
 }
 
 function injectApiStatusSidebar() {
   if (document.getElementById("apiStatusSidebar")) return;
   const el = document.createElement("div");
-  el.id        = "apiStatusSidebar";
-  el.className = "api-status-sidebar";
+  el.id = "apiStatusSidebar"; el.className = "api-status-sidebar";
   el.innerHTML = `
     <div class="aps-header">
       <span class="aps-title">&#9889; API Status</span>
@@ -234,8 +206,7 @@ function injectApiStatusSidebar() {
     </div>
     <div class="aps-subhead">Click any row to configure &middot; Live call counters</div>
     <div class="aps-list" id="apiStatusList"></div>
-    <div class="aps-footer" id="apiStatusFooter"></div>
-  `;
+    <div class="aps-footer" id="apiStatusFooter"></div>`;
   document.body.appendChild(el);
   document.addEventListener("click", e => {
     if (!_apiStatusOpen) return;
@@ -298,15 +269,9 @@ function switchApiTab(tabId) {
 function renderProviderList() {
   const box = document.getElementById("apiProviderList");
   if (!box) return;
-
   const providers = allProviders();
   const groups = {};
-  providers.forEach(p => {
-    const g = p.group || "Other";
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(p);
-  });
-
+  providers.forEach(p => { const g = p.group||"Other"; if(!groups[g])groups[g]=[]; groups[g].push(p); });
   let html = "";
   Object.entries(groups).forEach(([groupName, items]) => {
     html += `<div class="api-group-heading">${cfgEsc(groupName)}</div>`;
@@ -327,25 +292,22 @@ function renderProviderList() {
           </div>
           <span class="api-key-badge ${bCls}">${cfgEsc(bLbl)}</span>
         </div>
-        ${p.desc ? `<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl
-          ? ` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Get free key &rarr;</a>` : ""}</div>` : ""}
+        ${p.desc?`<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl?` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Get free key &rarr;</a>`:""}  </div>`:""}
         <div class="api-key-input-row">
           <input type="password" id="kinput-${cfgEsc(p.id)}" class="api-key-field"
                  placeholder="Paste API key here…" value="${cfgEsc(val)}"
                  autocomplete="off" spellcheck="false"
                  oninput="livePreviewKey('${cfgEsc(p.id)}')" />
-          <button class="api-key-eye" title="Show/hide"
-                  onclick="toggleKeyVis('kinput-${cfgEsc(p.id)}',this)">&#128065;</button>
+          <button class="api-key-eye" title="Show/hide" onclick="toggleKeyVis('kinput-${cfgEsc(p.id)}',this)">&#128065;</button>
           <button class="api-key-save"  onclick="saveKey('${cfgEsc(p.id)}')">Save</button>
           <button class="api-key-clear" onclick="clearKey('${cfgEsc(p.id)}')">Clear</button>
         </div>
         <div class="api-key-status" id="kstatus-${cfgEsc(p.id)}"></div>
-        ${val && p.sessionKey ? `<div class="api-key-usage">
+        ${val&&p.sessionKey?`<div class="api-key-usage">
           Session calls: <strong>${n}</strong>${p.limitMax?" / "+p.limitMax:""}
           ${n>0?`<button class="api-reset-count-btn" onclick="resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')">Reset</button>`:""}
         </div>`:""}
-        ${p.custom?`<button class="api-custom-del-btn" style="margin-top:6px"
-            onclick="removeCustom('${cfgEsc(p.id)}')">&#10005; Remove</button>`:""}
+        ${p.custom?`<button class="api-custom-del-btn" style="margin-top:6px" onclick="removeCustom('${cfgEsc(p.id)}')">&#10005; Remove</button>`:""}
       </div>
       <div class="api-modal-divider"></div>`;
     });
@@ -382,6 +344,11 @@ function saveKey(id) {
   if (id === "openexchange" && typeof oerLoadRates      === "function") setTimeout(() => { oerLoadRates(); oerLoadCurrencyList(); }, 200);
   if (id === "yahoo"        && typeof yfLoadTrending    === "function") setTimeout(() => yfLoadTrending(), 200);
   if (id === "ninjas" && typeof fmpLoadTranscript === "function") setTimeout(() => fmpLoadTranscript(ticker), 300);
+  /* New provider triggers */
+  if (id === "eia"      && typeof energyLoadAll       === "function") setTimeout(() => energyLoadAll(), 300);
+  if (id === "gie"      && typeof energyLoadAll       === "function") setTimeout(() => energyLoadAll(), 300);
+  if (id === "bls"      && typeof blsLoadPPI          === "function") setTimeout(() => blsLoadPPI(), 300);
+  if (id === "comtrade" && typeof tradeflowsLoadAll   === "function") setTimeout(() => tradeflowsLoadAll(), 300);
 
   // Hide setup banners when key is configured
   const bannerMap = { ninjas: "trans-setup-banner", openaq: "airqual-setup-banner" };
@@ -653,14 +620,14 @@ function injectSidebarHTML() {
     injectSidebarHTML();
     injectApiStatusSidebar();
     document.addEventListener("keydown", e => {
-      if (e.key === "Escape") { closeApiConfig(); closeApiStatus(); }
+      if (e.key==="Escape") { closeApiConfig(); closeApiStatus(); }
     });
     renderApiStatusSidebar();
 
-    if (!allProviders().some(p => !!getKey(p.id))) {
-      setTimeout(() => {
-        if (typeof showApiToast === "function")
-          showApiToast("&#9881; No API keys — click &#9881; API Keys to configure.", "info");
+    if (!allProviders().some(p=>!!getKey(p.id))) {
+      setTimeout(()=>{
+        if (typeof showApiToast==="function")
+          showApiToast("&#9881; No API keys — click &#9881; API Keys to configure.","info");
       }, 1400);
     }
   }
