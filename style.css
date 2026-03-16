@@ -7125,3 +7125,475 @@ body.panel-dragging iframe, body.panel-resizing iframe {
   text-decoration: none;
 }
 .finra-link:hover { text-decoration: underline; }
+/* ══════════════════════════════════════════════════════════════════
+   phase4_styles.css — CSS additions for Phase 4 Reference Data
+   Append this to the end of style.css
+   Covers: esmafirds.js · secdera.js (N-PORT / N-CEN / Twelve Data)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   SHARED — source badge helper (reused across Phase 4 blocks)
+   ───────────────────────────────────────────────────────────────── */
+.firds-src-badge,
+.nport-src-badge,
+.ncen-src-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6e7681);
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: auto;
+}
+
+.firds-head,
+.nport-head,
+.ncen-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   ESMA FIRDS — EU Instrument Reference block in #fund-des
+   ───────────────────────────────────────────────────────────────── */
+.firds-block {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #3fb950;
+  border-radius: 0 6px 6px 0;
+}
+
+.firds-grid {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.firds-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.firds-label {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.firds-value {
+  font-size: 11px;
+  color: var(--color-text-primary, #e6edf3);
+  word-break: break-all;
+}
+
+.firds-isin {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: #3fb950;
+  letter-spacing: 0.5px;
+}
+
+.firds-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.firds-link {
+  font-size: 10px;
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.firds-link:hover { text-decoration: underline; }
+
+/* ─────────────────────────────────────────────────────────────────
+   SEC N-PORT — Regulatory Holdings section in #fund-hold
+   ───────────────────────────────────────────────────────────────── */
+.nport-section {
+  margin-top: 14px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border, #21262d);
+}
+
+.nport-meta {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  padding: 3px 0 6px;
+}
+
+.nport-table-wrap {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.nport-table .nport-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nport-table .nport-id {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  letter-spacing: 0.3px;
+}
+
+.nport-table .nport-pct {
+  font-weight: 600;
+  color: var(--color-accent, #58a6ff);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.nport-table .nport-val {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+
+.nport-table .nport-cat {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+}
+
+.nport-footer {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  padding: 5px 0 2px;
+  margin-top: 4px;
+  border-top: 1px solid var(--color-border, #21262d);
+}
+
+.nport-link {
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.nport-link:hover { text-decoration: underline; }
+
+/* ─────────────────────────────────────────────────────────────────
+   SEC N-CEN — Fund Metadata block in #fund-des
+   ───────────────────────────────────────────────────────────────── */
+.ncen-block {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #58a6ff;
+  border-radius: 0 6px 6px 0;
+}
+
+.ncen-grid {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.ncen-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.ncen-label {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.ncen-value {
+  font-size: 11px;
+  color: var(--color-text-primary, #e6edf3);
+}
+
+.ncen-links {
+  margin-top: 6px;
+}
+
+.ncen-link {
+  font-size: 10px;
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.ncen-link:hover { text-decoration: underline; }
+
+/* ─────────────────────────────────────────────────────────────────
+   TWELVE DATA — Fallback section in #fund-div
+   ───────────────────────────────────────────────────────────────── */
+.td-fallback-section {
+  margin-top: 14px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border, #21262d);
+}
+
+.td-fallback-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.td-note-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #d29922;
+  background: rgba(210,153,34,0.1);
+  border: 0.5px solid rgba(210,153,34,0.3);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: auto;
+}
+/* ══════════════════════════════════════════════════════════════════
+   phase5_styles.css — CSS additions for Phase 5 Fund & ETF Ecosystem
+   Append this to the end of style.css
+   Covers: xbrlenhance.js · mfprospectus.js
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   SHARED — source badge for Phase 5 blocks
+   ───────────────────────────────────────────────────────────────── */
+.xbrl-src-badge,
+.mf-src-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6e7681);
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.xbrl-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   XBRL ENHANCED — Business Segments block in #fund-des
+   ───────────────────────────────────────────────────────────────── */
+.xbrl-segments-block {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #f0883e;
+  border-radius: 0 6px 6px 0;
+}
+
+.xbrl-segs-type {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-muted, #6e7681);
+  margin: 4px 0 6px;
+}
+
+.xbrl-seg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.xbrl-seg-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+}
+
+.xbrl-seg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.xbrl-seg-label {
+  font-size: 10px;
+  color: var(--color-text-secondary, #8b949e);
+  min-width: 100px;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.xbrl-seg-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--color-border, #21262d);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.xbrl-seg-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.xbrl-seg-pct {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary, #e6edf3);
+  min-width: 38px;
+  text-align: right;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   XBRL ENHANCED — Extended financials section in #fund-fa
+   ───────────────────────────────────────────────────────────────── */
+.xbrl-extra-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--color-border, #21262d);
+  padding-top: 6px;
+}
+
+/* Employee count enrichment in #fund-des */
+.xbrl-emp-block .metric {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 11px;
+  border-bottom: 1px solid var(--color-border, #21262d);
+}
+
+/* Geographic segment section in SEG tab */
+.xbrl-geo-section {
+  margin-top: 14px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border, #21262d);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   MUTUAL FUND PROSPECTUS — #fund-ee section
+   ───────────────────────────────────────────────────────────────── */
+.mf-prospectus-section {
+  /* Container — inherits panel scroll */
+}
+
+.mf-prosp-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mf-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  padding: 4px 12px 0;
+}
+
+/* ── Expense ratio fee grid ── */
+.mf-fee-grid {
+  margin: 6px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mf-fee-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 12px;
+  font-size: 11px;
+  border-bottom: 0.5px solid var(--color-border, #21262d);
+}
+.mf-fee-row:last-child { border-bottom: none; }
+
+.mf-fee-primary {
+  background: rgba(88,166,255,0.04);
+  border-bottom: 1px solid var(--color-border, #21262d) !important;
+}
+
+.mf-fee-label {
+  color: var(--color-text-secondary, #8b949e);
+  font-size: 11px;
+}
+
+.mf-fee-val {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.mf-fee-note {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  padding: 4px 12px 8px;
+  font-style: italic;
+}
+
+/* ── Narrative blocks ── */
+.mf-narrative-block {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+}
+
+.mf-objective { border-left: 2px solid #58a6ff; }
+.mf-strategy  { border-left: 2px solid #3fb950; }
+.mf-risks     { border-left: 2px solid #f85149; }
+.mf-perf      { border-left: 2px solid #d29922; }
+
+.mf-narrative-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-muted, #6e7681);
+  margin-bottom: 5px;
+}
+
+.mf-narrative-text {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8b949e);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Footer ── */
+.mf-prosp-footer {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  padding: 6px 12px 4px;
+  border-top: 1px solid var(--color-border, #21262d);
+  margin-top: 8px;
+}
+
+.mf-prosp-link {
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.mf-prosp-link:hover { text-decoration: underline; }
