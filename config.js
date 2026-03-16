@@ -105,7 +105,9 @@ function getBlsKey()         { return getKey("bls");           }
 function getComtradeKey()    { return getKey("comtrade");      }
 function getGieKey()         { return getKey("gie");           }
 /* Phase 1 — Identity Infrastructure */
-function getOpenFigiKey()    { return getKey("openfigi");      }
+function getOpenFigiKey()       { return getKey("openfigi");       }
+/* Phase 2 — Registry & Ownership */
+function getCompaniesHouseKey() { return getKey("companieshouse"); }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
@@ -355,6 +357,11 @@ function saveKey(id) {
   if (id === "openfigi" && typeof openfigiLoadForTicker === "function") {
     const t = typeof currentTicker !== "undefined" ? currentTicker : null;
     if (t) setTimeout(() => openfigiLoadForTicker(t), 300);
+  }
+  /* Phase 2 — Registry & Ownership */
+  if (id === "companieshouse" && typeof chLoadForTicker === "function") {
+    const t = typeof currentTicker !== "undefined" ? currentTicker : null;
+    if (t) setTimeout(() => chLoadForTicker(t), 400);
   }
 
   // Hide setup banners when key is configured
