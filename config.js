@@ -87,39 +87,121 @@ function saveCustom(list) { localStorage.setItem(LS_CUSTOM, JSON.stringify(list)
 function allProviders() { return [...KNOWN_PROVIDERS, ...getCustom()]; }
 
 /* ══════════════════════════════════════════════════════════════════
-   TOPBAR BADGES
+   TOPBAR BADGES — removed from topbar.
+   All API status now lives in the left API Status sidebar.
+   Stubs keep legacy callers from throwing.
    ══════════════════════════════════════════════════════════════════ */
-function renderTopbarBadges() {
-  const btn = document.querySelector(".api-config-btn");
-  if (!btn) return;
-  document.querySelectorAll(".api-dyn-badge").forEach(el => el.remove());
+function renderTopbarBadges() { renderApiStatusSidebar(); }
+function updateApiStatus()    { renderApiStatusSidebar(); }
+function updateFmpStatus()    { renderApiStatusSidebar(); }
+function refreshBadges()      { renderApiStatusSidebar(); }
 
-  // Only show providers that have a real call limit (limitMax defined).
-  // Unlimited providers (FRED, OpenAQ, Massive, etc.) are still fully
-  // configurable in the sidebar — they just don't clutter the topbar.
-  allProviders()
-    .filter(p => p.limitMax != null)
-    .forEach(p => {
-      const key = getKey(p.id);
-      const n   = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
-      const cls = !key ? "api-unconfigured"
-                : n >= p.limitMax   ? "api-limit"
-                : n >= p.limitWarn  ? "api-warn"
-                : "api-ok";
-      const el  = document.createElement("div");
-      el.className = `api-status api-dyn-badge ${cls}`;
-      el.title     = key ? `${p.name}: ${n}/${p.limitMax} calls` : `${p.name}: not configured`;
-      el.style.cursor = "pointer";
-      el.innerHTML = `<span class="api-dot"></span><span>${cfgEsc(p.badge)}</span>`
-                   + (key ? `<span>${n}/${p.limitMax}</span>` : "");
-      el.addEventListener("click", () => openApiConfig(p.id));
-      btn.insertAdjacentElement("beforebegin", el);
-    });
+/* ══════════════════════════════════════════════════════════════════
+   API STATUS LEFT SIDEBAR
+   ══════════════════════════════════════════════════════════════════ */
+let _apiStatusOpen = false;
+
+function toggleApiStatus() {
+  _apiStatusOpen ? closeApiStatus() : openApiStatus();
 }
 
-function updateApiStatus() { renderTopbarBadges(); }
-function updateFmpStatus() { renderTopbarBadges(); }
-function refreshBadges()   { renderTopbarBadges(); }
+function openApiStatus() {
+  _apiStatusOpen = true;
+  const el = document.getElementById("apiStatusSidebar");
+  if (el) { el.classList.add("open"); renderApiStatusSidebar(); }
+  document.getElementById("apiStatusBtn")?.classList.add("active");
+}
+
+function closeApiStatus() {
+  _apiStatusOpen = false;
+  document.getElementById("apiStatusSidebar")?.classList.remove("open");
+  document.getElementById("apiStatusBtn")?.classList.remove("active");
+}
+
+function renderApiStatusSidebar() {
+  const box = document.getElementById("apiStatusList");
+  if (!box) return;
+
+  const providers = allProviders();
+
+  box.innerHTML = providers.map(p => {
+    const key = getKey(p.id);
+    const n   = parseInt(sessionStorage.getItem(p.sessionKey || "") || "0");
+
+    const dot = !key ? "#484f58"
+      : p.limitMax && n >= p.limitMax   ? "#f85149"
+      : p.limitWarn && n >= p.limitWarn ? "#d29922"
+      : "#3fb950";
+
+    const statusLabel = !key ? "NOT SET"
+      : p.limitMax && n >= p.limitMax   ? "LIMIT REACHED"
+      : p.limitWarn && n >= p.limitWarn ? "WARNING"
+      : "OK";
+
+    const barHtml = (key && p.limitMax)
+      ? (() => {
+          const pct    = Math.min(100, (n / p.limitMax) * 100);
+          const barCol = pct >= 100 ? "#f85149" : pct >= 80 ? "#d29922" : "#3fb950";
+          return `<div class="aps-bar-wrap">
+            <div class="aps-bar-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div>
+          </div>
+          <span class="aps-count">${n} / ${p.limitMax}</span>`;
+        })()
+      : key
+        ? `<span class="aps-unlimited">∞ no call limit</span>`
+        : `<span class="aps-nokey">no key set</span>`;
+
+    const resetBtn = (key && p.sessionKey && n > 0)
+      ? `<button class="aps-reset-btn" onclick="event.stopPropagation();resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')" title="Reset counter">↺</button>`
+      : "";
+
+    return `<div class="aps-row" onclick="openApiConfig('${cfgEsc(p.id)}')" title="Configure ${cfgEsc(p.name)}">
+      <div class="aps-row-top">
+        <span class="aps-dot" style="background:${dot}"></span>
+        <span class="aps-badge">${cfgEsc(p.badge)}</span>
+        <span class="aps-name">${cfgEsc(p.name)}</span>
+        <span class="aps-status-lbl" style="color:${dot}">${cfgEsc(statusLabel)}</span>
+        ${resetBtn}
+      </div>
+      <div class="aps-row-bottom">${barHtml}</div>
+    </div>`;
+  }).join("");
+
+  const footer = document.getElementById("apiStatusFooter");
+  if (footer) {
+    const configured = providers.filter(p => !!getKey(p.id)).length;
+    const cacheN     = Object.keys(sessionStorage)
+      .filter(k => providers.some(p => k.startsWith(p.id + "_") || k.startsWith("av_") || k.startsWith("fmp_"))).length;
+    footer.innerHTML = `
+      <span>${configured} / ${providers.length} configured · ${cacheN} cached</span>
+      <button class="aps-clear-btn" onclick="clearAllCache()">Clear cache</button>`;
+  }
+}
+
+function injectApiStatusSidebar() {
+  if (document.getElementById("apiStatusSidebar")) return;
+  const el = document.createElement("div");
+  el.id        = "apiStatusSidebar";
+  el.className = "api-status-sidebar";
+  el.innerHTML = `
+    <div class="aps-header">
+      <span class="aps-title">⚡ API Status</span>
+      <button class="aps-close-btn" onclick="closeApiStatus()" title="Close">✕</button>
+    </div>
+    <div class="aps-subhead">Click any row to configure · Live call counters</div>
+    <div class="aps-list" id="apiStatusList"></div>
+    <div class="aps-footer" id="apiStatusFooter"></div>
+  `;
+  document.body.appendChild(el);
+
+  // Close on outside click
+  document.addEventListener("click", e => {
+    if (!_apiStatusOpen) return;
+    if (el.contains(e.target)) return;
+    if (document.getElementById("apiStatusBtn")?.contains(e.target)) return;
+    closeApiStatus();
+  }, true);
+}
 
 /* ══════════════════════════════════════════════════════════════════
    SIDEBAR
@@ -515,13 +597,16 @@ function injectSidebarHTML() {
 
   function afterDom() {
     injectSidebarHTML();
-    document.addEventListener("keydown", e => { if (e.key==="Escape") closeApiConfig(); });
-    renderTopbarBadges();
+    injectApiStatusSidebar();
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") { closeApiConfig(); closeApiStatus(); }
+    });
+    renderApiStatusSidebar();
 
-    if (!allProviders().some(p=>!!getKey(p.id))) {
-      setTimeout(()=>{
-        if (typeof showApiToast==="function")
-          showApiToast("&#9881; No API keys &mdash; click &#9881; API to configure.","info");
+    if (!allProviders().some(p => !!getKey(p.id))) {
+      setTimeout(() => {
+        if (typeof showApiToast === "function")
+          showApiToast("&#9881; No API keys — click &#9881; API to configure.", "info");
       }, 1400);
     }
   }
