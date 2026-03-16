@@ -39,7 +39,6 @@
 /* ── Constants ──────────────────────────────────────────────────── */
 const PROXY           = "https://api.allorigins.win/raw?url=";
 const NASDAQ_BASE     = "https://www.nasdaqtrader.com/dynamic/symdir/";
-const DAILY_LIST_URL  = "https://www.nasdaqtrader.com/dynamic/symdir/nasdaqtraded.txt"; // most comprehensive
 const DIR_TTL_MS      = 4 * 60 * 60 * 1000;   // 4 h session cache
 const LS_NASDAQ_DIR   = "finterm_nasdaq_dir_ts";  // timestamp key
 
@@ -167,49 +166,174 @@ async function _loadMutualFunds() {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   3. DAILY LIST
-   nasdaqtraded.txt is the unified traded file; the actual Daily
-   List spec uses a separate file. We approximate with nasdaqtraded
-   for additions/deletions and supplement with a delta scan.
+   3. DAILY LIST — via Nasdaq Trader RSS feeds (no key, no proxy needed)
+   ──────────────────────────────────────────────────────────────────
+   Nasdaq publishes four dedicated RSS feeds updated each trading day:
+     newlisted  — new security listings (additions)
+     delisted   — security removals (deletions)
+     namechange — ticker symbol / company name changes (renames)
+     dividends  — upcoming dividend ex-dates (corporate actions)
+   Each feed is standard RSS 2.0 XML, fully CORS-accessible.
    ══════════════════════════════════════════════════════════════════ */
+
+const NASDAQ_RSS  = "https://www.nasdaqtrader.com/rss.aspx?feed=";
+const DAILY_FEEDS = {
+  newlisted:  "newlisted",
+  delisted:   "delisted",
+  namechange: "namechange",
+  dividends:  "dividends",
+};
+
+/* Parse an RSS 2.0 feed text into an array of {title, description, pubDate, link} */
+function _parseRSS(text) {
+  if (!text || text.length < 100) return [];
+  try {
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(text, "text/xml");
+    const items  = Array.from(doc.querySelectorAll("item"));
+    return items.map(item => ({
+      title:       item.querySelector("title")?.textContent?.trim()       || "",
+      description: item.querySelector("description")?.textContent?.trim() || "",
+      pubDate:     item.querySelector("pubDate")?.textContent?.trim()     || "",
+      link:        item.querySelector("link")?.textContent?.trim()        || "",
+    }));
+  } catch (e) {
+    console.warn("[NasdaqDir] RSS parse error:", e.message);
+    return [];
+  }
+}
+
+/* Fetch a Nasdaq RSS feed directly (CORS-accessible, no proxy needed) */
+async function _fetchRSS(feedName) {
+  try {
+    const res = await fetch(`${NASDAQ_RSS}${feedName}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return _parseRSS(await res.text());
+  } catch (e) {
+    /* RSS fetch failed — try allorigins proxy as fallback */
+    try {
+      const url     = `${NASDAQ_RSS}${feedName}`;
+      const proxied = PROXY + encodeURIComponent(url);
+      const res2    = await fetch(proxied, { signal: AbortSignal.timeout(12000) });
+      if (!res2.ok) return [];
+      return _parseRSS(await res2.text());
+    } catch {
+      console.warn("[NasdaqDir] RSS feed unavailable:", feedName);
+      return [];
+    }
+  }
+}
+
+/* Extract ticker symbol from RSS item title/description for Nasdaq feeds */
+function _extractSym(title, description) {
+  /* Nasdaq RSS titles often start with: "AAPL - Apple Inc." or "Symbol: AAPL" */
+  const combined = `${title} ${description}`;
+  const patterns = [
+    /^([A-Z]{1,5})\s*[-–:]/,           // leading ticker
+    /Symbol[:\s]+([A-Z]{1,5})\b/i,     // "Symbol: AAPL"
+    /Ticker[:\s]+([A-Z]{1,5})\b/i,     // "Ticker: AAPL"
+    /\b([A-Z]{1,5})\s+(?:will|has|is)\b/, // "AAPL will be..."
+  ];
+  for (const p of patterns) {
+    const m = combined.match(p);
+    if (m) return m[1].toUpperCase();
+  }
+  return null;
+}
+
+/* Parse a date string from RSS pubDate */
+function _parseRSSDate(pubDate) {
+  if (!pubDate) return null;
+  try { return new Date(pubDate).toISOString().slice(0, 10); }
+  catch { return pubDate.slice(0, 10) || null; }
+}
+
 async function _loadDailyList() {
-  /* Only fetch once per session and only between 14:00–23:59 UTC
-     (Daily List is typically posted 1–2pm ET = ~18:00–19:00 UTC)  */
   if (window._nasdaqDaily) return;
 
-  try {
-    /* Use the nasdaqtraded full file as our daily snapshot */
-    const text = await _proxyFetch(
-      `${NASDAQ_BASE}nasdaqtraded.txt`,
-      20000
-    );
-    const { rows } = _parsePipe(text);
+  /* Fetch all four feeds in parallel */
+  const [newItems, delItems, renameItems, divItems] = await Promise.allSettled([
+    _fetchRSS(DAILY_FEEDS.newlisted),
+    _fetchRSS(DAILY_FEEDS.delisted),
+    _fetchRSS(DAILY_FEEDS.namechange),
+    _fetchRSS(DAILY_FEEDS.dividends),
+  ]).then(results => results.map(r => r.status === "fulfilled" ? r.value : []));
 
-    const additions = [];
-    const deletions = [];
+  /* ── Additions ── */
+  const additions = newItems.map(item => ({
+    sym:  _extractSym(item.title, item.description) || "",
+    name: item.title.replace(/^[A-Z]{1,5}\s*[-–:]\s*/, "").trim() || item.title,
+    date: _parseRSSDate(item.pubDate),
+    link: item.link,
+  })).filter(a => a.sym);
 
-    /* Detect newly listed tickers: nextShares flag or recent note fields */
-    for (const r of rows) {
-      const sym = (r["NASDAQ Symbol"] || r["Symbol"] || "").toUpperCase();
-      if (!sym) continue;
-      if (r["Listing Exchange"]?.includes("D")) {
-        deletions.push({ sym, name: r["Security Name"] || sym, reason: "Delisted" });
-      }
+  /* ── Deletions ── */
+  const deletions = delItems.map(item => ({
+    sym:    _extractSym(item.title, item.description) || "",
+    name:   item.title.replace(/^[A-Z]{1,5}\s*[-–:]\s*/, "").trim() || item.title,
+    reason: item.description.slice(0, 80) || "Delisted",
+    date:   _parseRSSDate(item.pubDate),
+  })).filter(d => d.sym);
+
+  /* ── Symbol / Name Changes ── */
+  const renames = renameItems.map(item => {
+    /* Nasdaq namechange titles often: "OLD → NEW" or "OLD to NEW" or "Ticker Change: OLD / NEW" */
+    const t = item.title;
+    const arrowMatch = t.match(/([A-Z]{1,5})\s*(?:→|->|to|\/)\s*([A-Z]{1,5})/i);
+    if (arrowMatch) {
+      return {
+        oldSym: arrowMatch[1].toUpperCase(),
+        newSym: arrowMatch[2].toUpperCase(),
+        oldName: "",
+        newName: item.description.slice(0, 60) || "",
+        date:   _parseRSSDate(item.pubDate),
+      };
     }
+    /* Try description for symbol info */
+    const descMatch = item.description.match(/([A-Z]{1,5})\s*(?:→|->|to|\/)\s*([A-Z]{1,5})/i);
+    if (descMatch) {
+      return {
+        oldSym: descMatch[1].toUpperCase(),
+        newSym: descMatch[2].toUpperCase(),
+        oldName: "",
+        newName: item.title,
+        date:   _parseRSSDate(item.pubDate),
+      };
+    }
+    return null;
+  }).filter(Boolean);
 
-    window._nasdaqDaily = {
-      ts:        Date.now(),
-      additions,
-      deletions,
-      renames:   [],    // populated from Nasdaq Daily List PDF spec — not available via no-key
-      actions:   [],    // dividend ex-dates — populated from ex-dividend data
+  /* ── Corporate Actions (dividends) ── */
+  const actions = divItems.map(item => {
+    const sym = _extractSym(item.title, item.description) || "";
+    /* Extract ex-date from description: "Ex-Dividend Date: 2026-03-20" */
+    const exMatch = item.description.match(/ex.?(?:dividend)?.?date[:\s]+(\d{4}-\d{2}-\d{2}|\w+ \d+,? \d{4})/i)
+                 || item.title.match(/(\d{4}-\d{2}-\d{2})/);
+    const amountMatch = item.description.match(/\$?([\d.]+)\s*(?:per share)?/i);
+    return {
+      sym,
+      type:   "dividend",
+      detail: item.title,
+      exDate: exMatch ? _parseRSSDate(exMatch[1]) : null,
+      amount: amountMatch ? parseFloat(amountMatch[1]) : null,
+      date:   _parseRSSDate(item.pubDate),
     };
+  }).filter(a => a.sym);
 
-    console.log("[NasdaqDir] Daily list snapshot loaded.");
-  } catch (e) {
-    console.warn("[NasdaqDir] Daily list fetch failed:", e.message);
-    window._nasdaqDaily = { ts: Date.now(), additions: [], deletions: [], renames: [], actions: [] };
-  }
+  window._nasdaqDaily = {
+    ts: Date.now(),
+    additions,
+    deletions,
+    renames,
+    actions,
+  };
+
+  const total = additions.length + deletions.length + renames.length + actions.length;
+  console.log(`[NasdaqDir] Daily list loaded via RSS: ${total} events `
+    + `(+${additions.length} new, -${deletions.length} del, `
+    + `~${renames.length} rename, ${actions.length} div)`);
 }
 
 /* ══════════════════════════════════════════════════════════════════
