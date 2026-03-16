@@ -108,6 +108,8 @@ function getGieKey()         { return getKey("gie");           }
 function getOpenFigiKey()       { return getKey("openfigi");       }
 /* Phase 2 — Registry & Ownership */
 function getCompaniesHouseKey() { return getKey("companieshouse"); }
+/* Phase 4 — Reference Data */
+function getTwelvedataKey()     { return getKey("twelvedata");     }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
@@ -362,6 +364,11 @@ function saveKey(id) {
   if (id === "companieshouse" && typeof chLoadForTicker === "function") {
     const t = typeof currentTicker !== "undefined" ? currentTicker : null;
     if (t) setTimeout(() => chLoadForTicker(t), 400);
+  }
+  /* Phase 4 — Reference Data */
+  if (id === "twelvedata" && typeof tdEnrichDividends === "function") {
+    const sym = typeof currentTicker !== "undefined" ? currentTicker.replace(/.*:/, "").toUpperCase() : null;
+    if (sym) setTimeout(() => tdEnrichDividends(sym), 400);
   }
 
   // Hide setup banners when key is configured
