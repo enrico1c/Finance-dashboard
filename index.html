@@ -345,9 +345,11 @@
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="hds"  onclick="switchTab('ownership','hds')">HDS</button>
         <button class="tab-btn"        data-tab="mgmt" onclick="switchTab('ownership','mgmt')">MGMT</button>
+        <button class="tab-btn"        data-tab="psc"  onclick="switchTab('ownership','psc');(function(){var t=typeof currentTicker!=='undefined'?currentTicker:'';if(t&&typeof chLoadForTicker==='function'&&!document.getElementById('own-psc')?.dataset.chLoaded){chLoadForTicker(t);document.getElementById('own-psc').dataset.chLoaded='1';}})()">PSC / BO</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="hds"  id="own-hds"></div>
       <div class="tab-pane        panel-content" data-tab="mgmt" id="own-mgmt"></div>
+      <div class="tab-pane        panel-content" data-tab="psc"  id="own-psc"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -1423,6 +1425,9 @@ document.addEventListener("DOMContentLoaded", () => {
   <script src="openfigi.js"></script>
   <script src="nasdaqdir.js"></script>
   <script src="gleif.js"></script>
+
+  <!-- Phase 2 — Registry & Ownership -->
+  <script src="companieshouse.js"></script>
 
   <!-- switchNewsTab helper -->
   <script>
