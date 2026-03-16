@@ -9,50 +9,80 @@ function cfgEsc(s) {
 }
 
 const KNOWN_PROVIDERS = [
-  { id:"av",  name:"Alpha Vantage",           badge:"AV",
+
+  /* ── MARKET DATA ──────────────────────────────────────────────── */
+  { id:"av", name:"Alpha Vantage", badge:"AV", group:"Market Data",
     desc:"Quote · Fundamentals · Earnings · Income / Balance / Cash Flow · News + Sentiment",
     limit:"25 req/day (free)", docsUrl:"https://www.alphavantage.co/support/#api-key",
     sessionKey:"av_call_count", limitWarn:20, limitMax:25 },
-  { id:"fmp", name:"Financial Modeling Prep", badge:"FMP",
+  { id:"fmp", name:"Financial Modeling Prep", badge:"FMP", group:"Market Data",
     desc:"Analyst Ratings · Targets · Estimates · Holders · Insiders · Management · Events · Ratios",
     limit:"250 req/day (free)", docsUrl:"https://financialmodelingprep.com/developer/docs/",
     sessionKey:"fmp_call_count", limitWarn:200, limitMax:250 },
-  { id:"finnhub", name:"Finnhub", badge:"FH",
-    desc:"Quote · Analyst Consensus · Price Targets · Upgrades/Downgrades · Insider Transactions · Institutional Holders · Company News · Peers · Economic Calendar · WebSocket prezzi live",
+  { id:"finnhub", name:"Finnhub", badge:"FH", group:"Market Data",
+    desc:"Quote · Analyst Consensus · Price Targets · Upgrades/Downgrades · Insider Transactions · Company News · Peers · Economic Calendar · WebSocket live",
     limit:"60 req/min (free)", docsUrl:"https://finnhub.io/docs/api",
     sessionKey:"fh_call_count", limitWarn:50, limitMax:60 },
-  { id:"ninjas", name:"API Ninjas — Earnings Transcripts", badge:"NJA",
-    desc:"Earnings Call Transcripts — testo integrale con speaker labels (CEO, CFO, Analyst) · ~10K req/mese free · Fallback automatico a FMP /earning_call_transcript · Usato dal tab TRANS in Fundamentals",
-    limit:"~10,000 req/mese (free)", docsUrl:"https://api-ninjas.com/api/earningscalltranscript",
-    sessionKey:"ninjas_call_count", limitWarn:9000, limitMax:10000 },
-  { id:"openaq", name:"OpenAQ v3 — Air Quality", badge:"AQI",
-    desc:"Qualità aria in tempo reale · PM2.5, PM10, NO2, O3, CO, SO2 da 30.000+ stazioni in 100+ paesi · Collegato automaticamente all'HQ dell'azienda caricata · Usato dal tab 💨 AIR in Geo·Risk",
-    limit:"Generoso free tier — nessun limite fisso", docsUrl:"https://api.openaq.org/",
-    sessionKey:"openaq_call_count", limitWarn:null, limitMax:null },
-  { id:"fred", name:"FRED (St. Louis Fed)", badge:"FRD",
-    desc:"840K+ economic series: Yield Curve (DGS1M–DGS30) · CPI · GDP · Unemployment · Fed Funds Rate · Inflation Breakeven · HY Spreads · Tassi BCE/BoE/BoJ",
-    limit:"Unlimited (free)", docsUrl:"https://fred.stlouisfed.org/docs/api/fred/",
-    sessionKey:"fred_call_count", limitWarn:null, limitMax:null },
-  { id:"openexchange", name:"Open Exchange Rates", badge:"OER",
-    desc:"200+ currency pairs · Forex rates live + historical · Currency converter · Exotic pairs (VND, NGN, KES, IDR…) · 1K req/month free",
-    limit:"1,000 req/month (free)", docsUrl:"https://openexchangerates.org/account/app-ids",
-    sessionKey:"oer_call_count", limitWarn:900, limitMax:1000 },
-  { id:"yahoo", name:"Yahoo Finance (RapidAPI)", badge:"YHO",
-    desc:"Options chain · Income statement · Institutional holders · Trending tickers · Analyst consensus · Peer comparison · 52W price history — Optional: all features fall back to FMP/AV when key is absent",
+  { id:"eodhd", name:"EODHD", badge:"EOD", group:"Market Data",
+    desc:"Quote live/EOD · Fondamentali globali (150K+ ticker) · News · Dividendi · Earnings Calendar · 70+ borse",
+    limit:"20 req/day (free)", docsUrl:"https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis",
+    sessionKey:"eodhd_call_count", limitWarn:15, limitMax:20 },
+  { id:"yahoo", name:"Yahoo Finance (RapidAPI)", badge:"YHO", group:"Market Data",
+    desc:"Options chain · Income statement · Institutional holders · Trending tickers · Analyst consensus · Peer comparison · 52W price history",
     limit:"500 req/month (free tier)", docsUrl:"https://rapidapi.com/search/yahoo+finance",
     sessionKey:"yf_call_count", limitWarn:450, limitMax:500 },
-  { id:"eodhd", name:"EODHD", badge:"EOD",
-    desc:"Quote live/EOD · Fondamentali globali (150K+ ticker) · News · Dividendi · Earnings Calendar · Screener · 70+ borse",
-    limit:"20 req/day (free) — illimitato sui piani paid", docsUrl:"https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis",
-    sessionKey:"eodhd_call_count", limitWarn:15, limitMax:20 },
-  { id:"apitube", name:"APITube", badge:"APT",
+  { id:"openexchange", name:"Open Exchange Rates", badge:"OER", group:"Market Data",
+    desc:"200+ currency pairs · Forex rates live + historical · Currency converter · Exotic pairs",
+    limit:"1,000 req/month (free)", docsUrl:"https://openexchangerates.org/account/app-ids",
+    sessionKey:"oer_call_count", limitWarn:900, limitMax:1000 },
+
+  /* ── NEWS & ALTERNATIVE DATA ─────────────────────────────────── */
+  { id:"apitube", name:"APITube", badge:"APT", group:"News & Alt Data",
     desc:"Financial News real-time · YouTube/Video news · Sentiment NLP · 500K+ fonti · Filtro ticker / settore / lingua",
     limit:"Varia per piano (free tier disponibile)", docsUrl:"https://apitube.io/en-it/blog/post/how-to-get-started-with-apitube-news-api-a-step-by-step-guide",
     sessionKey:"apitube_call_count", limitWarn:80, limitMax:100 },
-  { id:"massive", name:"Massive", badge:"MSV",
+  { id:"ninjas", name:"API Ninjas — Transcripts", badge:"NJA", group:"News & Alt Data",
+    desc:"Earnings Call Transcripts completi con speaker labels (CEO, CFO, Analyst) · Usato dal tab TRANS",
+    limit:"~10,000 req/mese (free)", docsUrl:"https://api-ninjas.com/api/earningscalltranscript",
+    sessionKey:"ninjas_call_count", limitWarn:9000, limitMax:10000 },
+  { id:"massive", name:"Massive", badge:"MSV", group:"News & Alt Data",
     desc:"Alternative data · Macro indicators · Institutional flow · Economic calendar · Sentiment crowd",
     limit:"Varia per piano", docsUrl:"https://massive.io/",
     sessionKey:"massive_call_count", limitWarn:null, limitMax:null },
+
+  /* ── MACRO & ECONOMIC ─────────────────────────────────────────── */
+  { id:"fred", name:"FRED — St. Louis Fed", badge:"FRD", group:"Macro & Economic",
+    desc:"840K+ economic series: Yield Curve · CPI · GDP · Unemployment · Fed Funds Rate · HY Spreads · Inflation Breakeven",
+    limit:"Unlimited (free)", docsUrl:"https://fred.stlouisfed.org/docs/api/fred/",
+    sessionKey:"fred_call_count", limitWarn:null, limitMax:null },
+  { id:"eia", name:"EIA — U.S. Energy Info Admin", badge:"EIA", group:"Macro & Economic",
+    desc:"Henry Hub gas · WTI crude · Coal production · Weekly storage report · Petroleum inventories · US energy benchmarks · Tab Macro·Energy",
+    limit:"Unlimited (free key)", docsUrl:"https://www.eia.gov/opendata/register.php",
+    sessionKey:"eia_call_count", limitWarn:null, limitMax:null },
+  { id:"bls", name:"BLS — Bureau of Labor Statistics", badge:"BLS", group:"Macro & Economic",
+    desc:"CPI · PPI · Producer Price Indices per categoria commodity · Inflazione legata alle materie prime · API v2",
+    limit:"500 req/day (free, v2)", docsUrl:"https://www.bls.gov/developers/home.htm",
+    sessionKey:"bls_call_count", limitWarn:400, limitMax:500 },
+
+  /* ── COMMODITIES & SUPPLY CHAIN ──────────────────────────────── */
+  { id:"comtrade", name:"UN Comtrade+", badge:"CMT", group:"Commodities & Supply Chain",
+    desc:"Flussi commerciali bilaterali per codice HS · Critical minerals · Gas industriali · Tungsteno · Terre rare · 200 paesi · Tab Supply·Chain > Trade Flows",
+    limit:"500 req/day (free key)", docsUrl:"https://comtradeplus.un.org/",
+    sessionKey:"comtrade_call_count", limitWarn:400, limitMax:500 },
+  { id:"gie", name:"GIE — Gas Infrastructure Europe", badge:"GIE", group:"Commodities & Supply Chain",
+    desc:"AGSI: stoccaggio gas UE giornaliero per paese/operatore · ALSI: inventari LNG · Trasparenza operativa europea · Tab Macro·Energy > EU Storage",
+    limit:"Unlimited (free key)", docsUrl:"https://www.gie.eu/transparency-platform/",
+    sessionKey:"gie_call_count", limitWarn:null, limitMax:null },
+
+  /* ── ENVIRONMENT & GEO ────────────────────────────────────────── */
+  { id:"openaq", name:"OpenAQ v3 — Air Quality", badge:"AQI", group:"Environment & Geo",
+    desc:"Qualità aria real-time · PM2.5, PM10, NO2, O3, CO, SO2 da 30.000+ stazioni · Tab AIR in Geo·Risk",
+    limit:"Generoso free tier — nessun limite fisso", docsUrl:"https://api.openaq.org/",
+    sessionKey:"openaq_call_count", limitWarn:null, limitMax:null },
+  { id:"wm", name:"WorldMonitor", badge:"WM", group:"Environment & Geo",
+    desc:"Chokepoints · Shipping rates · Minerals supply · GPS Jam · Military Ops · Intel Feed — nessuna chiave richiesta",
+    limit:"No key required (public cache)", docsUrl:"https://worldmonitor.app/",
+    sessionKey:"wm_call_count", limitWarn:null, limitMax:null },
 ];
 
 window._KEYS = {};
@@ -73,6 +103,12 @@ function getOpenExchangeKey(){ return getKey("openexchange"); }
 function getEodhdKey()       { return getKey("eodhd");        }
 function getApitubeKey()     { return getKey("apitube");      }
 function getMassiveKey()     { return getKey("massive");      }
+/* New providers from Phase 1–5 integration */
+function getEiaKey()         { return getKey("eia");          }
+function getBlsKey()         { return getKey("bls");          }
+function getComtradeKey()    { return getKey("comtrade");     }
+function getGieKey()         { return getKey("gie");          }
+function getWmKey()          { return getKey("wm");           }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
@@ -87,8 +123,7 @@ function saveCustom(list) { localStorage.setItem(LS_CUSTOM, JSON.stringify(list)
 function allProviders() { return [...KNOWN_PROVIDERS, ...getCustom()]; }
 
 /* ══════════════════════════════════════════════════════════════════
-   TOPBAR BADGES — removed from topbar.
-   All API status now lives in the left API Status sidebar.
+   TOPBAR BADGES — removed. All API status is in the left sidebar.
    Stubs keep legacy callers from throwing.
    ══════════════════════════════════════════════════════════════════ */
 function renderTopbarBadges() { renderApiStatusSidebar(); }
@@ -104,14 +139,12 @@ let _apiStatusOpen = false;
 function toggleApiStatus() {
   _apiStatusOpen ? closeApiStatus() : openApiStatus();
 }
-
 function openApiStatus() {
   _apiStatusOpen = true;
   const el = document.getElementById("apiStatusSidebar");
   if (el) { el.classList.add("open"); renderApiStatusSidebar(); }
   document.getElementById("apiStatusBtn")?.classList.add("active");
 }
-
 function closeApiStatus() {
   _apiStatusOpen = false;
   document.getElementById("apiStatusSidebar")?.classList.remove("open");
@@ -124,56 +157,72 @@ function renderApiStatusSidebar() {
 
   const providers = allProviders();
 
-  box.innerHTML = providers.map(p => {
-    const key = getKey(p.id);
-    const n   = parseInt(sessionStorage.getItem(p.sessionKey || "") || "0");
+  // Group by .group field
+  const groups = {};
+  providers.forEach(p => {
+    const g = p.group || "Other";
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(p);
+  });
 
-    const dot = !key ? "#484f58"
-      : p.limitMax && n >= p.limitMax   ? "#f85149"
-      : p.limitWarn && n >= p.limitWarn ? "#d29922"
-      : "#3fb950";
+  let html = "";
+  Object.entries(groups).forEach(([groupName, items]) => {
+    html += `<div class="aps-group-label">${cfgEsc(groupName)}</div>`;
+    items.forEach(p => {
+      const key = getKey(p.id);
+      const n   = parseInt(sessionStorage.getItem(p.sessionKey || "") || "0");
 
-    const statusLabel = !key ? "NOT SET"
-      : p.limitMax && n >= p.limitMax   ? "LIMIT REACHED"
-      : p.limitWarn && n >= p.limitWarn ? "WARNING"
-      : "OK";
+      const dot = !key        ? "#484f58"
+        : p.limitMax && n >= p.limitMax   ? "#f85149"
+        : p.limitWarn && n >= p.limitWarn ? "#d29922"
+        : "#3fb950";
 
-    const barHtml = (key && p.limitMax)
-      ? (() => {
-          const pct    = Math.min(100, (n / p.limitMax) * 100);
-          const barCol = pct >= 100 ? "#f85149" : pct >= 80 ? "#d29922" : "#3fb950";
-          return `<div class="aps-bar-wrap">
-            <div class="aps-bar-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div>
-          </div>
-          <span class="aps-count">${n} / ${p.limitMax}</span>`;
-        })()
-      : key
-        ? `<span class="aps-unlimited">∞ no call limit</span>`
-        : `<span class="aps-nokey">no key set</span>`;
+      const statusLabel = !key ? "NOT SET"
+        : p.limitMax && n >= p.limitMax   ? "LIMIT"
+        : p.limitWarn && n >= p.limitWarn ? "WARN"
+        : "OK";
 
-    const resetBtn = (key && p.sessionKey && n > 0)
-      ? `<button class="aps-reset-btn" onclick="event.stopPropagation();resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')" title="Reset counter">↺</button>`
-      : "";
+      const barHtml = (key && p.limitMax)
+        ? (() => {
+            const pct    = Math.min(100, (n / p.limitMax) * 100);
+            const barCol = pct >= 100 ? "#f85149" : pct >= 80 ? "#d29922" : "#3fb950";
+            return `<div class="aps-bar-wrap">
+              <div class="aps-bar-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div>
+            </div>
+            <span class="aps-count">${n} / ${p.limitMax}</span>`;
+          })()
+        : key
+          ? `<span class="aps-unlimited">&#8734; no limit</span>`
+          : `<span class="aps-nokey">no key set</span>`;
 
-    return `<div class="aps-row" onclick="openApiConfig('${cfgEsc(p.id)}')" title="Configure ${cfgEsc(p.name)}">
-      <div class="aps-row-top">
-        <span class="aps-dot" style="background:${dot}"></span>
-        <span class="aps-badge">${cfgEsc(p.badge)}</span>
-        <span class="aps-name">${cfgEsc(p.name)}</span>
-        <span class="aps-status-lbl" style="color:${dot}">${cfgEsc(statusLabel)}</span>
-        ${resetBtn}
-      </div>
-      <div class="aps-row-bottom">${barHtml}</div>
-    </div>`;
-  }).join("");
+      const resetBtn = (key && p.sessionKey && n > 0)
+        ? `<button class="aps-reset-btn" onclick="event.stopPropagation();resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')" title="Reset counter">&#8635;</button>`
+        : "";
+
+      html += `<div class="aps-row" onclick="openApiConfig('${cfgEsc(p.id)}')" title="${cfgEsc(p.name)} — click to configure">
+        <div class="aps-row-top">
+          <span class="aps-dot" style="background:${dot}"></span>
+          <span class="aps-badge">${cfgEsc(p.badge)}</span>
+          <span class="aps-name">${cfgEsc(p.name)}</span>
+          <span class="aps-status-lbl" style="color:${dot}">${cfgEsc(statusLabel)}</span>
+          ${resetBtn}
+        </div>
+        <div class="aps-row-bottom">${barHtml}</div>
+        ${key && p.limit ? `<div class="aps-limit-note">${cfgEsc(p.limit)}</div>` : ""}
+      </div>`;
+    });
+  });
+  box.innerHTML = html;
 
   const footer = document.getElementById("apiStatusFooter");
   if (footer) {
     const configured = providers.filter(p => !!getKey(p.id)).length;
     const cacheN     = Object.keys(sessionStorage)
-      .filter(k => providers.some(p => k.startsWith(p.id + "_") || k.startsWith("av_") || k.startsWith("fmp_"))).length;
+      .filter(k => providers.some(p =>
+        k.startsWith(p.id + "_") || k.startsWith("av_") || k.startsWith("fmp_")
+      )).length;
     footer.innerHTML = `
-      <span>${configured} / ${providers.length} configured · ${cacheN} cached</span>
+      <span>${configured} / ${providers.length} configured &middot; ${cacheN} cached</span>
       <button class="aps-clear-btn" onclick="clearAllCache()">Clear cache</button>`;
   }
 }
@@ -185,16 +234,14 @@ function injectApiStatusSidebar() {
   el.className = "api-status-sidebar";
   el.innerHTML = `
     <div class="aps-header">
-      <span class="aps-title">⚡ API Status</span>
-      <button class="aps-close-btn" onclick="closeApiStatus()" title="Close">✕</button>
+      <span class="aps-title">&#9889; API Status</span>
+      <button class="aps-close-btn" onclick="closeApiStatus()" title="Close">&#10005;</button>
     </div>
-    <div class="aps-subhead">Click any row to configure · Live call counters</div>
+    <div class="aps-subhead">Click any row to configure &middot; Live call counters</div>
     <div class="aps-list" id="apiStatusList"></div>
     <div class="aps-footer" id="apiStatusFooter"></div>
   `;
   document.body.appendChild(el);
-
-  // Close on outside click
   document.addEventListener("click", e => {
     if (!_apiStatusOpen) return;
     if (el.contains(e.target)) return;
@@ -256,6 +303,63 @@ function switchApiTab(tabId) {
 function renderProviderList() {
   const box = document.getElementById("apiProviderList");
   if (!box) return;
+
+  // Build grouped output
+  const providers = allProviders();
+  const groups = {};
+  providers.forEach(p => {
+    const g = p.group || "Other";
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(p);
+  });
+
+  let allHtml = "";
+  const flatList = []; // for divider logic
+  Object.entries(groups).forEach(([groupName, items]) => {
+    allHtml += `<div class="api-group-heading">${cfgEsc(groupName)}</div>`;
+    items.forEach((p, i) => {
+      flatList.push(p);
+      const val  = getKey(p.id);
+      const n    = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
+      const bCls = !val ? "badge-unset" : (p.limitMax && n >= p.limitMax) ? "badge-limit" : "badge-set";
+      const bLbl = !val ? "NOT SET"     : (p.limitMax && n >= p.limitMax) ? "LIMIT"       : mask(val);
+      allHtml += `
+      <div class="api-key-block${_focusId===p.id?" api-key-block-focus":""}" id="pblock-${cfgEsc(p.id)}">
+        <div class="api-key-provider">
+          <div class="api-key-provider-left">
+            <span class="api-badge-pill">${cfgEsc(p.badge)}</span>
+            <div>
+              <div class="api-key-name">${cfgEsc(p.name)}</div>
+              <div class="api-key-limit">${cfgEsc(p.limit||"")}</div>
+            </div>
+          </div>
+          <span class="api-key-badge ${bCls}">${cfgEsc(bLbl)}</span>
+        </div>
+        ${p.desc ? `<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl
+          ? ` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Get free key &rarr;</a>` : ""}</div>` : ""}
+        <div class="api-key-input-row">
+          <input type="password" id="kinput-${cfgEsc(p.id)}" class="api-key-field"
+                 placeholder="Paste API key here…" value="${cfgEsc(val)}"
+                 autocomplete="off" spellcheck="false"
+                 oninput="livePreviewKey('${cfgEsc(p.id)}')" />
+          <button class="api-key-eye" title="Show/hide"
+                  onclick="toggleKeyVis('kinput-${cfgEsc(p.id)}',this)">&#128065;</button>
+          <button class="api-key-save"  onclick="saveKey('${cfgEsc(p.id)}')">Save</button>
+          <button class="api-key-clear" onclick="clearKey('${cfgEsc(p.id)}')">Clear</button>
+        </div>
+        <div class="api-key-status" id="kstatus-${cfgEsc(p.id)}"></div>
+        ${val && p.sessionKey ? `<div class="api-key-usage">
+          Session calls: <strong>${n}</strong>${p.limitMax?" / "+p.limitMax:""}
+          ${n>0?`<button class="api-reset-count-btn" onclick="resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')">Reset</button>`:""}
+        </div>`:""}
+        ${p.custom?`<button class="api-custom-del-btn" style="margin-top:6px"
+            onclick="removeCustom('${cfgEsc(p.id)}')">&#10005; Remove</button>`:""}
+      </div>
+      <div class="api-modal-divider"></div>`;
+    });
+  });
+  box.innerHTML = allHtml;
+  return; // early return — old map() code below replaced
 
   box.innerHTML = allProviders().map((p, i, arr) => {
     const val  = getKey(p.id);
