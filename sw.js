@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v8-2026';
+const CACHE_VERSION  = 'finterm-v9-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -44,6 +44,9 @@ const APP_SHELL = [
   '/companieshouse.js',
   /* Phase 3 — Market Structure */
   '/finra.js',
+  /* Phase 4 — Reference Data & Instrument Lifecycle */
+  '/esmafirds.js',
+  '/secdera.js',
 ];
 
 /* API hosts to cache with network-first strategy */
@@ -79,6 +82,9 @@ const API_HOSTS = [
   /* Phase 3 — Market Structure */
   'cdn.finra.org',
   'services.finra.org',
+  /* Phase 4 — Reference Data & Instrument Lifecycle */
+  'registers.esma.europa.eu',
+  'api.twelvedata.com',
 ];
 
 /* ── Install: pre-cache app shell ────────────────────────────────── */
