@@ -94,22 +94,27 @@ function renderTopbarBadges() {
   if (!btn) return;
   document.querySelectorAll(".api-dyn-badge").forEach(el => el.remove());
 
-  allProviders().forEach(p => {
-    const key = getKey(p.id);
-    const n   = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
-    const cls = !key ? "api-unconfigured"
-              : (p.limitMax && n >= p.limitMax)   ? "api-limit"
-              : (p.limitWarn && n >= p.limitWarn) ? "api-warn"
-              : "api-ok";
-    const el  = document.createElement("div");
-    el.className = `api-status api-dyn-badge ${cls}`;
-    el.title     = key ? `${p.name}: ${n}${p.limitMax?"/"+p.limitMax:""} calls` : `${p.name}: not configured`;
-    el.style.cursor = "pointer";
-    el.innerHTML = `<span class="api-dot"></span><span>${cfgEsc(p.badge)}</span>`
-                 + (key ? `<span>${n}${p.limitMax?"/"+p.limitMax:""}</span>` : "");
-    el.addEventListener("click", () => openApiConfig(p.id));
-    btn.insertAdjacentElement("beforebegin", el);
-  });
+  // Only show providers that have a real call limit (limitMax defined).
+  // Unlimited providers (FRED, OpenAQ, Massive, etc.) are still fully
+  // configurable in the sidebar — they just don't clutter the topbar.
+  allProviders()
+    .filter(p => p.limitMax != null)
+    .forEach(p => {
+      const key = getKey(p.id);
+      const n   = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
+      const cls = !key ? "api-unconfigured"
+                : n >= p.limitMax   ? "api-limit"
+                : n >= p.limitWarn  ? "api-warn"
+                : "api-ok";
+      const el  = document.createElement("div");
+      el.className = `api-status api-dyn-badge ${cls}`;
+      el.title     = key ? `${p.name}: ${n}/${p.limitMax} calls` : `${p.name}: not configured`;
+      el.style.cursor = "pointer";
+      el.innerHTML = `<span class="api-dot"></span><span>${cfgEsc(p.badge)}</span>`
+                   + (key ? `<span>${n}/${p.limitMax}</span>` : "");
+      el.addEventListener("click", () => openApiConfig(p.id));
+      btn.insertAdjacentElement("beforebegin", el);
+    });
 }
 
 function updateApiStatus() { renderTopbarBadges(); }
