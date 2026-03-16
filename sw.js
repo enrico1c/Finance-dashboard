@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v7-2026';
+const CACHE_VERSION  = 'finterm-v8-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -42,6 +42,8 @@ const APP_SHELL = [
   '/gleif.js',
   /* Phase 2 — Registry & Ownership */
   '/companieshouse.js',
+  /* Phase 3 — Market Structure */
+  '/finra.js',
 ];
 
 /* API hosts to cache with network-first strategy */
@@ -74,6 +76,9 @@ const API_HOSTS = [
   /* Phase 2 — Registry & Ownership */
   'api.company-information.service.gov.uk',
   'bods-data.openownership.org',
+  /* Phase 3 — Market Structure */
+  'cdn.finra.org',
+  'services.finra.org',
 ];
 
 /* ── Install: pre-cache app shell ────────────────────────────────── */
