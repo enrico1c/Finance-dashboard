@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v6-2026';
+const CACHE_VERSION  = 'finterm-v7-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -40,6 +40,8 @@ const APP_SHELL = [
   '/openfigi.js',
   '/nasdaqdir.js',
   '/gleif.js',
+  /* Phase 2 — Registry & Ownership */
+  '/companieshouse.js',
 ];
 
 /* API hosts to cache with network-first strategy */
@@ -69,6 +71,9 @@ const API_HOSTS = [
   'api.openfigi.com',
   'api.gleif.org',
   'www.nasdaqtrader.com',
+  /* Phase 2 — Registry & Ownership */
+  'api.company-information.service.gov.uk',
+  'bods-data.openownership.org',
 ];
 
 /* ── Install: pre-cache app shell ────────────────────────────────── */
