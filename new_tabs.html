@@ -1,0 +1,41 @@
+<!-- ══════════════════════════════════════════════════════════════════
+     new_tabs.html  — New tab buttons and panel divs to add to index.html
+     ══════════════════════════════════════════════════════════════════ -->
+
+<!-- ── 1. ADD TO MACRO INTEL TAB BAR (alongside existing tabs like econ, yield, global, pmi, cb) ── -->
+<!-- Find the macro intel tab bar and add these buttons: -->
+
+<button class="tab-btn" data-tab="energy"      onclick="switchTab('macro','energy');    if(typeof energyLoadAll==='function')energyLoadAll()">⚡ Energy</button>
+<button class="tab-btn" data-tab="commodities" onclick="switchTab('macro','commodities');if(typeof commoditiesLoadAll==='function')commoditiesLoadAll()">📦 Commodities</button>
+<button class="tab-btn" data-tab="agri"        onclick="switchTab('macro','agri');      if(typeof agricultureLoadAll==='function')agricultureLoadAll()">🌾 Agriculture</button>
+<button class="tab-btn" data-tab="positioning" onclick="switchTab('macro','positioning');if(typeof positioningLoadAll==='function')positioningLoadAll()">📊 Positioning</button>
+
+<!-- ── 2. ADD MACRO PANEL CONTENT DIVS (alongside existing like macro-econ, macro-yield, etc.) ── -->
+
+<div id="macro-energy"      class="tab-pane" data-parent="macro"></div>
+<div id="macro-commodities" class="tab-pane" data-parent="macro"></div>
+<div id="macro-agri"        class="tab-pane" data-parent="macro"></div>
+<div id="macro-positioning" class="tab-pane" data-parent="macro"></div>
+
+<!-- ── 3. ADD NEWS/INTEL TAB (in the News panel tab bar) ── -->
+
+<button class="tab-btn" data-tab="intel" onclick="switchTab('news','intel');if(typeof intelLoadAll==='function')intelLoadAll()">🔍 Intel</button>
+
+<div id="news-intel" class="tab-pane" data-parent="news"></div>
+
+<!-- ── 4. ADD SUPPLY CHAIN MINERALS SUB-PANEL ── -->
+<!-- The supply-minerals div should already exist. The minerals.js and tradeflows.js -->
+<!-- scripts will inject their sections into it automatically on DOMContentLoaded.    -->
+<!-- No HTML changes needed for supply-minerals beyond ensuring the div exists:       -->
+
+<div id="supply-minerals" class="tab-pane" data-parent="supply"></div>
+
+<!-- ── 5. ADD SCRIPT TAGS (in <head> or before </body>, after all existing scripts) ── -->
+
+<script src="energy.js"></script>
+<script src="commodities.js"></script>
+<script src="minerals.js"></script>
+<script src="agriculture.js"></script>
+<script src="tradeflows.js"></script>
+<script src="positioning.js"></script>
+<script src="intel.js"></script>
