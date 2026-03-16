@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v5-2026';
+const CACHE_VERSION  = 'finterm-v6-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -36,6 +36,10 @@ const APP_SHELL = [
   '/tradeflows.js',
   '/positioning.js',
   '/intel.js',
+  /* Phase 1 — Identity Infrastructure */
+  '/openfigi.js',
+  '/nasdaqdir.js',
+  '/gleif.js',
 ];
 
 /* API hosts to cache with network-first strategy */
@@ -61,6 +65,10 @@ const API_HOSTS = [
   'api.bls.gov',
   'api.gdeltproject.org',
   'www.federalregister.gov',
+  /* Phase 1 — Identity Infrastructure */
+  'api.openfigi.com',
+  'api.gleif.org',
+  'www.nasdaqtrader.com',
 ];
 
 /* ── Install: pre-cache app shell ────────────────────────────────── */
