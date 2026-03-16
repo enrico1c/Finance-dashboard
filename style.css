@@ -6639,3 +6639,489 @@ body.panel-dragging iframe, body.panel-resizing iframe {
   font-size: 10px;
   color: var(--color-text-muted, #6e7681);
 }
+/* ══════════════════════════════════════════════════════════════════
+   phase2_styles.css — CSS additions for Phase 2 Registry & Ownership
+   Append this to the end of style.css
+   Covers: companieshouse.js (CH + BODS)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   SHARED — source badge used by both CH and BODS heads
+   ───────────────────────────────────────────────────────────────── */
+.ch-head,
+.bods-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ch-src-badge,
+.bods-src-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6e7681);
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   COMPANIES HOUSE — UK Registry block in #fund-des
+   ───────────────────────────────────────────────────────────────── */
+.ch-registry-block {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #d29922;
+  border-radius: 0 6px 6px 0;
+}
+
+.ch-grid {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.ch-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.ch-label {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.ch-value {
+  font-size: 11px;
+  color: var(--color-text-primary, #e6edf3);
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ch-num-code {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: #d29922;
+  background: rgba(210,153,34,0.1);
+  border: 0.5px solid rgba(210,153,34,0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  letter-spacing: 0.5px;
+}
+
+.ch-ext-link {
+  font-size: 10px;
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.ch-ext-link:hover { text-decoration: underline; }
+
+.ch-sics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ch-sic-chip {
+  font-size: 9px;
+  font-family: var(--font-mono, monospace);
+  color: var(--color-text-secondary, #8b949e);
+  background: rgba(110,118,129,0.12);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   COMPANIES HOUSE — Directors block in #own-mgmt
+   ───────────────────────────────────────────────────────────────── */
+.ch-directors-block {
+  margin-top: 2px;
+}
+
+.ch-avatar {
+  background: rgba(210,153,34,0.15);
+  border: 1px solid rgba(210,153,34,0.3);
+  color: #d29922;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   COMPANIES HOUSE — Setup banner in #own-psc (no key)
+   ───────────────────────────────────────────────────────────────── */
+.ch-setup-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 14px;
+  background: rgba(210,153,34,0.06);
+  border: 0.5px solid rgba(210,153,34,0.2);
+  border-radius: 8px;
+  margin: 10px;
+}
+
+.ch-setup-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.ch-setup-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ch-setup-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-primary, #e6edf3);
+  margin-bottom: 4px;
+}
+
+.ch-setup-desc {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8b949e);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.ch-setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ch-setup-btn {
+  background: rgba(210,153,34,0.15);
+  border: 0.5px solid rgba(210,153,34,0.4);
+  color: #d29922;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ch-setup-btn:hover {
+  background: rgba(210,153,34,0.25);
+  border-color: rgba(210,153,34,0.6);
+}
+
+.ch-setup-link {
+  font-size: 11px;
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.ch-setup-link:hover { text-decoration: underline; }
+
+/* ─────────────────────────────────────────────────────────────────
+   COMPANIES HOUSE — PSC cards in #own-psc
+   ───────────────────────────────────────────────────────────────── */
+.ch-psc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.ch-psc-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  transition: border-color 0.15s;
+}
+.ch-psc-card:hover { border-color: rgba(210,153,34,0.45); }
+
+.ch-psc-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(210,153,34,0.15);
+  border: 1px solid rgba(210,153,34,0.3);
+  color: #d29922;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ch-psc-corp {
+  background: rgba(88,166,255,0.12);
+  border-color: rgba(88,166,255,0.3);
+  color: var(--color-accent, #58a6ff);
+  font-size: 16px;
+}
+
+.ch-psc-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ch-psc-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, #e6edf3);
+  margin-bottom: 3px;
+}
+
+.ch-psc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  margin-bottom: 4px;
+}
+
+.ch-psc-kind-tag {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--color-accent, #58a6ff);
+  background: rgba(88,166,255,0.1);
+  border: 0.5px solid rgba(88,166,255,0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.ch-psc-natures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.ch-psc-nature {
+  font-size: 9px;
+  font-weight: 600;
+  color: #d29922;
+  background: rgba(210,153,34,0.1);
+  border: 0.5px solid rgba(210,153,34,0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   OPEN OWNERSHIP BODS — #own-psc beneficial ownership section
+   ───────────────────────────────────────────────────────────────── */
+.bods-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border, #21262d);
+}
+
+.bods-owner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 6px 0;
+}
+
+.bods-owner-card {
+  padding: 8px 10px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid rgba(162,94,247,0.5);
+  border-radius: 0 5px 5px 0;
+}
+
+.bods-owner-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, #e6edf3);
+  margin-bottom: 2px;
+}
+
+.bods-owner-interest {
+  font-size: 10px;
+  color: #a371f7;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.bods-owner-date {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+}
+/* ══════════════════════════════════════════════════════════════════
+   phase3_styles.css — CSS additions for Phase 3 Market Structure
+   Append this to the end of style.css
+   Covers: finra.js (FINRA Short Sale Volume + Short Interest)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   SHARED — FINRA section head badge
+   ───────────────────────────────────────────────────────────────── */
+.finra-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finra-src-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6e7681);
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: auto;
+}
+
+.finra-primary-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   FINRA Short Interest — primary authoritative section (top of panel)
+   ───────────────────────────────────────────────────────────────── */
+.finra-si-section {
+  /* No special wrapper needed — uses existing si-kpi-grid classes */
+}
+
+.finra-authoritative-note {
+  font-size: 10px;
+  color: var(--color-text-secondary, #8b949e);
+  padding: 5px 12px 6px;
+  background: rgba(88,166,255,0.05);
+  border-left: 2px solid rgba(88,166,255,0.3);
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+.finra-divider {
+  height: 1px;
+  background: var(--color-border, #21262d);
+  margin: 10px 0 0;
+}
+
+.finra-si-unavail {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8b949e);
+  padding: 8px 12px;
+  font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   FINRA Daily Short Sale Volume section (bottom of panel)
+   ───────────────────────────────────────────────────────────────── */
+.finra-ssv-section {
+  border-top: 1px solid var(--color-border, #21262d);
+  padding-top: 2px;
+  margin-top: 4px;
+}
+
+.finra-ssv-note {
+  font-size: 10px;
+  color: var(--color-text-secondary, #8b949e);
+  padding: 5px 12px 6px;
+  background: rgba(210,153,34,0.05);
+  border-left: 2px solid rgba(210,153,34,0.3);
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+.finra-no-data {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #8b949e);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   FINRA KPI row (short sale volume metrics)
+   Re-uses existing si-kpi-* classes for the SI section;
+   these are new classes for the SSV KPI layout.
+   ───────────────────────────────────────────────────────────────── */
+.finra-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 1px;
+  background: var(--color-border, #21262d);
+  border: 1px solid var(--color-border, #21262d);
+  margin: 8px 0;
+}
+
+.finra-kpi {
+  background: var(--bg-panel, #0d1117);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.finra-kpi-lbl {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6e7681);
+  font-weight: 700;
+}
+
+.finra-kpi-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text, #e6edf3);
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.finra-kpi-sub {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+}
+
+/* Spark cell — wider to accommodate SVG */
+.finra-kpi-spark {
+  grid-column: span 2;
+}
+
+.finra-spark {
+  width: 100%;
+  height: 20px;
+  display: block;
+  margin-top: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   FINRA footer / links
+   ───────────────────────────────────────────────────────────────── */
+.finra-footer {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  padding: 6px 12px 4px;
+  border-top: 1px solid var(--color-border, #21262d);
+  margin-top: 6px;
+}
+
+.finra-link {
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.finra-link:hover { text-decoration: underline; }
