@@ -126,10 +126,9 @@
 
       <div class="topbar-divider"></div>
 
-      <!-- ── API buttons ────────────────────────────────────────── -->
+      <!-- ── API sidebar toggle button ─────────────────────────── -->
       <span id="fh-ws-status" title="Finnhub WebSocket status" style="font-size:9px;font-weight:700;letter-spacing:.03em;cursor:default;margin-right:2px"></span>
-      <button id="apiStatusBtn" class="api-status-btn" onclick="toggleApiStatus()" title="API call status &amp; counters">&#9889; API Status</button>
-      <button class="api-config-btn" onclick="toggleApiSidebar()" title="Configure API Keys">&#9881; API Keys</button>
+      <button class="api-config-btn" onclick="toggleApiSidebar()" title="Configure API Keys">⚙ API</button>
 
       <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse">▲</button>
     </div>
@@ -314,7 +313,13 @@
           <button class="icon-btn close" onclick="hidePanel('news')">✕</button>
         </div>
       </div>
-      <div class="panel-content" id="news-feed"></div>
+      <!-- News sub-tabs: Ticker news | Intel/Policy feed -->
+      <div class="tab-bar" id="news-tab-bar" style="border-bottom:1px solid var(--border)">
+        <button class="tab-btn active" data-tab="news-feed" onclick="switchNewsTab('news-feed')">📰 NEWS</button>
+        <button class="tab-btn"        data-tab="news-intel" onclick="switchNewsTab('news-intel');if(typeof intelLoadAll==='function')intelLoadAll()">🔍 INTEL</button>
+      </div>
+      <div id="news-feed"  class="panel-content news-subpane active"></div>
+      <div id="news-intel" class="panel-content news-subpane" style="display:none"></div>
       <!-- legacy IDs kept invisible so API renderers don't crash -->
       <div id="news-cn"   style="display:none"></div>
       <div id="news-evts" style="display:none"></div>
@@ -781,14 +786,31 @@
         <button class="tab-btn"        data-tab="ship"    onclick="switchTab('supply','ship')">SHIPPING</button>
         <button class="tab-btn"        data-tab="minerals" onclick="switchTab('supply','minerals')">MINERALS</button>
         <button class="tab-btn"        data-tab="flights" onclick="switchTab('supply','flights')">FLIGHTS</button>
-        <button class="tab-btn"        data-tab="energy"  onclick="switchTab('supply','energy')">ENERGY</button>
+        <button class="tab-btn"        data-tab="energy"  onclick="switchTab('supply','energy');if(typeof energyLoadAll==='function')energyLoadAll()">ENERGY</button>
         <button class="tab-btn"        data-tab="weather" onclick="switchTab('supply','weather');if(typeof meteoLoadSupplyWeather==='function')meteoLoadSupplyWeather()">WEATHER</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="choke"    id="supply-choke"></div>
       <div class="tab-pane        panel-content" data-tab="ship"     id="supply-ship"></div>
       <div class="tab-pane        panel-content" data-tab="minerals" id="supply-minerals"></div>
       <div class="tab-pane        panel-content" data-tab="flights"  id="supply-flights"></div>
-      <div class="tab-pane        panel-content" data-tab="energy"   id="supply-energy"></div>
+      <div class="tab-pane        panel-content" data-tab="energy"   id="supply-energy">
+        <div class="api-quicksetup-banner" id="energy-setup-banner">
+          <div class="api-qs-icon">⚡</div>
+          <div class="api-qs-body">
+            <div class="api-qs-title">Energy Intelligence — EIA + ENTSOG + GIE</div>
+            <div class="api-qs-desc">
+              WTI · Henry Hub · OPEC Basket · US Gas Storage · EU Gas Flows · EU Storage Levels<br>
+              <span style="color:var(--text-muted);font-size:9px">EIA bulk data requires no key · GIE: free registration at agsi.gie.eu</span>
+            </div>
+            <div class="api-qs-actions">
+              <button class="api-qs-btn-primary" onclick="if(typeof energyLoadAll==='function')energyLoadAll();this.closest('.api-quicksetup-banner').style.display='none'">⚡ Load Energy Data</button>
+              <a href="https://agsi.gie.eu/" target="_blank" class="api-qs-btn-link">GIE key ↗</a>
+              <a href="https://www.eia.gov/opendata/register.php" target="_blank" class="api-qs-btn-link">EIA key ↗</a>
+            </div>
+          </div>
+          <button class="api-qs-dismiss" onclick="this.closest('.api-quicksetup-banner').style.display='none'" title="Dismiss">✕</button>
+        </div>
+      </div>
       <div class="tab-pane        panel-content" data-tab="weather"  id="supply-weather"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
@@ -860,6 +882,10 @@
         <button class="tab-btn"        data-tab="global"   onclick="switchTab('macro','global');if(typeof macroLoadGlobal==='function')macroLoadGlobal()">🌐 GLOBAL</button>
         <button class="tab-btn"        data-tab="pmi"      onclick="switchTab('macro','pmi');if(typeof macroLoadPMI==='function')macroLoadPMI()">📊 PMI</button>
         <button class="tab-btn"        data-tab="cb"       onclick="switchTab('macro','cb');if(typeof macroLoadCentralBanks==='function')macroLoadCentralBanks()">🏦 BANKS</button>
+        <button class="tab-btn"        data-tab="energy"      onclick="switchTab('macro','energy');      if(typeof energyLoadAll==='function')energyLoadAll()">⚡ ENERGY</button>
+        <button class="tab-btn"        data-tab="commodities" onclick="switchTab('macro','commodities'); if(typeof commoditiesLoadAll==='function')commoditiesLoadAll()">📦 COMMOD.</button>
+        <button class="tab-btn"        data-tab="agri"        onclick="switchTab('macro','agri');        if(typeof agricultureLoadAll==='function')agricultureLoadAll()">🌾 AGRI</button>
+        <button class="tab-btn"        data-tab="positioning" onclick="switchTab('macro','positioning'); if(typeof positioningLoadAll==='function')positioningLoadAll()">📊 COT</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="signals" id="macro-signals"></div>
       <div class="tab-pane        panel-content" data-tab="comm"    id="macro-comm"></div>
@@ -874,7 +900,11 @@
       <div class="tab-pane        panel-content" data-tab="bonds"    id="bonds-content"></div>
       <div class="tab-pane        panel-content" data-tab="global"   id="macro-global"></div>
       <div class="tab-pane        panel-content" data-tab="pmi"      id="macro-pmi"></div>
-      <div class="tab-pane        panel-content" data-tab="cb"       id="macro-cb"></div>
+      <div class="tab-pane        panel-content" data-tab="cb"          id="macro-cb"></div>
+      <div class="tab-pane        panel-content" data-tab="energy"      id="macro-energy"></div>
+      <div class="tab-pane        panel-content" data-tab="commodities" id="macro-commodities"></div>
+      <div class="tab-pane        panel-content" data-tab="agri"        id="macro-agri"></div>
+      <div class="tab-pane        panel-content" data-tab="positioning" id="macro-positioning"></div>
       <div class="tab-pane        panel-content" data-tab="trending" id="macro-trending">
         <div id="yf-trending" class="panel-content"></div>
       </div>
@@ -1380,6 +1410,27 @@ document.addEventListener("DOMContentLoaded", () => {
   renderGeoRoutes();
 });
 </script>
+  <!-- ── New data module scripts ──────────────────────────────── -->
+  <script src="energy.js"></script>
+  <script src="commodities.js"></script>
+  <script src="minerals.js"></script>
+  <script src="agriculture.js"></script>
+  <script src="tradeflows.js"></script>
+  <script src="positioning.js"></script>
+  <script src="intel.js"></script>
+
+  <!-- switchNewsTab helper -->
+  <script>
+    function switchNewsTab(id) {
+      document.querySelectorAll('.news-subpane').forEach(p => {
+        p.style.display = p.id === id ? '' : 'none';
+      });
+      document.querySelectorAll('#news-tab-bar .tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === id);
+      });
+    }
+  </script>
+
   <!-- PWA: Service Worker registration -->
   <script>
     if ('serviceWorker' in navigator) {
