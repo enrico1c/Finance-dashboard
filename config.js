@@ -56,7 +56,7 @@ const KNOWN_PROVIDERS = [
     limit:"Unlimited (free)", docsUrl:"https://fred.stlouisfed.org/docs/api/fred/",
     sessionKey:"fred_call_count", limitWarn:null, limitMax:null },
   { id:"eia", name:"EIA — U.S. Energy Info Admin", badge:"EIA", group:"Macro & Economic",
-    desc:"Henry Hub gas · WTI crude · Coal production · Weekly storage report · Petroleum inventories · US energy benchmarks · Tab Macro·Energy",
+    desc:"Henry Hub gas · WTI crude · Coal production · Weekly storage report · Petroleum inventories · Tab Macro·Energy",
     limit:"Unlimited (free key)", docsUrl:"https://www.eia.gov/opendata/register.php",
     sessionKey:"eia_call_count", limitWarn:null, limitMax:null },
   { id:"bls", name:"BLS — Bureau of Labor Statistics", badge:"BLS", group:"Macro & Economic",
@@ -70,7 +70,7 @@ const KNOWN_PROVIDERS = [
     limit:"500 req/day (free key)", docsUrl:"https://comtradeplus.un.org/",
     sessionKey:"comtrade_call_count", limitWarn:400, limitMax:500 },
   { id:"gie", name:"GIE — Gas Infrastructure Europe", badge:"GIE", group:"Commodities & Supply Chain",
-    desc:"AGSI: stoccaggio gas UE giornaliero per paese/operatore · ALSI: inventari LNG · Trasparenza operativa europea · Tab Macro·Energy > EU Storage",
+    desc:"AGSI: stoccaggio gas UE giornaliero per paese/operatore · ALSI: inventari LNG · Tab Macro·Energy > EU Storage",
     limit:"Unlimited (free key)", docsUrl:"https://www.gie.eu/transparency-platform/",
     sessionKey:"gie_call_count", limitWarn:null, limitMax:null },
 
@@ -99,12 +99,10 @@ function getOpenExchangeKey(){ return getKey("openexchange"); }
 function getEodhdKey()       { return getKey("eodhd");        }
 function getApitubeKey()     { return getKey("apitube");      }
 function getMassiveKey()     { return getKey("massive");      }
-/* New providers from Phase 1–5 integration */
 function getEiaKey()         { return getKey("eia");          }
 function getBlsKey()         { return getKey("bls");          }
 function getComtradeKey()    { return getKey("comtrade");     }
 function getGieKey()         { return getKey("gie");          }
-function getWmKey()          { return getKey("wm");           }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
@@ -119,7 +117,7 @@ function saveCustom(list) { localStorage.setItem(LS_CUSTOM, JSON.stringify(list)
 function allProviders() { return [...KNOWN_PROVIDERS, ...getCustom()]; }
 
 /* ══════════════════════════════════════════════════════════════════
-   TOPBAR BADGES — removed. All API status is in the left sidebar.
+   TOPBAR BADGES — removed. Status lives in the left API sidebar.
    Stubs keep legacy callers from throwing.
    ══════════════════════════════════════════════════════════════════ */
 function renderTopbarBadges() { renderApiStatusSidebar(); }
@@ -132,15 +130,15 @@ function refreshBadges()      { renderApiStatusSidebar(); }
    ══════════════════════════════════════════════════════════════════ */
 let _apiStatusOpen = false;
 
-function toggleApiStatus() {
-  _apiStatusOpen ? closeApiStatus() : openApiStatus();
-}
+function toggleApiStatus() { _apiStatusOpen ? closeApiStatus() : openApiStatus(); }
+
 function openApiStatus() {
   _apiStatusOpen = true;
   const el = document.getElementById("apiStatusSidebar");
   if (el) { el.classList.add("open"); renderApiStatusSidebar(); }
   document.getElementById("apiStatusBtn")?.classList.add("active");
 }
+
 function closeApiStatus() {
   _apiStatusOpen = false;
   document.getElementById("apiStatusSidebar")?.classList.remove("open");
@@ -168,7 +166,8 @@ function renderApiStatusSidebar() {
       const key = getKey(p.id);
       const n   = parseInt(sessionStorage.getItem(p.sessionKey || "") || "0");
 
-      const dot = !key        ? "#484f58"
+      const dot = !key
+        ? "#484f58"
         : p.limitMax && n >= p.limitMax   ? "#f85149"
         : p.limitWarn && n >= p.limitWarn ? "#d29922"
         : "#3fb950";
@@ -213,7 +212,7 @@ function renderApiStatusSidebar() {
   const footer = document.getElementById("apiStatusFooter");
   if (footer) {
     const configured = providers.filter(p => !!getKey(p.id)).length;
-    const cacheN     = Object.keys(sessionStorage)
+    const cacheN = Object.keys(sessionStorage)
       .filter(k => providers.some(p =>
         k.startsWith(p.id + "_") || k.startsWith("av_") || k.startsWith("fmp_")
       )).length;
@@ -300,7 +299,6 @@ function renderProviderList() {
   const box = document.getElementById("apiProviderList");
   if (!box) return;
 
-  // Build grouped output
   const providers = allProviders();
   const groups = {};
   providers.forEach(p => {
@@ -309,17 +307,15 @@ function renderProviderList() {
     groups[g].push(p);
   });
 
-  let allHtml = "";
-  const flatList = []; // for divider logic
+  let html = "";
   Object.entries(groups).forEach(([groupName, items]) => {
-    allHtml += `<div class="api-group-heading">${cfgEsc(groupName)}</div>`;
-    items.forEach((p, i) => {
-      flatList.push(p);
+    html += `<div class="api-group-heading">${cfgEsc(groupName)}</div>`;
+    items.forEach(p => {
       const val  = getKey(p.id);
       const n    = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
       const bCls = !val ? "badge-unset" : (p.limitMax && n >= p.limitMax) ? "badge-limit" : "badge-set";
       const bLbl = !val ? "NOT SET"     : (p.limitMax && n >= p.limitMax) ? "LIMIT"       : mask(val);
-      allHtml += `
+      html += `
       <div class="api-key-block${_focusId===p.id?" api-key-block-focus":""}" id="pblock-${cfgEsc(p.id)}">
         <div class="api-key-provider">
           <div class="api-key-provider-left">
@@ -354,49 +350,7 @@ function renderProviderList() {
       <div class="api-modal-divider"></div>`;
     });
   });
-  box.innerHTML = allHtml;
-  return; // early return — old map() code below replaced
-
-  box.innerHTML = allProviders().map((p, i, arr) => {
-    const val  = getKey(p.id);
-    const n    = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
-    const bCls = !val ? "badge-unset" : (p.limitMax && n >= p.limitMax) ? "badge-limit" : "badge-set";
-    const bLbl = !val ? "NOT SET"     : (p.limitMax && n >= p.limitMax) ? "LIMIT"       : mask(val);
-
-    return `
-    <div class="api-key-block${_focusId===p.id?" api-key-block-focus":""}" id="pblock-${cfgEsc(p.id)}">
-      <div class="api-key-provider">
-        <div class="api-key-provider-left">
-          <span class="api-badge-pill">${cfgEsc(p.badge)}</span>
-          <div>
-            <div class="api-key-name">${cfgEsc(p.name)}</div>
-            <div class="api-key-limit">${cfgEsc(p.limit||"")}</div>
-          </div>
-        </div>
-        <span class="api-key-badge ${bCls}">${cfgEsc(bLbl)}</span>
-      </div>
-      ${p.desc ? `<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl
-        ? ` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Get free key &rarr;</a>` : ""}</div>` : ""}
-      <div class="api-key-input-row">
-        <input type="password" id="kinput-${cfgEsc(p.id)}" class="api-key-field"
-               placeholder="Paste API key here…" value="${cfgEsc(val)}"
-               autocomplete="off" spellcheck="false"
-               oninput="livePreviewKey('${cfgEsc(p.id)}')" />
-        <button class="api-key-eye" title="Show/hide"
-                onclick="toggleKeyVis('kinput-${cfgEsc(p.id)}',this)">&#128065;</button>
-        <button class="api-key-save"  onclick="saveKey('${cfgEsc(p.id)}')">Save</button>
-        <button class="api-key-clear" onclick="clearKey('${cfgEsc(p.id)}')">Clear</button>
-      </div>
-      <div class="api-key-status" id="kstatus-${cfgEsc(p.id)}"></div>
-      ${val && p.sessionKey ? `<div class="api-key-usage">
-        Session calls: <strong>${n}</strong>${p.limitMax?" / "+p.limitMax:""}
-        ${n>0?`<button class="api-reset-count-btn" onclick="resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')">Reset</button>`:""}
-      </div>`:""}
-      ${p.custom?`<button class="api-custom-del-btn" style="margin-top:6px"
-          onclick="removeCustom('${cfgEsc(p.id)}')">&#10005; Remove</button>`:""}
-    </div>
-    ${i<arr.length-1?'<div class="api-modal-divider"></div>':""}`;
-  }).join("");
+  box.innerHTML = html;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -706,7 +660,7 @@ function injectSidebarHTML() {
     if (!allProviders().some(p => !!getKey(p.id))) {
       setTimeout(() => {
         if (typeof showApiToast === "function")
-          showApiToast("&#9881; No API keys — click &#9881; API to configure.", "info");
+          showApiToast("&#9881; No API keys — click &#9881; API Keys to configure.", "info");
       }, 1400);
     }
   }
