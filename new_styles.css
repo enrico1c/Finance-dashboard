@@ -1,0 +1,246 @@
+/* ══════════════════════════════════════════════════════════════════
+   new_styles.css — CSS additions for all Phase 1-5 modules
+   Append this to the end of style.css
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   SHARED COMMODITY / ENERGY COMPONENTS
+   ───────────────────────────────────────────────────────────────── */
+
+.energy-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.energy-kpi-card {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.energy-kpi-label { font-size: 10px; color: var(--color-text-secondary, #8b949e); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+.energy-kpi-val   { font-size: 18px; font-weight: 700; color: var(--color-text-primary, #e6edf3); font-variant-numeric: tabular-nums; }
+.energy-kpi-sub   { font-size: 11px; font-variant-numeric: tabular-nums; }
+.energy-kpi-date  { font-size: 9px; color: var(--color-text-muted, #6e7681); margin-top: 2px; }
+
+.energy-storage-panel { background: var(--color-background-secondary, #161b22); border-radius: 6px; padding: 12px; margin: 6px 0; }
+.energy-storage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.energy-storage-label  { font-size: 12px; font-weight: 600; }
+.energy-storage-pct    { font-size: 20px; font-weight: 700; }
+.energy-storage-bar    { height: 8px; background: var(--color-border, #21262d); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+.energy-storage-fill   { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.energy-storage-meta   { font-size: 10px; color: var(--color-text-muted, #6e7681); display: flex; gap: 16px; align-items: center; }
+
+.energy-entsog-info { background: var(--color-background-secondary, #161b22); border: 0.5px solid var(--color-border-secondary, #30363d); border-radius: 6px; padding: 12px; margin: 6px 0; }
+.energy-entsog-link { color: var(--color-accent, #58a6ff); font-size: 11px; text-decoration: none; }
+.energy-entsog-link:hover { text-decoration: underline; }
+
+.energy-hydrogen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin: 6px 0; }
+.energy-hydrogen-card { background: var(--color-background-secondary, #161b22); border: 0.5px solid var(--color-border-secondary, #30363d); border-radius: 6px; padding: 10px 12px; }
+.energy-hydrogen-name { font-size: 12px; font-weight: 600; color: var(--color-text-primary, #e6edf3); margin-bottom: 3px; }
+.energy-hydrogen-note { font-size: 10px; color: var(--color-text-muted, #6e7681); margin-bottom: 6px; }
+
+/* ─────────────────────────────────────────────────────────────────
+   COMMODITY PRICE GRID
+   ───────────────────────────────────────────────────────────────── */
+
+.commodity-price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 6px 0;
+}
+.commodity-price-card {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.commodity-price-icon  { font-size: 18px; line-height: 1; margin-top: 2px; }
+.commodity-price-body  { flex: 1; min-width: 0; }
+.commodity-price-label { font-size: 10px; color: var(--color-text-secondary, #8b949e); font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.commodity-price-val   { font-size: 15px; font-weight: 700; color: var(--color-text-primary, #e6edf3); font-variant-numeric: tabular-nums; }
+.commodity-price-unit  { font-size: 9px; font-weight: 400; color: var(--color-text-muted, #6e7681); }
+.commodity-price-chg   { font-size: 10px; font-variant-numeric: tabular-nums; }
+.commodity-price-period{ font-size: 9px; color: var(--color-text-muted, #6e7681); margin-top: 2px; }
+.commodity-price-spark { align-self: center; margin-left: auto; }
+
+.commodity-wb-panel { background: var(--color-background-secondary, #161b22); border: 0.5px solid var(--color-border-secondary, #30363d); border-radius: 6px; padding: 12px; margin: 6px 0; }
+
+/* ─────────────────────────────────────────────────────────────────
+   CRITICAL MINERALS (minerals.js)
+   ───────────────────────────────────────────────────────────────── */
+
+.min-subnav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--color-border, #21262d);
+}
+.min-subnav-btn {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  color: var(--color-text-secondary, #8b949e);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.min-subnav-btn:hover  { border-color: var(--color-accent, #58a6ff); color: var(--color-accent, #58a6ff); }
+.min-subnav-btn.active { background: rgba(88,166,255,0.12); border-color: var(--color-accent, #58a6ff); color: var(--color-accent, #58a6ff); font-weight: 600; }
+
+.min-section         { display: none; }
+.min-section.active  { display: block; }
+
+/* Criticality badges */
+.min-badge { display: inline-block; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; margin-right: 2px; letter-spacing: 0.3px; }
+.min-badge-srm  { background: rgba(162,94,247,0.2); color: #a371f7; border: 0.5px solid rgba(162,94,247,0.4); }
+.min-badge-crm  { background: rgba(88,166,255,0.15); color: #58a6ff; border: 0.5px solid rgba(88,166,255,0.35); }
+.min-badge-nato { background: rgba(255,165,0,0.15); color: #ffa500; border: 0.5px solid rgba(255,165,0,0.35); }
+.min-badge-doe  { background: rgba(63,185,80,0.15); color: #3fb950; border: 0.5px solid rgba(63,185,80,0.35); }
+.min-badge-usgs { background: rgba(248,81,73,0.12); color: #f85149; border: 0.5px solid rgba(248,81,73,0.3); }
+
+.min-legend { margin: 6px 0 10px; font-size: 10px; color: var(--color-text-muted, #6e7681); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.min-mineral-card {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 6px 0;
+}
+.min-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.min-card-icon   { font-size: 20px; }
+.min-card-title  { flex: 1; }
+.min-card-name   { font-size: 13px; font-weight: 700; color: var(--color-text-primary, #e6edf3); display: block; }
+.min-card-symbol { font-size: 10px; color: var(--color-text-muted, #6e7681); font-family: monospace; }
+.min-card-badges { display: flex; flex-wrap: wrap; gap: 2px; justify-content: flex-end; }
+.min-card-body   { }
+
+.min-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px; margin-bottom: 6px; }
+.min-stat        { display: flex; flex-direction: column; gap: 1px; }
+.min-stat-label  { font-size: 9px; color: var(--color-text-muted, #6e7681); text-transform: uppercase; letter-spacing: 0.3px; }
+.min-stat-val    { font-size: 11px; color: var(--color-text-primary, #e6edf3); font-variant-numeric: tabular-nums; }
+
+.min-import-row  { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.min-import-bar-wrap { flex: 1; display: flex; align-items: center; gap: 6px; }
+.min-import-bar  { height: 6px; border-radius: 3px; min-width: 4px; }
+.min-import-pct  { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.min-producers   { margin: 4px 0; font-size: 10px; }
+.min-producer-chip { display: inline-block; background: rgba(88,166,255,0.1); border: 0.5px solid rgba(88,166,255,0.25); border-radius: 3px; padding: 1px 5px; margin: 1px 2px; font-size: 10px; color: var(--color-text-secondary, #8b949e); }
+.min-note    { font-size: 10px; color: var(--color-text-muted, #6e7681); margin-top: 4px; font-style: italic; }
+.min-eu-note { font-size: 10px; color: #58a6ff; margin-top: 2px; }
+
+/* ─────────────────────────────────────────────────────────────────
+   CFTC COT POSITIONING (positioning.js)
+   ───────────────────────────────────────────────────────────────── */
+
+.cot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 6px 0;
+}
+.cot-card {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.cot-card-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.cot-icon        { font-size: 16px; }
+.cot-name        { font-size: 10px; color: var(--color-text-secondary, #8b949e); font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cot-net         { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cot-sentiment   { font-size: 11px; font-weight: 600; }
+.cot-chg         { font-size: 10px; font-variant-numeric: tabular-nums; color: var(--color-text-muted, #6e7681); }
+.cot-bar-wrap    { margin: 6px 0 3px; }
+.cot-bar         { height: 5px; display: flex; border-radius: 3px; overflow: hidden; background: var(--color-border, #21262d); margin-bottom: 3px; }
+.cot-bar-long    { height: 100%; border-radius: 3px 0 0 3px; }
+.cot-bar-short   { height: 100%; border-radius: 0 3px 3px 0; }
+.cot-bar-labels  { display: flex; justify-content: space-between; font-size: 9px; font-variant-numeric: tabular-nums; }
+.cot-oi          { font-size: 9px; color: var(--color-text-muted, #6e7681); margin-top: 2px; }
+.cot-date        { font-size: 9px; color: var(--color-text-muted, #6e7681); }
+
+/* ─────────────────────────────────────────────────────────────────
+   INTEL / NEWS-INTEL (intel.js)
+   ───────────────────────────────────────────────────────────────── */
+
+.intel-subnav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 6px 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border, #21262d);
+}
+.intel-tab-btn {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  color: var(--color-text-secondary, #8b949e);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.intel-tab-btn:hover  { border-color: var(--color-accent, #58a6ff); color: var(--color-accent, #58a6ff); }
+.intel-tab-btn.active { background: rgba(88,166,255,0.12); border-color: var(--color-accent, #58a6ff); color: var(--color-accent, #58a6ff); font-weight: 600; }
+.intel-tab        { display: none; }
+.intel-tab.active { display: block; }
+
+/* ─────────────────────────────────────────────────────────────────
+   CONFLICT RISK (intel.js geo section)
+   ───────────────────────────────────────────────────────────────── */
+
+.conflict-card {
+  background: var(--color-background-secondary, #161b22);
+  border-left: 3px solid var(--color-border, #30363d);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  margin: 5px 0;
+}
+.conflict-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.conflict-country { font-size: 13px; font-weight: 700; color: var(--color-text-primary, #e6edf3); }
+.conflict-region  { font-size: 10px; }
+.conflict-risk    { font-size: 11px; font-weight: 700; }
+.conflict-type    { font-size: 10px; background: rgba(88,166,255,0.1); border-radius: 3px; padding: 1px 6px; color: var(--color-text-secondary, #8b949e); }
+.conflict-minerals { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; }
+.conflict-note    { font-size: 10px; color: var(--color-text-muted, #6e7681); font-style: italic; }
+
+/* ─────────────────────────────────────────────────────────────────
+   UTILITY CLASSES (shared)
+   ───────────────────────────────────────────────────────────────── */
+
+.pos  { color: #3fb950; }
+.neg  { color: #f85149; }
+.warn { color: #d29922; }
+.neutral { color: #8b949e; }
+
+.section-head {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #8b949e);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 10px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 0.5px solid var(--color-border, #21262d);
+}
