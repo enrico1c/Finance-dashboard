@@ -79,10 +79,6 @@ const KNOWN_PROVIDERS = [
     desc:"Qualità aria real-time · PM2.5, PM10, NO2, O3, CO, SO2 da 30.000+ stazioni · Tab AIR in Geo·Risk",
     limit:"Generoso free tier — nessun limite fisso", docsUrl:"https://api.openaq.org/",
     sessionKey:"openaq_call_count", limitWarn:null, limitMax:null },
-  { id:"wm", name:"WorldMonitor", badge:"WM", group:"Environment & Geo",
-    desc:"Chokepoints · Shipping rates · Minerals supply · GPS Jam · Military Ops · Intel Feed — nessuna chiave richiesta",
-    limit:"No key required (public cache)", docsUrl:"https://worldmonitor.app/",
-    sessionKey:"wm_call_count", limitWarn:null, limitMax:null },
 ];
 
 window._KEYS = {};
