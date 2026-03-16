@@ -104,6 +104,8 @@ function getEiaKey()         { return getKey("eia");           }
 function getBlsKey()         { return getKey("bls");           }
 function getComtradeKey()    { return getKey("comtrade");      }
 function getGieKey()         { return getKey("gie");           }
+/* Phase 1 — Identity Infrastructure */
+function getOpenFigiKey()    { return getKey("openfigi");      }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
@@ -349,6 +351,11 @@ function saveKey(id) {
   if (id === "gie"      && typeof energyLoadAll       === "function") setTimeout(() => energyLoadAll(), 300);
   if (id === "bls"      && typeof blsLoadPPI          === "function") setTimeout(() => blsLoadPPI(), 300);
   if (id === "comtrade" && typeof tradeflowsLoadAll   === "function") setTimeout(() => tradeflowsLoadAll(), 300);
+  /* Phase 1 — Identity Infrastructure */
+  if (id === "openfigi" && typeof openfigiLoadForTicker === "function") {
+    const t = typeof currentTicker !== "undefined" ? currentTicker : null;
+    if (t) setTimeout(() => openfigiLoadForTicker(t), 300);
+  }
 
   // Hide setup banners when key is configured
   const bannerMap = { ninjas: "trans-setup-banner", openaq: "airqual-setup-banner" };
