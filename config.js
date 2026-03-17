@@ -79,6 +79,35 @@ const KNOWN_PROVIDERS = [
     desc:"Qualità aria real-time · PM2.5, PM10, NO2, O3, CO, SO2 da 30.000+ stazioni · Tab AIR in Geo·Risk",
     limit:"Generoso free tier — nessun limite fisso", docsUrl:"https://api.openaq.org/",
     sessionKey:"openaq_call_count", limitWarn:null, limitMax:null },
+  /* ── CRYPTO & ON-CHAIN ──────────────────────────────────────── */
+  {
+    id:         'defillama',
+    name:       'DefiLlama — DeFi TVL',
+    badge:      'DFL',
+    group:      'Crypto & On-Chain',
+    desc:       'Total Value Locked for 3,000+ DeFi protocols. ' +
+                'Supplies TVL and 30D growth for the Crypto valuation model. ' +
+                'No API key required.',
+    limit:      'Unlimited (no key required)',
+    docsUrl:    'https://defillama.com/docs/api',
+    sessionKey: 'vds_call_count',
+    limitWarn:  null,
+    limitMax:   null,
+  },
+  {
+    id:         'blockchain_info',
+    name:       'Blockchain.info — BTC On-Chain',
+    badge:      'BCH',
+    group:      'Crypto & On-Chain',
+    desc:       'Bitcoin network metrics: Hash Rate, Active Addresses, Transaction Count. ' +
+                'Powers Security and Adoption scores in the BTC valuation model. ' +
+                'No API key required.',
+    limit:      'Unlimited (no key required)',
+    docsUrl:    'https://www.blockchain.com/explorer/api',
+    sessionKey: 'vds_call_count',
+    limitWarn:  null,
+    limitMax:   null,
+  },
 ];
 
 window._KEYS = {};
