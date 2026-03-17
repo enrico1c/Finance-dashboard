@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v12-2026';
+const CACHE_VERSION  = 'finterm-v13-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -53,6 +53,14 @@ const APP_SHELL = [
   '/valuation-datasources.js',
   '/valuation-data.js',
   '/fred_credit_addition.js',
+  /* UARS Engine — Universal Asset Rating System */
+  '/valuation-missing-sources.js',
+  '/uars_engine.js',
+  '/uars-source-connector.js',
+  '/uars-peer-builder.js',
+  '/uars-widget.js',
+  '/uars-widget.css',
+  '/uars-integration.js',
 ];
 
 /* API hosts to cache with network-first strategy */
