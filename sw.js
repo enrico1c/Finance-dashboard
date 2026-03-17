@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v11-2026';
+const CACHE_VERSION  = 'finterm-v12-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -50,6 +50,9 @@ const APP_SHELL = [
   /* Phase 5 — Fund & ETF Data Ecosystem */
   '/xbrlenhance.js',
   '/mfprospectus.js',
+  '/valuation-datasources.js',
+  '/valuation-data.js',
+  '/fred_credit_addition.js',
 ];
 
 /* API hosts to cache with network-first strategy */
