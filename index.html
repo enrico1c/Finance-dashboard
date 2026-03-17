@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FINTERM — Finance Dashboard</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="uars-widget.css" />
   <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
@@ -357,28 +358,21 @@
       <div class="size-tooltip" id="tooltip-ownership"></div>
     </section>
 
-    <!-- ▸ ANALYSTS + VALUATION SCORECARD ─────────────────────── -->
+    <!-- ▸ UARS ENGINE — Analysts & Evaluation ───────────────────── -->
     <section class="panel" id="panel-analysts" data-panel="analysts">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Analysts &amp; Valuation</h3>
+        <h3>▸ Analysts &amp; Evaluation</h3>
         <div class="panel-actions">
           <button class="icon-btn close" onclick="hidePanel('analysts')">✕</button>
         </div>
       </div>
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="score" onclick="switchTab('analysts','score');renderScorecard(currentTicker)">SCORE</button>
-        <button class="tab-btn"        data-tab="anr"   onclick="switchTab('analysts','anr')">ANR</button>
-        <button class="tab-btn"        data-tab="brc"   onclick="switchTab('analysts','brc')">BRC</button>
-        <button class="tab-btn"        data-tab="val"   onclick="switchTab('analysts','val');renderValuation(currentValTicker||currentTicker)">VAL</button>
-      </div>
-      <div class="tab-pane active panel-content" data-tab="score" id="analysts-score">
-        <div class="no-data">// Load a ticker to see the Analyst Scorecard.</div>
-      </div>
-      <div class="tab-pane panel-content" data-tab="anr" id="analysts-anr"></div>
-      <div class="tab-pane panel-content" data-tab="brc" id="analysts-brc"></div>
-      <div class="tab-pane panel-content" data-tab="val" id="valuationBox">
-        <div class="no-data">// Click any stock in the Sector Watchlist<br>// to load valuation analysis here.</div>
+      <!-- uars-widget.js injects the tab-bar and panes here on DOMContentLoaded -->
+      <div id="uars-widget-mount">
+        <div class="uars-loading" style="height:80px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:#8b949e">
+          <div class="uars-spinner" style="width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:uars-spin 0.8s linear infinite"></div>
+          Initialising UARS Engine…
+        </div>
       </div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
@@ -1476,17 +1470,14 @@ document.addEventListener("DOMContentLoaded", () => {
   <script src="fred_credit_addition.js"></script>
   <script src="valuation-datasources.js"></script>
   <script src="valuation-data.js"></script>
+ 
+  <!-- UARS Engine — Universal Asset Rating System -->
+  <!-- Load order is critical: engine → missing sources → connector → peers → widget → integration -->
   <script src="valuation-missing-sources.js"></script>
   <script src="uars_engine.js"></script>
-  <script src="uars-source-connector.js"></script>
-  <script src="uars-peer-builder.js"></script>
-  <link rel="stylesheet" href="uars-widget.css" />
-  <script src="uars_engine.js"></script>
-  <script src="valuation-data.js"></script>
-  <script src="valuation-missing-sources.js"></script>
-  <script src="valuation-datasources.js"></script>
   <script src="uars-source-connector.js"></script>
   <script src="uars-peer-builder.js"></script>
   <script src="uars-widget.js"></script>
+  <script src="uars-integration.js"></script>
 </body>
 </html>
