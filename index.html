@@ -468,9 +468,9 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars');if(typeof georiskLoadWars==='function'&&!document.getElementById('georisk-wars-content')?.dataset?.loaded){document.getElementById('georisk-wars-content').dataset.loaded='1';georiskLoadWars()}">WARS</button>
-        <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources');if(typeof georiskLoadResources==='function'&&!document.getElementById('georisk-resources-content')?.dataset?.loaded){document.getElementById('georisk-resources-content').dataset.loaded='1';georiskLoadResources()}">RESOURCES</button>
-        <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes');if(typeof georiskLoadRoutes==='function'&&!document.getElementById('georisk-routes-content')?.dataset?.loaded){document.getElementById('georisk-routes-content').dataset.loaded='1';georiskLoadRoutes()}">ROUTES</button>
+        <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars');(function(){var el=document.getElementById('georisk-wars-content');if(el&&!el.dataset.wmLoaded){el.dataset.wmLoaded='1';if(typeof wmGeoWars==='function')wmGeoWars();else if(typeof renderGeoWars==='function')renderGeoWars();}})()">WARS</button>
+        <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources');(function(){var el=document.getElementById('georisk-resources-content');if(el&&!el.dataset.wmLoaded){el.dataset.wmLoaded='1';if(typeof wmGeoResources==='function')wmGeoResources();else if(typeof renderGeoResources==='function')renderGeoResources();}})()">RESOURCES</button>
+        <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes');(function(){var el=document.getElementById('georisk-routes-content');if(el&&!el.dataset.wmLoaded){el.dataset.wmLoaded='1';if(typeof wmGeoRoutes==='function')wmGeoRoutes();else if(typeof renderGeoRoutes==='function')renderGeoRoutes();}})()">ROUTES</button>
         <button class="tab-btn"        data-tab="intel"     onclick="switchTab('geopolitical','intel');wmGeoIntel()">INTEL</button>
         <button class="tab-btn"        data-tab="signals"   onclick="switchTab('geopolitical','signals');wmGeoSignals()">SIGNALS</button>
         <button class="tab-btn"        data-tab="quakes"    onclick="switchTab('geopolitical','quakes');wmGeoQuakes()">QUAKES</button>
@@ -1401,9 +1401,27 @@ function riskLevel(r){ return {CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[r]||0; }
 
 /* ─── INIT ──────────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
-  renderGeoWars();
-  renderGeoResources();
-  renderGeoRoutes();
+  // WARS: try live WM data first; static array is the fallback inside wmGeoWars()
+  if (typeof wmGeoWars === 'function') {
+    wmGeoWars();
+  } else {
+    renderGeoWars();
+  }
+  // RESOURCES: depends on _wmConflicts populated by wmGeoWars above
+  // Give wmGeoWars a tick to set window._wmConflicts before resources runs
+  setTimeout(() => {
+    if (typeof wmGeoResources === 'function') {
+      wmGeoResources();
+    } else {
+      renderGeoResources();
+    }
+  }, 200);
+  // ROUTES: reuses 'chokepoints' WM bootstrap key
+  if (typeof wmGeoRoutes === 'function') {
+    wmGeoRoutes();
+  } else {
+    renderGeoRoutes();
+  }
 });
 </script>
   <!-- ── New data module scripts ──────────────────────────────── -->
