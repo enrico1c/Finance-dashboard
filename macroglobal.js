@@ -235,7 +235,11 @@ const FOMC_DATES_2025_26 = [
   { date:'2026-03-18', type:'FOMC', decision:'SEP + Press conference' },
   { date:'2026-04-29', type:'FOMC', decision:'Rate decision' },
   { date:'2026-06-17', type:'FOMC', decision:'SEP + Press conference' },
-];
+  { date:'2026-07-29', type:'FOMC', decision:'Rate decision' },
+  { date:'2026-09-16', type:'FOMC', decision:'SEP + Press conference' },
+  { date:'2026-11-04', type:'FOMC', decision:'Rate decision' },
+  { date:'2026-12-16', type:'FOMC', decision:'SEP + Press conference' },
+]; // Last updated: March 2026. Source: federalreserve.gov/monetarypolicy/fomccalendars.htm
 
 const ECB_DATES_2025_26 = [
   { date:'2025-01-30', type:'ECB',  decision:'Governing Council' },
@@ -249,7 +253,12 @@ const ECB_DATES_2025_26 = [
   { date:'2026-01-29', type:'ECB',  decision:'Governing Council' },
   { date:'2026-03-05', type:'ECB',  decision:'Governing Council + Press' },
   { date:'2026-04-30', type:'ECB',  decision:'Governing Council' },
-];
+  { date:'2026-06-04', type:'ECB',  decision:'Governing Council + Press' },
+  { date:'2026-07-23', type:'ECB',  decision:'Governing Council' },
+  { date:'2026-09-10', type:'ECB',  decision:'Governing Council + Press' },
+  { date:'2026-10-29', type:'ECB',  decision:'Governing Council' },
+  { date:'2026-12-17', type:'ECB',  decision:'Governing Council + Press' },
+]; // Last updated: March 2026. Source: ecb.europa.eu/press/calendars
 
 const BOE_DATES_2025_26 = [
   { date:'2025-02-06', type:'BoE',  decision:'MPC Decision' },
@@ -262,7 +271,13 @@ const BOE_DATES_2025_26 = [
   { date:'2025-12-18', type:'BoE',  decision:'MPC Decision' },
   { date:'2026-02-05', type:'BoE',  decision:'MPC + MPR' },
   { date:'2026-03-19', type:'BoE',  decision:'MPC Decision' },
-];
+  { date:'2026-05-07', type:'BoE',  decision:'MPC + MPR' },
+  { date:'2026-06-18', type:'BoE',  decision:'MPC Decision' },
+  { date:'2026-08-06', type:'BoE',  decision:'MPC + MPR' },
+  { date:'2026-09-17', type:'BoE',  decision:'MPC Decision' },
+  { date:'2026-11-05', type:'BoE',  decision:'MPC + MPR' },
+  { date:'2026-12-17', type:'BoE',  decision:'MPC Decision' },
+]; // Last updated: March 2026. Source: bankofengland.co.uk/monetary-policy/the-interest-rate
 
 const BOJ_DATES_2025_26 = [
   { date:'2025-01-24', type:'BoJ',  decision:'MPM Decision' },
@@ -273,7 +288,15 @@ const BOJ_DATES_2025_26 = [
   { date:'2025-09-19', type:'BoJ',  decision:'MPM Decision' },
   { date:'2025-10-29', type:'BoJ',  decision:'Outlook Report' },
   { date:'2025-12-19', type:'BoJ',  decision:'MPM Decision' },
-];
+  { date:'2026-01-23', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-03-19', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-04-28', type:'BoJ',  decision:'Outlook Report' },
+  { date:'2026-06-16', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-07-30', type:'BoJ',  decision:'Outlook Report' },
+  { date:'2026-09-17', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-10-28', type:'BoJ',  decision:'Outlook Report' },
+  { date:'2026-12-18', type:'BoJ',  decision:'MPM Decision' },
+]; // Last updated: March 2026. Source: boj.or.jp/en/mopo/mpmsche_mei
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER — 🌐 GLOBAL TAB
@@ -551,6 +574,44 @@ window.macroLoadCentralBanks = async function() {
     } catch {}
   }
 
+  // Attempt to enrich meeting dates from FMP economic calendar (if FMP key available)
+  // This supplements (not replaces) the hardcoded arrays above.
+  const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  const fmpCalendarEvents = [];
+  if (fmpKey) {
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const future= new Date(Date.now() + 120*864e5).toISOString().slice(0,10);
+      const calRes = await fetch(
+        `https://financialmodelingprep.com/api/v3/economic_calendar?from=${today}&to=${future}&apikey=${fmpKey}`,
+        {signal:AbortSignal.timeout(6000)}
+      );
+      const calData = await calRes.json();
+      if (Array.isArray(calData)) {
+        const cbKeywords = ['federal reserve','fomc','fed rate','ecb','european central bank',
+                            'bank of england','boe','bank of japan','boj','pboc','peoples bank'];
+        calData.forEach(ev => {
+          const evName = (ev.event || ev.name || '').toLowerCase();
+          if (cbKeywords.some(kw => evName.includes(kw))) {
+            fmpCalendarEvents.push({
+              date:     ev.date?.slice(0,10) || '',
+              bank:     evName.includes('fomc') || evName.includes('federal') ? 'Fed'
+                      : evName.includes('ecb')  || evName.includes('european') ? 'ECB'
+                      : evName.includes('england') || evName.includes('boe') ? 'BoE'
+                      : evName.includes('japan')   || evName.includes('boj') ? 'BoJ'
+                      : 'CB',
+              event:    ev.event || ev.name || '',
+              actual:   ev.actual   ?? null,
+              estimate: ev.estimate ?? null,
+            });
+          }
+        });
+      }
+    } catch(e) {
+      console.warn('[macroLoadCentralBanks] FMP calendar fetch failed:', e.message);
+    }
+  }
+
   // Latest known rates as fallback (updated approx. to current policy)
   const RATES = [
     { bank:'Federal Reserve', country:'🇺🇸 USA',  rate: fedRate  ?? 4.33, currency:'USD', nextMeeting: nextMeeting(FOMC_DATES_2025_26), color:'#58a6ff', live: fedRate  != null },
@@ -648,7 +709,29 @@ window.macroLoadCentralBanks = async function() {
     <div class="mg-footer">
       Rates: ${fredKey?'FRED live':'Approximate (add FRED key for live rates)'}
       · Calendars: Official central bank published schedules
-    </div>`;
+      ${fmpKey ? ' · Live calendar via FMP' : ' · <a href="#" onclick="openApiConfig(\'fmp\');return false" style="color:var(--accent,#58a6ff)">Add FMP key for live events ↗</a>'}
+    </div>
+    ${fmpCalendarEvents.length ? `
+    <div class="mg-section">
+      <div class="mg-section-title">📡 FMP Live Calendar — Next 120 Days</div>
+      <div class="cb-calendar">
+        ${fmpCalendarEvents.slice(0,15).map(ev => {
+          const d      = new Date(ev.date);
+          const daysTo = Math.round((d - new Date()) / 864e5);
+          const isNear = daysTo <= 14;
+          const bankColor = ev.bank==='Fed'?'#58a6ff':ev.bank==='ECB'?'#3fb950':ev.bank==='BoE'?'#d29922':ev.bank==='BoJ'?'#f0883e':'#a371f7';
+          return `<div class="cb-event-row ${isNear?'cb-event-near':''}">
+            <span class="cb-event-date">${_me(ev.date)}</span>
+            <span class="cb-event-bank" style="color:${bankColor}">${_me(ev.bank)}</span>
+            <span class="cb-event-type" style="flex:1">${_me(ev.event)}</span>
+            <span class="cb-event-days ${daysTo<=7?'neg':daysTo<=30?'pos':''}">${daysTo}d</span>
+            ${ev.actual   != null ? `<span style="font-size:9px;color:#3fb950;margin-left:4px">Act: ${ev.actual}%</span>` : ''}
+            ${ev.estimate != null && ev.actual == null ? `<span style="font-size:9px;color:#58a6ff;margin-left:4px">Est: ${ev.estimate}%</span>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
+  `;
 };
 
 function nextMeeting(dates) {
