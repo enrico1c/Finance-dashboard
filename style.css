@@ -1634,6 +1634,16 @@ textarea::placeholder { color:var(--text-muted); }
 .badge-set   { color: var(--accent-green); background: rgba(0,212,160,.1); border-color: rgba(0,212,160,.25); }
 .badge-unset { color: var(--text-muted);   background: var(--bg-surface);  border-color: var(--border); }
 .badge-limit { color: var(--accent-red);   background: rgba(255,71,87,.1); border-color: rgba(255,71,87,.25); }
+.badge-nokey { color: #4a9eff;             background: rgba(74,158,255,.1); border-color: rgba(74,158,255,.25); }
+
+.api-key-nokey-note {
+  font-size: 11px; color: #4a9eff;
+  background: rgba(74,158,255,.07);
+  border: 1px solid rgba(74,158,255,.2);
+  border-radius: 5px;
+  padding: 6px 10px;
+  margin-top: 4px;
+}
 
 .api-key-desc {
   font-size: 11px; color: var(--text-secondary);
