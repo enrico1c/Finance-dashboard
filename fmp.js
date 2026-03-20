@@ -552,7 +552,11 @@ function fmpRenderRatios(sym, r) {
   // Update WACC tab with live beta + D/E from FMP ratios + live Kd + tax rate
   const wc = document.getElementById("fund-wacc");
   if (wc) {
-    const beta    = parseFloat(r?.beta   || 1.0);
+    // Beta cascade: FMP ratios → Finnhub profile → AV overview → fallback 1.0
+    const fhLiveFmp  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+    const avBetaFmp  = (typeof avLiveCache !== 'undefined') ? (avLiveCache[sym]?.overview?.beta ?? null) : null;
+    const beta    = parseFloat(r?.beta || fhLiveFmp?.profile?.beta || avBetaFmp || 1.0);
+    const betaSrcFmp = r?.beta ? 'FMP' : fhLiveFmp?.profile?.beta ? 'Finnhub' : avBetaFmp ? 'AV' : 'estimated';
     const debtEq  = parseFloat(r?.debtEq || 0.3);
     const _ty2    = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
     const rf      = _ty2['10Y'] ?? 4.5;
@@ -580,9 +584,9 @@ function fmpRenderRatios(sym, r) {
 
     wc.dataset.loaded = "fmp";
     wc.innerHTML = `
-      <div class="av-live-badge">● WACC · ${fmpEsc(sym)} · FMP live · Kd:${fmpEsc(kdSrc)} · tax:${fmpEsc(taxSrc)}</div>
+      <div class="av-live-badge">● WACC · ${fmpEsc(sym)} · beta:${fmpEsc(betaSrcFmp)} · Kd:${fmpEsc(kdSrc)} · tax:${fmpEsc(taxSrc)}</div>
       <div class="section-head">WACC Inputs</div>
-      ${mRow("Beta (levered)",         beta.toFixed(2))}
+      ${mRow("Beta (levered)",         beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+fmpEsc(betaSrcFmp)+')</span>')}
       ${mRow("D/E Ratio",              debtEq.toFixed(2))}
       ${mRow("Risk-Free Rate (10Y)",   rf+"%")}
       ${mRow("Equity Risk Premium",    erp+'% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
