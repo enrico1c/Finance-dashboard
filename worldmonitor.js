@@ -2789,6 +2789,221 @@ async function frankfurterHistory(base, target, days = 90) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   GEO·RISK LIVE DATA — ROUTES / WARS / RESOURCES
+   These three functions replace the static inline arrays in index.html
+   (renderGeoRoutes / renderGeoWars / renderGeoResources) with live
+   WorldMonitor bootstrap data, falling back gracefully to the static
+   versions when WM data is unavailable.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── ROUTES tab: live chokepoints (reuses 'chokepoints' bootstrap key) ── */
+async function wmGeoRoutes() {
+  const el = document.getElementById('georisk-routes-content');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading chokepoint data…');
+  try {
+    // 'chokepoints' key is already fetched by wmSupplyChokepoints() for the
+    // Supply panel — if that ran first this is an instant WM_CACHE hit.
+    const d     = await wmBootstrap(['chokepoints']);
+    const items = d.chokepoints?.chokepoints || d.chokepoints?.data || d.chokepoints || [];
+
+    if (!Array.isArray(items) || !items.length) {
+      // Fall back to static renderGeoRoutes()
+      if (typeof renderGeoRoutes === 'function') renderGeoRoutes();
+      return;
+    }
+
+    el.innerHTML = wmLiveBar('Strategic chokepoints & trade route disruption', `${items.length} monitored`) +
+      items.map(c => {
+        const risk       = c.riskLevel || c.risk_level || c.status || 'unknown';
+        const col        = wmSeverityColor(risk);
+        const disruption = c.disruption_pct ?? c.disruptionPct ?? c.throughputReduction ?? null;
+        const delay      = c.avgDelayDays ?? c.delay_days ?? null;
+        const traffic    = c.dailyVessels || c.vessel_count || null;
+        return `<div class="wm-choke-card" style="border-left:3px solid ${col.border}">
+          <div class="wm-choke-header">
+            <span class="wm-choke-icon">${wmEsc(c.emoji || c.icon || '🌊')}</span>
+            <div class="wm-choke-info">
+              <span class="wm-choke-name">${wmEsc(c.name)}</span>
+              <span class="wm-choke-region">${wmEsc(c.region || c.location || '')}</span>
+            </div>
+            ${wmBadge(risk.toUpperCase(), risk)}
+          </div>
+          <div class="wm-choke-stats">
+            ${disruption != null ? `<span class="wm-stat-chip">📉 ${disruption}% disruption</span>` : ''}
+            ${delay      != null ? `<span class="wm-stat-chip">⏱ +${delay}d delay</span>` : ''}
+            ${traffic    != null ? `<span class="wm-stat-chip">🚢 ${traffic} vessels/day</span>` : ''}
+            ${c.tradePct           ? `<span class="wm-stat-chip">📦 ${c.tradePct}% global trade</span>` : ''}
+          </div>
+          ${c.note || c.description
+            ? `<div class="wm-choke-note">${wmEsc(c.note || c.description)}</div>` : ''}
+          ${c.affectedCommodities?.length
+            ? `<div class="wm-choke-commodities">${c.affectedCommodities.map(x => `<span class="wm-comm-chip">${wmEsc(x)}</span>`).join('')}</div>` : ''}
+          ${c.conflicts?.length
+            ? `<div class="wm-choke-note" style="font-size:9px;opacity:.65">Conflicts: ${c.conflicts.map(wmEsc).join(', ')}</div>` : ''}
+        </div>`;
+      }).join('');
+  } catch(e) {
+    console.warn('[WM] wmGeoRoutes error:', e.message);
+    if (typeof renderGeoRoutes === 'function') renderGeoRoutes();
+  }
+}
+window.wmGeoRoutes = wmGeoRoutes;
+
+/* ── Shared risk-level sorter (mirrors inline riskLevel() in index.html) ── */
+function _wmRiskLevel(r) { return {CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[String(r).toUpperCase()] || 0; }
+
+/* ── WARS tab: live active conflicts ─────────────────────────────────── */
+async function wmGeoWars() {
+  const el = document.getElementById('georisk-wars-content');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading conflict data…');
+  try {
+    const d     = await wmBootstrap(['conflicts']);
+    const items = d.conflicts?.conflicts || d.conflicts?.data || d.conflicts || [];
+
+    if (!Array.isArray(items) || !items.length) {
+      if (typeof renderGeoWars === 'function') renderGeoWars();
+      return;
+    }
+
+    // Cache for RESOURCES tab to reuse without a second fetch
+    window._wmConflicts = items;
+
+    const RISK_COLOR_WM = {
+      CRITICAL: { bg:'rgba(255,71,87,.15)', border:'rgba(255,71,87,.4)', text:'#ff4757' },
+      HIGH:     { bg:'rgba(255,165,0,.12)',  border:'rgba(255,165,0,.35)',  text:'#ffa500' },
+      MEDIUM:   { bg:'rgba(26,107,255,.12)', border:'rgba(26,107,255,.3)',  text:'#3d8bff' },
+      LOW:      { bg:'rgba(0,212,160,.1)',   border:'rgba(0,212,160,.25)',  text:'#00d4a0' },
+    };
+
+    el.innerHTML = wmLiveBar('Live conflict data — WorldMonitor.app', `${items.length} active conflicts`) +
+      items.map(c => {
+        const intensity  = (c.intensity || c.riskLevel || c.severity || 'MEDIUM').toUpperCase();
+        const rc         = RISK_COLOR_WM[intensity] || RISK_COLOR_WM.LOW;
+        const resources  = c.resources || c.commodities || [];
+        const critCount  = resources.filter(r => (r.risk||r.riskLevel||'').toUpperCase() === 'CRITICAL').length;
+        const highCount  = resources.filter(r => (r.risk||r.riskLevel||'').toUpperCase() === 'HIGH').length;
+        const icolor     = rc.text;
+        const flag       = c.flag || c.emoji || '';
+        const flag2      = c.flag2 || c.flag_b || '';
+
+        return `<div class="geo-conflict-card" onclick="this.classList.toggle('geo-expanded')">
+          <div class="geo-conflict-header">
+            <div class="geo-conflict-left">
+              <span class="geo-intensity-dot" style="background:${icolor};box-shadow:0 0 6px ${icolor}"></span>
+              <div>
+                <div class="geo-conflict-name">${wmEsc(flag)} ${wmEsc(flag2)} ${wmEsc(c.name || c.title || '')}</div>
+                <div class="geo-conflict-meta">${wmEsc(c.region || c.location || '')}
+                  ${c.since ? ` &nbsp;·&nbsp; Since ${wmEsc(c.since)}` : ''}
+                  ${c.phase ? ` &nbsp;·&nbsp; ${wmEsc(c.phase)}` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="geo-conflict-right">
+              <span class="geo-badge geo-badge-intensity" style="color:${icolor};border-color:${icolor}40;background:${icolor}15">${intensity}</span>
+              ${critCount > 0 ? `<span class="geo-badge geo-badge-crit">${critCount} CRITICAL</span>` : ''}
+              ${highCount > 0 ? `<span class="geo-badge geo-badge-high">${highCount} HIGH</span>` : ''}
+            </div>
+          </div>
+          <div class="geo-conflict-summary">${wmEsc(c.summary || c.description || '')}</div>
+          <div class="geo-conflict-stats">
+            ${c.casualties ? `<span>💀 ${wmEsc(c.casualties)}</span>` : ''}
+            ${c.displaced  ? `<span>🏚 ${wmEsc(c.displaced)} displaced</span>` : ''}
+            ${c.wm_url     ? `<a href="${wmEsc(c.wm_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="geo-wm-link-small">WorldMonitor ↗</a>` : ''}
+          </div>
+          ${resources.length ? `<div class="geo-resources-mini">
+            ${resources.slice(0,4).map(r => {
+              const rRisk = (r.risk || r.riskLevel || 'LOW').toUpperCase();
+              const rrc   = RISK_COLOR_WM[rRisk] || RISK_COLOR_WM.LOW;
+              return `<span class="geo-res-chip" style="background:${rrc.bg};border-color:${rrc.border};color:${rrc.text}">${wmEsc(r.icon||r.emoji||'⛏')} ${wmEsc(r.name||r.commodity||'')}</span>`;
+            }).join('')}
+            ${resources.length > 4 ? `<span class="geo-res-chip-more">+${resources.length-4} more</span>` : ''}
+          </div>` : ''}
+        </div>`;
+      }).join('');
+  } catch(e) {
+    console.warn('[WM] wmGeoWars error:', e.message);
+    if (typeof renderGeoWars === 'function') renderGeoWars();
+  }
+}
+window.wmGeoWars = wmGeoWars;
+
+/* ── RESOURCES tab: live commodity risk aggregated across conflicts ─── */
+async function wmGeoResources() {
+  const el = document.getElementById('georisk-resources-content');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading resource risk data…');
+  try {
+    // Prefer already-cached conflicts from wmGeoWars(); otherwise fetch
+    let items = window._wmConflicts;
+    if (!Array.isArray(items) || !items.length) {
+      const d = await wmBootstrap(['conflicts']);
+      items   = d.conflicts?.conflicts || d.conflicts?.data || d.conflicts || [];
+      if (Array.isArray(items) && items.length) window._wmConflicts = items;
+    }
+
+    if (!Array.isArray(items) || !items.length) {
+      if (typeof renderGeoResources === 'function') renderGeoResources();
+      return;
+    }
+
+    const RISK_COLOR_WM = {
+      CRITICAL: { bg:'rgba(255,71,87,.15)', border:'rgba(255,71,87,.4)', text:'#ff4757' },
+      HIGH:     { bg:'rgba(255,165,0,.12)',  border:'rgba(255,165,0,.35)',  text:'#ffa500' },
+      MEDIUM:   { bg:'rgba(26,107,255,.12)', border:'rgba(26,107,255,.3)',  text:'#3d8bff' },
+      LOW:      { bg:'rgba(0,212,160,.1)',   border:'rgba(0,212,160,.25)',  text:'#00d4a0' },
+    };
+
+    // Flatten all resources across conflicts, deduplicate by name (keep highest risk)
+    const allRes = {};
+    items.forEach(c => {
+      const resources = c.resources || c.commodities || [];
+      resources.forEach(r => {
+        const name    = r.name || r.commodity || '';
+        const rRisk   = (r.risk || r.riskLevel || 'LOW').toUpperCase();
+        const cName   = c.name || c.title || '';
+        const cFlag   = c.flag || c.emoji || '';
+        if (!allRes[name] || _wmRiskLevel(rRisk) > _wmRiskLevel(allRes[name].risk)) {
+          allRes[name] = { ...r, risk: rRisk, conflicts: [cName], conflictFlags: [cFlag] };
+        } else if (allRes[name]) {
+          allRes[name].conflicts.push(cName);
+          allRes[name].conflictFlags.push(cFlag);
+        }
+      });
+    });
+
+    const sorted = Object.values(allRes).sort((a,b) => _wmRiskLevel(b.risk) - _wmRiskLevel(a.risk));
+
+    if (!sorted.length) {
+      if (typeof renderGeoResources === 'function') renderGeoResources();
+      return;
+    }
+
+    el.innerHTML = wmLiveBar('Supply chain disruption risk by commodity') +
+      `<div class="geo-section-head">Critical Commodities at Risk</div>` +
+      sorted.map(r => {
+        const rc = RISK_COLOR_WM[r.risk] || RISK_COLOR_WM.LOW;
+        return `<div class="geo-resource-row" style="border-left:3px solid ${rc.border}">
+          <div class="geo-resource-top">
+            <span class="geo-resource-icon">${wmEsc(r.icon || r.emoji || '⛏')}</span>
+            <div class="geo-resource-info">
+              <span class="geo-resource-name">${wmEsc(r.name || r.commodity || '')}</span>
+              <span class="geo-resource-conflicts">${r.conflictFlags.join(' ')} ${r.conflicts.map(wmEsc).join(', ')}</span>
+            </div>
+            <span class="geo-risk-badge" style="color:${rc.text};background:${rc.bg};border-color:${rc.border}">${r.risk}</span>
+          </div>
+          <div class="geo-resource-note">${wmEsc(r.note || r.description || '')}</div>
+        </div>`;
+      }).join('');
+  } catch(e) {
+    console.warn('[WM] wmGeoResources error:', e.message);
+    if (typeof renderGeoResources === 'function') renderGeoResources();
+  }
+}
+window.wmGeoResources = wmGeoResources;
+
+/* ══════════════════════════════════════════════════════════════════
    EXTEND wmInitAll with all new endpoints
    ══════════════════════════════════════════════════════════════════ */
 (function extendWmInitAll() {
