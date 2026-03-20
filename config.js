@@ -85,9 +85,10 @@ const KNOWN_PROVIDERS = [
     name:       'DefiLlama — DeFi TVL',
     badge:      'DFL',
     group:      'Crypto & On-Chain',
+    noKey:      true,
     desc:       'Total Value Locked for 3,000+ DeFi protocols. ' +
                 'Supplies TVL and 30D growth for the Crypto valuation model. ' +
-                'No API key required.',
+                'No API key required — open data.',
     limit:      'Unlimited (no key required)',
     docsUrl:    'https://defillama.com/docs/api',
     sessionKey: 'vds_call_count',
@@ -99,9 +100,10 @@ const KNOWN_PROVIDERS = [
     name:       'Blockchain.info — BTC On-Chain',
     badge:      'BCH',
     group:      'Crypto & On-Chain',
+    noKey:      true,
     desc:       'Bitcoin network metrics: Hash Rate, Active Addresses, Transaction Count. ' +
                 'Powers Security and Adoption scores in the BTC valuation model. ' +
-                'No API key required.',
+                'No API key required — open data.',
     limit:      'Unlimited (no key required)',
     docsUrl:    'https://www.blockchain.com/explorer/api',
     sessionKey: 'vds_call_count',
@@ -313,8 +315,12 @@ function renderProviderList() {
     items.forEach(p => {
       const val  = getKey(p.id);
       const n    = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
-      const bCls = !val ? "badge-unset" : (p.limitMax && n >= p.limitMax) ? "badge-limit" : "badge-set";
-      const bLbl = !val ? "NOT SET"     : (p.limitMax && n >= p.limitMax) ? "LIMIT"       : mask(val);
+      const bCls = p.noKey ? "badge-nokey"
+                 : !val   ? "badge-unset"
+                 : (p.limitMax && n >= p.limitMax) ? "badge-limit" : "badge-set";
+      const bLbl = p.noKey ? "NO KEY NEEDED"
+                 : !val   ? "NOT SET"
+                 : (p.limitMax && n >= p.limitMax) ? "LIMIT" : mask(val);
       html += `
       <div class="api-key-block${_focusId===p.id?" api-key-block-focus":""}" id="pblock-${cfgEsc(p.id)}">
         <div class="api-key-provider">
@@ -327,7 +333,8 @@ function renderProviderList() {
           </div>
           <span class="api-key-badge ${bCls}">${cfgEsc(bLbl)}</span>
         </div>
-        ${p.desc?`<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl?` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Get free key &rarr;</a>`:""}  </div>`:""}
+        ${p.desc?`<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl?` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Docs &rarr;</a>`:""}  </div>`:""}
+        ${p.noKey ? `<div class="api-key-nokey-note">✓ This source requires no API key — it connects automatically.</div>` : `
         <div class="api-key-input-row">
           <input type="password" id="kinput-${cfgEsc(p.id)}" class="api-key-field"
                  placeholder="Paste API key here…" value="${cfgEsc(val)}"
@@ -342,6 +349,7 @@ function renderProviderList() {
           Session calls: <strong>${n}</strong>${p.limitMax?" / "+p.limitMax:""}
           ${n>0?`<button class="api-reset-count-btn" onclick="resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')">Reset</button>`:""}
         </div>`:""}
+        `}
         ${p.custom?`<button class="api-custom-del-btn" style="margin-top:6px" onclick="removeCustom('${cfgEsc(p.id)}')">&#10005; Remove</button>`:""}
       </div>
       <div class="api-modal-divider"></div>`;
