@@ -372,6 +372,13 @@ function fredLazyEcon() {
 document.addEventListener('DOMContentLoaded', () => {
   // Only load if key already exists — otherwise wait for saveKey callback
   if (getFredKey()) fredInitAll();
+  // Always fetch TreasuryDirect (no key required) to populate window._treasuryYields
+  // for the WACC risk-free rate — runs silently in background
+  setTimeout(() => {
+    if (typeof fredLoadTreasuryDirect === 'function') {
+      fredLoadTreasuryDirect().catch(() => {});
+    }
+  }, 3000); // 3s delay — after page fully settles, non-blocking
   // Refresh every 30 min
   setInterval(() => {
     if (!getFredKey()) return;
