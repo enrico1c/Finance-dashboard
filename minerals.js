@@ -59,6 +59,8 @@ const USGS_MCS_DATA = {
 
 /* ══════════════════════════════════════════════════════════════════
    EU RMIS CRITICALITY CLASSIFICATIONS (static lookup — review cycle: 2027)
+   Source: EU Critical Raw Materials Act (CRMA) 2024 · ec.europa.eu/growth/tools-databases/rmis
+   Last updated: 2023/2024. Next EU CRM review: 2027.
    ══════════════════════════════════════════════════════════════════ */
 const EU_CRITICALITY = {
   rare_earths: { eu_crm: true,  eu_srm: true,  nato: true,  doe: true,  note:'Rare earths for magnets classified as EU Strategic Raw Material' },
@@ -145,6 +147,10 @@ function _mineralsRenderUSGS() {
   if (!el) return;
 
   let html = `<div class="av-live-badge">● USGS Mineral Commodity Summaries 2025/2026 · Annual · Public Domain</div>`;
+  html += `<div class="av-note" style="margin:4px 0 8px">
+    EU criticality classification: <strong>EU CRM Act (CRMA) 2023/2024</strong> · Next review cycle: <strong>2027</strong> ·
+    <a href="https://ec.europa.eu/growth/tools-databases/rmis" target="_blank" rel="noopener" class="energy-entsog-link">RMIS JRC ↗</a>
+  </div>`;
   html += `<div class="min-legend">
     <span class="min-badge min-badge-srm">EU SRM</span> EU Strategic Raw Material &nbsp;
     <span class="min-badge min-badge-crm">EU CRM</span> EU Critical Raw Material &nbsp;
