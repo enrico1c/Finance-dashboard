@@ -6,6 +6,21 @@ let currentTicker        = "AAPL";
 let currentForexPair     = "EUR/USD";
 let currentForexInterval = "60";
 
+/* ── Damodaran Equity Risk Premium ───────────────────────────────────
+   Implied ERP from Aswath Damodaran (NYU Stern).
+   Updated annually — source: pages.stern.nyu.edu/~adamodar/
+   Last update: January 2026. Next update: January 2027.         */
+window.DAMODARAN_ERP = 4.60; // 4.60% implied ERP, US market, Jan 2026
+
+/* ── Country → Default Terminal Growth Rate ─────────────────────────
+   Used as the initial termG suggestion in the WACC DCF block.
+   Based on long-run nominal GDP growth expectations per region.  */
+const COUNTRY_TERM_GROWTH = {
+  US:2.5, GB:2.0, DE:1.8, FR:1.8, IT:1.5, ES:1.8, JP:1.0,
+  CN:4.5, IN:5.5, BR:3.5, KR:2.5, AU:2.5, CA:2.3, CH:1.5,
+  SG:2.5, HK:2.0, NL:1.8, SE:2.0, NO:2.0, DK:1.8,
+};
+
 function escapeHtml(str) {
   return String(str ?? "")
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
@@ -297,7 +312,33 @@ async function refreshSectorDBPrices() {
   if (!unique.length) return;
 
   const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
-  if (!fmpKey) return;
+  if (!fmpKey) {
+    // Finnhub REST fallback: individual quotes (no key = free-tier 60/min)
+    const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+    if (fhKey) {
+      // Stagger requests slightly to respect rate limit
+      for (let i = 0; i < unique.length; i++) {
+        const sym = unique[i];
+        try {
+          const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${fhKey}`, {signal:AbortSignal.timeout(4000)});
+          const q   = await res.json();
+          if (q?.c) {
+            Object.values(sectorDB).forEach(sector => {
+              const s = sector.stocks.find(st => st.ticker.replace(/.*:/,'').toUpperCase() === sym);
+              if (s) {
+                s.price  = q.c;
+                s.change = q.dp ?? s.change; // dp = daily change %
+              }
+            });
+          }
+        } catch {}
+        // Brief pause every 10 tickers to stay within 60/min limit
+        if (i > 0 && i % 10 === 0) await new Promise(r => setTimeout(r, 1000));
+      }
+      console.info('[sectorDB] Prices refreshed from Finnhub (FMP key absent)');
+    }
+    return;
+  }
 
   try {
     // Batch in chunks of 50
@@ -542,8 +583,14 @@ function renderFundamentals(ticker) {
   }
 
   /* ── WACC — Cost of Capital Calculator ─────────────────────────
-     Sources: beta from Finnhub profile / FMP / Yahoo
-              debt from FMP ratios, risk-free from FRED (US10Y) */
+     Sources:
+       • Beta     : Finnhub profile2 → FMP ratios → fallback 1.0
+       • Kd       : FMP income-statement interestExpense/totalDebt
+       • Tax rate : FMP income-statement incomeTaxExpense/incomeBeforeTax
+       • Rf       : FRED 10Y Treasury (window._treasuryYields) → 4.5%
+       • ERP      : Damodaran implied ERP (window.DAMODARAN_ERP)
+       • D/E      : FMP ratios.debtEq → fallback 0.3
+       • termG    : country-mapped default, user-adjustable             */
   const wc = document.getElementById('fund-wacc');
   if (wc && !wc.dataset.loaded) {
     wc.dataset.loaded = '1';
@@ -553,38 +600,73 @@ function renderFundamentals(ticker) {
       const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
       const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
 
-      const beta     = parseFloat(fhLive?.profile?.beta  || fmpLive?.ratios?.beta  || fmpLive?.profile?.beta || 1.0);
-      const debtEq   = parseFloat(fmpLive?.ratios?.debtEq || 0.3);
-      // Use live 10Y Treasury yield if available from fredLoadTreasuryDirect
-      const _ty = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
-      const rf       = _ty['10Y'] ?? 4.5;  // Live US 10Y
-      const erp      = 5.5;  // Damodaran implied ERP
-      const ke       = (rf + beta * erp).toFixed(2);
-      const kd       = 5.5;
-      const tax      = 21;
-      const eqW      = Math.max(20, Math.round(100 / (1 + debtEq)));
-      const debtW    = 100 - eqW;
-      const wacc     = (eqW/100 * parseFloat(ke) + debtW/100 * kd * (1-tax/100)).toFixed(2);
-      const termG    = 2.5;
+      const beta   = parseFloat(fhLive?.profile?.beta  || fmpLive?.ratios?.beta  || fmpLive?.profile?.beta || 1.0);
+      const debtEq = parseFloat(fmpLive?.ratios?.debtEq || 0.3);
 
-      const src = fhLive?.profile?.beta ? 'Finnhub' : fmpLive?.ratios?.beta ? 'FMP' : 'estimated';
+      // Risk-free rate: live US 10Y from FRED/TreasuryDirect
+      const _ty = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
+      const rf   = _ty['10Y'] ?? 4.5;
+
+      // ERP: Damodaran implied (updated annually — see top of script.js)
+      const erp  = window.DAMODARAN_ERP ?? 4.60;
+
+      // Pre-tax cost of debt: from live FMP WACC inputs if available
+      const waccInputs = fmpLive?.waccInputs;
+      const kd   = waccInputs?.kdPct  ?? 5.5;   // fallback 5.5% when no FMP key
+      const tax  = waccInputs?.taxRatePct ?? 21; // fallback US statutory 21%
+      const kdSrc = waccInputs?.kdPct  != null ? 'FMP' : 'est.';
+      const taxSrc= waccInputs?.taxRatePct != null ? 'FMP' : 'statutory';
+
+      const ke   = (rf + beta * erp).toFixed(2);
+      const eqW  = Math.max(20, Math.round(100 / (1 + debtEq)));
+      const debtW= 100 - eqW;
+      const wacc = (eqW/100 * parseFloat(ke) + debtW/100 * kd * (1 - tax/100)).toFixed(2);
+
+      // Terminal growth: country-mapped default; user can override via input
+      const country = fhLive?.profile?.country || fmpLive?.profile?.country || 'US';
+      const termGDefault = (COUNTRY_TERM_GROWTH[country] ?? 2.5);
+      // Read user override from sessionStorage if set
+      const ssKey = `wacc_termg_${sym}`;
+      const termG = parseFloat(sessionStorage.getItem(ssKey) ?? termGDefault);
+
+      // EV/EBITDA implied exit multiple from Gordon Growth Model
+      const waccN = parseFloat(wacc);
+      const exitMult = (waccN > termG)
+        ? ((1 + termG/100) / (waccN/100 - termG/100)).toFixed(1) + 'x'
+        : 'N/A (termG ≥ WACC)';
+
+      const betaSrc = fhLive?.profile?.beta ? 'Finnhub' : fmpLive?.ratios?.beta ? 'FMP' : 'estimated';
+
       wc.innerHTML = `
-        <div class="av-live-badge">● WACC · ${escapeHtml(sym)} · beta from ${src}</div>
+        <div class="av-live-badge">● WACC · ${escapeHtml(sym)} · beta:${betaSrc} · Kd:${kdSrc} · tax:${taxSrc}</div>
         ${sHead('WACC Inputs')}
-        ${mRow('Risk-Free Rate (10Y)',      rf + '%')}
-        ${mRow('Equity Risk Premium',       erp + '%')}
-        ${mRow('Beta (levered)',            beta.toFixed(2))}
-        ${mRow('Cost of Equity (Ke)',       ke + '%')}
-        ${mRow('Pre-Tax Cost of Debt (Kd)', kd + '%')}
-        ${mRow('Tax Rate',                  tax + '%')}
-        ${mRow('D/E Ratio',                 debtEq.toFixed(2))}
-        ${mRow('Equity Weight',             eqW + '%')}
-        ${mRow('Debt Weight',               debtW + '%')}
+        ${mRow('Risk-Free Rate (10Y)',       rf + '%')}
+        ${mRow('Equity Risk Premium',        erp + '% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
+        ${mRow('Beta (levered)',             beta.toFixed(2))}
+        ${mRow('Cost of Equity (Ke)',        ke + '%')}
+        ${mRow('Pre-Tax Cost of Debt (Kd)',  kd.toFixed(2) + '% <span style="font-size:9px;opacity:.6">('+kdSrc+')</span>')}
+        ${mRow('Tax Rate',                   tax.toFixed(1) + '% <span style="font-size:9px;opacity:.6">('+taxSrc+')</span>')}
+        ${mRow('D/E Ratio',                  debtEq.toFixed(2))}
+        ${mRow('Equity Weight',              eqW + '%')}
+        ${mRow('Debt Weight',                debtW + '%')}
         <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
         ${sHead('DCF Sensitivity')}
-        ${mRow('Terminal Growth Rate', termG + '%')}
-        ${mRow('Implied EV/EBITDA exit', '—')}
-        <div class="av-note">// Beta and D/E from live provider data.<br>// Risk-free rate is approximate (add FRED key for live 10Y).</div>`;
+        <div class="metric">
+          <span>Terminal Growth Rate</span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <input id="wacc-termg-${escapeHtml(sym)}" type="number" value="${termG}" min="0" max="10" step="0.1"
+              style="width:58px;background:var(--bg2,#161b22);border:1px solid var(--border,#30363d);color:var(--text,#e6edf3);border-radius:4px;padding:2px 5px;font-size:12px;font-family:monospace"
+              onchange="(function(el){
+                var s='${escapeHtml(sym)}';
+                sessionStorage.setItem('wacc_termg_'+s, el.value);
+                var wc2=document.getElementById('fund-wacc');
+                if(wc2){wc2.dataset.loaded='';renderFundamentals(s);}
+              })(this)" />
+            <span style="font-size:10px;opacity:.6">%</span>
+          </span>
+        </div>
+        ${mRow('Implied EV/EBITDA exit',    exitMult)}
+        <div class="av-note">// Kd = interest expense / total debt (FMP). Tax = effective rate (FMP).<br>// ERP: Damodaran Jan 2026 · <a href="https://pages.stern.nyu.edu/~adamodar/" target="_blank" rel="noopener" style="color:var(--accent,#58a6ff)">stern.nyu.edu/adamodar ↗</a><br>// Adjust terminal growth rate above to update exit multiple.</div>`;
     }, 1500); // Wait for Finnhub/FMP data
   }
 }
