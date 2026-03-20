@@ -599,8 +599,10 @@ function renderFundamentals(ticker) {
     setTimeout(() => {
       const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
       const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+      // AV overview beta — works for non-US tickers where Finnhub free tier returns null
+      const avBeta  = (typeof avLiveCache !== 'undefined') ? (avLiveCache[sym]?.overview?.beta ?? null) : null;
 
-      const beta   = parseFloat(fhLive?.profile?.beta  || fmpLive?.ratios?.beta  || fmpLive?.profile?.beta || 1.0);
+      const beta   = parseFloat(fhLive?.profile?.beta  || fmpLive?.ratios?.beta  || fmpLive?.profile?.beta || avBeta || 1.0);
       const debtEq = parseFloat(fmpLive?.ratios?.debtEq || 0.3);
 
       // Risk-free rate: live US 10Y from FRED/TreasuryDirect
@@ -635,14 +637,14 @@ function renderFundamentals(ticker) {
         ? ((1 + termG/100) / (waccN/100 - termG/100)).toFixed(1) + 'x'
         : 'N/A (termG ≥ WACC)';
 
-      const betaSrc = fhLive?.profile?.beta ? 'Finnhub' : fmpLive?.ratios?.beta ? 'FMP' : 'estimated';
+      const betaSrc = fhLive?.profile?.beta ? 'Finnhub' : fmpLive?.ratios?.beta ? 'FMP' : avBeta ? 'AV' : 'estimated';
 
       wc.innerHTML = `
         <div class="av-live-badge">● WACC · ${escapeHtml(sym)} · beta:${betaSrc} · Kd:${kdSrc} · tax:${taxSrc}</div>
         ${sHead('WACC Inputs')}
         ${mRow('Risk-Free Rate (10Y)',       rf + '%')}
         ${mRow('Equity Risk Premium',        erp + '% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
-        ${mRow('Beta (levered)',             beta.toFixed(2))}
+        ${mRow('Beta (levered)',             beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+betaSrc+')</span>')}
         ${mRow('Cost of Equity (Ke)',        ke + '%')}
         ${mRow('Pre-Tax Cost of Debt (Kd)',  kd.toFixed(2) + '% <span style="font-size:9px;opacity:.6">('+kdSrc+')</span>')}
         ${mRow('Tax Rate',                   tax.toFixed(1) + '% <span style="font-size:9px;opacity:.6">('+taxSrc+')</span>')}
@@ -1247,15 +1249,9 @@ function renderValuation(ticker) {
     }
   }
 
-  // 4. Fallback to static getTickerData
-  if (!stock) {
-    const d = getTickerData(ticker);
-    if (d) {
-      stock = {ticker, name:d.name, price:d.price, pe:d.pe, pb:d.pbv,
-        evEbitda:d.evEbitda, fcfYield:d.divYield*2, peg:d.pe/20,
-        divYield:d.divYield, epsGrowth:18, desc:d.description.slice(0,80)};
-    }
-  }
+  // 4. No live data available — show no-data prompt instead of stale mock
+  // NOTE: DB.AAPL mock data intentionally removed here (was step 4).
+  // Steps 1–3 cover FMP, Yahoo, and sectorDB; if all fail, the user needs a key.
 
   // 5. If Yahoo key active and no data yet, trigger async enrichment
   if (!stock && typeof yfEnrichValuation === "function") {
