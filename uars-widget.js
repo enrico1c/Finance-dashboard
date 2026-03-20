@@ -113,48 +113,40 @@ function _injectWidgetShell() {
   const panel = document.getElementById('panel-analysts');
   if (!panel) return;
 
-  /* Replace the tab-bar */
-  const oldTabBar = panel.querySelector('.tab-bar');
-  if (oldTabBar) {
-    oldTabBar.innerHTML = `
-      <button class="uars-tab-btn active" data-utab="overview"  onclick="uarsSwitchTab('overview')">OVERVIEW</button>
-      <button class="uars-tab-btn"        data-utab="model1"    onclick="uarsSwitchTab('model1')">MODEL 1</button>
-      <button class="uars-tab-btn"        data-utab="model2"    onclick="uarsSwitchTab('model2')">MODEL 2</button>
-      <button class="uars-tab-btn"        data-utab="model3"    onclick="uarsSwitchTab('model3')">MODEL 3</button>`;
-    oldTabBar.className = 'uars-tab-bar';
-  }
+  /* ── Target the static mount point in index.html ──────────────────
+     index.html uses #uars-widget-mount as the placeholder div (no
+     .tab-bar / .tab-pane exist here). Clear it and inject the full
+     4-tab shell directly. If the shell was already injected (e.g.
+     a second DOMContentLoaded call), bail early.                   */
+  const mount = document.getElementById('uars-widget-mount');
+  if (!mount) return;
+  if (mount.querySelector('.uars-tab-bar')) return; // already injected
 
-  /* Replace every .tab-pane with one uars-pane per tab */
-  /* Remove all existing panes */
-  panel.querySelectorAll('.tab-pane').forEach(el => el.remove());
-
-  /* Inject new panes */
-  const paneContainer = document.createElement('div');
-  paneContainer.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column;';
-  paneContainer.innerHTML = `
-    <div id="uars-pane-overview" class="uars-pane active">
-      <div class="uars-loading"><div class="uars-spinner"></div>Waiting for ticker…</div>
+  mount.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;';
+  mount.innerHTML = `
+    <div class="uars-tab-bar">
+      <button class="uars-tab-btn active" data-utab="overview" onclick="uarsSwitchTab('overview')">OVERVIEW</button>
+      <button class="uars-tab-btn"        data-utab="model1"   onclick="uarsSwitchTab('model1')">MODEL 1</button>
+      <button class="uars-tab-btn"        data-utab="model2"   onclick="uarsSwitchTab('model2')">MODEL 2</button>
+      <button class="uars-tab-btn"        data-utab="model3"   onclick="uarsSwitchTab('model3')">MODEL 3</button>
     </div>
-    <div id="uars-pane-model1" class="uars-pane"></div>
-    <div id="uars-pane-model2" class="uars-pane"></div>
-    <div id="uars-pane-model3" class="uars-pane"></div>`;
-
-  /* Insert after tab-bar, before resize handles */
-  const firstResize = panel.querySelector('.resize-handle');
-  if (firstResize) {
-    panel.insertBefore(paneContainer, firstResize);
-  } else {
-    panel.appendChild(paneContainer);
-  }
+    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div id="uars-pane-overview" class="uars-pane active">
+        <div class="uars-loading"><div class="uars-spinner"></div><span>Loading UARS…</span></div>
+      </div>
+      <div id="uars-pane-model1"  class="uars-pane"></div>
+      <div id="uars-pane-model2"  class="uars-pane"></div>
+      <div id="uars-pane-model3"  class="uars-pane"></div>
+    </div>`;
 }
 
 /** Public: switch UARS tab */
 window.uarsSwitchTab = function uarsSwitchTab(tabId) {
   _uarsActiveTab = tabId;
-  const panel = document.getElementById('panel-analysts');
-  if (!panel) return;
+  const mount = document.getElementById('uars-widget-mount');
+  if (!mount) return;
 
-  panel.querySelectorAll('.uars-tab-btn').forEach(b =>
+  mount.querySelectorAll('.uars-tab-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.utab === tabId)
   );
   ['overview','model1','model2','model3'].forEach(id => {
@@ -869,7 +861,7 @@ function _showError(sym, msg) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  /* ── Inject widget shell into the analysts panel ── */
+  /* ── Inject widget shell into #uars-widget-mount ── */
   _injectWidgetShell();
 
   /* ── Patch changeTicker to trigger UARS loading ── */
@@ -889,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ── Override renderScorecard to be a no-op ──
      The original renderScorecard() wrote to #analysts-score which no
      longer exists. Replacing it prevents any JS errors from the
-     existing changeTicker call at line 1654 of script.js.          */
+     existing changeTicker call in script.js.                       */
   window.renderScorecard = function (ticker) {
     /* No-op — UARS widget handles this panel now */
     if (ticker && ticker !== _uarsCurrentTicker) {
@@ -897,11 +889,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  /* ── Auto-load for the initial ticker ── */
-  setTimeout(() => {
-    const t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
-    if (t) uarsLoadForTicker(t);
-  }, 3000);
+  /* ── Signal ready to uars-integration.js queue ──────────────────
+     This flushes any calls that arrived before DOMContentLoaded
+     (e.g. from uars-integration.js safety net or changeTicker).
+     Must be called AFTER _injectWidgetShell() so the pane DOM
+     exists when uarsLoadForTicker() runs.                         */
+  if (typeof window._uarsSignalReady === 'function') {
+    window._uarsSignalReady();
+  } else {
+    /* Integration script not loaded yet — auto-load directly */
+    setTimeout(() => {
+      const t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
+      if (t) uarsLoadForTicker(t);
+    }, 500);
+  }
 
-  console.info('[UARS Widget] Loaded — panel-analysts replaced with 4-tab UARS widget.');
+  console.info('[UARS Widget] Loaded — #uars-widget-mount replaced with 4-tab UARS widget.');
 });
