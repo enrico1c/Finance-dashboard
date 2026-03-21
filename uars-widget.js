@@ -885,8 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
       _prevCT.apply(this, arguments);
       const ticker = document.getElementById('tickerInput')?.value?.trim();
       if (ticker) {
-        /* Delay slightly to let other data loaders start first */
-        setTimeout(() => uarsLoadForTicker(ticker), 1200);
+        uarsLoadForTicker(ticker);
       }
     };
     window.changeTicker._uars_patched = true;
@@ -899,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.renderScorecard = function (ticker) {
     /* No-op — UARS widget handles this panel now */
     if (ticker && ticker !== _uarsCurrentTicker) {
-      setTimeout(() => uarsLoadForTicker(ticker), 800);
+      uarsLoadForTicker(ticker);
     }
   };
 
@@ -912,10 +911,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window._uarsSignalReady();
   } else {
     /* Integration script not loaded yet — auto-load directly */
-    setTimeout(() => {
-      const t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
-      if (t) uarsLoadForTicker(t);
-    }, 500);
+    const _t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
+    if (_t) uarsLoadForTicker(_t);
   }
 
   console.info('[UARS Widget] Loaded — #uars-widget-mount replaced with 4-tab UARS widget.');

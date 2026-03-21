@@ -658,18 +658,20 @@
    */
   window.uarsBuildRawData = async function uarsBuildRawData(ticker) {
     const sym = ticker.replace(/.*:/, '').toUpperCase();
-    const merged = {};
+    const sources = Object.entries(engine._sources);
 
-    for (const [sourceId, source] of Object.entries(engine._sources)) {
-      try {
-        const data = await source.fetch(ticker);
-        if (data && typeof data === 'object') {
-          Object.assign(merged, data);
-        }
-      } catch (e) {
-        console.warn(`[UARS Connector] Source "${sourceId}" failed for ${sym}:`, e.message);
+    const results = await Promise.allSettled(
+      sources.map(([, source]) => source.fetch(ticker))
+    );
+
+    const merged = {};
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled' && result.value && typeof result.value === 'object') {
+        Object.assign(merged, result.value);
+      } else if (result.status === 'rejected') {
+        console.warn(`[UARS Connector] Source "${sources[i][0]}" failed for ${sym}:`, result.reason?.message);
       }
-    }
+    });
 
     return merged;
   };

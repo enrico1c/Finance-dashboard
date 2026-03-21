@@ -754,17 +754,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const raw = document.getElementById('tickerInput')?.value?.trim();
       if (raw) {
         /* Small delay — let other modules initialise first */
-        setTimeout(() => assembleValuationData(raw), 800);
+        assembleValuationData(raw);
       }
     };
     window.changeTicker._vd_patched = true;
   }
 
   /* Pre-load for initial ticker */
-  setTimeout(() => {
-    const t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
-    if (t) assembleValuationData(t);
-  }, 3000);
+  const _vdInitTicker = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
+  if (_vdInitTicker) assembleValuationData(_vdInitTicker);
 });
 
 console.info('[VD] valuation-data.js loaded — unified data aggregator ready.');
