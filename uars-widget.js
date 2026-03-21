@@ -878,18 +878,6 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ── Inject widget shell into #uars-widget-mount ── */
   _injectWidgetShell();
 
-  /* ── Patch changeTicker to trigger UARS loading ── */
-  const _prevCT = typeof changeTicker === 'function' ? changeTicker : null;
-  if (_prevCT && !_prevCT._uars_patched) {
-    window.changeTicker = function () {
-      _prevCT.apply(this, arguments);
-      const ticker = document.getElementById('tickerInput')?.value?.trim();
-      if (ticker) {
-        uarsLoadForTicker(ticker);
-      }
-    };
-    window.changeTicker._uars_patched = true;
-  }
 
   /* ── Override renderScorecard to be a no-op ──
      The original renderScorecard() wrote to #analysts-score which no
@@ -911,9 +899,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window._uarsSignalReady();
   } else {
     /* Integration script not loaded yet — auto-load directly */
-    const _t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
-    if (_t) uarsLoadForTicker(_t);
+    const t = typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL';
+    if (t) uarsLoadForTicker(t);
   }
+
 
   console.info('[UARS Widget] Loaded — #uars-widget-mount replaced with 4-tab UARS widget.');
 });

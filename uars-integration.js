@@ -137,8 +137,8 @@ function _applyChangeTickerPatch() {
 
     if (!raw) return;
 
-    /* Fire UARS load after yielding to the event loop so all other loaders start first */
-    setTimeout(() => uarsSafeLoad(raw), 0);
+    /* Fire UARS load — other loaders start first via the call chain */
+    uarsSafeLoad(raw);
   };
 
   window.changeTicker._uars_integration_patched = true;
