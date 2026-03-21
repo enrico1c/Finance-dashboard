@@ -137,7 +137,7 @@ function _applyChangeTickerPatch() {
 
     if (!raw) return;
 
-    /* Fire UARS load after a short delay so all other loaders start first */
+    /* Fire UARS load — other loaders start first via the call chain */
     uarsSafeLoad(raw);
   };
 
