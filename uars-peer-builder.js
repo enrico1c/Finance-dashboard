@@ -164,12 +164,13 @@ async function _fetchPeerMetrics(peerSymbols) {
   const metricsMap = {};
   const toFetch    = peerSymbols.slice(0, _PEER_TARGET);
 
-  for (const peer of toFetch) {
+  /* Fetch all peers in parallel — no sequential sleep needed */
+  await Promise.allSettled(toFetch.map(async peer => {
     const cacheKey = `peer_metrics_${peer}`;
     const cached   = _peerCacheGet(cacheKey);
     if (cached) {
       metricsMap[peer] = cached;
-      continue;
+      return;
     }
 
     /* Check if valuation-data.js already assembled this peer's data */
@@ -178,13 +179,13 @@ async function _fetchPeerMetrics(peerSymbols) {
       const m = _metricsFromVD(vd);
       _peerCacheSet(cacheKey, m);
       metricsMap[peer] = m;
-      continue;
+      return;
     }
 
     /* Fetch from FMP */
     try {
       const url  = `https://financialmodelingprep.com/api/v3/key-metrics-ttm/${peer}?apikey=${fmpKey}`;
-      const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const res  = await fetch(url, { signal: AbortSignal.timeout(6000) });
       const data = await res.json();
       if (Array.isArray(data) && data[0]) {
         const m = data[0];
@@ -192,10 +193,7 @@ async function _fetchPeerMetrics(peerSymbols) {
         metricsMap[peer] = m;
       }
     } catch (_) { /* peer unavailable */ }
-
-    /* Rate-limit: small delay between calls */
-    await _sleep(_PEER_RATE_MS);
-  }
+  }));
 
   return metricsMap;
 }
