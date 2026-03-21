@@ -1645,12 +1645,29 @@ function bringToFront(panel){panel.style.zIndex=++zCounter;}
 /* ══════════════════════════════════════════════════════════════════
    TRADINGVIEW
    ══════════════════════════════════════════════════════════════════ */
+let _tvWidget = null;
 function loadChart(symbol){
   const el=document.getElementById("priceChart"); if(!el) return;
   el.innerHTML="";
-  new TradingView.widget({autosize:true,symbol,interval:"D",timezone:"Europe/Rome",
+  _tvWidget = new TradingView.widget({autosize:true,symbol,interval:"D",timezone:"Europe/Rome",
     theme:"dark",style:"1",locale:"it",toolbar_bg:"#0d1117",
     enable_publishing:false,allow_symbol_change:true,save_image:false,container_id:"priceChart"});
+
+  /* Sync chart symbol changes back to the rest of the dashboard */
+  _tvWidget.onChartReady(function() {
+    _tvWidget.chart().onSymbolChanged().subscribe(null, function() {
+      const newFull = _tvWidget.chart().symbol();
+      if (!newFull || newFull === currentTicker) return;
+      currentTicker = newFull;
+      const inp = document.getElementById('tickerInput');
+      if (inp) inp.value = newFull;
+      const sym = newFull.replace(/.*:/, '').toUpperCase();
+      reloadAllPanels(newFull);
+      if (typeof avLoadAll       === 'function') avLoadAll(sym);
+      if (typeof finnhubLoadAll  === 'function') finnhubLoadAll(sym);
+      if (typeof uarsSafeLoad    === 'function') uarsSafeLoad(newFull);
+    });
+  });
 }
 function loadForexChart(pair,interval){
   pair=pair??currentForexPair; interval=interval??currentForexInterval;
