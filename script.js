@@ -1763,7 +1763,7 @@ function changeTicker(){
   // Always refresh Yahoo quote on ticker change if key is set
   if(typeof yfLoadAll === "function") yfLoadAll(sym);
   loadComparables(sym);
-  renderScorecard(ticker);
+  renderScorecard(sym);
   // Enrich watchlist rows with Yahoo live prices
   if(typeof yfEnrichWatchlist === "function") setTimeout(() => yfEnrichWatchlist(), 1500);
   // Technical panel — load if visible, else mark stale
@@ -2029,7 +2029,7 @@ function renderScorecard(ticker) {
   let techSignal = '—', techColor = 'var(--text-muted)';
   const _techRsi = (typeof techGetRsi === 'function') ? techGetRsi(sym) : null;
   if (_techRsi != null || (typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.rsi)) {
-    const rsi = _techRsi ?? avLiveCache[sym].rsi;
+    const rsi = _techRsi ?? avLiveCache[sym]?.rsi;
     if (rsi < 30)      { techSignal = 'Strong Buy';  techColor = '#3fb950'; }
     else if (rsi < 45) { techSignal = 'Buy';         techColor = '#58a6ff'; }
     else if (rsi > 70) { techSignal = 'Strong Sell'; techColor = '#f85149'; }
@@ -2134,15 +2134,6 @@ function renderScorecard(ticker) {
           ${holdCount>0 ? `<span class="sc-pill sc-pill-hold">◆ Hold ${holdCount}</span>` : ''}
           ${sellCount>0 ? `<span class="sc-pill sc-pill-sell">🐻 Sell ${sellCount}</span>` : ''}
         </div>` : '<div class="sc-nodata">// Add FMP key for analyst data</div>'}
-      </div>
-
-      <!-- Members Sentiment (placeholder) -->
-      <div class="sc-section sc-section-border">
-        <div class="sc-section-label" style="margin-bottom:6px">Members' Sentiments</div>
-        <div class="sc-members-row">
-          <span class="sc-pill sc-pill-sell">🐻 Bearish</span>
-          <span class="sc-pill sc-pill-buy">🐂 Bullish</span>
-        </div>
       </div>
 
       <!-- Pro Tips -->
