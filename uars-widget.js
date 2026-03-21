@@ -174,7 +174,21 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
 
   const engine = window.uarsEngine;
   if (!engine) {
-    console.warn('[UARS Widget] Engine not ready — ensure uars-source-connector.js is loaded.');
+    /* Engine not yet initialised — retry once it's available (up to 3s) */
+    let waited = 0;
+    const interval = setInterval(() => {
+      waited += 100;
+      if (window.uarsEngine) {
+        clearInterval(interval);
+        if (_uarsCurrentTicker === ticker) {
+          window.uarsLoadForTicker(ticker);
+        }
+      } else if (waited >= 3000) {
+        clearInterval(interval);
+        console.warn('[UARS Widget] Engine not ready after 3s — ensure uars-source-connector.js is loaded.');
+        _showError(sym, 'Engine failed to initialise.');
+      }
+    }, 100);
     return;
   }
 

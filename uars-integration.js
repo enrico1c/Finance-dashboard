@@ -137,8 +137,8 @@ function _applyChangeTickerPatch() {
 
     if (!raw) return;
 
-    /* Fire UARS load after a short delay so all other loaders start first */
-    setTimeout(() => uarsSafeLoad(raw), 1200);
+    /* Fire UARS load after yielding to the event loop so all other loaders start first */
+    setTimeout(() => uarsSafeLoad(raw), 0);
   };
 
   window.changeTicker._uars_integration_patched = true;
@@ -336,7 +336,7 @@ function _uarsIntegrationInit() {
       }
       _triggerFirstLoad();
     }
-  }, 6000);   /* 6s safety net */
+  }, 2000);   /* 2s safety net */
 
   console.info('[UARS Integration] Phase 4 wired — changeTicker patched, fhGetLive exposed.');
 }
