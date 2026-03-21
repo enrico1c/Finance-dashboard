@@ -324,6 +324,14 @@ function _uarsIntegrationInit() {
     _triggerFirstLoad();
   };
 
+  /* If widget's DOMContentLoaded fired before this patch was applied
+     (always the case since uars-widget.js loads before uars-integration.js),
+     _uarsSignalReady was already called and _uarsWidgetReady is already true.
+     Trigger the first load directly. */
+  if (_uarsWidgetReady) {
+    _triggerFirstLoad();
+  }
+
   /* Safety net: if widget never signals (e.g. load error), fire anyway */
   setTimeout(() => {
     if (!_uarsWidgetReady) {
