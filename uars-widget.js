@@ -194,9 +194,7 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
 
   /* Show loading state */
   _showLoading(sym);
-
-  /* ── Step 1: Ensure valuation data is assembled ── */
-  _setStatus(`Fetching fundamental & market data for ${sym}…`);
+  _setStatus(`Fetching fundamental & market data…`);
   if (typeof assembleValuationData === 'function') {
     const _asmTimeout = new Promise(r => setTimeout(r, 8000));
     await Promise.race([assembleValuationData(ticker), _asmTimeout]).catch(() => {});
@@ -206,14 +204,14 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
   }
 
   /* ── Step 2: Detect asset class + sync regime ── */
-  _setStatus(`Detecting asset class & macro regime for ${sym}…`);
+  _setStatus(`Detecting asset class & macro regime…`);
   const assetClass  = typeof uarsDetectAssetClass === 'function'
     ? uarsDetectAssetClass(ticker) : 'equities';
   const regime      = typeof uarsSyncRegime === 'function'
     ? uarsSyncRegime() : 'expansion';
 
   /* ── Step 3: Build peer groups (fire-and-forget with onReady callback) ── */
-  _setStatus(`Building peer comparison group for ${sym}…`);
+  _setStatus(`Building peer comparison group…`);
   let RA = 50;
   if (typeof uarsBuildPeerGroups === 'function') {
     uarsBuildPeerGroups(ticker, {
@@ -234,7 +232,7 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
   }
 
   /* ── Step 4: Build raw data + penalties ── */
-  _setStatus(`Computing risk, quality & liquidity metrics for ${sym}…`);
+  _setStatus(`Computing risk, quality & liquidity metrics…`);
   const rawData  = typeof uarsBuildRawData === 'function'
     ? await uarsBuildRawData(ticker).catch(() => ({})) : {};
   const penalties = typeof uarsBuildPenalties === 'function'
@@ -243,7 +241,7 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
     ? uarsBuildQualityMults(ticker, assetClass, rawData) : {};
 
   /* ── Step 5: Score ── */
-  _setStatus(`Running UScore · UARS · CAS models for ${sym}…`);
+  _setStatus(`Running UScore · UARS · CAS models…`);
   const result = await _score(ticker, assetClass, RA, rawData, penalties, qualityMults);
   if (!result) {
     _showError(sym, 'Scoring failed — check API keys.');
@@ -906,7 +904,8 @@ function _showLoading(sym) {
   if (el) el.innerHTML = `
     <div class="uars-loading">
       <div class="uars-spinner"></div>
-      <span id="uars-status-text">Analysing ${_esc(sym)}…</span>
+      <div class="uars-loading-ticker">${_esc(sym)}</div>
+      <div id="uars-status-text" class="uars-loading-step">Initialising…</div>
     </div>`;
 }
 
