@@ -43,7 +43,7 @@ async function fhFetch(path, params = {}) {
 
   fhBump();
   try {
-    const r = await fetch(url.toString());
+    const r = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
     if (!r.ok) return null;
     const data = await r.json();
     sessionStorage.setItem(cacheKey, JSON.stringify(data));
