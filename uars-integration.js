@@ -137,7 +137,8 @@ function _applyChangeTickerPatch() {
 
     if (!raw) return;
 
-    /* Fire UARS load — other loaders start first via the call chain */
+    /* Show the Analysts panel and fire UARS load */
+    if (typeof window.showPanel === 'function') window.showPanel('analysts');
     uarsSafeLoad(raw);
   };
 
@@ -348,6 +349,33 @@ function _uarsIntegrationInit() {
 
   console.info('[UARS Integration] Phase 4 wired — changeTicker patched, fhGetLive exposed.');
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   4.9 — TradingView postMessage fallback
+   ──────────────────────────────────────────────────────────────────
+   The charting library API (onChartReady) may not fire in all
+   configurations. TradingView's embed widget always posts messages
+   to the parent window when the symbol changes. Catch those here.
+══════════════════════════════════════════════════════════════════ */
+window.addEventListener('message', function _tvMsgBridge(e) {
+  try {
+    if (!e.data) return;
+    const d = (typeof e.data === 'string') ? JSON.parse(e.data) : e.data;
+    if (!d || typeof d !== 'object') return;
+
+    /* TradingView uses various message name formats depending on version */
+    const name = (d.name || d.type || d.event || '').toLowerCase();
+    const sym  = d?.data?.symbol || d?.symbol || d?.ticker || null;
+
+    if (!sym) return;
+    if (!/symbol|ticker|setsymbol/.test(name)) return;
+
+    /* Delegate to the same handler used by onSymbolChanged */
+    if (typeof window._onTvSymbolChange === 'function') {
+      window._onTvSymbolChange(sym);
+    }
+  } catch (_) { /* non-TradingView messages — ignore */ }
+});
 
 /* ── Run on DOM ready ─────────────────────────────────────────────── */
 if (document.readyState === 'loading') {

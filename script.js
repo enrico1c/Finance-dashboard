@@ -1646,6 +1646,24 @@ function bringToFront(panel){panel.style.zIndex=++zCounter;}
    TRADINGVIEW
    ══════════════════════════════════════════════════════════════════ */
 let _tvWidget = null;
+
+/* Called whenever the TradingView chart changes its symbol (any source).
+   Exposed on window so uars-integration.js postMessage bridge can reach it. */
+window._onTvSymbolChange = function _onTvSymbolChange(newFull) {
+  if (!newFull) return;
+  const bare = newFull.replace(/.*:/, '').toUpperCase();
+  if (bare === (currentTicker || '').replace(/.*:/, '').toUpperCase()) return;
+  currentTicker = newFull;
+  const inp = document.getElementById('tickerInput');
+  if (inp) inp.value = newFull;
+  reloadAllPanels(newFull);
+  if (typeof avLoadAll      === 'function') avLoadAll(bare);
+  if (typeof finnhubLoadAll === 'function') finnhubLoadAll(bare);
+  /* Show + trigger UARS Analysts panel immediately */
+  showPanel('analysts');
+  if (typeof uarsSafeLoad   === 'function') uarsSafeLoad(newFull);
+};
+
 function loadChart(symbol){
   const el=document.getElementById("priceChart"); if(!el) return;
   el.innerHTML="";
@@ -1653,21 +1671,20 @@ function loadChart(symbol){
     theme:"dark",style:"1",locale:"it",toolbar_bg:"#0d1117",
     enable_publishing:false,allow_symbol_change:true,save_image:false,container_id:"priceChart"});
 
-  /* Sync chart symbol changes back to the rest of the dashboard */
-  _tvWidget.onChartReady(function() {
-    _tvWidget.chart().onSymbolChanged().subscribe(null, function() {
-      const newFull = _tvWidget.chart().symbol();
-      if (!newFull || newFull === currentTicker) return;
-      currentTicker = newFull;
-      const inp = document.getElementById('tickerInput');
-      if (inp) inp.value = newFull;
-      const sym = newFull.replace(/.*:/, '').toUpperCase();
-      reloadAllPanels(newFull);
-      if (typeof avLoadAll       === 'function') avLoadAll(sym);
-      if (typeof finnhubLoadAll  === 'function') finnhubLoadAll(sym);
-      if (typeof uarsSafeLoad    === 'function') uarsSafeLoad(newFull);
-    });
-  });
+  /* Primary: use TradingView charting library API if available */
+  try {
+    if (typeof _tvWidget.onChartReady === 'function') {
+      _tvWidget.onChartReady(function() {
+        try {
+          const chart = typeof _tvWidget.activeChart === 'function'
+            ? _tvWidget.activeChart() : _tvWidget.chart();
+          chart.onSymbolChanged().subscribe(null, function() {
+            try { _onTvSymbolChange(chart.symbol()); } catch(_) {}
+          });
+        } catch(_) {}
+      });
+    }
+  } catch(_) {}
 }
 function loadForexChart(pair,interval){
   pair=pair??currentForexPair; interval=interval??currentForexInterval;
