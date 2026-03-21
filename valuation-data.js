@@ -231,7 +231,7 @@ async function _fetchMarketData(sym) {
   try {
     if (typeof getFinnhubKey === 'function' && getFinnhubKey()) {
       const qUrl = `https://finnhub.io/api/v1/quote?symbol=${sym}&token=${getFinnhubKey()}`;
-      const q    = await fetch(qUrl).then(r => r.json());
+      const q    = await fetch(qUrl, { signal: AbortSignal.timeout(5000) }).then(r => r.json());
       if (q?.c) out.currentPrice = q.c;
     }
   } catch (_) { /* continue */ }
@@ -290,7 +290,7 @@ async function _fetchMarketData(sym) {
   try {
     if (typeof getFinnhubKey === 'function' && getFinnhubKey()) {
       const mUrl  = `https://finnhub.io/api/v1/stock/metric?symbol=${sym}&metric=all&token=${getFinnhubKey()}`;
-      const meta  = await fetch(mUrl).then(r => r.json());
+      const meta  = await fetch(mUrl, { signal: AbortSignal.timeout(5000) }).then(r => r.json());
       if (meta?.metric?.beta) out.beta = meta.metric.beta;
       /* Also extract 52W return */
       if (meta?.metric?.['52WeekPriceReturnDaily']) {
@@ -486,7 +486,7 @@ async function _fetchAnalystData(sym) {
   try {
     if (typeof getFinnhubKey === 'function' && getFinnhubKey() && !out.meanTarget) {
       const ptUrl = `https://finnhub.io/api/v1/stock/price-target?symbol=${sym}&token=${getFinnhubKey()}`;
-      const pt    = await fetch(ptUrl).then(r => r.json());
+      const pt    = await fetch(ptUrl, { signal: AbortSignal.timeout(5000) }).then(r => r.json());
       if (pt?.targetMean) {
         out.meanTarget  = pt.targetMean;
         out.highTarget  = pt.targetHigh ?? null;

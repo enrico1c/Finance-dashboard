@@ -67,7 +67,7 @@ async function fmpFetch(path, symbol, params = {}) {
 
   try {
     fmpIncrement();
-    const res  = await fetch(url);
+    const res  = await fetch(url, { signal: AbortSignal.timeout(7000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 

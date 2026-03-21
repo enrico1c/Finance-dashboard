@@ -197,7 +197,8 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
 
   /* ── Step 1: Ensure valuation data is assembled ── */
   if (typeof assembleValuationData === 'function') {
-    await assembleValuationData(ticker).catch(() => {});
+    const _asmTimeout = new Promise(r => setTimeout(r, 8000));
+    await Promise.race([assembleValuationData(ticker), _asmTimeout]).catch(() => {});
   }
   if (typeof enrichValuationData === 'function') {
     enrichValuationData(ticker).catch(() => {});   /* non-blocking */
