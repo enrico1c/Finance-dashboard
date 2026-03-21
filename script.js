@@ -1818,6 +1818,11 @@ function hidePanel(id){
   const cb=document.querySelector(`.panel-toggle[data-panel="${id}"]`);
   if(cb) cb.checked=false;
 }
+/* Button on the chart panel — show Analysts & Evaluation and run UARS */
+function openAnalysts(){
+  showPanel('analysts');
+  if (typeof uarsSafeLoad === 'function') uarsSafeLoad(currentTicker);
+}
 function showPanel(id){
   const el=document.getElementById(`panel-${id}`); if(!el) return;
   el.classList.remove("hidden"); applyPanelPosition(id); bringToFront(el);

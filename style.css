@@ -410,6 +410,8 @@ h1 {
   background: var(--accent-glow);
 }
 .icon-btn.close:hover { border-color:var(--accent-red); color:var(--accent-red); background:#ff475711; }
+.icon-btn.chart-analyse-btn { width:auto; padding:0 6px; color:var(--accent-bright); border-color:var(--accent); }
+.icon-btn.chart-analyse-btn:hover { background:var(--accent-glow); border-color:var(--accent-bright); }
 
 .mini-input {
   background:var(--bg-input); border:1px solid var(--border);
