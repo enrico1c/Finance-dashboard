@@ -196,6 +196,7 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
   _showLoading(sym);
 
   /* ── Step 1: Ensure valuation data is assembled ── */
+  _setStatus(`Fetching fundamental & market data for ${sym}…`);
   if (typeof assembleValuationData === 'function') {
     const _asmTimeout = new Promise(r => setTimeout(r, 8000));
     await Promise.race([assembleValuationData(ticker), _asmTimeout]).catch(() => {});
@@ -205,12 +206,14 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
   }
 
   /* ── Step 2: Detect asset class + sync regime ── */
+  _setStatus(`Detecting asset class & macro regime for ${sym}…`);
   const assetClass  = typeof uarsDetectAssetClass === 'function'
     ? uarsDetectAssetClass(ticker) : 'equities';
   const regime      = typeof uarsSyncRegime === 'function'
     ? uarsSyncRegime() : 'expansion';
 
   /* ── Step 3: Build peer groups (fire-and-forget with onReady callback) ── */
+  _setStatus(`Building peer comparison group for ${sym}…`);
   let RA = 50;
   if (typeof uarsBuildPeerGroups === 'function') {
     uarsBuildPeerGroups(ticker, {
@@ -231,6 +234,7 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
   }
 
   /* ── Step 4: Build raw data + penalties ── */
+  _setStatus(`Computing risk, quality & liquidity metrics for ${sym}…`);
   const rawData  = typeof uarsBuildRawData === 'function'
     ? await uarsBuildRawData(ticker).catch(() => ({})) : {};
   const penalties = typeof uarsBuildPenalties === 'function'
@@ -239,6 +243,7 @@ window.uarsLoadForTicker = async function uarsLoadForTicker(ticker) {
     ? uarsBuildQualityMults(ticker, assetClass, rawData) : {};
 
   /* ── Step 5: Score ── */
+  _setStatus(`Running UScore · UARS · CAS models for ${sym}…`);
   const result = await _score(ticker, assetClass, RA, rawData, penalties, qualityMults);
   if (!result) {
     _showError(sym, 'Scoring failed — check API keys.');
@@ -330,6 +335,52 @@ function _renderOverview(result, sym) {
         <span>confidence · band ${_esc(rating.band)}</span>
       </div>
     </div>`;
+
+  /* ── Section A2: Wall St. Analyst Consensus ── */
+  const fmpLive0 = typeof fmpGetLive === 'function' ? fmpGetLive(sym) : null;
+  const analystRaw  = fmpLive0?.analystRaw;
+  const ptData      = fmpLive0?.targets;
+  const currentPx   = m.currentPrice ?? (typeof fhGetLive === 'function' ? fhGetLive(sym)?.quote?.c : null) ?? null;
+
+  let analystHtml = '';
+  if (analystRaw && analystRaw.total > 0) {
+    const total = analystRaw.total;
+    const buyPct  = Math.round(analystRaw.buy  / total * 100);
+    const holdPct = Math.round(analystRaw.hold / total * 100);
+    const sellPct = 100 - buyPct - holdPct;
+
+    /* Upside from price target */
+    let upsideHtml = '';
+    if (ptData?.avgTarget && currentPx) {
+      const upside = ((ptData.avgTarget - currentPx) / currentPx * 100);
+      const upCls  = upside >= 0 ? 'pos' : 'neg';
+      upsideHtml = `
+        <div class="uars-analyst-target">
+          <span class="uars-analyst-target-label">Avg PT</span>
+          <span class="uars-analyst-target-value">$${_f(ptData.avgTarget, 2)}</span>
+          <span class="uars-analyst-target-upside ${upCls}">${upside >= 0 ? '+' : ''}${_f(upside, 1)}% upside</span>
+          <span class="uars-analyst-target-range">Low $${_f(ptData.lowTarget, 2)} · High $${_f(ptData.highTarget, 2)}</span>
+        </div>`;
+    }
+
+    analystHtml = `
+      <div class="uars-analyst-block">
+        <div class="uars-section-head">Wall St. Analyst Consensus <span class="uars-analyst-count">(${total} ratings)</span></div>
+        <div class="uars-analyst-bar-wrap">
+          <div class="uars-analyst-bar">
+            <div class="uars-analyst-seg buy"  style="width:${buyPct}%"  title="Buy ${buyPct}%"></div>
+            <div class="uars-analyst-seg hold" style="width:${holdPct}%" title="Hold ${holdPct}%"></div>
+            <div class="uars-analyst-seg sell" style="width:${sellPct}%" title="Sell ${sellPct}%"></div>
+          </div>
+          <div class="uars-analyst-legend">
+            <span class="buy">▌ Buy ${buyPct}%</span>
+            <span class="hold">▌ Hold ${holdPct}%</span>
+            <span class="sell">▌ Sell ${sellPct}%</span>
+          </div>
+        </div>
+        ${upsideHtml}
+      </div>`;
+  }
 
   /* ── Section B: Three model badges ── */
   const models = [
@@ -481,7 +532,7 @@ function _renderOverview(result, sym) {
       </div>
     </div>`;
 
-  el.innerHTML = consensusHtml + badgesHtml + kpiHtml + dimChartHtml + verdictHtml;
+  el.innerHTML = consensusHtml + analystHtml + badgesHtml + kpiHtml + dimChartHtml + verdictHtml;
 }
 
 /** Generate a plain-language insight for a dimension */
@@ -855,8 +906,13 @@ function _showLoading(sym) {
   if (el) el.innerHTML = `
     <div class="uars-loading">
       <div class="uars-spinner"></div>
-      <span>Loading UARS scores for ${_esc(sym)}…</span>
+      <span id="uars-status-text">Analysing ${_esc(sym)}…</span>
     </div>`;
+}
+
+function _setStatus(msg) {
+  const el = document.getElementById('uars-status-text');
+  if (el) el.textContent = msg;
 }
 
 function _showError(sym, msg) {
