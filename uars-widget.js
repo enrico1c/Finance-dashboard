@@ -892,4 +892,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
   console.info('[UARS Widget] Loaded — #uars-widget-mount replaced with 4-tab UARS widget.');
 });
-
