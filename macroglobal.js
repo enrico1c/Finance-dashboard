@@ -621,20 +621,50 @@ window.macroLoadCentralBanks = async function() {
     { bank:'PBoC',            country:'🇨🇳 China', rate: pbocRate ?? 3.10, currency:'CNY', nextMeeting: null,                             color:'#a371f7', live: pbocRate != null },
   ];
 
-  // Merge all calendar events, sort chronologically
-  const allEvents = [
-    ...FOMC_DATES_2025_26.map(e => ({ ...e, bank:'Fed', color:'#58a6ff', flag:'🇺🇸' })),
-    ...ECB_DATES_2025_26.map(e  => ({ ...e, bank:'ECB', color:'#3fb950', flag:'🇪🇺' })),
-    ...BOE_DATES_2025_26.map(e  => ({ ...e, bank:'BoE', color:'#d29922', flag:'🇬🇧' })),
-    ...BOJ_DATES_2025_26.map(e  => ({ ...e, bank:'BoJ', color:'#f0883e', flag:'🇯🇵' })),
-  ].sort((a,b) => a.date.localeCompare(b.date));
+  const today = new Date().toISOString().slice(0,10);
 
-  const today      = new Date().toISOString().slice(0,10);
-  const upcoming   = allEvents.filter(e => e.date >= today).slice(0, 20);
-  const past3m     = allEvents.filter(e => {
-    const d = new Date(e.date);
-    return d < new Date() && d >= new Date(Date.now() - 90*864e5);
-  }).slice(-8).reverse();
+  // Build upcoming meetings: prefer live FMP calendar events; fall back to official schedules
+  let upcoming, past3m, calendarSource;
+  const bankColor = b => b==='Fed'?'#58a6ff':b==='ECB'?'#3fb950':b==='BoE'?'#d29922':b==='BoJ'?'#f0883e':'#a371f7';
+  const bankFlag  = b => b==='Fed'?'🇺🇸':b==='ECB'?'🇪🇺':b==='BoE'?'🇬🇧':b==='BoJ'?'🇯🇵':'🏦';
+
+  if (fmpCalendarEvents.length) {
+    // Use live FMP data as primary source
+    calendarSource = 'FMP Live Calendar';
+    const liveEvents = fmpCalendarEvents
+      .filter(ev => ev.date >= today)
+      .sort((a,b) => a.date.localeCompare(b.date))
+      .slice(0, 20)
+      .map(ev => ({
+        date:     ev.date,
+        bank:     ev.bank,
+        decision: ev.event,
+        color:    bankColor(ev.bank),
+        flag:     bankFlag(ev.bank),
+        actual:   ev.actual,
+        estimate: ev.estimate,
+      }));
+    upcoming = liveEvents;
+    const pastLive = fmpCalendarEvents
+      .filter(ev => { const d = new Date(ev.date); return d < new Date() && d >= new Date(Date.now() - 90*864e5); })
+      .sort((a,b) => b.date.localeCompare(a.date)).slice(0, 8)
+      .map(ev => ({ date:ev.date, bank:ev.bank, decision:ev.event, color:bankColor(ev.bank), flag:bankFlag(ev.bank) }));
+    past3m = pastLive;
+  } else {
+    // Fall back to official published schedules
+    calendarSource = 'Official CB Schedules';
+    const allHardcoded = [
+      ...FOMC_DATES_2025_26.map(e => ({ ...e, bank:'Fed', color:'#58a6ff', flag:'🇺🇸' })),
+      ...ECB_DATES_2025_26.map(e  => ({ ...e, bank:'ECB', color:'#3fb950', flag:'🇪🇺' })),
+      ...BOE_DATES_2025_26.map(e  => ({ ...e, bank:'BoE', color:'#d29922', flag:'🇬🇧' })),
+      ...BOJ_DATES_2025_26.map(e  => ({ ...e, bank:'BoJ', color:'#f0883e', flag:'🇯🇵' })),
+    ].sort((a,b) => a.date.localeCompare(b.date));
+    upcoming = allHardcoded.filter(e => e.date >= today).slice(0, 20);
+    past3m   = allHardcoded.filter(e => {
+      const d = new Date(e.date);
+      return d < new Date() && d >= new Date(Date.now() - 90*864e5);
+    }).slice(-8).reverse();
+  }
 
   el.innerHTML = `
     <div class="av-live-badge">● Central Bank Rates &amp; Calendar · ${fredKey?'FRED live rates · ':'Approximate rates · '}Free</div>
@@ -708,29 +738,9 @@ window.macroLoadCentralBanks = async function() {
 
     <div class="mg-footer">
       Rates: ${fredKey?'FRED live':'Approximate (add FRED key for live rates)'}
-      · Calendars: Official central bank published schedules
-      ${fmpKey ? ' · Live calendar via FMP' : ' · <a href="#" onclick="openApiConfig(\'fmp\');return false" style="color:var(--accent,#58a6ff)">Add FMP key for live events ↗</a>'}
+      · Calendar: ${calendarSource}
+      ${!fmpKey ? ' · <a href="#" onclick="openApiConfig && openApiConfig(\'fmp\');return false" style="color:var(--accent,#58a6ff)">Add FMP key for live calendar ↗</a>' : ''}
     </div>
-    ${fmpCalendarEvents.length ? `
-    <div class="mg-section">
-      <div class="mg-section-title">📡 FMP Live Calendar — Next 120 Days</div>
-      <div class="cb-calendar">
-        ${fmpCalendarEvents.slice(0,15).map(ev => {
-          const d      = new Date(ev.date);
-          const daysTo = Math.round((d - new Date()) / 864e5);
-          const isNear = daysTo <= 14;
-          const bankColor = ev.bank==='Fed'?'#58a6ff':ev.bank==='ECB'?'#3fb950':ev.bank==='BoE'?'#d29922':ev.bank==='BoJ'?'#f0883e':'#a371f7';
-          return `<div class="cb-event-row ${isNear?'cb-event-near':''}">
-            <span class="cb-event-date">${_me(ev.date)}</span>
-            <span class="cb-event-bank" style="color:${bankColor}">${_me(ev.bank)}</span>
-            <span class="cb-event-type" style="flex:1">${_me(ev.event)}</span>
-            <span class="cb-event-days ${daysTo<=7?'neg':daysTo<=30?'pos':''}">${daysTo}d</span>
-            ${ev.actual   != null ? `<span style="font-size:9px;color:#3fb950;margin-left:4px">Act: ${ev.actual}%</span>` : ''}
-            ${ev.estimate != null && ev.actual == null ? `<span style="font-size:9px;color:#58a6ff;margin-left:4px">Est: ${ev.estimate}%</span>` : ''}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>` : ''}
   `;
 };
 
