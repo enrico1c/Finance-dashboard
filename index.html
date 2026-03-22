@@ -864,10 +864,10 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="signals" onclick="switchTab('macro','signals')">SIGNALS</button>
-        <button class="tab-btn"        data-tab="comm"    onclick="switchTab('macro','comm')">COMMODITIES</button>
-        <button class="tab-btn"        data-tab="risk"    onclick="switchTab('macro','risk')">RISK</button>
-        <button class="tab-btn"        data-tab="pred"    onclick="switchTab('macro','pred')">PREDICTIONS</button>
+        <button class="tab-btn active" data-tab="signals" onclick="switchTab('macro','signals');if(typeof wmMacroSignals==='function')wmMacroSignals()">SIGNALS</button>
+        <button class="tab-btn"        data-tab="comm"    onclick="switchTab('macro','comm');if(typeof wmMacroCommodities==='function')wmMacroCommodities()">COMMODITIES</button>
+        <button class="tab-btn"        data-tab="risk"    onclick="switchTab('macro','risk');if(typeof wmMacroRisk==='function')wmMacroRisk()">RISK</button>
+        <button class="tab-btn"        data-tab="pred"    onclick="switchTab('macro','pred');if(typeof wmMacroPredictions==='function')wmMacroPredictions()">PREDICTIONS</button>
         <button class="tab-btn"        data-tab="yield"   onclick="switchTab('macro','yield');if(typeof fredLazyYield==='function')fredLazyYield()">YIELD</button>
         <button class="tab-btn"        data-tab="econ"    onclick="switchTab('macro','econ');(function(){if(typeof fredLazyEcon==='function')fredLazyEcon();if(document.getElementById('econ-cal-head'))return;if(typeof fhRenderEconCalendar==='function')fhRenderEconCalendar('macro-econ')})()">ECON</button>
         <button class="tab-btn"        data-tab="crypto"  onclick="switchTab('macro','crypto');if(typeof wmMacroCrypto==='function')wmMacroCrypto()">CRYPTO</button>

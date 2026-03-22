@@ -152,13 +152,14 @@ async function fredLoadYieldCurve() {
 
   // ── 1. US Treasury Direct (no key needed) ────────────────────
   const treasuryData = await fredLoadTreasuryDirect();
-  if (treasuryData?.yields?.length) {
+  const hasYields = Array.isArray(treasuryData?.yields) && treasuryData.yields.length > 0;
+  if (hasYields) {
     _fredRenderYieldCurve(el, treasuryData.yields, treasuryData.date, treasuryData.src);
   }
 
   // ── 2. FRED credit spreads (BAMLC0A0CM, BAMLH0A0HYM2, T10YIE) ─
   if (!getFredKey()) {
-    if (!treasuryData?.yields?.length) el.innerHTML = fredNoKey();
+    if (!hasYields) el.innerHTML = fredNoKey();
     return;
   }
 
@@ -219,7 +220,15 @@ const FRED_MACRO_SERIES = [
 async function fredLoadMacroIndicators() {
   const el = document.getElementById('macro-econ');
   if (!el) return;
-  if (!getFredKey()) { el.innerHTML = fredNoKey(); return; }
+  if (!getFredKey()) {
+    // Show World Bank global macro data as free fallback
+    if (typeof macroLoadEconFallback === 'function') {
+      macroLoadEconFallback(el);
+    } else {
+      el.innerHTML = fredNoKey();
+    }
+    return;
+  }
   el.innerHTML = fredSpinner();
   try {
     const results = await Promise.allSettled(
@@ -326,25 +335,27 @@ async function fredLoadTreasuryDirect() {
     if (!entries.length) return null;
     const last  = entries[entries.length-1];
     const getV  = tag => parseFloat(last.querySelector(tag)?.textContent || '0');
+    const yieldPairs = [
+      { label:'1M',  value: getV('d\\:BC_1MONTH,  BC_1MONTH')  },
+      { label:'3M',  value: getV('d\\:BC_3MONTH,  BC_3MONTH')  },
+      { label:'6M',  value: getV('d\\:BC_6MONTH,  BC_6MONTH')  },
+      { label:'1Y',  value: getV('d\\:BC_1YEAR,   BC_1YEAR')   },
+      { label:'2Y',  value: getV('d\\:BC_2YEAR,   BC_2YEAR')   },
+      { label:'3Y',  value: getV('d\\:BC_3YEAR,   BC_3YEAR')   },
+      { label:'5Y',  value: getV('d\\:BC_5YEAR,   BC_5YEAR')   },
+      { label:'7Y',  value: getV('d\\:BC_7YEAR,   BC_7YEAR')   },
+      { label:'10Y', value: getV('d\\:BC_10YEAR,  BC_10YEAR')  },
+      { label:'20Y', value: getV('d\\:BC_20YEAR,  BC_20YEAR')  },
+      { label:'30Y', value: getV('d\\:BC_30YEAR,  BC_30YEAR')  },
+    ].filter(y => y.value > 0);
+
     const result = {
-      date: last.querySelector('d\:NEW_DATE, NEW_DATE')?.textContent?.slice(0,10) || '',
-      yields: {
-        '1M': getV('d\:BC_1MONTH,  BC_1MONTH'),
-        '3M': getV('d\:BC_3MONTH,  BC_3MONTH'),
-        '6M': getV('d\:BC_6MONTH,  BC_6MONTH'),
-        '1Y': getV('d\:BC_1YEAR,   BC_1YEAR'),
-        '2Y': getV('d\:BC_2YEAR,   BC_2YEAR'),
-        '3Y': getV('d\:BC_3YEAR,   BC_3YEAR'),
-        '5Y': getV('d\:BC_5YEAR,   BC_5YEAR'),
-        '7Y': getV('d\:BC_7YEAR,   BC_7YEAR'),
-        '10Y': getV('d\:BC_10YEAR, BC_10YEAR'),
-        '20Y': getV('d\:BC_20YEAR, BC_20YEAR'),
-        '30Y': getV('d\:BC_30YEAR, BC_30YEAR'),
-      },
-      _src: 'US Treasury Direct',
+      date:   last.querySelector('d\\:NEW_DATE, NEW_DATE')?.textContent?.slice(0,10) || '',
+      yields: yieldPairs,
+      src:    'US Treasury Direct',
     };
-    // Cache globally for WACC/other modules
-    window._treasuryYields = result.yields;
+    // Cache globally for WACC/other modules (object form for backward compat)
+    window._treasuryYields = Object.fromEntries(yieldPairs.map(y => [y.label, y.value]));
     return result;
   } catch(e) {
     console.warn('[Treasury Direct]', e.message);

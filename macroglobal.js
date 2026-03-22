@@ -346,7 +346,8 @@ window.macroLoadGlobal = async function() {
       };
     });
 
-    el.dataset.mgLoaded = '1';
+    const hasData = rows.some(r => r.gdp_growth != null || r.cpi != null || r.imf_growth != null);
+    if (hasData) el.dataset.mgLoaded = '1';
     el.innerHTML = `
       <div class="av-live-badge">● World Bank · IMF WEO · ${new Date().getFullYear()} data · No API key required</div>
 
@@ -461,7 +462,8 @@ window.macroLoadPMI = async function() {
       ...(parsed[code] || {}),
     })).filter(i => i.value != null).sort((a,b) => b.value - a.value);
 
-    el.dataset.mgLoaded = '1';
+    // Only mark as loaded if OECD returned actual data; otherwise allow retry on next click
+    if (items.length > 0) el.dataset.mgLoaded = '1';
 
     const pmiSignal = v => {
       if (v == null) return { label:'—', color:'var(--text-muted)' };
@@ -799,3 +801,82 @@ document.addEventListener('DOMContentLoaded', () => {
 window.macroLoadGlobal       = macroLoadGlobal;
 window.macroLoadPMI          = macroLoadPMI;
 window.macroLoadCentralBanks = macroLoadCentralBanks;
+
+/* ══════════════════════════════════════════════════════════════════
+   ECON TAB FALLBACK — shown when no FRED key is configured
+   Uses World Bank + IMF free data to populate the ECON tab with
+   key macro indicators for major economies.
+   ══════════════════════════════════════════════════════════════════ */
+window.macroLoadEconFallback = async function(el) {
+  if (!el) return;
+  el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading macro data (World Bank · IMF)…</div>';
+
+  try {
+    const countryCodes = ['US','CN','DE','JP','GB'];
+    const imfCodes     = ['USA','CHN','DEU','JPN','GBR'];
+
+    const [wbGdp, wbCpi, wbUnemp, imfGrowth, imfInflation] = await Promise.all([
+      wbFetch(WB_INDICATORS.gdp_growth,   countryCodes, 3),
+      wbFetch(WB_INDICATORS.cpi,          countryCodes, 3),
+      wbFetch(WB_INDICATORS.unemployment, countryCodes, 3),
+      imfFetch(IMF_INDICATORS.gdp_growth, imfCodes).catch(() => null),
+      imfFetch(IMF_INDICATORS.inflation,  imfCodes).catch(() => null),
+    ]);
+
+    const iso3Map = { US:'USA', CN:'CHN', DE:'DEU', JP:'JPN', GB:'GBR' };
+    const flags   = { US:'🇺🇸', CN:'🇨🇳', DE:'🇩🇪', JP:'🇯🇵', GB:'🇬🇧' };
+    const names   = { US:'USA', CN:'China', DE:'Germany', JP:'Japan', GB:'UK' };
+
+    const rows = countryCodes.map(code => {
+      const iso3   = iso3Map[code];
+      const gdpRow = wbLatest(wbGdp,   code);
+      const cpiRow = wbLatest(wbCpi,   code);
+      const ueRow  = wbLatest(wbUnemp, code);
+      const imfG   = imfGrowth    ? imfLatestAndForecast(imfGrowth,   iso3) : null;
+      const imfI   = imfInflation ? imfLatestAndForecast(imfInflation, iso3) : null;
+      return { code, flag: flags[code], name: names[code],
+               gdp: gdpRow?.value, gdpYear: gdpRow?.date,
+               cpi: cpiRow?.value, ue: ueRow?.value,
+               imfGdp: imfG?.value, imfGdpF: imfG?.forecast,
+               imfInfl: imfI?.value };
+    });
+
+    const fmt = (v, unit='%') => v == null ? '—' : Number(v).toFixed(1) + unit;
+    const cls = v => v == null ? '' : v > 0 ? 'fred-pos' : 'fred-neg';
+
+    let html = `<div class="av-live-badge">● World Bank · IMF WEO · Free data · No API key needed</div>
+    <div style="padding:6px 10px 10px;margin-bottom:4px;background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.2);border-radius:4px;font-size:11px;color:#ffa500">
+      🔑 <a href="#" onclick="openApiConfig('fred');return false" style="color:var(--accent)">Add your free FRED key</a>
+      for live US data: CPI, GDP, Unemployment, Yield Curve, Consumer Sentiment and more.
+    </div>
+    <div class="fred-section-head">🌍 Key Economy Snapshot — World Bank + IMF</div>
+    <div class="fred-macro-grid">`;
+
+    for (const r of rows) {
+      html += `<div class="fred-macro-card">
+        <div class="fred-mc-icon">${r.flag}</div>
+        <div class="fred-mc-body">
+          <div class="fred-mc-label">${_me(r.name)}</div>
+          <div class="fred-mc-val" style="font-size:11px">
+            GDP: <span class="${cls(r.gdp)}">${fmt(r.gdp)}</span>
+            &nbsp;CPI: <span class="${cls(r.cpi)}">${fmt(r.cpi)}</span>
+            &nbsp;UE: ${fmt(r.ue)}
+          </div>
+          ${r.imfGdpF != null ? `<div class="fred-mc-chg" style="color:#58a6ff">IMF forecast: ${fmt(r.imfGdpF)} GDP growth</div>` : ''}
+          <div class="fred-mc-date">${r.gdpYear || ''}</div>
+        </div>
+      </div>`;
+    }
+
+    html += `</div>
+    <div class="mg-footer" style="margin-top:8px">
+      Source: <a href="https://data.worldbank.org" target="_blank" class="geo-wm-link">World Bank</a>
+      · <a href="https://www.imf.org/en/Publications/WEO" target="_blank" class="geo-wm-link">IMF WEO</a>
+      · Annual data · Free, no key
+    </div>`;
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// Macro data error: ${_me(e.message)}</div>`;
+  }
+};
