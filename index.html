@@ -1127,13 +1127,15 @@ function wmIntelShowTelegram() {
   if (typeof wmIntelTelegram === 'function') wmIntelTelegram();
 }
 /* Patch wmIntelSetFilter to restore main list when standard tabs clicked */
-const _origSetFilter = typeof wmIntelSetFilter === 'function' ? wmIntelSetFilter : null;
-function wmIntelSetFilter(type) {
-  document.getElementById('intel-feed-list').style.display = '';
-  document.getElementById('intel-oref').style.display      = 'none';
-  document.getElementById('intel-telegram').style.display  = 'none';
-  if (_origSetFilter) _origSetFilter(type);
-}
+(function() {
+  const _origSetFilter = window.wmIntelSetFilter; // capture worldmonitor.js version before overwriting
+  window.wmIntelSetFilter = function(type) {
+    document.getElementById('intel-feed-list').style.display = '';
+    document.getElementById('intel-oref').style.display      = 'none';
+    document.getElementById('intel-telegram').style.display  = 'none';
+    if (_origSetFilter) _origSetFilter(type);
+  };
+})();
 </script>
 <script>
 /* ══════════════════════════════════════════════════════════════════

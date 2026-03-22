@@ -8,6 +8,13 @@
 /* ── ⚙️  Keys are managed via the ⚙ API button in the UI ────────── */
 /* Use the modal to paste your FMP key — stored in localStorage.     */
 
+/* HTML escape helper — used throughout template literals */
+function fmpEsc(s) {
+  return typeof escapeHtml === 'function'
+    ? escapeHtml(String(s ?? ''))
+    : String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
 // Runtime key: config.js stores under finterm_key_fmp (via lsId = id => `finterm_key_${id}`)
 function getFmpKey() {
   return (window._KEYS && window._KEYS["fmp"])
