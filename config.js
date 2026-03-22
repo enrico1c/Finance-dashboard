@@ -79,6 +79,22 @@ const KNOWN_PROVIDERS = [
     desc:"Qualità aria real-time · PM2.5, PM10, NO2, O3, CO, SO2 da 30.000+ stazioni · Tab AIR in Geo·Risk",
     limit:"Generoso free tier — nessun limite fisso", docsUrl:"https://api.openaq.org/",
     sessionKey:"openaq_call_count", limitWarn:null, limitMax:null },
+  /* ── STORAGE & PERSISTENCE ───────────────────────────────────── */
+  {
+    id:         'supabase',
+    name:       'Supabase — Persistent Storage',
+    badge:      'SB',
+    group:      'Storage & Persistence',
+    desc:       'Supabase anon key for ft_events and ft_cache tables. ' +
+                'Enables cross-session persistence of news, intel alerts, and API cache. ' +
+                'Get your anon key from the Supabase project dashboard → Settings → API.',
+    limit:      'Free tier: 500MB DB, 2GB bandwidth',
+    docsUrl:    'https://supabase.com/dashboard',
+    sessionKey: 'sb_call_count',
+    limitWarn:  null,
+    limitMax:   null,
+  },
+
   /* ── CRYPTO & ON-CHAIN ──────────────────────────────────────── */
   {
     id:         'defillama',
@@ -141,6 +157,8 @@ function getOpenFigiKey()       { return getKey("openfigi");       }
 function getCompaniesHouseKey() { return getKey("companieshouse"); }
 /* Phase 4 — Reference Data */
 function getTwelvedataKey()     { return getKey("twelvedata");     }
+/* Persistence */
+function getSbKey()             { return getKey("supabase");       }
 
 function loadAllKeys() {
   allProviders().forEach(p => {
