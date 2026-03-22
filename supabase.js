@@ -38,8 +38,12 @@
    ══════════════════════════════════════════════════════════════════ */
 
 const SB_URL  = 'https://zvvsdxzdywagtsgndbqd.supabase.co';
-const SB_KEY  = 'sb_publishable_lIKXA5g0XrRqkW4FNgyS6Q_Znizu4m4';
-const SB_HDR  = { 'Content-Type':'application/json', 'apikey': SB_KEY, 'Authorization':`Bearer ${SB_KEY}` };
+const SB_KEY_DEFAULT = 'sb_publishable_lIKXA5g0XrRqkW4FNgyS6Q_Znizu4m4';
+function getSbAuthKey() { return (typeof getSbKey === 'function' && getSbKey()) || SB_KEY_DEFAULT; }
+const SB_HDR  = () => {
+  const k = getSbAuthKey();
+  return { 'Content-Type':'application/json', 'apikey': k, 'Authorization':`Bearer ${k}` };
+};
 const SB_TABLE = 'ft_events';
 
 /* ── In-memory read cache (avoid redundant GETs) ────────────────── */
@@ -66,7 +70,7 @@ function sbCompress(text) {
 async function sbFetch(path, method = 'GET', body = null, extraHeaders = {}) {
   const opts = {
     method,
-    headers: { ...SB_HDR, ...extraHeaders },
+    headers: { ...SB_HDR(), ...extraHeaders },
     signal: AbortSignal.timeout(8000),
   };
   if (body) opts.body = JSON.stringify(body);
