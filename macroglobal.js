@@ -219,7 +219,7 @@ function oecdParseLatest(json) {
    ══════════════════════════════════════════════════════════════════ */
 const FOMC_URL   = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm';
 const ECB_URL    = 'https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html';
-const ALLORIGINS  = 'https://api.allorigins.win/get?url=';
+const _MG_ALLORIGINS = 'https://api.allorigins.win/get?url=';
 
 // Hardcoded 2025-2026 FOMC dates (publicly known, stable)
 const FOMC_DATES_2025_26 = [
