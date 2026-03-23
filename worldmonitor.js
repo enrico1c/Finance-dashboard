@@ -791,8 +791,6 @@ function wmPredFilter(chip, cat) {
   });
 }
 
-);
-}
 
 /* ─────────────────────────────────────────────────────────────────
    ENHANCED GEO·RISK TABS
