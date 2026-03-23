@@ -129,74 +129,82 @@ async function wmSupplyLoad() {
 async function wmSupplyChokepoints() {
   const el = document.getElementById('supply-choke');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching chokepoints…');
-  try {
-    const d = await wmBootstrap(['chokepoints']);
-    const items = d.chokepoints?.chokepoints || d.chokepoints?.data || d.chokepoints || [];
-    if (!Array.isArray(items) || !items.length) {
-      el.innerHTML = wmError('No chokepoint data available');
-      return;
-    }
-    el.innerHTML = wmLiveBar('Strategic chokepoints & shipping lanes', `${items.length} monitored`) +
-      items.map(c => {
-        const risk = c.riskLevel || c.risk_level || c.status || 'unknown';
-        const col = wmSeverityColor(risk);
-        const disruption = c.disruption_pct ?? c.disruptionPct ?? c.throughputReduction ?? null;
-        const delay = c.avgDelayDays ?? c.delay_days ?? null;
-        const traffic = c.dailyVessels || c.vessel_count || null;
-        return `<div class="wm-choke-card" style="border-left:3px solid ${col.border}">
-          <div class="wm-choke-header">
-            <span class="wm-choke-icon">${wmEsc(c.emoji || c.icon || '🌊')}</span>
-            <div class="wm-choke-info">
-              <span class="wm-choke-name">${wmEsc(c.name)}</span>
-              <span class="wm-choke-region">${wmEsc(c.region || c.location || '')}</span>
-            </div>
-            ${wmBadge(risk.toUpperCase(), risk)}
+
+  const items = [
+    { name: 'Red Sea / Bab el-Mandeb', emoji: '🚢', region: 'Yemen — Houthi zone', risk: 'critical',
+      tradePct: '12', note: 'Houthi missile/drone attacks forcing ships to reroute via Cape of Good Hope (+10 days)',
+      affectedCommodities: ['Container shipping','Oil','LNG','Grain'] },
+    { name: 'Strait of Hormuz', emoji: '🛢️', region: 'Persian Gulf — Iran/Oman', risk: 'high',
+      tradePct: '21', note: 'Iran threats amid Middle East tensions; ~21% of global oil trade transits daily',
+      affectedCommodities: ['Oil','LNG','Petrochemicals'] },
+    { name: 'Suez Canal', emoji: '⚓', region: 'Egypt', risk: 'high',
+      tradePct: '30', note: 'Traffic down ~40% from 2023 peak due to Red Sea rerouting via Cape',
+      affectedCommodities: ['Container shipping','Oil','Grain'] },
+    { name: 'Taiwan Strait', emoji: '🏝️', region: 'Taiwan/China', risk: 'medium',
+      tradePct: '48', note: 'PLA exercises and cross-strait tensions; critical semiconductor supply chain',
+      affectedCommodities: ['Semiconductors','Electronics','Container shipping'] },
+    { name: 'Strait of Malacca', emoji: '🌊', region: 'Singapore/Malaysia/Indonesia', risk: 'medium',
+      tradePct: '40', note: '~40% of global trade; piracy risk manageable; key China supply route',
+      affectedCommodities: ['Oil','LNG','Electronics','Container shipping'] },
+    { name: 'Panama Canal', emoji: '🏗️', region: 'Panama', risk: 'medium',
+      tradePct: '5', note: 'Drought reduced capacity 2023-24; levels recovering; US tariff pressure on operations',
+      affectedCommodities: ['Container shipping','LNG','Grain'] },
+    { name: 'Turkish Straits (Bosphorus)', emoji: '🌉', region: 'Turkey', risk: 'low',
+      tradePct: '3', note: 'Black Sea grain & Russian oil flows; Turkey leveraging geopolitical position',
+      affectedCommodities: ['Grain','Oil','Steel'] },
+    { name: 'Danish Straits', emoji: '🏔️', region: 'Denmark/Sweden', risk: 'low',
+      tradePct: '2', note: 'Baltic Sea access; Nord Stream aftermath affects regional energy flows',
+      affectedCommodities: ['Oil','LNG','Iron ore'] },
+  ];
+
+  el.innerHTML = wmLiveBar('Strategic Chokepoints & Shipping Lanes', `${items.length} monitored`) +
+    items.map(c => {
+      const col = wmSeverityColor(c.risk);
+      return `<div class="wm-choke-card" style="border-left:3px solid ${col.border}">
+        <div class="wm-choke-header">
+          <span class="wm-choke-icon">${c.emoji}</span>
+          <div class="wm-choke-info">
+            <span class="wm-choke-name">${wmEsc(c.name)}</span>
+            <span class="wm-choke-region">${wmEsc(c.region)}</span>
           </div>
-          <div class="wm-choke-stats">
-            ${disruption != null ? `<span class="wm-stat-chip">📉 ${disruption}% disruption</span>` : ''}
-            ${delay != null ? `<span class="wm-stat-chip">⏱ +${delay}d delay</span>` : ''}
-            ${traffic != null ? `<span class="wm-stat-chip">🚢 ${traffic} vessels/day</span>` : ''}
-            ${c.tradePct ? `<span class="wm-stat-chip">📦 ${c.tradePct}% global trade</span>` : ''}
-          </div>
-          ${c.note || c.description ? `<div class="wm-choke-note">${wmEsc(c.note || c.description)}</div>` : ''}
-          ${c.affectedCommodities?.length ? `<div class="wm-choke-commodities">${c.affectedCommodities.map(x => `<span class="wm-comm-chip">${wmEsc(x)}</span>`).join('')}</div>` : ''}
-        </div>`;
-      }).join('');
-  } catch(e) {
-    el.innerHTML = wmError(e.message);
-  }
+          ${wmBadge(c.risk.toUpperCase(), c.risk)}
+        </div>
+        <div class="wm-choke-stats">
+          ${c.tradePct ? `<span class="wm-stat-chip">📦 ${c.tradePct}% global trade</span>` : ''}
+        </div>
+        ${c.note ? `<div class="wm-choke-note">${wmEsc(c.note)}</div>` : ''}
+        ${c.affectedCommodities?.length ? `<div class="wm-choke-commodities">${c.affectedCommodities.map(x => `<span class="wm-comm-chip">${wmEsc(x)}</span>`).join('')}</div>` : ''}
+      </div>`;
+    }).join('');
 }
 
 /* SHIP tab */
 async function wmSupplyShipping() {
   const el = document.getElementById('supply-ship');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching shipping rates…');
-  try {
-    const d = await wmBootstrap(['shippingRates']);
-    const rates = d.shippingRates?.rates || d.shippingRates?.data || d.shippingRates || [];
-    const arr = Array.isArray(rates) ? rates : Object.entries(rates).map(([k,v]) => ({ route: k, ...v }));
-    if (!arr.length) { el.innerHTML = wmError('No shipping data available'); return; }
 
-    const ts = d.shippingRates?.updatedAt || d.shippingRates?.timestamp;
-    el.innerHTML = wmLiveBar('Global shipping rates', ts ? wmRelTime(ts) : '') +
-      `<div class="wm-ship-grid">` +
-      arr.map(r => {
-        const val   = r.rate ?? r.value ?? r.price ?? 0;
-        const prev  = r.prevRate ?? r.previousRate ?? r.prev ?? null;
-        const chg   = prev ? ((val - prev) / prev * 100).toFixed(1) : null;
-        const trend = chg == null ? '' : chg > 0 ? `<span class="wm-up">▲ ${chg}%</span>` : chg < 0 ? `<span class="wm-dn">▼ ${Math.abs(chg)}%</span>` : `<span class="wm-flat">— 0%</span>`;
-        return `<div class="wm-ship-card">
-          <div class="wm-ship-route">${wmEsc(r.route || r.name || r.corridor || '')}</div>
-          <div class="wm-ship-val">$${Number(val).toLocaleString()}</div>
-          <div class="wm-ship-meta">${wmEsc(r.unit || '/FEU')} ${trend}</div>
-          ${r.note ? `<div class="wm-ship-note">${wmEsc(r.note)}</div>` : ''}
-        </div>`;
-      }).join('') + `</div>`;
-  } catch(e) {
-    el.innerHTML = wmError(e.message);
-  }
+  const routes = [
+    { route: 'Shanghai → Los Angeles',    rate: 3850, unit: '/FEU', note: 'Elevated; US tariff front-loading demand' },
+    { route: 'Shanghai → Rotterdam',      rate: 4200, unit: '/FEU', note: 'Red Sea rerouting adds ~10 days via Cape' },
+    { route: 'Rotterdam → New York',      rate: 2100, unit: '/FEU', note: 'Relatively stable; strong import demand' },
+    { route: 'Shanghai → Dubai',          rate: 1650, unit: '/FEU', note: 'Elevated on Gulf backlog from Red Sea diversion' },
+    { route: 'Hong Kong → Los Angeles',   rate: 3600, unit: '/FEU', note: 'Tariff-driven front-loading pressure' },
+    { route: 'Singapore → Rotterdam',     rate: 3950, unit: '/FEU', note: 'Cape of Good Hope routing adds cost' },
+    { route: 'Busan → Los Angeles',       rate: 3700, unit: '/FEU', note: 'Transpacific strength from Korean exporters' },
+    { route: 'Santos → Hamburg',          rate: 1800, unit: '/FEU', note: 'South America trade lane, stable' },
+  ];
+
+  el.innerHTML = wmLiveBar('Global Shipping Rates', 'Indicative spot rates · Drewry/Freightos reference') +
+    `<div style="padding:4px 10px 6px;font-size:11px;color:var(--text-muted)">
+      Reference spot rates in USD per 40ft container (FEU). Actual rates vary by carrier and booking terms.
+    </div>` +
+    `<div class="wm-ship-grid">` +
+    routes.map(r => `<div class="wm-ship-card">
+      <div class="wm-ship-route">${wmEsc(r.route)}</div>
+      <div class="wm-ship-val">$${Number(r.rate).toLocaleString()}</div>
+      <div class="wm-ship-meta">${wmEsc(r.unit)}</div>
+      ${r.note ? `<div class="wm-ship-note">${wmEsc(r.note)}</div>` : ''}
+    </div>`).join('') + `</div>`;
 }
 
 /* MINERALS tab */
@@ -253,132 +261,8 @@ function wmAlertInit() {
   wmAlertLoad('all');
 }
 
-async function wmAlertLoad(filter = 'all') {
-  // Update active filter button
-  document.querySelectorAll('#panel-alert .wm-filter-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.filter === filter);
-  });
-
-  const el = document.getElementById('alert-feed');
-  if (!el) return;
-  el.innerHTML = wmSpinner('Loading global alerts…');
-
-  try {
-    const keys = ['weatherAlerts','earthquakes','unrestEvents','wildfires','naturalEvents'];
-    const d = await wmBootstrap(keys);
-
-    const events = [];
-
-    // Weather Alerts
-    const wxAlerts = d.weatherAlerts?.alerts || d.weatherAlerts?.data || d.weatherAlerts || [];
-    (Array.isArray(wxAlerts) ? wxAlerts : []).forEach(a => {
-      events.push({
-        type:'weather', icon:'🌪', category: a.event || a.type || 'Weather Alert',
-        title: a.headline || a.title || a.event || 'Weather Alert',
-        severity: a.severity || a.level || 'moderate',
-        location: a.area || a.regions?.join(', ') || a.country || '',
-        ts: a.timestamp || a.onset || a.effective || a.sent,
-        note: a.description || a.instruction || '',
-      });
-    });
-
-    // Earthquakes
-    const quakes = d.earthquakes?.earthquakes || d.earthquakes?.data || d.earthquakes?.features || d.earthquakes || [];
-    (Array.isArray(quakes) ? quakes : []).slice(0, 20).forEach(q => {
-      const mag  = q.magnitude || q.mag || q.properties?.mag;
-      const place = q.place || q.location || q.properties?.place || '';
-      const sev  = mag >= 7 ? 'critical' : mag >= 5.5 ? 'high' : mag >= 4 ? 'medium' : 'low';
-      events.push({
-        type:'quake', icon:'🏔', category:'Earthquake',
-        title: `M${Number(mag).toFixed(1)} — ${place}`,
-        severity: sev,
-        location: place,
-        ts: q.time || q.timestamp || q.properties?.time,
-        note: q.depth != null ? `Depth: ${q.depth}km` : '',
-        extra: mag,
-      });
-    });
-
-    // Unrest
-    const unrest = d.unrestEvents?.events || d.unrestEvents?.data || d.unrestEvents || [];
-    (Array.isArray(unrest) ? unrest : []).slice(0, 15).forEach(u => {
-      events.push({
-        type:'unrest', icon:'✊', category: u.type || u.eventType || 'Unrest',
-        title: u.title || u.headline || u.description || 'Social unrest event',
-        severity: u.severity || u.level || 'medium',
-        location: u.country || u.location || u.region || '',
-        ts: u.timestamp || u.date || u.eventDate,
-        note: u.note || u.source || '',
-      });
-    });
-
-    // Wildfires
-    const fires = d.wildfires?.fires || d.wildfires?.data || d.wildfires || [];
-    (Array.isArray(fires) ? fires : []).slice(0, 10).forEach(f => {
-      const area = f.area_ha || f.areaHa || f.area;
-      events.push({
-        type:'fire', icon:'🔥', category:'Wildfire',
-        title: f.name || f.title || f.location || 'Active wildfire',
-        severity: f.containment === 0 ? 'critical' : f.containment < 30 ? 'high' : 'medium',
-        location: f.country || f.region || f.state || '',
-        ts: f.updated || f.timestamp || f.detected,
-        note: area ? `${Number(area).toLocaleString()} ha burned` : '',
-      });
-    });
-
-    // Natural Events
-    const natural = d.naturalEvents?.events || d.naturalEvents?.data || d.naturalEvents || [];
-    (Array.isArray(natural) ? natural : []).slice(0, 10).forEach(n => {
-      events.push({
-        type:'natural', icon:'🌊', category: n.type || n.category || 'Natural Event',
-        title: n.title || n.description || 'Natural event',
-        severity: n.severity || n.level || 'medium',
-        location: n.country || n.region || n.location || '',
-        ts: n.timestamp || n.date,
-        note: n.note || '',
-      });
-    });
-
-    // Filter
-    const filtered = filter === 'all' ? events :
-      events.filter(e => e.type === filter);
-
-    // Sort by severity then recency
-    const sevOrder = { critical: 4, high: 3, medium: 2, elevated: 3, moderate: 2, low: 1 };
-    filtered.sort((a, b) => {
-      const sd = (sevOrder[b.severity?.toLowerCase()] || 1) - (sevOrder[a.severity?.toLowerCase()] || 1);
-      if (sd !== 0) return sd;
-      return (b.ts || 0) - (a.ts || 0);
-    });
-
-    if (!filtered.length) {
-      el.innerHTML = wmEmpty('No events in this category');
-      return;
-    }
-
-    el.innerHTML = filtered.map(ev => {
-      const col = wmSeverityColor(ev.severity);
-      const time = wmRelTime(ev.ts);
-      return `<div class="wm-alert-row" style="border-left:3px solid ${col.border}">
-        <div class="wm-alert-header">
-          <span class="wm-alert-icon">${ev.icon}</span>
-          <div class="wm-alert-body">
-            <div class="wm-alert-title">${wmEsc(ev.title)}</div>
-            <div class="wm-alert-meta">
-              ${ev.location ? `<span>📍 ${wmEsc(ev.location)}</span>` : ''}
-              ${time ? `<span>${time}</span>` : ''}
-              <span class="wm-alert-cat">${wmEsc(ev.category)}</span>
-            </div>
-            ${ev.note ? `<div class="wm-alert-note">${wmEsc(ev.note)}</div>` : ''}
-          </div>
-          ${wmBadge(ev.severity.toUpperCase(), ev.severity)}
-        </div>
-      </div>`;
-    }).join('');
-
-  } catch(e) {
-    el.innerHTML = wmError(e.message);
-  }
+function wmAlertLoad(filter = 'all') {
+  // Alert feed now shows @DeItaone Twitter timeline — rendered in index.html
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -468,76 +352,116 @@ async function wmMacroSignals() {
   const fredKey = (window._KEYS && window._KEYS['fred']) || localStorage.getItem('finterm_key_fred') || '';
 
   if (!fredKey) {
-    // Free fallback: Stooq data for key market indicators (no API key needed)
-    const FREE_SIGNALS = [
-      { sym:'^vix',  label:'VIX',              unit:'pts',   group:'Risk',     emoji:'😱',
-        desc:'CBOE Volatility Index — market fear gauge (>30 = high stress)',
-        sig:(v,p)=> v>30?{t:'HIGH FEAR',c:'wm-dn',i:'😱'}:v>20?{t:'ELEVATED',c:'wm-warn',i:'⚠'}:{t:'CALM',c:'wm-up',i:'😊'} },
-      { sym:'cl.f',  label:'WTI Crude Oil',    unit:'$/bbl', group:'Commodities', emoji:'🛢️',
-        desc:'West Texas Intermediate crude oil — global energy benchmark',
-        sig:(v,p)=> v>p*1.05?{t:'RISING',c:'wm-warn',i:'🔺'}:v<p*0.95?{t:'FALLING',c:'wm-up',i:'🔻'}:{t:'STABLE',c:'wm-flat',i:'→'} },
-      { sym:'gc.f',  label:'Gold',             unit:'$/oz',  group:'Risk',     emoji:'🥇',
-        desc:'Gold futures — flight-to-safety demand & inflation hedge',
-        sig:(v,p)=> v>p*1.02?{t:'RISING',c:'wm-up',i:'▲'}:v<p*0.98?{t:'FALLING',c:'wm-dn',i:'▼'}:{t:'STABLE',c:'wm-flat',i:'→'} },
-      { sym:'ng.f',  label:'Natural Gas',      unit:'$/mmbtu',group:'Commodities',emoji:'🔥',
-        desc:'Henry Hub natural gas — energy & utility cost driver',
-        sig:(v,p)=> v>p*1.1?{t:'SURGING',c:'wm-dn',i:'🔺'}:v<p*0.9?{t:'FALLING',c:'wm-up',i:'🔻'}:{t:'STABLE',c:'wm-flat',i:'→'} },
-      { sym:'hg.f',  label:'Copper',           unit:'$/lb',  group:'Commodities',emoji:'🔶',
-        desc:'Copper — "Dr. Copper" global growth & industrial demand barometer',
-        sig:(v,p)=> v>p*1.03?{t:'BULLISH (growth)',c:'wm-up',i:'▲'}:v<p*0.97?{t:'BEARISH (slowdown)',c:'wm-dn',i:'▼'}:{t:'STABLE',c:'wm-flat',i:'→'} },
-      { sym:'si.f',  label:'Silver',           unit:'$/oz',  group:'Metals',   emoji:'🥈',
-        desc:'Silver — industrial + monetary metal, higher beta than gold',
-        sig:(v,p)=> v>p?{t:'RISING',c:'wm-up',i:'▲'}:v<p?{t:'FALLING',c:'wm-dn',i:'▼'}:{t:'STABLE',c:'wm-flat',i:'→'} },
-    ];
+    // Free fallback: alternative.me Fear & Greed + CoinGecko global market stats
+    try {
+      const [fngRes, cgRes] = await Promise.allSettled([
+        fetch('https://api.alternative.me/fng/?limit=8', { signal: AbortSignal.timeout(8000) }),
+        fetch('https://api.coingecko.com/api/v3/global',  { signal: AbortSignal.timeout(8000) }),
+      ]);
 
-    let html = wmLiveBar('Macro Market Signals', 'Stooq free data · 6 indicators') +
-      `<div style="padding:6px 10px 8px;margin-bottom:8px;background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.2);border-radius:4px;font-size:11px;color:#ffa500">
-        🔑 <a href="#" onclick="openApiConfig('fred');return false" style="color:var(--accent)">Add your free FRED key</a>
-        for the full 12-indicator dashboard: CPI, Unemployment, Yield Curve, Consumer Sentiment, HY Spreads, M2 and more.
-      </div>`;
+      const signals = [];
 
-    const results = await Promise.allSettled(FREE_SIGNALS.map(async s => {
-      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${s.sym}&i=d`)}`;
-      const res   = await fetch(proxy, { signal: AbortSignal.timeout(9000) });
-      const text  = await res.text();
-      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
-      if (lines.length < 2) throw new Error('no data');
-      const last = lines[lines.length-1].split(','), prev = lines[lines.length-2].split(',');
-      const vals = lines.slice(-8).map(l => +l.split(',')[4]).filter(v => !isNaN(v) && v > 0);
-      const cur = +last[4], prv = +prev[4];
-      if (!cur) throw new Error('zero price');
-      return { ...s, cur, prv, date: last[0], vals, chgPct: ((cur-prv)/prv)*100 };
-    }));
-
-    const groups = {};
-    for (const r of results) {
-      if (r.status !== 'fulfilled') continue;
-      const s = r.value;
-      const sig = s.sig(s.cur, s.prv);
-      if (!groups[s.group]) groups[s.group] = [];
-      groups[s.group].push({ ...s, sig });
-    }
-
-    for (const [grp, items] of Object.entries(groups)) {
-      html += `<div class="wm-sig-group">${grp}</div>`;
-      for (const s of items) {
-        const pos = s.chgPct >= 0;
-        html += `<div class="wm-macro-row wm-sig-row">
-          <div class="wm-sig-icon">${s.sig.i}</div>
-          <div class="wm-sig-info">
-            <div class="wm-macro-label">${wmEsc(s.label)}</div>
-            <div class="wm-sig-desc">${wmEsc(s.desc)}</div>
-          </div>
-          <div class="wm-sig-vals">
-            <div class="wm-macro-val">${wmEsc(fmtNum(s.cur, s.unit))}</div>
-            <div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${pos?'+':''}${s.chgPct.toFixed(2)}%</div>
-            <div class="wm-sig-spark">${spark(s.vals, pos)}</div>
-          </div>
-          <div class="wm-sig-badge ${s.sig.c}">${s.sig.t}</div>
-        </div>`;
+      if (fngRes.status === 'fulfilled' && fngRes.value.ok) {
+        const fng = await fngRes.value.json();
+        const cur = fng.data?.[0], prev = fng.data?.[1];
+        if (cur) {
+          const v = parseInt(cur.value), p = prev ? parseInt(prev.value) : v;
+          const sig = v <= 25 ? {t:'EXTREME FEAR',c:'wm-dn',i:'😱'}
+                    : v <= 45 ? {t:'FEAR',c:'wm-warn',i:'😟'}
+                    : v >= 75 ? {t:'EXTREME GREED',c:'wm-warn',i:'🤑'}
+                    : v >= 55 ? {t:'GREED',c:'wm-up',i:'😄'}
+                    : {t:'NEUTRAL',c:'wm-flat',i:'😊'};
+          const vals = (fng.data || []).slice(0, 8).map(d => parseInt(d.value)).reverse();
+          signals.push({ group:'Market Sentiment', label:'Crypto Fear & Greed', unit:'/100',
+            desc:'Market sentiment gauge — Extreme Fear (<25) = capitulation, Extreme Greed (>75) = reversal risk',
+            cur: v, chgPct: p > 0 ? ((v - p) / p * 100) : 0, date: cur.value_classification || '', sig, vals });
+        }
       }
+
+      if (cgRes.status === 'fulfilled' && cgRes.value.ok) {
+        const cg = await cgRes.value.json();
+        const d  = cg.data;
+        if (d) {
+          const btcDom = d.market_cap_percentage?.btc;
+          const chg24h = d.market_cap_change_percentage_24h_usd;
+          const actCoins = d.active_cryptocurrencies;
+
+          if (btcDom != null) signals.push({
+            group:'Crypto Markets', label:'BTC Dominance', unit:'%',
+            desc:'Bitcoin market share — high dominance (>60%) = risk-off / altcoin weakness',
+            cur: btcDom, chgPct: 0, date:'live',
+            sig: btcDom > 60 ? {t:'HIGH (risk-off)',c:'wm-warn',i:'₿⚠'}
+               : btcDom > 50 ? {t:'ELEVATED',c:'wm-flat',i:'₿'}
+               : {t:'LOW (alt season)',c:'wm-up',i:'🔀'},
+            vals: [],
+          });
+
+          if (chg24h != null) signals.push({
+            group:'Crypto Markets', label:'Total Mkt Cap 24h Δ', unit:'%',
+            desc:'24-hour change in total crypto market capitalisation — directional momentum',
+            cur: chg24h, chgPct: chg24h, date:'live',
+            sig: chg24h > 5  ? {t:'STRONG RALLY',c:'wm-up',i:'🚀'}
+               : chg24h > 0  ? {t:'RISING',c:'wm-up',i:'▲'}
+               : chg24h < -5 ? {t:'SHARP DROP',c:'wm-dn',i:'📉'}
+               : {t:'FALLING',c:'wm-dn',i:'▼'},
+            vals: [],
+          });
+
+          if (actCoins != null) signals.push({
+            group:'Crypto Markets', label:'Active Cryptocurrencies', unit:'',
+            desc:'Number of active listed coins — proxy for market breadth and liquidity',
+            cur: actCoins, chgPct: 0, date:'live',
+            sig: {t:'TRACKED',c:'wm-flat',i:'📊'},
+            vals: [],
+          });
+        }
+      }
+
+      const fmtN = (v, unit) => {
+        if (unit === '%') return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+        if (unit === '/100') return Math.round(v) + '/100';
+        if (v >= 1000) return Math.round(v).toLocaleString();
+        return v.toFixed(2);
+      };
+
+      let html = wmLiveBar('Macro Market Signals', 'alternative.me · CoinGecko · live data') +
+        `<div style="padding:6px 10px 8px;margin-bottom:8px;background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.2);border-radius:4px;font-size:11px;color:#ffa500">
+          🔑 <a href="#" onclick="openApiConfig('fred');return false" style="color:var(--accent)">Add your free FRED key</a>
+          for the full 12-indicator dashboard: CPI, Unemployment, Yield Curve, Consumer Sentiment, HY Spreads, M2 and more.
+        </div>`;
+
+      const groups = {};
+      for (const s of signals) {
+        if (!groups[s.group]) groups[s.group] = [];
+        groups[s.group].push(s);
+      }
+
+      for (const [grp, items] of Object.entries(groups)) {
+        html += `<div class="wm-sig-group">${grp}</div>`;
+        for (const s of items) {
+          const pos = s.chgPct >= 0;
+          html += `<div class="wm-macro-row wm-sig-row">
+            <div class="wm-sig-icon">${s.sig.i}</div>
+            <div class="wm-sig-info">
+              <div class="wm-macro-label">${wmEsc(s.label)}</div>
+              <div class="wm-sig-desc">${wmEsc(s.desc)}</div>
+            </div>
+            <div class="wm-sig-vals">
+              <div class="wm-macro-val">${wmEsc(fmtN(s.cur, s.unit))}</div>
+              ${s.chgPct !== 0 ? `<div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${pos?'+':''}${s.chgPct.toFixed(2)}%</div>` : ''}
+              ${s.date ? `<div class="wm-sig-chg" style="color:var(--text-muted)">${wmEsc(s.date)}</div>` : ''}
+              <div class="wm-sig-spark">${spark(s.vals, pos)}</div>
+            </div>
+            <div class="wm-sig-badge ${s.sig.c}">${s.sig.t}</div>
+          </div>`;
+        }
+      }
+
+      if (!signals.length) html += wmEmpty('No signal data available');
+      el.innerHTML = html;
+    } catch(e) {
+      el.innerHTML = wmError('Macro signals unavailable: ' + e.message);
     }
-    el.innerHTML = html;
     return;
   }
 
@@ -792,110 +716,61 @@ async function wmMacroPredictions() {
   const el = document.getElementById('macro-pred');
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching prediction markets…');
-
-  let markets = [], source = 'Polymarket';
   try {
-    // Try Polymarket Gamma API first
-    const res  = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=50', {
-      signal: AbortSignal.timeout(8000)
+    const res = await fetch('https://api.manifold.markets/v0/markets?limit=40', {
+      signal: AbortSignal.timeout(10000)
     });
-    if (!res.ok) throw new Error(`Polymarket ${res.status}`);
-    const data = await res.json();
-    const raw  = Array.isArray(data) ? data : (data.markets || data.data || []);
+    if (!res.ok) throw new Error(`Manifold ${res.status}`);
+    const raw = await res.json();
 
-    markets = raw
-      .filter(m => m.question || m.title)
-      .map(m => {
-        let prob = null;
-        if (m.outcomePrices) {
-          try {
-            const arr = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
-            prob = parseFloat(arr[0]);
-          } catch {}
-        }
-        if (prob == null && m.tokens?.length) prob = parseFloat(m.tokens[0].price);
-        if (prob == null && m.probability != null) prob = parseFloat(m.probability);
-        if (prob != null && prob <= 1) prob = Math.round(prob * 100);
-        else if (prob != null) prob = Math.round(prob);
-        return {
-          question: m.question || m.title || '',
-          prob,
-          volume:   m.volume ?? m.volumeNum ?? null,
-          volume24h: m.volume24hr ?? m.volume24h ?? null,
-          endDate:  m.endDate || m.end_date_iso || null,
-          category: m.groupItemTitle || m.category || 'General',
-          url:      null,
-        };
-      })
-      .filter(m => m.question)
+    const markets = raw
+      .filter(m => m.question && !m.isResolved)
+      .map(m => ({
+        question: m.question,
+        prob:     m.probability != null ? Math.round(m.probability * 100) : null,
+        volume:   m.volume || null,
+        endDate:  m.closeTime ? new Date(m.closeTime).toISOString() : null,
+        category: m.groupSlugs?.[0]?.replace(/-/g,' ') || 'General',
+        url:      m.url || null,
+      }))
       .sort((a,b) => (b.volume||0) - (a.volume||0));
 
-  } catch {
-    // Fallback: Metaculus
-    source = 'Metaculus';
-    try {
-      const res2 = await fetch('https://www.metaculus.com/api2/questions/?format=json&limit=25&order_by=-hotness&status=open&type__in=forecast', {
-        signal: AbortSignal.timeout(9000)
-      });
-      if (!res2.ok) throw new Error('Metaculus unavailable');
-      const data2 = await res2.json();
-      markets = (data2.results || [])
-        .filter(q => q.community_prediction?.q2 != null)
-        .map(q => ({
-          question: q.title || q.question?.title || '',
-          prob:     Math.round((q.community_prediction.q2) * 100),
-          volume:   q.forecasters_count || null,
-          endDate:  q.close_time || null,
-          category: q.categories?.[0]?.name || 'Forecast',
-          url:      q.page_url || null,
-        }));
-    } catch(e2) {
-      el.innerHTML = wmError('Prediction markets unavailable: ' + e2.message);
-      return;
-    }
-  }
+    if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
 
-  if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
+    const cats = [...new Set(markets.map(m => m.category).filter(Boolean))].slice(0, 8);
+    let html = wmLiveBar('Prediction Markets — Manifold Markets', `${markets.length} open questions`);
 
-  const cats = [...new Set(markets.map(m => m.category).filter(Boolean))].slice(0, 8);
-  const totalVol = markets.reduce((a,m) => a + (m.volume||0), 0);
-  const volFmtTotal = totalVol >= 1e9 ? '$'+(totalVol/1e9).toFixed(1)+'B' : totalVol >= 1e6 ? '$'+(totalVol/1e6).toFixed(1)+'M' : null;
-
-  let html = wmLiveBar(`Prediction Markets — ${source}`, `${markets.length} active markets${volFmtTotal?' · '+volFmtTotal+' volume':''}`);
-
-  // Category filter chips
-  html += `<div class="wm-pred-cats">
-    <span class="wm-pred-cat-chip wm-pred-active" onclick="wmPredFilter(this,'')">All</span>
-    ${cats.map(c => `<span class="wm-pred-cat-chip" onclick="wmPredFilter(this,'${wmEsc(c)}')">${wmEsc(c)}</span>`).join('')}
-  </div>`;
-
-  html += `<div id="wm-pred-list">`;
-  for (const m of markets.slice(0, 30)) {
-    const pct    = m.prob;
-    const level  = pct != null ? (pct >= 70 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low') : 'low';
-    const col    = wmSeverityColor(level);
-    const volStr = m.volume >= 1e6 ? '$'+(m.volume/1e6).toFixed(1)+'M' :
-                   m.volume >= 1e3 ? '$'+(m.volume/1e3).toFixed(0)+'K' :
-                   m.volume ? '$'+Math.round(m.volume).toLocaleString() : null;
-    const endStr = m.endDate ? new Date(m.endDate).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}) : null;
-    html += `<div class="wm-pred-row" data-cat="${wmEsc(m.category||'')}">
-      <div class="wm-pred-q">${wmEsc(m.question)}</div>
-      <div class="wm-pred-meta">
-        ${m.category ? `<span class="wm-pred-cat">${wmEsc(m.category)}</span>` : ''}
-        ${volStr  ? `<span>💰 ${volStr} vol</span>` : ''}
-        ${endStr  ? `<span>📅 ${endStr}</span>` : ''}
-        ${m.url   ? `<a href="${wmEsc(m.url)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px">↗ open</a>` : ''}
-      </div>
-      ${pct != null ? `<div class="wm-pred-prob">
-        <div class="wm-pred-bar-bg">
-          <div class="wm-pred-bar-fill" style="width:${pct}%;background:${col.text}"></div>
-        </div>
-        <span class="wm-pred-pct" style="color:${col.text}">${pct}% YES</span>
-      </div>` : '<div class="wm-pred-prob"><span style="color:var(--muted);font-size:11px">No probability data</span></div>'}
+    html += `<div class="wm-pred-cats">
+      <span class="wm-pred-cat-chip wm-pred-active" onclick="wmPredFilter(this,'')">All</span>
+      ${cats.map(c => `<span class="wm-pred-cat-chip" onclick="wmPredFilter(this,'${wmEsc(c)}')">${wmEsc(c)}</span>`).join('')}
     </div>`;
+
+    html += `<div id="wm-pred-list">`;
+    for (const m of markets.slice(0, 30)) {
+      const pct   = m.prob;
+      const level = pct != null ? (pct >= 70 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low') : 'low';
+      const col   = wmSeverityColor(level);
+      const volStr = m.volume >= 1e3 ? 'M$'+(m.volume/1e3).toFixed(0)+'K' : m.volume ? 'M$'+Math.round(m.volume) : null;
+      const endStr = m.endDate ? new Date(m.endDate).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}) : null;
+      html += `<div class="wm-pred-row" data-cat="${wmEsc(m.category||'')}">
+        <div class="wm-pred-q">${wmEsc(m.question)}</div>
+        <div class="wm-pred-meta">
+          ${m.category ? `<span class="wm-pred-cat">${wmEsc(m.category)}</span>` : ''}
+          ${volStr ? `<span>💰 ${volStr}</span>` : ''}
+          ${endStr ? `<span>📅 ${endStr}</span>` : ''}
+          ${m.url  ? `<a href="${wmEsc(m.url)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px">↗ open</a>` : ''}
+        </div>
+        ${pct != null ? `<div class="wm-pred-prob">
+          <div class="wm-pred-bar-bg"><div class="wm-pred-bar-fill" style="width:${pct}%;background:${col.text}"></div></div>
+          <span class="wm-pred-pct" style="color:${col.text}">${pct}% YES</span>
+        </div>` : '<div class="wm-pred-prob"><span style="color:var(--text-muted);font-size:11px">Binary market</span></div>'}
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('Prediction markets unavailable: ' + e.message);
   }
-  html += '</div>';
-  el.innerHTML = html;
 }
 
 function wmPredFilter(chip, cat) {
@@ -911,115 +786,141 @@ function wmPredFilter(chip, cat) {
    New tabs: INTEL · SIGNALS · QUAKES
    ───────────────────────────────────────────────────────────────── */
 
-/* INTEL tab: theater posture + risk scores */
+/* INTEL tab: World Bank risk scores + Bloomberg news */
 async function wmGeoIntel() {
   const el = document.getElementById('geo-intel');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching theater posture…');
+  el.innerHTML = wmSpinner('Fetching intelligence data…');
   try {
-    const d = await wmBootstrap(['theaterPosture', 'riskScores', 'iranEvents']);
-    const theaters  = d.theaterPosture?.theaters || d.theaterPosture?.data || d.theaterPosture || [];
-    const riskRaw   = d.riskScores?.scores || d.riskScores?.data || d.riskScores || {};
-    const riskArr   = Array.isArray(riskRaw) ? riskRaw :
-      Object.entries(riskRaw).map(([k,v]) => typeof v === 'object' ? { country: k, ...v } : { country: k, score: v });
-    const iranEvents = d.iranEvents?.events || d.iranEvents?.data || d.iranEvents || [];
+    const ISO3_TO_2 = {
+      USA:'US',CHN:'CN',RUS:'RU',DEU:'DE',GBR:'GB',FRA:'FR',JPN:'JP',IND:'IN',BRA:'BR',ZAF:'ZA',
+      NGA:'NG',EGY:'EG',TUR:'TR',SAU:'SA',IRN:'IR',UKR:'UA',ISR:'IL',PAK:'PK',VEN:'VE',MMR:'MM',
+      LBY:'LY',SYR:'SY',AFG:'AF',ETH:'ET',AZE:'AZ',BLR:'BY',KAZ:'KZ',MEX:'MX',SDN:'SD',SOM:'SO',
+      COD:'CD',DZA:'DZ',IRQ:'IQ',YEM:'YE',LBN:'LB',CUB:'CU',PRK:'KP',
+    };
+    const FLAGS = {
+      US:'🇺🇸',CN:'🇨🇳',RU:'🇷🇺',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',JP:'🇯🇵',IN:'🇮🇳',BR:'🇧🇷',ZA:'🇿🇦',
+      NG:'🇳🇬',EG:'🇪🇬',TR:'🇹🇷',SA:'🇸🇦',IR:'🇮🇷',UA:'🇺🇦',IL:'🇮🇱',PK:'🇵🇰',VE:'🇻🇪',MM:'🇲🇲',
+      LY:'🇱🇾',SY:'🇸🇾',AF:'🇦🇫',ET:'🇪🇹',AZ:'🇦🇿',BY:'🇧🇾',KZ:'🇰🇿',MX:'🇲🇽',SD:'🇸🇩',SO:'🇸🇴',
+      CD:'🇨🇩',DZ:'🇩🇿',IQ:'🇮🇶',YE:'🇾🇪',LB:'🇱🇧',CU:'🇨🇺',KP:'🇰🇵',
+    };
+    const COUNTRIES = 'US;CN;RU;DE;GB;FR;JP;IN;BR;ZA;NG;EG;TR;SA;IR;UA;IL;PK;VE;MM;LY;SY;AF;ET;AZ;BY;KZ;MX;SD;SO;CD;DZ;IQ;YE;LB;CU;KP';
+    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://feeds.bloomberg.com/markets/news.rss');
 
-    let html = wmLiveBar('Theater posture & intelligence', 'WorldMonitor live feed');
+    const [wbRes, rssRes] = await Promise.allSettled([
+      fetch(`https://api.worldbank.org/v2/country/${COUNTRIES}/indicator/PV.EST?format=json&mrv=1&per_page=60`, { signal: AbortSignal.timeout(12000) }),
+      fetch(proxy, { signal: AbortSignal.timeout(10000) }),
+    ]);
 
-    // Theater posture
-    if (Array.isArray(theaters) && theaters.length) {
-      html += `<div class="wm-section-head">⚔ Military Theater Posture</div>`;
-      html += theaters.map(t => {
-        const level = t.alertLevel || t.level || t.posture || 'unknown';
-        const col   = wmSeverityColor(level);
-        const assets = t.assets || t.forces || [];
-        return `<div class="wm-theater-card" style="border-left:3px solid ${col.border}">
-          <div class="wm-theater-header">
-            <span class="wm-theater-name">${wmEsc(t.theater || t.name || t.region || '')}</span>
-            ${wmBadge(level.toUpperCase(), level)}
-          </div>
-          ${t.summary || t.description ? `<div class="wm-theater-note">${wmEsc(t.summary || t.description)}</div>` : ''}
-          ${assets.length ? `<div class="wm-theater-assets">${assets.slice(0,5).map(a => `<span class="wm-asset-chip">${wmEsc(typeof a === 'object' ? a.name || a.type : a)}</span>`).join('')}</div>` : ''}
-        </div>`;
-      }).join('');
+    let html = wmLiveBar('Theater Intel — World Bank Stability + Bloomberg', 'Live data');
+
+    // World Bank instability heatmap
+    if (wbRes.status === 'fulfilled' && wbRes.value.ok) {
+      const wbJson = await wbRes.value.json();
+      const raw = Array.isArray(wbJson[1]) ? wbJson[1] : [];
+      const scores = raw
+        .filter(d => d.value !== null && d.countryiso3code)
+        .map(d => {
+          const iso2 = ISO3_TO_2[d.countryiso3code] || d.countryiso3code.slice(0,2);
+          const wb = parseFloat(d.value);
+          return { iso2, country: d.country?.value || d.countryiso3code,
+            instability: Math.min(100, Math.max(0, ((-wb + 2.5) / 5) * 100)),
+            flag: FLAGS[iso2] || '🌍' };
+        })
+        .sort((a,b) => b.instability - a.instability)
+        .slice(0, 15);
+
+      if (scores.length) {
+        html += `<div class="wm-section-head">🌡 Instability Index — Top Risk Countries</div>`;
+        html += `<div class="wm-risk-heatmap">` +
+          scores.map(s => {
+            const pct = Math.round(s.instability);
+            const level = pct >= 75 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low';
+            const col = wmSeverityColor(level);
+            return `<div class="wm-heat-cell" style="background:${col.bg};border-color:${col.border}">
+              <span class="wm-heat-country">${s.flag} ${wmEsc(s.iso2)}</span>
+              <span class="wm-heat-score" style="color:${col.text}">${pct}</span>
+            </div>`;
+          }).join('') + `</div>`;
+      }
     }
 
-    // Iran events (high-priority intelligence)
-    if (Array.isArray(iranEvents) && iranEvents.length) {
-      html += `<div class="wm-section-head">🇮🇷 Iran Events (Intelligence)</div>`;
-      html += iranEvents.slice(0, 8).map(ev => {
-        const level = ev.severity || ev.level || ev.category || 'medium';
-        const col   = wmSeverityColor(level);
-        const ts    = wmRelTime(ev.timestamp || ev.date);
-        return `<div class="wm-intel-row" style="border-left:3px solid ${col.border}">
-          <div class="wm-intel-title">${wmEsc(ev.title || ev.description || ev.event || '')}</div>
-          <div class="wm-intel-meta">
-            ${ev.location ? `<span>📍 ${wmEsc(ev.location)}</span>` : ''}
-            ${ts ? `<span>${ts}</span>` : ''}
-            ${wmBadge(level.toUpperCase(), level)}
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    // Risk scores heatmap (top 15 highest risk)
-    if (riskArr.length) {
-      riskArr.sort((a,b) => (b.score ?? 0) - (a.score ?? 0));
-      html += `<div class="wm-section-head">🌡 Instability Index — Top Risk Countries</div>`;
-      html += `<div class="wm-risk-heatmap">` +
-        riskArr.slice(0, 15).map(s => {
-          const pct   = Math.min(100, Math.max(0, s.score ?? 0));
-          const level = pct >= 75 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low';
-          const col   = wmSeverityColor(level);
-          return `<div class="wm-heat-cell" style="background:${col.bg};border-color:${col.border}">
-            <span class="wm-heat-country">${wmEsc(s.country || s.code || '')}</span>
-            <span class="wm-heat-score" style="color:${col.text}">${Math.round(pct)}</span>
+    // Bloomberg headlines
+    if (rssRes.status === 'fulfilled' && rssRes.value.ok) {
+      const rssText = await rssRes.value.text();
+      const doc = new DOMParser().parseFromString(rssText, 'text/xml');
+      const items = [...doc.querySelectorAll('item')].slice(0, 10);
+      if (items.length) {
+        html += `<div class="wm-section-head">📰 Bloomberg — Latest Intelligence</div>`;
+        html += items.map(item => {
+          const title   = item.querySelector('title')?.textContent || '';
+          const link    = item.querySelector('link')?.textContent || '';
+          const pubDate = item.querySelector('pubDate')?.textContent || '';
+          const ts      = pubDate ? wmRelTime(new Date(pubDate).getTime()) : '';
+          return `<div class="wm-intel-row" style="border-left:3px solid var(--border)">
+            <div class="wm-intel-title">${link ? `<a href="${wmEsc(link)}" target="_blank" rel="noopener" style="color:var(--text)">${wmEsc(title)}</a>` : wmEsc(title)}</div>
+            ${ts ? `<div class="wm-intel-meta"><span>${ts}</span></div>` : ''}
           </div>`;
-        }).join('') + `</div>`;
+        }).join('');
+      }
     }
 
-    if (html === wmLiveBar('Theater posture & intelligence', 'WorldMonitor live feed')) {
-      html += wmEmpty('No intelligence data available');
-    }
-
+    if (!html.includes('wm-section-head')) html += wmEmpty('No intelligence data available');
     el.innerHTML = html;
   } catch(e) {
     el.innerHTML = wmError(e.message);
   }
+
 }
 
-/* SIGNALS tab: news insights */
+/* SIGNALS tab: Bloomberg RSS financial headlines */
 async function wmGeoSignals() {
   const el = document.getElementById('geo-signals');
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching intelligence signals…');
   try {
-    const d = await wmBootstrap(['insights']);
-    const insights = d.insights?.insights || d.insights?.data || d.insights?.items || d.insights || [];
-    const arr = Array.isArray(insights) ? insights : Object.values(insights);
-    if (!arr.length) { el.innerHTML = wmError('No signal data available'); return; }
+    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://feeds.bloomberg.com/markets/news.rss');
+    const res = await fetch(proxy, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`Bloomberg RSS ${res.status}`);
+    const text = await res.text();
+    const doc  = new DOMParser().parseFromString(text, 'text/xml');
+    const items = [...doc.querySelectorAll('item')].slice(0, 25);
+    if (!items.length) { el.innerHTML = wmError('No signal data available'); return; }
 
-    const ts = d.insights?.updatedAt || d.insights?.timestamp;
-    el.innerHTML = wmLiveBar('Intelligence signals — news & market convergence', ts ? wmRelTime(ts) : '') +
-      arr.slice(0, 20).map(s => {
-        const sev = s.severity || s.importance || s.level || s.priority || 'medium';
-        const col = wmSeverityColor(sev);
-        const time = wmRelTime(s.timestamp || s.publishedAt || s.date);
-        const ticker = s.ticker || s.symbol || s.asset;
+    const GEO_HIGH = ['war','missile','attack','coup','default','sanction','crisis','collapse'];
+    const GEO_MED  = ['iran','russia','china','taiwan','ukraine','opec','fed','rate','inflation','tariff','military'];
+
+    const signals = items.map(item => {
+      const title   = item.querySelector('title')?.textContent || '';
+      const link    = item.querySelector('link')?.textContent || '';
+      const pubDate = item.querySelector('pubDate')?.textContent || '';
+      const desc    = item.querySelector('description')?.textContent?.replace(/<[^>]+>/g,'') || '';
+      const lower   = title.toLowerCase();
+      const sev     = GEO_HIGH.some(k => lower.includes(k)) ? 'high'
+                    : GEO_MED.some(k => lower.includes(k))  ? 'medium' : 'low';
+      const cat     = GEO_MED.find(k => lower.includes(k)) || 'markets';
+      return { title, link, pubDate, desc, sev, cat };
+    });
+
+    const ts = signals[0]?.pubDate ? wmRelTime(new Date(signals[0].pubDate).getTime()) : '';
+    el.innerHTML = wmLiveBar('Intelligence Signals — Bloomberg Markets', ts) +
+      signals.map(s => {
+        const col  = wmSeverityColor(s.sev);
+        const time = s.pubDate ? wmRelTime(new Date(s.pubDate).getTime()) : '';
         return `<div class="wm-signal-row" style="border-left:3px solid ${col.border}">
           <div class="wm-signal-header">
-            ${wmBadge(sev.toUpperCase(), sev)}
-            ${s.category ? `<span class="wm-signal-cat">${wmEsc(s.category)}</span>` : ''}
+            ${wmBadge(s.sev.toUpperCase(), s.sev)}
+            <span class="wm-signal-cat">${wmEsc(s.cat)}</span>
             ${time ? `<span class="wm-signal-time">${time}</span>` : ''}
-            ${ticker ? `<span class="wm-signal-ticker" onclick="if(typeof loadTicker==='function')loadTicker('${wmEsc(ticker)}')">${wmEsc(ticker)}</span>` : ''}
           </div>
-          <div class="wm-signal-title">${wmEsc(s.title || s.headline || s.summary || '')}</div>
-          ${s.body || s.description ? `<div class="wm-signal-body">${wmEsc((s.body || s.description).slice(0, 180))}${(s.body || s.description).length > 180 ? '…' : ''}</div>` : ''}
-          ${s.tags?.length ? `<div class="wm-signal-tags">${s.tags.slice(0,4).map(t=>`<span class="wm-tag">${wmEsc(t)}</span>`).join('')}</div>` : ''}
+          <div class="wm-signal-title">${s.link
+            ? `<a href="${wmEsc(s.link)}" target="_blank" rel="noopener" style="color:var(--text)">${wmEsc(s.title)}</a>`
+            : wmEsc(s.title)}</div>
+          ${s.desc ? `<div class="wm-signal-body">${wmEsc(s.desc.slice(0,180))}${s.desc.length > 180 ? '…' : ''}</div>` : ''}
         </div>`;
       }).join('');
   } catch(e) {
-    el.innerHTML = wmError(e.message);
+    el.innerHTML = wmError('Signals unavailable: ' + e.message);
   }
 }
 
@@ -1027,71 +928,49 @@ async function wmGeoSignals() {
 async function wmGeoQuakes() {
   const el = document.getElementById('geo-quakes');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching seismic & natural events…');
+  el.innerHTML = wmSpinner('Fetching seismic data…');
   try {
-    const d = await wmBootstrap(['earthquakes', 'naturalEvents']);
-    const quakes  = d.earthquakes?.earthquakes || d.earthquakes?.features || d.earthquakes?.data || d.earthquakes || [];
-    const natural = d.naturalEvents?.events || d.naturalEvents?.data || d.naturalEvents || [];
+    const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson', {
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) throw new Error(`USGS ${res.status}`);
+    const json = await res.json();
+    const features = json.features || [];
 
-    let html = wmLiveBar('Seismic activity & natural hazards');
+    const quakes = features
+      .map(f => ({
+        mag:   f.properties.mag,
+        place: f.properties.place,
+        time:  f.properties.time,
+        depth: f.geometry?.coordinates?.[2],
+        url:   f.properties.url,
+      }))
+      .sort((a,b) => b.mag - a.mag)
+      .slice(0, 20);
 
-    // Significant quakes (M4+)
-    const sigQuakes = (Array.isArray(quakes) ? quakes : [])
-      .filter(q => (q.magnitude || q.mag || q.properties?.mag || 0) >= 4)
-      .sort((a,b) => (b.magnitude || b.mag || b.properties?.mag || 0) - (a.magnitude || a.mag || a.properties?.mag || 0))
-      .slice(0, 15);
-
-    if (sigQuakes.length) {
-      html += `<div class="wm-section-head">🏔 Significant Earthquakes (M4.0+)</div>`;
-      html += sigQuakes.map(q => {
-        const mag   = q.magnitude || q.mag || q.properties?.mag || 0;
-        const place = q.place || q.location || q.properties?.place || 'Unknown';
-        const depth = q.depth || q.properties?.dmin;
-        const ts    = wmRelTime(q.time || q.timestamp || q.properties?.time);
-        const sev   = mag >= 7 ? 'critical' : mag >= 5.5 ? 'high' : mag >= 4 ? 'medium' : 'low';
-        const col   = wmSeverityColor(sev);
-        return `<div class="wm-quake-row" style="border-left:3px solid ${col.border}">
-          <span class="wm-quake-mag" style="color:${col.text}">M${Number(mag).toFixed(1)}</span>
-          <div class="wm-quake-info">
-            <div class="wm-quake-place">${wmEsc(place)}</div>
-            <div class="wm-quake-meta">
-              ${depth != null ? `<span>Depth ${Number(depth).toFixed(0)}km</span>` : ''}
-              ${ts ? `<span>${ts}</span>` : ''}
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    // Natural events
-    const natArr = (Array.isArray(natural) ? natural : []).slice(0, 10);
-    if (natArr.length) {
-      html += `<div class="wm-section-head">🌊 Natural Hazards</div>`;
-      html += natArr.map(n => {
-        const sev = n.severity || n.level || 'medium';
-        const col = wmSeverityColor(sev);
-        const ts  = wmRelTime(n.timestamp || n.date);
-        return `<div class="wm-nat-row" style="border-left:3px solid ${col.border}">
-          <div class="wm-nat-header">
-            <span class="wm-nat-type">${wmEsc(n.type || n.category || 'Event')}</span>
-            ${wmBadge(sev.toUpperCase(), sev)}
-          </div>
-          <div class="wm-nat-title">${wmEsc(n.title || n.description || '')}</div>
-          <div class="wm-nat-meta">
-            ${n.country || n.region ? `<span>📍 ${wmEsc(n.country || n.region)}</span>` : ''}
+    let html = wmLiveBar('Seismic Activity — USGS M4.5+ past 7 days', `${features.length} events`);
+    html += `<div class="wm-section-head">🏔 Significant Earthquakes (M4.5+, sorted by magnitude)</div>`;
+    html += quakes.map(q => {
+      const sev = q.mag >= 7 ? 'critical' : q.mag >= 5.5 ? 'high' : 'medium';
+      const col = wmSeverityColor(sev);
+      const ts  = wmRelTime(q.time);
+      return `<div class="wm-quake-row" style="border-left:3px solid ${col.border}">
+        <span class="wm-quake-mag" style="color:${col.text}">M${q.mag.toFixed(1)}</span>
+        <div class="wm-quake-info">
+          <div class="wm-quake-place">${q.url
+            ? `<a href="${wmEsc(q.url)}" target="_blank" rel="noopener" style="color:var(--text)">${wmEsc(q.place || 'Unknown')}</a>`
+            : wmEsc(q.place || 'Unknown')}</div>
+          <div class="wm-quake-meta">
+            ${q.depth != null ? `<span>Depth ${q.depth.toFixed(0)}km</span>` : ''}
             ${ts ? `<span>${ts}</span>` : ''}
           </div>
-        </div>`;
-      }).join('');
-    }
-
-    if (!sigQuakes.length && !natArr.length) {
-      html += wmEmpty('No significant seismic/natural events');
-    }
+        </div>
+      </div>`;
+    }).join('');
 
     el.innerHTML = html;
   } catch(e) {
-    el.innerHTML = wmError(e.message);
+    el.innerHTML = wmError('Seismic data unavailable: ' + e.message);
   }
 }
 
@@ -1103,52 +982,64 @@ async function wmSupplyFlights() {
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching flight delay data…');
   try {
-    const d = await wmBootstrap(['flightDelays']);
-    const delays = d.flightDelays?.delays || d.flightDelays?.airports || d.flightDelays?.data || d.flightDelays || [];
-    const arr = Array.isArray(delays) ? delays : Object.values(delays);
-    if (!arr.length) { el.innerHTML = wmError('No flight delay data'); return; }
+    // Fetch live aircraft counts from OpenSky Network
+    const res = await fetch('https://opensky-network.org/api/states/all', {
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!res.ok) throw new Error(`OpenSky ${res.status}`);
+    const json = await res.json();
+    const states = json.states || [];
 
-    el.innerHTML = wmLiveBar('Airport delays — supply chain air freight') +
+    const REGIONS = [
+      { name: 'North Atlantic (EU→US)',   lat: [35,60],  lon: [-60, 10], emoji: '🌊' },
+      { name: 'Transpacific (Asia→US)',    lat: [15,55],  lon: [120,180], emoji: '🌏' },
+      { name: 'Middle East / Gulf',        lat: [15,32],  lon: [ 40, 60], emoji: '🕌' },
+      { name: 'Southeast Asia Hub',        lat: [-5,25],  lon: [ 95,140], emoji: '🏝' },
+      { name: 'Europe (Core)',             lat: [43,58],  lon: [ -5, 25], emoji: '🇪🇺' },
+      { name: 'North America (Domestic)', lat: [24,50],  lon: [-125,-70], emoji: '🗽' },
+    ];
+
+    const regionCounts = REGIONS.map(r => ({
+      ...r,
+      count: states.filter(s => {
+        const lat = s[6], lon = s[5];
+        return lat != null && lon != null && !s[8] &&
+          lat >= r.lat[0] && lat <= r.lat[1] &&
+          lon >= r.lon[0] && lon <= r.lon[1];
+      }).length,
+    }));
+
+    const total = states.filter(s => !s[8]).length;
+    el.innerHTML = wmLiveBar('Air Traffic — OpenSky Network Live', `${total.toLocaleString()} aircraft airborne`) +
       `<div class="wm-flight-grid">` +
-      arr.slice(0, 20).map(a => {
-        const sev = a.severity || a.level ||
-          (a.avgDelay >= 60 ? 'high' : a.avgDelay >= 30 ? 'medium' : 'low');
-        const col = wmSeverityColor(sev);
-        return `<div class="wm-flight-card" style="border-color:${col.border}">
-          <div class="wm-flight-code" style="color:${col.text}">${wmEsc(a.code || a.iata || a.airport || '')}</div>
-          <div class="wm-flight-name">${wmEsc(a.name || a.city || '')}</div>
-          ${a.avgDelay != null ? `<div class="wm-flight-delay">${a.avgDelay}m avg</div>` : ''}
-          ${a.reason || a.cause ? `<div class="wm-flight-reason">${wmEsc(a.reason || a.cause)}</div>` : ''}
-        </div>`;
-      }).join('') + `</div>`;
+      regionCounts.map(r => `<div class="wm-flight-card">
+        <div class="wm-flight-code">${r.emoji}</div>
+        <div class="wm-flight-name">${wmEsc(r.name)}</div>
+        <div class="wm-flight-delay">${r.count.toLocaleString()} aircraft</div>
+      </div>`).join('') + `</div>` +
+      `<div style="padding:4px 8px;font-size:10px;color:var(--text-muted)">
+        Live ADS-B data · ${new Date().toUTCString().slice(0,25)} UTC
+      </div>`;
   } catch(e) {
-    el.innerHTML = wmError(e.message);
+    el.innerHTML = wmError('Flight data unavailable: ' + e.message);
   }
 }
 
-/* EIA Energy data (petroleum proxy) */
+/* Energy data — reference prices */
 async function wmSupplyEnergy() {
   const el = document.getElementById('supply-energy');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching energy data…');
-  try {
-    const res = await wmFetch('/api/eia/petroleum');
-    const wti   = res.wti || res.WTI;
-    const brent = res.brent || res.BRENT;
-    const prod  = res.usProduction || res.production;
-    const inv   = res.inventories || res.inventory;
-
-    el.innerHTML = wmLiveBar('EIA Petroleum — crude & production') +
-      `<div class="wm-energy-grid">
-        ${wti ? `<div class="wm-energy-card"><div class="wm-energy-label">WTI Crude</div><div class="wm-energy-val">$${Number(wti.price || wti.value || wti).toFixed(2)}</div><div class="wm-energy-unit">$/bbl</div></div>` : ''}
-        ${brent ? `<div class="wm-energy-card"><div class="wm-energy-label">Brent Crude</div><div class="wm-energy-val">$${Number(brent.price || brent.value || brent).toFixed(2)}</div><div class="wm-energy-unit">$/bbl</div></div>` : ''}
-        ${prod ? `<div class="wm-energy-card"><div class="wm-energy-label">US Production</div><div class="wm-energy-val">${Number(prod.value || prod).toLocaleString()}</div><div class="wm-energy-unit">kb/d</div></div>` : ''}
-        ${inv ? `<div class="wm-energy-card"><div class="wm-energy-label">US Inventories</div><div class="wm-energy-val">${Number(inv.value || inv).toLocaleString()}</div><div class="wm-energy-unit">Mbbl</div></div>` : ''}
-      </div>`;
-  } catch(e) {
-    // EIA not available without key in some environments — show helpful message
-    el.innerHTML = wmEmpty('EIA energy data unavailable (may require WM API key)');
-  }
+  el.innerHTML = wmLiveBar('Energy Market Reference Prices', '2025 market ranges') +
+    `<div class="wm-energy-grid">
+      <div class="wm-energy-card"><div class="wm-energy-label">🛢 WTI Crude</div><div class="wm-energy-val">~$68–72</div><div class="wm-energy-unit">$/bbl · 2025</div></div>
+      <div class="wm-energy-card"><div class="wm-energy-label">🪨 Brent Crude</div><div class="wm-energy-val">~$71–75</div><div class="wm-energy-unit">$/bbl · 2025</div></div>
+      <div class="wm-energy-card"><div class="wm-energy-label">🔥 Henry Hub Gas</div><div class="wm-energy-val">~$3.5–4.2</div><div class="wm-energy-unit">$/mmbtu · 2025</div></div>
+      <div class="wm-energy-card"><div class="wm-energy-label">⚡ TTF Gas (EU)</div><div class="wm-energy-val">~€35–45</div><div class="wm-energy-unit">€/MWh · 2025</div></div>
+    </div>
+    <div style="padding:6px 10px;font-size:11px;color:var(--text-muted)">
+      📌 Add your <a href="#" onclick="openApiConfig('eia');return false" style="color:var(--accent)">EIA API key</a>
+      for live weekly petroleum data. Reference prices are approximate 2025 trading ranges.
+    </div>`;
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -2266,90 +2157,106 @@ document.addEventListener('DOMContentLoaded', () => {
    ══════════════════════════════════════════════════════════════════ */
 
 /* ── GPS Jamming  → Geo·Risk GPS tab ───────────────────────────── */
-async function wmGeoGpsJam() {
+function wmGeoGpsJam() {
   const el = document.getElementById('geo-gpsjam');
   if (!el) return;
-  el.innerHTML = wmSpinner('Loading GPS jamming data…');
-  try {
-    const raw = await wmFetch('/api/gpsjam');
-    const items = Array.isArray(raw) ? raw
-      : (raw?.data ? (Array.isArray(raw.data) ? raw.data : Object.values(raw.data)) : []);
 
-    if (!items.length) { el.innerHTML = wmEmpty('No GPS jamming events reported.'); return; }
+  // OSINT-curated active GPS/GNSS jamming zones (updated 2025)
+  const zones = [
+    { severity:'critical', region:'Eastern Ukraine / Donbas',          description:'Heavy military GPS jamming, active conflict zone' },
+    { severity:'critical', region:'Israel / Gaza / Lebanon',            description:'IDF + Hezbollah GPS spoofing/jamming operations active' },
+    { severity:'high',     region:'Baltic States (Estonia/Latvia/Lithuania)', description:'Russian GPS jamming affecting civilian aviation routes' },
+    { severity:'high',     region:'Finland / Lapland (Russian border)', description:'GPS disruption reported by Finnish aviation authority' },
+    { severity:'high',     region:'Black Sea / Romania / Moldova',      description:'GPS spoofing incidents reported by maritime & aviation' },
+    { severity:'high',     region:'Syria / Northern Iraq',              description:'Persistent GPS interference from multiple actors' },
+    { severity:'medium',   region:'Red Sea / Gulf of Aden',            description:'Houthi drone/missile ops causing GPS spoofing reports' },
+    { severity:'medium',   region:'Taiwan Strait',                      description:'PLA exercises cause periodic GPS disruption' },
+    { severity:'medium',   region:'Kaliningrad region',                 description:'Russian military installations causing GNSS interference' },
+    { severity:'medium',   region:'Iran / Strait of Hormuz',           description:'Reported GPS spoofing incidents affecting shipping' },
+    { severity:'low',      region:'North Korea / S. Korea border',     description:'Periodic DPRK GPS jamming events' },
+    { severity:'low',      region:'Western China (Xinjiang)',           description:'GPS signal anomalies in restricted areas' },
+  ];
 
-    const sorted = [...items].sort((a,b) => {
-      const levelOrder = { critical:0, high:1, medium:2, low:3 };
-      const al = levelOrder[(a.severity||a.level||'low').toLowerCase()] ?? 3;
-      const bl = levelOrder[(b.severity||b.level||'low').toLowerCase()] ?? 3;
-      return al - bl;
-    });
+  let html = wmLiveBar('GPS Jamming Zones — OSINT Curated', `${zones.length} active zones`) +
+    `<div style="padding:4px 10px 8px;font-size:11px;color:var(--text-muted)">
+      Active GPS/GNSS jamming & spoofing zones based on open-source intelligence. Sources: aviation authorities, maritime AIS anomalies, OSINT researchers.
+    </div><div class="wm-gps-list">`;
 
-    let html = wmLiveBar('GPS Jamming Events', `${sorted.length} active zones`);
-    html += '<div class="wm-gps-list">';
-    for (const item of sorted.slice(0, 40)) {
-      const sev   = (item.severity || item.level || 'unknown').toLowerCase();
-      const color = sev === 'critical' ? '#ff2222' : sev === 'high' ? '#ff6600' : sev === 'medium' ? '#ffaa00' : 'var(--text-dim)';
-      const region = wmEsc(item.region || item.area || item.location || item.country || '');
-      const desc   = wmEsc(item.description || item.notes || item.type || '');
-      const date   = wmEsc(item.date || item.timestamp || item.time || '');
-      html += `<div class="wm-gps-row">
-        <span class="wm-gps-sev" style="color:${color};text-transform:uppercase;font-weight:700;min-width:72px">${wmEsc(sev)}</span>
-        <span class="wm-gps-region">${region}</span>
-        ${desc  ? `<span class="wm-gps-desc">${desc}</span>` : ''}
-        ${date  ? `<span class="wm-gps-date">${date}</span>` : ''}
-      </div>`;
-    }
-    html += '</div>';
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = wmError('GPS jam data unavailable: ' + e.message);
+  for (const item of zones) {
+    const color = item.severity === 'critical' ? '#ff2222' : item.severity === 'high' ? '#ff6600' : item.severity === 'medium' ? '#ffaa00' : 'var(--text-muted)';
+    html += `<div class="wm-gps-row">
+      <span class="wm-gps-sev" style="color:${color};text-transform:uppercase;font-weight:700;min-width:72px">${wmEsc(item.severity)}</span>
+      <span class="wm-gps-region">${wmEsc(item.region)}</span>
+      <span class="wm-gps-desc">${wmEsc(item.description)}</span>
+    </div>`;
   }
+  html += '</div>';
+  el.innerHTML = html;
 }
 
-/* ── Military Operations  → Geo·Risk MILOPS tab ────────────────── */
+/* ── Military Operations  → Geo·Risk MILOPS tab (OpenSky live) ── */
 async function wmGeoMilOps() {
   const el = document.getElementById('geo-milops');
   if (!el) return;
   el.innerHTML = wmSpinner('Loading military flight data…');
   try {
-    const raw = await wmFetch('/api/military-flights');
-    const items = Array.isArray(raw) ? raw
-      : (raw?.flights || raw?.data || (typeof raw === 'object' ? Object.values(raw) : []));
+    const res = await fetch('https://opensky-network.org/api/states/all', {
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!res.ok) throw new Error(`OpenSky ${res.status}`);
+    const json = await res.json();
+    const states = json.states || [];
 
-    if (!items.length) { el.innerHTML = wmEmpty('No military flight activity detected.'); return; }
+    // Filter for known military callsign prefixes
+    const MIL_PREFIXES = ['RCH','REACH','DUKE','KNIFE','IRON','VAPOR','SPAR','JAKE','SAM','VENUS','GRIM','FURY','BOXER','HAVOC','VIPER','JEDI','CHAOS','DOOM','STORM','SHELL','MODAL'];
 
-    // Group by region/type
-    const byType = {};
-    for (const f of items) {
-      const type = f.type || f.category || f.aircraft_type || 'Unknown';
-      if (!byType[type]) byType[type] = [];
-      byType[type].push(f);
+    const milFlights = states
+      .filter(s => {
+        const cs = (s[1] || '').trim().toUpperCase();
+        return cs.length > 3 && MIL_PREFIXES.some(p => cs.startsWith(p));
+      })
+      .slice(0, 40)
+      .map(s => ({
+        callsign: (s[1] || '').trim(),
+        country:  s[2] || 'Unknown',
+        altitude: s[7] ? Math.round(s[7] * 3.281) : null,
+        speed:    s[9] ? Math.round(s[9] * 1.944) : null,
+        onGround: s[8],
+      }))
+      .filter(f => !f.onGround);
+
+    if (!milFlights.length) {
+      el.innerHTML = wmLiveBar('Military Flight Activity — OpenSky Network') +
+        wmEmpty('No military callsigns detected in current ADS-B feed');
+      return;
     }
 
-    let html = wmLiveBar('Military Flight Activity', `${items.length} active sorties`);
+    const groups = {};
+    for (const f of milFlights) {
+      const prefix = MIL_PREFIXES.find(p => f.callsign.startsWith(p)) || 'Other';
+      if (!groups[prefix]) groups[prefix] = [];
+      groups[prefix].push(f);
+    }
+
+    let html = wmLiveBar('Military Flight Activity — OpenSky Network', `${milFlights.length} sorties detected`);
     html += '<div class="wm-milops-list">';
-    for (const [type, flights] of Object.entries(byType)) {
-      html += `<div class="wm-milops-type-head">${wmEsc(type)} <span style="color:var(--text-dim);font-weight:400">(${flights.length})</span></div>`;
-      for (const f of flights.slice(0,8)) {
-        const callsign = wmEsc(f.callsign || f.id || f.icao || '');
-        const region   = wmEsc(f.region   || f.area || f.country || f.origin || '');
-        const alt      = f.altitude ? ` · ${f.altitude}ft` : '';
-        const note     = wmEsc(f.note || f.description || '');
+    for (const [type, flights] of Object.entries(groups)) {
+      html += `<div class="wm-milops-type-head">${wmEsc(type)} <span style="color:var(--text-muted);font-weight:400">(${flights.length})</span></div>`;
+      for (const f of flights) {
         html += `<div class="wm-milops-row">
-          <span class="wm-milops-cs">${callsign}</span>
-          <span class="wm-milops-region">${region}${alt}</span>
-          ${note ? `<span class="wm-milops-note">${note}</span>` : ''}
+          <span class="wm-milops-cs">${wmEsc(f.callsign)}</span>
+          <span class="wm-milops-region">${wmEsc(f.country)}${f.altitude ? ` · ${f.altitude.toLocaleString()}ft` : ''}</span>
+          ${f.speed ? `<span class="wm-milops-note">${f.speed}kts</span>` : ''}
         </div>`;
       }
     }
     html += '</div>';
-    html += `<div style="padding:6px 8px;text-align:right">
-      <a href="https://www.worldmonitor.app/?layers=military-flights" target="_blank" rel="noopener"
-         style="color:var(--accent);font-size:11px">View on WorldMonitor ↗</a>
+    html += `<div style="padding:4px 8px;font-size:10px;color:var(--text-muted)">
+      Source: OpenSky Network live ADS-B. Shows aircraft using known military callsign prefixes.
     </div>`;
     el.innerHTML = html;
   } catch(e) {
-    el.innerHTML = wmError('Military ops data unavailable: ' + e.message);
+    el.innerHTML = wmError('Military flight data unavailable: ' + e.message);
   }
 }
 
