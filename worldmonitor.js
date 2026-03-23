@@ -740,47 +740,40 @@ async function wmMacroPredictions() {
     return;
   }
 
-  if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
+    const cats = [...new Set(markets.map(m => m.category).filter(Boolean))].slice(0, 8);
+    let html = wmLiveBar('Prediction Markets — Manifold Markets', `${markets.length} open questions`);
 
-  const cats = [...new Set(markets.map(m => m.category).filter(Boolean))].slice(0, 8);
-  const totalVol = markets.reduce((a,m) => a + (m.volume||0), 0);
-  const volFmtTotal = totalVol >= 1e9 ? '$'+(totalVol/1e9).toFixed(1)+'B' : totalVol >= 1e6 ? '$'+(totalVol/1e6).toFixed(1)+'M' : null;
-
-  let html = wmLiveBar(`Prediction Markets — ${source}`, `${markets.length} active markets${volFmtTotal?' · '+volFmtTotal+' volume':''}`);
-
-  // Category filter chips
-  html += `<div class="wm-pred-cats">
-    <span class="wm-pred-cat-chip wm-pred-active" onclick="wmPredFilter(this,'')">All</span>
-    ${cats.map(c => `<span class="wm-pred-cat-chip" onclick="wmPredFilter(this,'${wmEsc(c)}')">${wmEsc(c)}</span>`).join('')}
-  </div>`;
-
-  html += `<div id="wm-pred-list">`;
-  for (const m of markets.slice(0, 30)) {
-    const pct    = m.prob;
-    const level  = pct != null ? (pct >= 70 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low') : 'low';
-    const col    = wmSeverityColor(level);
-    const volStr = m.volume >= 1e6 ? '$'+(m.volume/1e6).toFixed(1)+'M' :
-                   m.volume >= 1e3 ? '$'+(m.volume/1e3).toFixed(0)+'K' :
-                   m.volume ? '$'+Math.round(m.volume).toLocaleString() : null;
-    const endStr = m.endDate ? new Date(m.endDate).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}) : null;
-    html += `<div class="wm-pred-row" data-cat="${wmEsc(m.category||'')}">
-      <div class="wm-pred-q">${wmEsc(m.question)}</div>
-      <div class="wm-pred-meta">
-        ${m.category ? `<span class="wm-pred-cat">${wmEsc(m.category)}</span>` : ''}
-        ${volStr  ? `<span>💰 ${volStr} vol</span>` : ''}
-        ${endStr  ? `<span>📅 ${endStr}</span>` : ''}
-        ${m.url   ? `<a href="${wmEsc(m.url)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px">↗ open</a>` : ''}
-      </div>
-      ${pct != null ? `<div class="wm-pred-prob">
-        <div class="wm-pred-bar-bg">
-          <div class="wm-pred-bar-fill" style="width:${pct}%;background:${col.text}"></div>
-        </div>
-        <span class="wm-pred-pct" style="color:${col.text}">${pct}% YES</span>
-      </div>` : '<div class="wm-pred-prob"><span style="color:var(--muted);font-size:11px">No probability data</span></div>'}
+    html += `<div class="wm-pred-cats">
+      <span class="wm-pred-cat-chip wm-pred-active" onclick="wmPredFilter(this,'')">All</span>
+      ${cats.map(c => `<span class="wm-pred-cat-chip" onclick="wmPredFilter(this,'${wmEsc(c)}')">${wmEsc(c)}</span>`).join('')}
     </div>`;
+
+    html += `<div id="wm-pred-list">`;
+    for (const m of markets.slice(0, 30)) {
+      const pct   = m.prob;
+      const level = pct != null ? (pct >= 70 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low') : 'low';
+      const col   = wmSeverityColor(level);
+      const volStr = m.volume >= 1e3 ? 'M$'+(m.volume/1e3).toFixed(0)+'K' : m.volume ? 'M$'+Math.round(m.volume) : null;
+      const endStr = m.endDate ? new Date(m.endDate).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}) : null;
+      html += `<div class="wm-pred-row" data-cat="${wmEsc(m.category||'')}">
+        <div class="wm-pred-q">${wmEsc(m.question)}</div>
+        <div class="wm-pred-meta">
+          ${m.category ? `<span class="wm-pred-cat">${wmEsc(m.category)}</span>` : ''}
+          ${volStr ? `<span>💰 ${volStr}</span>` : ''}
+          ${endStr ? `<span>📅 ${endStr}</span>` : ''}
+          ${m.url  ? `<a href="${wmEsc(m.url)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px">↗ open</a>` : ''}
+        </div>
+        ${pct != null ? `<div class="wm-pred-prob">
+          <div class="wm-pred-bar-bg"><div class="wm-pred-bar-fill" style="width:${pct}%;background:${col.text}"></div></div>
+          <span class="wm-pred-pct" style="color:${col.text}">${pct}% YES</span>
+        </div>` : '<div class="wm-pred-prob"><span style="color:var(--text-muted);font-size:11px">Binary market</span></div>'}
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = wmError('Prediction markets unavailable: ' + e.message);
   }
-  html += '</div>';
-  el.innerHTML = html;
 }
 
 function wmPredFilter(chip, cat) {
@@ -790,6 +783,7 @@ function wmPredFilter(chip, cat) {
     r.style.display = (!cat || r.dataset.cat === cat) ? '' : 'none';
   });
 }
+
 
 
 /* ─────────────────────────────────────────────────────────────────
