@@ -1546,10 +1546,10 @@ function initLayout(){
   // 2. Then set visibility:
   //    Visible at startup: chart, fundamentals, news, analysts, ownership,
   //                        comparables, geopolitical, supply, alert, macro,
-  //                        intel, webhooks, watchlist
+  //                        webhooks, watchlist
   //    Hidden by default: notes, portfolio, screener
   const startVisible = ["chart","fundamentals","news","analysts","ownership",
-    "comparables","geopolitical","supply","alert","macro","intel","webhooks","watchlist"];
+    "comparables","geopolitical","supply","alert","macro","webhooks","watchlist"];
   const startHidden  = ["notes","portfolio","screener"];
 
   startVisible.forEach(id => {
