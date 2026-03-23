@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v17-2026';
+const CACHE_VERSION  = 'finterm-v18-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
