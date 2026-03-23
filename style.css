@@ -2432,19 +2432,6 @@ textarea::placeholder { color:var(--text-muted); }
   color: #ff4757;
 }
 
-/* ── IRAN EVENTS / INTEL ROWS ────────────────────────────────────── */
-.wm-intel-row {
-  padding: 6px 10px; border-bottom: 1px solid var(--border);
-}
-.wm-intel-title {
-  font-size: 11px; font-weight: 600; color: var(--text);
-  margin-bottom: 3px; line-height: 1.3;
-}
-.wm-intel-meta {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  font-size: 9px; color: var(--text-muted);
-}
-
 /* ── SIGNALS TAB ─────────────────────────────────────────────────── */
 .wm-signal-row {
   padding: 7px 10px; border-bottom: 1px solid var(--border);
@@ -2509,128 +2496,6 @@ textarea::placeholder { color:var(--text-muted); }
 }
 .wm-nat-title { font-size: 11px; color: var(--text); margin-bottom: 3px; }
 .wm-nat-meta { display: flex; gap: 8px; font-size: 9px; color: var(--text-muted); }
-
-/* ══════════════════════════════════════════════════════════════════
-   INTEL FEED PANEL
-   ══════════════════════════════════════════════════════════════════ */
-
-/* ── Panel header badge ─────────────────────────────────────────── */
-.intel-badge {
-  display: inline-block; padding: 2px 8px; border-radius: 3px;
-  font-size: 10px; font-weight: 800; letter-spacing: .5px;
-  background: #ff4757; color: #fff; margin-left: 8px;
-  flex-shrink: 0;
-}
-
-/* ── Toggle switches ────────────────────────────────────────────── */
-.wm-toggle-wrap {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 10px; color: var(--text-muted); cursor: pointer;
-  user-select: none;
-}
-.wm-toggle {
-  width: 28px; height: 15px; border-radius: 8px;
-  background: var(--bg-input); border: 1px solid var(--border);
-  position: relative; transition: background .2s; flex-shrink: 0;
-}
-.wm-toggle::after {
-  content: ''; position: absolute; top: 2px; left: 2px;
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--text-muted); transition: left .2s, background .2s;
-}
-.wm-toggle.on {
-  background: var(--accent); border-color: var(--accent);
-}
-.wm-toggle.on::after { left: 15px; background: #000; }
-
-/* ── Filter tabs ────────────────────────────────────────────────── */
-.wm-intel-tabs {
-  display: flex; gap: 2px; padding: 4px 6px;
-  background: var(--bg-panel); border-bottom: 1px solid var(--border);
-  flex-wrap: wrap; overflow-x: auto;
-}
-.wm-intel-tab {
-  padding: 3px 8px; font-size: 9px; font-weight: 700; letter-spacing: .4px;
-  background: transparent; border: 1px solid var(--border);
-  color: var(--text-muted); border-radius: 3px; cursor: pointer;
-  white-space: nowrap; transition: all .15s;
-}
-.wm-intel-tab:hover { color: var(--text); border-color: var(--accent); }
-.wm-intel-tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
-
-/* ── Intel alert cards ──────────────────────────────────────────── */
-.wm-intel-card {
-  padding: 9px 10px; border-bottom: 1px solid var(--border);
-  cursor: pointer; transition: background .12s;
-}
-.wm-intel-card:hover { background: rgba(255,255,255,.03); }
-
-.wm-ic-header {
-  display: flex; align-items: flex-start; gap: 7px; margin-bottom: 4px;
-}
-.wm-ic-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
-.wm-ic-title {
-  flex: 1; font-size: 12px; font-weight: 700; color: var(--text);
-  line-height: 1.3;
-}
-.wm-ic-badge {
-  display: inline-block; padding: 2px 6px; border-radius: 3px;
-  font-size: 9px; font-weight: 800; border: 1px solid;
-  letter-spacing: .5px; white-space: nowrap; flex-shrink: 0;
-}
-.wm-ic-sub {
-  font-size: 10px; color: var(--text-muted);
-  line-height: 1.4; margin-bottom: 3px; padding-left: 22px;
-}
-.wm-ic-detail {
-  font-size: 10px; color: #6b7a8d;
-  font-style: italic; line-height: 1.4; padding-left: 22px;
-  margin-bottom: 3px;
-}
-.wm-ic-footer {
-  display: flex; align-items: center; gap: 8px;
-  padding-left: 22px; margin-top: 4px;
-}
-.wm-ic-time { font-size: 9px; color: var(--text-dim, #555); }
-.wm-ic-ticker {
-  font-size: 10px; font-weight: 700; font-family: var(--font-mono);
-  color: var(--accent); padding: 0 5px; border-radius: 2px;
-  background: rgba(0,212,160,.1); border: 1px solid rgba(0,212,160,.25);
-  cursor: pointer;
-}
-.wm-ic-ticker:hover { background: rgba(0,212,160,.22); }
-.wm-ic-link {
-  font-size: 10px; color: var(--accent); cursor: pointer;
-  margin-left: auto; opacity: .7; transition: opacity .15s;
-  white-space: nowrap;
-}
-.wm-ic-link:hover { opacity: 1; text-decoration: underline; }
-
-.wm-intel-empty {
-  padding: 20px; text-align: center;
-  font-size: 11px; color: var(--text-muted);
-}
-
-/* ── Toast notifications ────────────────────────────────────────── */
-.wm-toast {
-  position: fixed; bottom: 16px; right: 16px; z-index: 9999;
-  width: 280px; background: var(--bg-panel);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 10px 12px; box-shadow: 0 4px 20px rgba(0,0,0,.5);
-  animation: wmToastIn .25s ease;
-}
-@keyframes wmToastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.wm-toast-fade { opacity: 0; transition: opacity .5s; }
-.wm-toast-head {
-  display: flex; align-items: center; gap: 6px;
-  margin-bottom: 5px;
-}
-.wm-toast-sev { font-size: 10px; font-weight: 800; }
-.wm-toast-close {
-  margin-left: auto; cursor: pointer; color: var(--text-muted);
-  font-size: 11px;
-}
-.wm-toast-title { font-size: 11px; color: var(--text); font-weight: 600; }
 
 /* ══════════════════════════════════════════════════════════════════
    RESOURCE DRAWER
@@ -4442,12 +4307,7 @@ textarea::placeholder { color:var(--text-muted); }
    ALERT FEED — WM filter bar (hidden when NOAA/EONET tab active)
    ══════════════════════════════════════════════════════════════════ */
 #alert-wm-filters { transition: max-height .2s ease, opacity .2s ease; }
-#alert-wm-filters.hidden {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
+#alert-wm-filters/* .hidden uses display:none !important — see above */
 
 /* Tab pane inside alert feed panel */
 #panel-alert .tab-pane { display: none; }
@@ -4696,15 +4556,6 @@ textarea::placeholder { color:var(--text-muted); }
 .yf-hist-ret    { font-size: 13px; font-weight: 600; margin-left: auto; }
 .yf-hist-chart  { width: 100%; height: 50px; display: block; margin: 4px 0; }
 .yf-hist-range  { font-size: 11px; color: var(--muted, #6e7681); }
-
-
-/* ══════════════════════════════════════════════════════════════════
-   TASK 1 — Intel Feed tab click fix (z-index over resize handles)
-   ══════════════════════════════════════════════════════════════════ */
-.wm-intel-tabs {
-  position: relative;
-  z-index: 12; /* above resize-handle z-index:10 */
-}
 
 /* ══════════════════════════════════════════════════════════════════
    TASK 2 — Dual Chart
@@ -6055,6 +5906,8 @@ body.panel-dragging iframe, body.panel-resizing iframe {
   transition: border-color .15s, background .15s;
 }
 .aps-row:hover { border-color: var(--accent, #58a6ff); background: rgba(88,166,255,.05); }
+@keyframes aps-flash { 0%,100%{background:var(--bg-primary,#0d1117);border-color:var(--border,#30363d)} 40%{background:rgba(63,185,80,.15);border-color:#3fb950} }
+.aps-row-flash { animation: aps-flash 1.6s ease; }
 
 .aps-row-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .aps-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
@@ -7693,3 +7546,70 @@ body.panel-dragging iframe, body.panel-resizing iframe {
   text-decoration: none;
 }
 .mf-prosp-link:hover { text-decoration: underline; }
+
+/* ── Technical sub-charts (RSI, MACD) ──────────────────────────── */
+.tech-sub-chart-wrap { width:100%;overflow:hidden;background:var(--bg-panel);position:relative; }
+
+/* ═══════════════════════════════════════════════════════════════
+   COMMODITIES.JS — Strategic Resource & Commodity Panel CSS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Commodity sub-tab bar */
+.comm-subtab-bar         { display:flex;gap:2px;padding:4px 8px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg-panel) }
+.comm-stab               { font-size:9px;padding:3px 8px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--border);color:var(--text);transition:all .15s }
+.comm-stab:hover         { background:var(--border-bright) }
+.comm-stab.active        { background:var(--accent);color:#000;border-color:var(--accent);font-weight:700 }
+
+/* Mineral cards grid */
+.comm-mineral-card       { background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:8px;transition:border-color .15s }
+.comm-mineral-card:hover { border-color:var(--border-bright) }
+
+/* Energy grid */
+.comm-energy-grid        { display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px;border-bottom:1px solid var(--border) }
+
+/* IMF / WB commodity grid */
+.comm-imf-grid           { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px }
+.comm-imf-card           { background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;padding:6px;font-size:10px }
+
+/* COT positioning bars */
+.comm-cot-bar-wrap       { height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:2px 0 }
+.comm-cot-long           { height:100%;background:#3fb950;float:left }
+.comm-cot-short          { height:100%;background:#f85149;float:right }
+
+/* Georisk resources extended grid */
+.georisk-commodity-grid  { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px;padding:4px 8px 8px }
+.georisk-commodity-card  { background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:7px }
+.georisk-section-head    { font-size:10px;font-weight:700;color:var(--text);padding:6px 10px 3px;border-bottom:1px solid var(--border);background:var(--bg-panel) }
+
+/* FAO / Agri panel */
+.comm-agri-grid          { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px;padding:6px }
+
+/* ═══════════════════════════════════════════════════════════════
+   COMMODITY NEWS SECTION — Resource intelligence in news bar
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Commodity news section injected into news-feed */
+.ni-comm-section         { border-top:2px solid var(--accent);margin-top:10px;padding-top:6px }
+
+/* Extended source buttons for commodity news */
+.ni-src-comm             { background:rgba(88,166,255,.10) !important;color:var(--accent) !important;border-color:rgba(88,166,255,.3) !important }
+.ni-src-energy           { background:rgba(248,81,73,.10)  !important;color:#f85149       !important;border-color:rgba(248,81,73,.3)  !important }
+.ni-src-supply           { background:rgba(63,185,80,.10)  !important;color:#3fb950       !important;border-color:rgba(63,185,80,.3)  !important }
+
+/* Commodity/resource toggle button */
+.ni-comm-toggle          { display:block;text-align:left;margin:4px 0 0;transition:color .15s }
+.ni-comm-toggle:hover    { color:var(--text) !important }
+
+/* GDELT tone indicators */
+.ni-tone-neg             { color:#f85149 }
+.ni-tone-pos             { color:#3fb950 }
+.ni-tone-neutral         { color:var(--text-muted) }
+
+/* OFAC sanctions section */
+.ofac-section            { border-top:2px solid #f85149;margin-top:10px;padding:8px 10px;background:rgba(248,81,73,.04);border-radius:0 0 4px 4px }
+
+/* ── Technical sub-chart responsive heights ────────────────────── */
+:root { --sub-chart-h: 80px; }
+@media (min-height: 800px) { :root { --sub-chart-h: 100px; } }
+@media (min-height: 1200px) { :root { --sub-chart-h: 120px; } }
+.tech-sub-chart-wrap { width:100%;overflow:hidden;background:var(--bg-panel);position:relative }

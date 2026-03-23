@@ -14,44 +14,7 @@
 </head>
 <body>
   <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
-  <div id="layoutSidebar" class="layout-sidebar collapsed">
-    <button class="layout-sidebar-toggle" id="layoutSidebarToggle" onclick="toggleLayoutSidebar()" title="Layout Manager">
-      <span class="lsb-toggle-icon">◧</span>
-    </button>
-    <div class="lsb-inner">
-      <div class="lsb-section-title">Layout Presets</div>
-      <button class="lsb-preset-btn" onclick="applyLayoutPreset('focus')"    title="Chart + Fundamentals + News">
-        <span class="lsb-preset-icon">🎯</span><span>Focus</span>
-      </button>
-      <button class="lsb-preset-btn" onclick="applyLayoutPreset('grid')"     title="4-column balanced grid">
-        <span class="lsb-preset-icon">⊞</span><span>Grid</span>
-      </button>
-      <button class="lsb-preset-btn" onclick="applyLayoutPreset('research')" title="Fundamentals + Analysts + Comparables">
-        <span class="lsb-preset-icon">🔬</span><span>Research</span>
-      </button>
-      <button class="lsb-preset-btn" onclick="applyLayoutPreset('monitor')"  title="Geo + Intel + Macro + Alerts">
-        <span class="lsb-preset-icon">🌍</span><span>Monitor</span>
-      </button>
-      <button class="lsb-preset-btn" onclick="applyLayoutPreset('trading')"  title="Chart + Watchlist + Analysts + Webhooks">
-        <span class="lsb-preset-icon">📊</span><span>Trading</span>
-      </button>
-
-      <div class="lsb-divider"></div>
-      <div class="lsb-section-title">Panels</div>
-      <div class="lsb-panel-list" id="lsbPanelList">
-        <!-- Populated by JS -->
-      </div>
-
-      <div class="lsb-divider"></div>
-      <div class="lsb-section-title">Actions</div>
-      <button class="lsb-action-btn" onclick="tileAllPanels()"    title="Auto-tile visible panels">⊡ Tile All</button>
-      <button class="lsb-action-btn" onclick="cascadePanels()"    title="Cascade panels">❐ Cascade</button>
-      <button class="lsb-action-btn" onclick="resetLayout()"      title="Reset to default layout">↺ Reset</button>
-      <button class="lsb-action-btn" onclick="hideAllPanels()"    title="Hide all panels">✕ Hide All</button>
-    </div>
-  </div>
-
-<div class="app-shell">
+  <div class="app-shell">
   <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
   <div id="layoutSidebar" class="layout-sidebar collapsed">
     <button class="layout-sidebar-toggle" id="layoutSidebarToggle" onclick="toggleLayoutSidebar()" title="Layout Manager">
@@ -143,14 +106,13 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="analysts"     checked> Analysts</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked> Ownership</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked> Comparables</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="notes"        checked> Notes</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="notes"       > Notes</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked> Watchlist</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked> Geo·Risk</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="supply"       checked> Supply·Chain</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="alert"        checked> Alert·Feed</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="intel"        checked> Intel·Feed</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="webhooks"             > Webhooks</label>
+        <label><input type="checkbox" class="panel-toggle" data-panel="webhooks"             checked> Webhooks</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="portfolio"            > Portfolio</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="screener"             > Screener</label>
       </div>
@@ -186,15 +148,14 @@
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked><span class="mti-icon">🏛</span><span class="mti-label">Ownership</span></label>
           <div class="modules-tray-section">News &amp; Notes</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="news"         checked><span class="mti-icon">📰</span><span class="mti-label">News</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="notes"        checked><span class="mti-icon">📝</span><span class="mti-label">Notes</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="notes"       ><span class="mti-icon">📝</span><span class="mti-label">Notes</span></label>
           <div class="modules-tray-section">Intelligence</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked><span class="mti-icon">🌍</span><span class="mti-label">Geo·Risk</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="intel"        checked><span class="mti-icon">🧠</span><span class="mti-label">Intel·Feed</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="macro"        checked><span class="mti-icon">📡</span><span class="mti-label">Macro·Intel</span></label>
           <div class="modules-tray-section">Supply &amp; Alerts</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="supply"       checked><span class="mti-icon">⛓</span><span class="mti-label">Supply·Chain</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="alert"        checked><span class="mti-icon">⚡</span><span class="mti-label">Alert·Feed</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="webhooks"            ><span class="mti-icon">🔔</span><span class="mti-label">Webhooks</span></label>
+          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="webhooks"            checked><span class="mti-icon">🔔</span><span class="mti-label">Webhooks</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="portfolio"           ><span class="mti-icon">💼</span><span class="mti-label">Portfolio</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="screener"            ><span class="mti-icon">🔍</span><span class="mti-label">Screener</span></label>
         </div>
@@ -207,7 +168,7 @@
     <div id="snapOverlay"></div>
 
     <!-- ▸ PRICE CHART ─────────────────────────────────────────── -->
-    <section class="panel" id="panel-chart" data-panel="chart">
+    <section class="panel hidden" id="panel-chart" data-panel="chart">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Price Chart — GP</h3>
@@ -230,7 +191,7 @@
 
 
     <!-- ▸ FUNDAMENTALS (DES / FA / ERN / EE / WACC) ───────────── -->
-    <section class="panel" id="panel-fundamentals" data-panel="fundamentals">
+    <section class="panel hidden" id="panel-fundamentals" data-panel="fundamentals">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Fundamentals</h3>
@@ -240,7 +201,7 @@
       </div>
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="des"     onclick="switchTab('fundamentals','des');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';renderFundamentals(s)})()">DES</button>
-        <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-fa');if(el&&!el.dataset.loaded){if(typeof avRenderFA!=='undefined'&&typeof avLiveCache!=='undefined'&&avLiveCache[s]?.income?.length){avRenderFA(s,avLiveCache[s].income,avLiveCache[s].balance,avLiveCache[s].cashflow);el.dataset.loaded='av';}else if(typeof faLoadEdgarXBRL==='function'){faLoadEdgarXBRL(s,el);el.dataset.loaded='xbrl';}}})()">FA</button>
+        <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-fa');if(el&&!el.dataset.loaded){if(typeof fmpLoadFATab==='function'){fmpLoadFATab(s);el.dataset.loaded='fmp';}else if(typeof avRenderFA!=='undefined'&&typeof avLiveCache!=='undefined'&&avLiveCache[s]?.income?.length){avRenderFA(s,avLiveCache[s].income,avLiveCache[s].balance,avLiveCache[s].cashflow);el.dataset.loaded='av';}else if(typeof faLoadEdgarXBRL==='function'){faLoadEdgarXBRL(s,el);el.dataset.loaded='xbrl';}}})()">FA</button>
         <button class="tab-btn"        data-tab="ern"     onclick="switchTab('fundamentals','ern');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ern');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">ERN</button>
         <button class="tab-btn"        data-tab="ee"      onclick="switchTab('fundamentals','ee');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ee');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">EE</button>
         <button class="tab-btn"        data-tab="wacc"    onclick="switchTab('fundamentals','wacc');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-wacc');if(el&&!el.dataset.loaded){renderFundamentals(s);}})()">WACC</button>
@@ -252,7 +213,7 @@
         <button class="tab-btn"        data-tab="div"     onclick="switchTab('fundamentals','div');if(typeof fmpLoadDividends==='function')fmpLoadDividends(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">DIV</button>
         <button class="tab-btn"        data-tab="filings" onclick="switchTab('fundamentals','filings');if(typeof fmpLoadSecFilings==='function')fmpLoadSecFilings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">FILINGS</button>
         <button class="tab-btn"        data-tab="yf-fin"  onclick="switchTab('fundamentals','yf-fin');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadFinancials==='function')yfLoadFinancials(s)})()">YF·FIN</button>
-        <button class="tab-btn"        data-tab="yf-opt"  onclick="switchTab('fundamentals','yf-opt');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadOptions==='function')yfLoadOptions(s)})()">OPTIONS</button>
+        <button class="tab-btn"        data-tab="yf-opt"  onclick="switchTab('fundamentals','yf-opt');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('yf-options');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof OptionsChainUI!=='undefined'&&OptionsChainUI.render){var price=parseFloat(document.querySelector('.qh-price')?.textContent?.replace(/[^0-9.]/g,'')||0);OptionsChainUI.render('yf-options',s,price||100);}else if(typeof yfLoadOptions==='function'){yfLoadOptions(s);}}})()">OPTIONS</button>
         <button class="tab-btn"        data-tab="yf-hld"  onclick="switchTab('fundamentals','yf-hld');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHolders==='function')yfLoadHolders(s)})()">YF·HLD</button>
         <button class="tab-btn"        data-tab="yf-hist" onclick="switchTab('fundamentals','yf-hist');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHistory==='function')yfLoadHistory(s)})()">YF·HIST</button>
       </div>
@@ -304,7 +265,7 @@
     </section>
 
     <!-- ▸ NEWS — flat live feed, no tabs ───────────────────────── -->
-    <section class="panel" id="panel-news" data-panel="news">
+    <section class="panel hidden" id="panel-news" data-panel="news">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
@@ -336,7 +297,7 @@
 
 
     <!-- ▸ OWNERSHIP (HDS / MGMT) ───────────────────────────────── -->
-    <section class="panel" id="panel-ownership" data-panel="ownership">
+    <section class="panel hidden" id="panel-ownership" data-panel="ownership">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Ownership</h3>
@@ -383,7 +344,7 @@
     </section>
 
     <!-- ▸ COMPARABLES ───────────────────────────────────────────── -->
-    <section class="panel" id="panel-comparables" data-panel="comparables">
+    <section class="panel hidden" id="panel-comparables" data-panel="comparables">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
@@ -403,7 +364,7 @@
     </section>
 
     <!-- ▸ NOTES ────────────────────────────────────────────────── -->
-    <section class="panel" id="panel-notes" data-panel="notes">
+    <section class="panel hidden" id="panel-notes" data-panel="notes">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Notes</h3>
@@ -422,7 +383,7 @@
     </section>
 
     <!-- ▸ SECTOR WATCHLIST ─────────────────────────────────────── -->
-    <section class="panel" id="panel-watchlist" data-panel="watchlist">
+    <section class="panel hidden" id="panel-watchlist" data-panel="watchlist">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
@@ -453,7 +414,7 @@
 
 
     <!-- ▸ GEOPOLITICAL RISK (WAR · RESOURCES) ─────────────────── -->
-    <section class="panel" id="panel-geopolitical" data-panel="geopolitical">
+    <section class="panel hidden" id="panel-geopolitical" data-panel="geopolitical">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
@@ -488,7 +449,6 @@
       <div class="tab-pane active" data-tab="wars" id="geo-wars">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">🔗 Click any resource chip to open News &amp; Watchlist</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('all');showPanel('intel')">🧠 Intel Feed</button>
           <button class="geo-cross-btn" onclick="switchTab('supply','choke');showPanel('supply')">⛓ Supply Chain</button>
         </div>
         <div id="georisk-wars-content"></div>
@@ -518,8 +478,6 @@
       <div class="tab-pane" data-tab="intel" id="geo-intel">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">Theater posture &amp; country risk</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('risk');showPanel('intel')">🌡 Full Risk Feed</button>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('iran');showPanel('intel')">🇮🇷 Iran Events</button>
         </div>
       </div>
 
@@ -527,7 +485,6 @@
       <div class="tab-pane" data-tab="signals" id="geo-signals">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">Intelligence signals with ticker links</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('insight');showPanel('intel')">🧠 Full Intel Feed</button>
           <button class="geo-cross-btn" onclick="switchTab('macro','signals');showPanel('macro')">📊 Macro Signals</button>
         </div>
       </div>
@@ -536,7 +493,6 @@
       <div class="tab-pane" data-tab="quakes" id="geo-quakes">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">USGS Seismic · M4.5+ global real-time</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('weather');showPanel('intel')">🌪 Weather Alerts</button>
           <button class="geo-cross-btn" onclick="switchTab('alert','wm');showPanel('alert');if(typeof wmAlertLoad==='function')wmAlertLoad('quake')">⚡ Alert Feed</button>
           <button class="geo-cross-btn" onclick="if(typeof usgsLoadQuakes==='function')usgsLoadQuakes()">↻ Refresh</button>
         </div>
@@ -548,7 +504,6 @@
         <div class="geo-cross-bar">
           <span class="geo-cross-label">GPS jamming zones — active electronic warfare</span>
           <button class="geo-cross-btn" onclick="switchTab('geopolitical','milops');wmGeoMilOps()">✈ Military Ops</button>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('cyber');showPanel('intel')">💻 Cyber Intel</button>
         </div>
       </div>
 
@@ -557,7 +512,6 @@
         <div class="geo-cross-bar">
           <span class="geo-cross-label">Military flight activity · Live sorties &amp; operations</span>
           <button class="geo-cross-btn" onclick="switchTab('geopolitical','gps');wmGeoGpsJam()">📡 GPS Jamming</button>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('risk');showPanel('intel')">🌡 Risk Feed</button>
         </div>
       </div>
 
@@ -639,45 +593,6 @@
     </section>
 
     <!-- ▸ INTEL FEED — Breaking Intelligence Alerts ─────────────── -->
-    <section class="panel" id="panel-intel" data-panel="intel">
-      <div class="panel-head">
-        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="panel-title-row">
-          <h3>▸ Intel·Feed — Intelligence Findings</h3>
-          <span id="intel-feed-badge" class="intel-badge">0 ALERTS</span>
-        </div>
-        <div class="panel-actions">
-          <label class="wm-toggle-wrap" title="Pop up new alerts">
-            <span>🔔 Popup</span>
-            <div class="wm-toggle" onclick="wmIntelPopupEnabled=!wmIntelPopupEnabled;this.classList.toggle('on')"></div>
-          </label>
-          <label class="wm-toggle-wrap" title="Breaking alerts">
-            <span>🚨 Breaking</span>
-            <div class="wm-toggle on" onclick="wmIntelBreaking=!wmIntelBreaking;this.classList.toggle('on')"></div>
-          </label>
-          <button class="icon-btn close" onclick="hidePanel('intel')">✕</button>
-        </div>
-      </div>
-      <div class="wm-intel-tabs">
-        <button class="wm-intel-tab active" data-type="all"      onclick="wmIntelSetFilter('all')">ALL</button>
-        <button class="wm-intel-tab"        data-type="insight"  onclick="wmIntelSetFilter('insight')">🧠 SIGNALS</button>
-        <button class="wm-intel-tab"        data-type="risk"     onclick="wmIntelSetFilter('risk')">🌡 RISK</button>
-        <button class="wm-intel-tab"        data-type="iran"     onclick="wmIntelSetFilter('iran')">🇮🇷 IRAN</button>
-        <button class="wm-intel-tab"        data-type="unrest"   onclick="wmIntelSetFilter('unrest')">✊ UNREST</button>
-        <button class="wm-intel-tab"        data-type="weather"  onclick="wmIntelSetFilter('weather')">🌪 WEATHER</button>
-        <button class="wm-intel-tab"        data-type="cyber"    onclick="wmIntelSetFilter('cyber')">💻 CYBER</button>
-        <button class="wm-intel-tab"        data-type="oref"     onclick="wmIntelShowOref()">🚨 OREF</button>
-        <button class="wm-intel-tab"        data-type="telegram" onclick="wmIntelShowTelegram()">📡 TELEGRAM</button>
-      </div>
-      <div class="panel-content" id="intel-feed-list"></div>
-      <div class="panel-content" id="intel-oref"     style="display:none"></div>
-      <div class="panel-content" id="intel-telegram" style="display:none"></div>
-      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-intel"></div>
-    </section>
 
 
     <!-- ▸ WEBHOOKS / PRICE ALERTS ─────────────────────────────── -->
@@ -767,7 +682,7 @@
 
 
     <!-- ▸ SUPPLY CHAIN INTELLIGENCE ────────────────────────────── -->
-    <section class="panel" id="panel-supply" data-panel="supply">
+    <section class="panel hidden" id="panel-supply" data-panel="supply">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
@@ -779,12 +694,14 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="choke"   onclick="switchTab('supply','choke')">CHOKE</button>
-        <button class="tab-btn"        data-tab="ship"    onclick="switchTab('supply','ship')">SHIPPING</button>
-        <button class="tab-btn"        data-tab="minerals" onclick="switchTab('supply','minerals')">MINERALS</button>
-        <button class="tab-btn"        data-tab="flights" onclick="switchTab('supply','flights')">FLIGHTS</button>
-        <button class="tab-btn"        data-tab="energy"  onclick="switchTab('supply','energy');if(typeof energyLoadAll==='function')energyLoadAll()">ENERGY</button>
-        <button class="tab-btn"        data-tab="weather" onclick="switchTab('supply','weather');if(typeof meteoLoadSupplyWeather==='function')meteoLoadSupplyWeather()">WEATHER</button>
+        <button class="tab-btn active" data-tab="choke"   onclick="switchTab('supply','choke');(function(){var el=document.getElementById('supply-choke');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmSupplyChokepoints==='function')wmSupplyChokepoints()}})()">CHOKE</button>
+        <button class="tab-btn"        data-tab="ship"    onclick="switchTab('supply','ship');(function(){var el=document.getElementById('supply-ship');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmSupplyShipping==='function')wmSupplyShipping()}})()">SHIPPING</button>
+        <button class="tab-btn"        data-tab="minerals" onclick="switchTab('supply','minerals');(function(){var el=document.getElementById('supply-minerals');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof commRenderMinerals==='function')commRenderMinerals('critical');else if(typeof wmSupplyMinerals==='function')wmSupplyMinerals()}})()">MINERALS</button>
+        <button class="tab-btn"        data-tab="flights" onclick="switchTab('supply','flights');(function(){var el=document.getElementById('supply-flights');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmSupplyFlights==='function')wmSupplyFlights()}})()">FLIGHTS</button>
+        <button class="tab-btn"        data-tab="energy"  onclick="switchTab('supply','energy');(function(){var el=document.getElementById('supply-energy');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof commRenderEnergy==='function')commRenderEnergy();else if(typeof wmSupplyEnergy==='function')wmSupplyEnergy()}})()">ENERGY</button>
+        <button class="tab-btn"        data-tab="weather"  onclick="switchTab('supply','weather');if(typeof meteoLoadSupplyWeather==='function')meteoLoadSupplyWeather()">WEATHER</button>
+        <button class="tab-btn"        data-tab="agri"    onclick="switchTab('supply','agri');if(typeof commRenderAgri==='function'&&!document.getElementById('supply-agri')?.dataset?.loaded){document.getElementById('supply-agri').dataset.loaded='1';commRenderAgri()}">🌾 AGRI</button>
+        <button class="tab-btn"        data-tab="cot"     onclick="switchTab('supply','cot');if(typeof commRenderCOT==='function'&&!document.getElementById('supply-cot')?.dataset?.loaded){document.getElementById('supply-cot').dataset.loaded='1';commRenderCOT()}">📊 COT</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="choke"    id="supply-choke"></div>
       <div class="tab-pane        panel-content" data-tab="ship"     id="supply-ship"></div>
@@ -809,6 +726,8 @@
         </div>
       </div>
       <div class="tab-pane        panel-content" data-tab="weather"  id="supply-weather"></div>
+      <div class="tab-pane        panel-content" data-tab="agri"     id="supply-agri"></div>
+      <div class="tab-pane        panel-content" data-tab="cot"      id="supply-cot"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -817,31 +736,29 @@
     </section>
 
     <!-- ▸ GLOBAL ALERT FEED ─────────────────────────────────────── -->
-    <section class="panel" id="panel-alert" data-panel="alert">
+    <section class="panel hidden" id="panel-alert" data-panel="alert">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
-          <h3>▸ Alert·Feed — Global Events</h3>
-          <div class="mode-label">Weather · Quakes · Unrest · Fires</div>
+          <h3>▸ Alert·Feed — @DeItaone</h3>
+          <div class="mode-label">Real-time market alerts</div>
         </div>
         <div class="panel-actions">
           <button class="icon-btn close" onclick="hidePanel('alert')">✕</button>
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="wm"    onclick="switchTab('alert','wm')">ALL</button>
+        <button class="tab-btn active" data-tab="wm"    onclick="switchTab('alert','wm')">📰 @DeItaone</button>
         <button class="tab-btn"        data-tab="noaa"  onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
         <button class="tab-btn"        data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
       </div>
-      <!-- WM sub-filter bar shown only on WM tab -->
-      <div class="wm-filter-bar" id="alert-wm-filters">
-        <button class="wm-filter-btn active" data-filter="all"     onclick="wmAlertLoad('all')">ALL</button>
-        <button class="wm-filter-btn"        data-filter="weather" onclick="wmAlertLoad('weather')">🌪 WEATHER</button>
-        <button class="wm-filter-btn"        data-filter="quake"   onclick="wmAlertLoad('quake')">🏔 QUAKES</button>
-        <button class="wm-filter-btn"        data-filter="unrest"  onclick="wmAlertLoad('unrest')">✊ UNREST</button>
-        <button class="wm-filter-btn"        data-filter="fire"    onclick="wmAlertLoad('fire')">🔥 FIRES</button>
+      <div class="tab-pane active panel-content" data-tab="wm" id="alert-feed" style="overflow:hidden;padding:0;height:100%">
+        <a class="twitter-timeline"
+           data-theme="dark"
+           data-chrome="noheader nofooter noborders transparent"
+           href="https://twitter.com/DeItaone?ref_src=twsrc%5Etfw">Tweets by DeItaone</a>
+        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
       </div>
-      <div class="tab-pane active panel-content" data-tab="wm"    id="alert-feed"></div>
       <div class="tab-pane        panel-content" data-tab="noaa"  id="alert-noaa"></div>
       <div class="tab-pane        panel-content" data-tab="eonet" id="alert-eonet"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
@@ -852,7 +769,7 @@
     </section>
 
     <!-- ▸ MACRO INTELLIGENCE ───────────────────────────────────── -->
-    <section class="panel" id="panel-macro" data-panel="macro">
+    <section class="panel hidden" id="panel-macro" data-panel="macro">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
@@ -864,10 +781,10 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="signals" onclick="switchTab('macro','signals')">SIGNALS</button>
-        <button class="tab-btn"        data-tab="comm"    onclick="switchTab('macro','comm')">COMMODITIES</button>
-        <button class="tab-btn"        data-tab="risk"    onclick="switchTab('macro','risk')">RISK</button>
-        <button class="tab-btn"        data-tab="pred"    onclick="switchTab('macro','pred')">PREDICTIONS</button>
+        <button class="tab-btn active" data-tab="signals" onclick="switchTab('macro','signals');(function(){var el=document.getElementById('macro-signals');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmMacroSignals==='function')wmMacroSignals()}})()">SIGNALS</button>
+        <button class="tab-btn"        data-tab="comm"    onclick="switchTab('macro','comm');if(typeof commRenderIMFComm==='function'&&!document.getElementById('macro-comm')?.dataset?.commLoaded){document.getElementById('macro-comm').dataset.commLoaded='1';commRenderIMFComm()}">COMMODITIES</button>
+        <button class="tab-btn"        data-tab="risk"    onclick="switchTab('macro','risk');(function(){var el=document.getElementById('macro-risk');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmMacroRisk==='function')wmMacroRisk()}})()">RISK</button>
+        <button class="tab-btn"        data-tab="pred"    onclick="switchTab('macro','pred');(function(){var el=document.getElementById('macro-pred');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmMacroPredictions==='function')wmMacroPredictions()}})()">PREDICTIONS</button>
         <button class="tab-btn"        data-tab="yield"   onclick="switchTab('macro','yield');if(typeof fredLazyYield==='function')fredLazyYield()">YIELD</button>
         <button class="tab-btn"        data-tab="econ"    onclick="switchTab('macro','econ');(function(){if(typeof fredLazyEcon==='function')fredLazyEcon();if(document.getElementById('econ-cal-head'))return;if(typeof fhRenderEconCalendar==='function')fhRenderEconCalendar('macro-econ')})()">ECON</button>
         <button class="tab-btn"        data-tab="crypto"  onclick="switchTab('macro','crypto');if(typeof wmMacroCrypto==='function')wmMacroCrypto()">CRYPTO</button>
@@ -1104,36 +1021,14 @@
 <script src="technical.js"></script>
 <script src="yahoo.js"></script>
 <script src="sbcache.js"></script>
-<script src="finterm-extras.js"></script>
-<script src="geointel.js"></script>
+<script src="finterm-extras.js?v=3"></script>
+<script src="warmonitor.js"></script>
+  <script src="geointel.js"></script>
 <script src="macroglobal.js"></script>
   <script src="finterm-modules.js"></script>
+  <script src="commodities.js?v=3"></script>
 <script>
-/* Intel Feed — OREF / TELEGRAM sub-panel switcher */
-function wmIntelShowOref() {
-  document.getElementById('intel-feed-list').style.display = 'none';
-  document.getElementById('intel-telegram').style.display  = 'none';
-  document.getElementById('intel-oref').style.display      = '';
-  document.querySelectorAll('.wm-intel-tab').forEach(b => b.classList.remove('active'));
-  document.querySelector('.wm-intel-tab[data-type="oref"]')?.classList.add('active');
-  if (typeof wmIntelOref === 'function') wmIntelOref();
-}
-function wmIntelShowTelegram() {
-  document.getElementById('intel-feed-list').style.display = 'none';
-  document.getElementById('intel-oref').style.display      = 'none';
-  document.getElementById('intel-telegram').style.display  = '';
-  document.querySelectorAll('.wm-intel-tab').forEach(b => b.classList.remove('active'));
-  document.querySelector('.wm-intel-tab[data-type="telegram"]')?.classList.add('active');
-  if (typeof wmIntelTelegram === 'function') wmIntelTelegram();
-}
-/* Patch wmIntelSetFilter to restore main list when standard tabs clicked */
-const _origSetFilter = typeof wmIntelSetFilter === 'function' ? wmIntelSetFilter : null;
-function wmIntelSetFilter(type) {
-  document.getElementById('intel-feed-list').style.display = '';
-  document.getElementById('intel-oref').style.display      = 'none';
-  document.getElementById('intel-telegram').style.display  = 'none';
-  if (_origSetFilter) _origSetFilter(type);
-}
+)();
 </script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
@@ -1427,7 +1322,6 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
   <!-- ── New data module scripts ──────────────────────────────── -->
   <script src="energy.js"></script>
-  <script src="commodities.js"></script>
   <script src="minerals.js"></script>
   <script src="agriculture.js"></script>
   <script src="tradeflows.js"></script>

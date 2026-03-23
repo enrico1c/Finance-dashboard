@@ -166,18 +166,6 @@ window.geoLoadTerror = async function() {
 
       <div class="gi-footer">Source: <a href="https://www.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT Project</a> · 100% free, no API key · Updates every 15 min</div>`;
 
-    // Auto-inject critical events into Intel Feed
-    _injectToIntelFeed(unique.slice(0,5).map(a => ({
-      type:     'terror',
-      icon:     '💥',
-      title:    a.title || '',
-      subtitle: a.sourcecountry || '',
-      severity: 'high',
-      ts:       a.seendate ? new Date(a.seendate).getTime()/1000 : Date.now()/1000,
-      resource: a.domain || 'GDELT',
-      url:      a.url,
-    })));
-
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading terrorism data: ${_giEsc(e.message)}</div>`;
   }
@@ -313,17 +301,6 @@ window.geoLoadCyber = async function() {
         · <a href="https://www.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT</a>
         · No API key required
       </div>`;
-
-    // Inject critical CVEs into Intel Feed
-    _injectToIntelFeed(recent.slice(0,3).map(v => ({
-      type:     'cyber',
-      icon:     '🔒',
-      title:    `${v.cveID}: ${v.vulnerabilityName||''}`,
-      subtitle: `${v.vendorProject||''} · ${v.product||''}`,
-      severity: v.knownRansomwareCampaignUse === 'Known' ? 'critical' : 'high',
-      ts:       v.dateAdded ? new Date(v.dateAdded).getTime()/1000 : Date.now()/1000,
-      resource: 'CISA KEV',
-    })));
 
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading cyber data: ${_giEsc(e.message)}</div>`;
@@ -466,17 +443,6 @@ window.geoLoadTravel = async function() {
         · Updated continuously · No API key required
       </div>`;
 
-    // Inject Level 4 countries into Intel Feed
-    _injectToIntelFeed(level4.slice(0,3).map(item => ({
-      type:     'risk',
-      icon:     '🚫',
-      title:    item.title,
-      subtitle: 'US State Dept: Do Not Travel',
-      severity: 'critical',
-      ts:       item.pubDate ? new Date(item.pubDate).getTime()/1000 : Date.now()/1000,
-      resource: 'State Dept',
-    })));
-
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading travel advisories: ${_giEsc(e.message)}</div>`;
   }
@@ -583,43 +549,7 @@ async function geoLoadInstabilityScores() {
   }
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   HELPER — Inject events into Intel Feed (wmIntelAlerts)
-   ══════════════════════════════════════════════════════════════════ */
-function _injectToIntelFeed(events) {
-  if (!Array.isArray(events) || !events.length) return;
-  if (typeof wmIntelAlerts === 'undefined' || !Array.isArray(wmIntelAlerts)) return;
 
-  events.forEach(evt => {
-    // Build id from title hash to avoid duplicates
-    const id = 'gi_' + Math.abs(
-      (evt.title||'').split('').reduce((h,c) => ((h<<5)-h+c.charCodeAt(0))|0, 0)
-    ).toString(36);
-
-    if (wmIntelAlerts.find(a => a.id === id)) return; // already present
-
-    wmIntelAlerts.unshift({
-      id, icon: evt.icon || '⚡',
-      type:     evt.type || 'intel',
-      title:    evt.title || '',
-      subtitle: evt.subtitle || '',
-      detail:   evt.detail || '',
-      severity: evt.severity || 'high',
-      ts:       evt.ts || Math.floor(Date.now()/1000),
-      resource: evt.resource || 'GeoIntel',
-      ticker:   evt.ticker || null,
-    });
-  });
-
-  // Re-render feed if visible
-  if (typeof wmRenderIntelFeed === 'function') wmRenderIntelFeed();
-  if (typeof sbSave === 'function') {
-    sbSave(events.map(e => ({
-      type: e.type||'intel', title: e.title||'', ts: e.ts,
-      sev: e.severity||'high', src: e.resource||'GeoIntel',
-    }))).catch(()=>{});
-  }
-}
 
 /* ══════════════════════════════════════════════════════════════════
    INIT — auto-load cyber on startup (quiet background fetch)
@@ -629,22 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Background fetch CISA KEV 3s after load (quiet, no UI update)
   setTimeout(async () => {
     try {
-      const kev = await fetchCISAKev();
-      if (kev?.vulnerabilities) {
-        // Inject latest 3 critical CVEs into Intel Feed silently
-        const recent = kev.vulnerabilities
-          .sort((a,b) => (b.dateAdded||'').localeCompare(a.dateAdded||''))
-          .slice(0, 3);
-        _injectToIntelFeed(recent.map(v => ({
-          type:     'cyber',
-          icon:     '🔒',
-          title:    `${v.cveID}: ${v.vulnerabilityName||''}`,
-          subtitle: `${v.vendorProject||''} ${v.product||''} · Due ${v.dueDate||''}`,
-          severity: v.knownRansomwareCampaignUse==='Known' ? 'critical' : 'high',
-          ts:       v.dateAdded ? new Date(v.dateAdded).getTime()/1000 : Date.now()/1000,
-          resource: 'CISA KEV',
-        })));
-      }
+      await fetchCISAKev();
     } catch {}
   }, 3000);
 
@@ -687,13 +602,24 @@ async function _fetchUCDPActive() {
   const cached = _giGet(cacheKey, _GW_CACHE_MS);
   if (cached) return cached;
   try {
-    // UCDP GED API — active dyads (conflict pairs) current year
+    // UCDP GED API — try direct, fallback to allorigins proxy (CORS)
     const year = new Date().getFullYear();
-    const url  = `https://ucdpapi.pcr.uu.se/api/gedevents/${year}?pagesize=100&page=1`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    const json = await res.json();
+    const ucdpUrl = `https://ucdpapi.pcr.uu.se/api/gedevents/${year}?pagesize=100&page=1`;
+    let json = null;
+    try {
+      const res = await fetch(ucdpUrl, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) json = await res.json();
+    } catch {}
+    // CORS fallback via allorigins
+    if (!json?.Result) {
+      try {
+        const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(ucdpUrl)}`;
+        const res2  = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+        if (res2.ok) json = await res2.json();
+      } catch {}
+    }
     const data = json?.Result || [];
-    _giSet(cacheKey, data, _GW_CACHE_MS);
+    if (data.length) _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
   } catch { return []; }
 }
@@ -858,9 +784,20 @@ async function _fetchWorldBankCommodities() {
 
     const results = await Promise.allSettled(
       indicators.map(async ind => {
-        const url = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(ind.id)}?downloadformat=json&mrv=3&format=json`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-        const json = await res.json();
+        const wbUrl = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(ind.id)}?downloadformat=json&mrv=3&format=json`;
+        let wbRes = null;
+        try {
+          const r = await fetch(wbUrl, { signal: AbortSignal.timeout(6000) });
+          if (r.ok) wbRes = await r.json();
+        } catch {}
+        if (!wbRes?.[1]) {
+          try {
+            const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(wbUrl)}`;
+            const r2 = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+            if (r2.ok) wbRes = await r2.json();
+          } catch {}
+        }
+        const json = wbRes;
         const obs = json?.[1]?.filter(o => o.value != null) || [];
         return { ...ind, latest: obs[0]?.value, prev: obs[1]?.value, date: obs[0]?.date };
       })

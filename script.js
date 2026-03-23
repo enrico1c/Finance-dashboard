@@ -746,23 +746,55 @@ function niCard(id, {headline, source, ts, sentiment, category, summary, url, im
 /* Quick-search links to sources that don't need an API key */
 function niSourceLinks(sym) {
   const q = encodeURIComponent(sym);
+
+  // Detect if ticker maps to a commodity / resource sector for extra links
+  const isCommodity = /^(GC|SI|CL|NG|HG|PL|PA|ZC|ZS|ZW|KC|SB|CT|CC|LBS|UX|ALI|BTC)/i.test(sym)
+    || /(?:gold|silver|copper|oil|gas|coal|wheat|corn|soy|coffee|sugar|lithium|cobalt|nickel|aluminum|zinc|iron|rare.?earth|mineral|commodity|resource)/i.test(sym);
+
   const sources = [
-    { name:"Reuters",        url:`https://www.reuters.com/site-search/?query=${q}` },
-    { name:"Bloomberg",      url:`https://www.bloomberg.com/search?query=${q}` },
-    { name:"FT",             url:`https://www.ft.com/search?q=${q}` },
-    { name:"WSJ",            url:`https://www.wsj.com/search?query=${q}` },
-    { name:"CNBC",           url:`https://www.cnbc.com/search/?query=${q}` },
-    { name:"SeekingAlpha",   url:`https://seekingalpha.com/search#q=${q}&tab=news` },
-    { name:"MarketWatch",    url:`https://www.marketwatch.com/search?q=${q}&ts=0&tab=All%20News` },
-    { name:"Yahoo Finance",  url:`https://finance.yahoo.com/quote/${q}/news/` },
-    { name:"Google News",    url:`https://news.google.com/search?q=${q}` },
-    { name:"The Economist",  url:`https://www.economist.com/search?q=${q}` },
+    { name:"Reuters",        url:`https://www.reuters.com/site-search/?query=${q}`,                 cat:'general' },
+    { name:"Bloomberg",      url:`https://www.bloomberg.com/search?query=${q}`,                     cat:'general' },
+    { name:"FT",             url:`https://www.ft.com/search?q=${q}`,                               cat:'general' },
+    { name:"WSJ",            url:`https://www.wsj.com/search?query=${q}`,                           cat:'general' },
+    { name:"CNBC",           url:`https://www.cnbc.com/search/?query=${q}`,                         cat:'general' },
+    { name:"SeekingAlpha",   url:`https://seekingalpha.com/search#q=${q}&tab=news`,                 cat:'general' },
+    { name:"MarketWatch",    url:`https://www.marketwatch.com/search?q=${q}&ts=0&tab=All%20News`,   cat:'general' },
+    { name:"Yahoo Finance",  url:`https://finance.yahoo.com/quote/${q}/news/`,                      cat:'general' },
+    { name:"Google News",    url:`https://news.google.com/search?q=${q}`,                           cat:'general' },
+    { name:"The Economist",  url:`https://www.economist.com/search?q=${q}`,                         cat:'general' },
+    // Commodity & resource-specific sources (always shown for relevant tickers, toggleable for others)
+    { name:"Reuters Commodities", url:`https://www.reuters.com/markets/commodities/?q=${q}`,           cat:'commodity' },
+    { name:"Bloomberg Commodities",url:`https://www.bloomberg.com/markets/commodities`,                cat:'commodity' },
+    { name:"Mining.com",     url:`https://www.mining.com/?s=${q}`,                                  cat:'commodity' },
+    { name:"Fastmarkets",    url:`https://www.fastmarkets.com/search/?q=${q}`,                      cat:'commodity' },
+    { name:"Argus Media",    url:`https://www.argusmedia.com/en/search?q=${q}`,                     cat:'commodity' },
+    { name:"Platts (OPIS)",  url:`https://www.spglobal.com/commodityinsights/en/market-insights/latest-news/commodities/${q}`, cat:'commodity' },
+    { name:"Metal Bulletin", url:`https://www.metalbulletin.com/Article/Search?q=${q}`,             cat:'commodity' },
+    { name:"World Bank Blogs",url:`https://blogs.worldbank.org/search?search_api_views_fulltext=${q}&filter_topic=All`, cat:'commodity' },
+    { name:"USGS Minerals",  url:`https://pubs.usgs.gov/search/?q=${q}`,                            cat:'commodity' },
+    { name:"EIA News",       url:`https://www.eia.gov/pressroom/releases/`,                         cat:'energy' },
+    { name:"OPEC Newsroom",  url:`https://www.opec.org/opec_web/en/press_room/1893.htm`,            cat:'energy' },
+    { name:"IEA News",       url:`https://www.iea.org/news`,                                        cat:'energy' },
+    { name:"Rare Earth Exchanges",url:`https://rareearthexchanges.com`,                             cat:'commodity' },
+    { name:"Supply Chain Dive",url:`https://www.supplychaindive.com/search/?q=${q}`,                cat:'supply' },
+    { name:"GDELT Supply",   url:`https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q+' commodity supply')}&mode=artlist&maxrecords=10&format=json&timespan=3d`, cat:'gdelt' },
   ];
+
+  // Show general + commodity if commodity detected, else just general
+  const shown  = isCommodity ? sources : sources.filter(s => s.cat === 'general');
+  const hidden = isCommodity ? [] : sources.filter(s => s.cat !== 'general');
+
+  const toggleId = `ni-more-${sym.replace(/[^a-z0-9]/gi,'')}`;
+
   return `<div class="ni-sources-wrap">
-    <div class="ni-sources-label">// Search without API key</div>
+    <div class="ni-sources-label">// Search without API key${isCommodity ? ' · Commodity mode' : ''}</div>
     <div class="ni-sources-list">
-      ${sources.map(s => `<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn">${escapeHtml(s.name)}</a>`).join("")}
+      ${shown.filter(s=>s.cat!=='gdelt').map(s => `<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn${s.cat==='commodity'?' ni-src-comm':s.cat==='energy'?' ni-src-energy':s.cat==='supply'?' ni-src-supply':''}">${escapeHtml(s.name)}</a>`).join("")}
     </div>
+    ${!isCommodity ? `<button onclick="document.getElementById('${toggleId}').style.display=document.getElementById('${toggleId}').style.display==='none'?'flex':'none'" class="ni-comm-toggle" style="font-size:9px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0">▶ Show commodity &amp; resource news sources</button>
+    <div id="${toggleId}" style="display:none;flex-wrap:wrap;gap:3px;margin-top:4px">
+      ${sources.filter(s=>s.cat!=='general'&&s.cat!=='gdelt').map(s=>`<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn ni-src-comm">${escapeHtml(s.name)}</a>`).join("")}
+    </div>` : ''}
   </div>`;
 }
 
@@ -1480,33 +1512,53 @@ function computeDefaultLayout(){
   panelLayout.webhooks     = {x: Math.round(W*0.35), y: Math.round(H*0.1), w: colB, h: rowT};
   panelLayout.intel        = {x: Math.round(W*0.2),  y: botY, w: Math.round(W*0.35), h: rowB};
   panelLayout.notes        = {x: Math.round(W*0.3),  y: Math.round(H*0.2), w: Math.round(W*0.28), h: Math.round(H*0.45)};
+  panelLayout.portfolio    = {x: Math.round(W*0.1),  y: Math.round(H*0.05), w: Math.round(W*0.80), h: Math.round(H*0.88)};
+  panelLayout.screener     = {x: Math.round(W*0.05), y: Math.round(H*0.04), w: Math.round(W*0.90), h: Math.round(H*0.90)};
+
 }
 
 function applyPanelPosition(id){
   const el=document.getElementById(`panel-${id}`); if(!el) return;
-  const l=panelLayout[id]; if(!l) return;
+  let l=panelLayout[id];
+  if(!l){
+    // Fallback: center panel on canvas with reasonable default size
+    const canvas=document.getElementById("dashboardCanvas");
+    const cw=canvas?.clientWidth||window.innerWidth;
+    const ch=canvas?.clientHeight||window.innerHeight;
+    const w=Math.min(860, Math.round(cw*0.60));
+    const h=Math.min(700, Math.round(ch*0.82));
+    l={x:Math.round((cw-w)/2), y:Math.round((ch-h)/2), w, h};
+    panelLayout[id]=l;
+  }
   const minY=getTopbarGuard();
   const safeY=Math.max(minY, l.y);
   Object.assign(el.style,{left:l.x+"px",top:safeY+"px",width:l.w+"px",height:l.h+"px"});
 }
 function initLayout(){
   computeDefaultLayout();
+
+  // 1. Apply ALL panel positions FIRST (while still hidden → no flash)
   Object.keys(panelLayout).forEach(applyPanelPosition);
-  // Apply startup visibility matching screenshot:
-  //   Visible:  chart, news, macro, geopolitical (top row, 4 full-height cols)
-  //             watchlist, analysts, comparables, ownership, alert, supply (bottom row, 6 panels)
-  //   Hidden:   fundamentals, webhooks, intel, notes
+
+  // 2. Then set visibility:
+  //    Visible at startup: chart, news, macro, geopolitical (top row, 4 full-height cols)
+  //                        watchlist, analysts, comparables, ownership, alert, supply (bottom row)
+  //    Hidden by default: fundamentals, webhooks, intel, notes, portfolio, screener
   const startVisible = ["chart","news","macro","geopolitical",
     "watchlist","analysts","comparables","ownership","alert","supply"];
-  const startHidden  = ["fundamentals","webhooks","intel","notes"];
+  const startHidden  = ["fundamentals","webhooks","intel","notes","portfolio","screener"];
+
   startVisible.forEach(id => {
     const el = document.getElementById("panel-"+id);
-    if(el) el.classList.remove("hidden");
+    if(!el) return;
+    applyPanelPosition(id);            // re-apply in case canvas was 0 on first pass
+    el.classList.remove("hidden");
     document.querySelectorAll(`.panel-toggle[data-panel="${id}"]`).forEach(cb => cb.checked = true);
   });
   startHidden.forEach(id => {
     const el = document.getElementById("panel-"+id);
-    if(el) el.classList.add("hidden");
+    if(!el) return;
+    el.classList.add("hidden");
     document.querySelectorAll(`.panel-toggle[data-panel="${id}"]`).forEach(cb => cb.checked = false);
   });
 }
@@ -1922,7 +1974,8 @@ window.addEventListener("load",()=>{
   document.getElementById("forexPairInput")?.addEventListener("keydown",e=>{if(e.key==="Enter")changeForexPair();});
   updateExchangeHint();
 
-  requestAnimationFrame(()=>{
+  // Double rAF ensures dashboardCanvas has computed dimensions before layout
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
     initLayout();
     initLayoutSidebar();
     whRenderAlerts();
@@ -1935,7 +1988,7 @@ window.addEventListener("load",()=>{
     if(typeof finnhubLoadAll === "function") finnhubLoadAll(initSym);
     if(typeof updateApiStatus  === "function") updateApiStatus();
     if(typeof updateFmpStatus  === "function") updateFmpStatus();
-  });
+  }));
 });
 
 window.addEventListener("resize",()=>{
@@ -2480,9 +2533,6 @@ function whStartPolling() {
         } catch (e) { _whLog(sym, a.condition, a.value, a.url, 'ERR'); }
       }
       // Toast notification
-      if (typeof wmIntelToast === 'function') {
-        wmIntelToast({ title: `🔔 Alert: ${sym}`, detail: `${whCondLabel(a.condition)} ${a.value} — current $${p.toFixed(2)}`, severity: 'high', icon: '🔔' });
-      }
     }
     whRenderAlerts();
   }, 60000);
@@ -2504,7 +2554,6 @@ const PANEL_META = {
   supply:        { label:'Supply·Chain', icon:'⛓'  },
   alert:         { label:'Alert·Feed',   icon:'⚡' },
   macro:         { label:'Macro·Intel',  icon:'📡' },
-  intel:         { label:'Intel·Feed',   icon:'🧠' },
   webhooks:      { label:'Webhooks',     icon:'🔔' },
   portfolio:     { label:'Portfolio',    icon:'💼' },
   screener:      { label:'Screener',     icon:'🔍' },
