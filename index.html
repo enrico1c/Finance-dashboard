@@ -113,7 +113,6 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="supply"       checked> Supply·Chain</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="alert"        checked> Alert·Feed</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="macro"        checked> Macro·Intel</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="intel"        checked> Intel·Feed</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="webhooks"             checked> Webhooks</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="portfolio"            > Portfolio</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="screener"             > Screener</label>
@@ -153,7 +152,6 @@
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="notes"       ><span class="mti-icon">📝</span><span class="mti-label">Notes</span></label>
           <div class="modules-tray-section">Intelligence</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked><span class="mti-icon">🌍</span><span class="mti-label">Geo·Risk</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="intel"        checked><span class="mti-icon">🧠</span><span class="mti-label">Intel·Feed</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="macro"        checked><span class="mti-icon">📡</span><span class="mti-label">Macro·Intel</span></label>
           <div class="modules-tray-section">Supply &amp; Alerts</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="supply"       checked><span class="mti-icon">⛓</span><span class="mti-label">Supply·Chain</span></label>
@@ -452,7 +450,6 @@
       <div class="tab-pane active" data-tab="wars" id="geo-wars">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">🔗 Click any resource chip to open News &amp; Watchlist</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('all');showPanel('intel')">🧠 Intel Feed</button>
           <button class="geo-cross-btn" onclick="switchTab('supply','choke');showPanel('supply')">⛓ Supply Chain</button>
         </div>
         <div id="georisk-wars-content"></div>
@@ -482,8 +479,6 @@
       <div class="tab-pane" data-tab="intel" id="geo-intel">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">Theater posture &amp; country risk</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('risk');showPanel('intel')">🌡 Full Risk Feed</button>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('iran');showPanel('intel')">🇮🇷 Iran Events</button>
         </div>
       </div>
 
@@ -491,7 +486,6 @@
       <div class="tab-pane" data-tab="signals" id="geo-signals">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">Intelligence signals with ticker links</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('insight');showPanel('intel')">🧠 Full Intel Feed</button>
           <button class="geo-cross-btn" onclick="switchTab('macro','signals');showPanel('macro')">📊 Macro Signals</button>
         </div>
       </div>
@@ -500,7 +494,6 @@
       <div class="tab-pane" data-tab="quakes" id="geo-quakes">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">USGS Seismic · M4.5+ global real-time</span>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('weather');showPanel('intel')">🌪 Weather Alerts</button>
           <button class="geo-cross-btn" onclick="switchTab('alert','wm');showPanel('alert');if(typeof wmAlertLoad==='function')wmAlertLoad('quake')">⚡ Alert Feed</button>
           <button class="geo-cross-btn" onclick="if(typeof usgsLoadQuakes==='function')usgsLoadQuakes()">↻ Refresh</button>
         </div>
@@ -512,7 +505,6 @@
         <div class="geo-cross-bar">
           <span class="geo-cross-label">GPS jamming zones — active electronic warfare</span>
           <button class="geo-cross-btn" onclick="switchTab('geopolitical','milops');wmGeoMilOps()">✈ Military Ops</button>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('cyber');showPanel('intel')">💻 Cyber Intel</button>
         </div>
       </div>
 
@@ -521,7 +513,6 @@
         <div class="geo-cross-bar">
           <span class="geo-cross-label">Military flight activity · Live sorties &amp; operations</span>
           <button class="geo-cross-btn" onclick="switchTab('geopolitical','gps');wmGeoGpsJam()">📡 GPS Jamming</button>
-          <button class="geo-cross-btn" onclick="wmIntelSetFilter('risk');showPanel('intel')">🌡 Risk Feed</button>
         </div>
       </div>
 
@@ -603,45 +594,6 @@
     </section>
 
     <!-- ▸ INTEL FEED — Breaking Intelligence Alerts ─────────────── -->
-    <section class="panel hidden" id="panel-intel" data-panel="intel">
-      <div class="panel-head">
-        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="panel-title-row">
-          <h3>▸ Intel·Feed — Intelligence Findings</h3>
-          <span id="intel-feed-badge" class="intel-badge">0 ALERTS</span>
-        </div>
-        <div class="panel-actions">
-          <label class="wm-toggle-wrap" title="Pop up new alerts">
-            <span>🔔 Popup</span>
-            <div class="wm-toggle" onclick="wmIntelPopupEnabled=!wmIntelPopupEnabled;this.classList.toggle('on')"></div>
-          </label>
-          <label class="wm-toggle-wrap" title="Breaking alerts">
-            <span>🚨 Breaking</span>
-            <div class="wm-toggle on" onclick="wmIntelBreaking=!wmIntelBreaking;this.classList.toggle('on')"></div>
-          </label>
-          <button class="icon-btn close" onclick="hidePanel('intel')">✕</button>
-        </div>
-      </div>
-      <div class="wm-intel-tabs">
-        <button class="wm-intel-tab active" data-type="all"      onclick="wmIntelSetFilter('all')">ALL</button>
-        <button class="wm-intel-tab"        data-type="insight"  onclick="wmIntelSetFilter('insight')">🧠 SIGNALS</button>
-        <button class="wm-intel-tab"        data-type="risk"     onclick="wmIntelSetFilter('risk')">🌡 RISK</button>
-        <button class="wm-intel-tab"        data-type="iran"     onclick="wmIntelSetFilter('iran')">🇮🇷 IRAN</button>
-        <button class="wm-intel-tab"        data-type="unrest"   onclick="wmIntelSetFilter('unrest')">✊ UNREST</button>
-        <button class="wm-intel-tab"        data-type="weather"  onclick="wmIntelSetFilter('weather')">🌪 WEATHER</button>
-        <button class="wm-intel-tab"        data-type="cyber"    onclick="wmIntelSetFilter('cyber')">💻 CYBER</button>
-        <button class="wm-intel-tab"        data-type="oref"     onclick="wmIntelShowOref()">🚨 OREF</button>
-        <button class="wm-intel-tab"        data-type="telegram" onclick="wmIntelShowTelegram()">📡 TELEGRAM</button>
-      </div>
-      <div class="panel-content" id="intel-feed-list"></div>
-      <div class="panel-content" id="intel-oref"     style="display:none"></div>
-      <div class="panel-content" id="intel-telegram" style="display:none"></div>
-      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-intel"></div>
-    </section>
 
 
     <!-- ▸ WEBHOOKS / PRICE ALERTS ─────────────────────────────── -->
@@ -1079,33 +1031,7 @@
   <script src="finterm-modules.js"></script>
   <script src="commodities.js?v=3"></script>
 <script>
-/* Intel Feed — OREF / TELEGRAM sub-panel switcher */
-function wmIntelShowOref() {
-  document.getElementById('intel-feed-list').style.display = 'none';
-  document.getElementById('intel-telegram').style.display  = 'none';
-  document.getElementById('intel-oref').style.display      = '';
-  document.querySelectorAll('.wm-intel-tab').forEach(b => b.classList.remove('active'));
-  document.querySelector('.wm-intel-tab[data-type="oref"]')?.classList.add('active');
-  if (typeof wmIntelOref === 'function') wmIntelOref();
-}
-function wmIntelShowTelegram() {
-  document.getElementById('intel-feed-list').style.display = 'none';
-  document.getElementById('intel-oref').style.display      = 'none';
-  document.getElementById('intel-telegram').style.display  = '';
-  document.querySelectorAll('.wm-intel-tab').forEach(b => b.classList.remove('active'));
-  document.querySelector('.wm-intel-tab[data-type="telegram"]')?.classList.add('active');
-  if (typeof wmIntelTelegram === 'function') wmIntelTelegram();
-}
-/* Patch wmIntelSetFilter to restore main list when standard tabs clicked */
-(function() {
-  const _origSetFilter = window.wmIntelSetFilter; // capture worldmonitor.js version before overwriting
-  window.wmIntelSetFilter = function(type) {
-    document.getElementById('intel-feed-list').style.display = '';
-    document.getElementById('intel-oref').style.display      = 'none';
-    document.getElementById('intel-telegram').style.display  = 'none';
-    if (_origSetFilter) _origSetFilter(type);
-  };
-})();
+)();
 </script>
 <script>
 /* ══════════════════════════════════════════════════════════════════

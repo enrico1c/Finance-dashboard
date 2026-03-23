@@ -717,14 +717,15 @@ async function wmMacroPredictions() {
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching prediction markets…');
 
-  let markets = [], source = 'Manifold Markets';
+  let markets = [], source = 'Polymarket';
   try {
     const res = await fetch('https://api.manifold.markets/v0/markets?limit=40', {
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) throw new Error(`Manifold ${res.status}`);
     const raw = await res.json();
-    markets = raw
+
+    const markets = raw
       .filter(m => m.question && !m.isResolved)
       .map(m => ({
         question: m.question,
@@ -735,10 +736,8 @@ async function wmMacroPredictions() {
         url:      m.url || null,
       }))
       .sort((a,b) => (b.volume||0) - (a.volume||0));
-  } catch(e) {
-    el.innerHTML = wmError('Prediction markets unavailable: ' + e.message);
-    return;
-  }
+
+    if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
 
     const cats = [...new Set(markets.map(m => m.category).filter(Boolean))].slice(0, 8);
     let html = wmLiveBar('Prediction Markets — Manifold Markets', `${markets.length} open questions`);
@@ -774,6 +773,8 @@ async function wmMacroPredictions() {
   } catch(e) {
     el.innerHTML = wmError('Prediction markets unavailable: ' + e.message);
   }
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function wmPredFilter(chip, cat) {
@@ -784,7 +785,13 @@ function wmPredFilter(chip, cat) {
   });
 }
 
-
+function wmPredFilter(chip, cat) {
+  document.querySelectorAll('.wm-pred-cat-chip').forEach(c => c.classList.remove('wm-pred-active'));
+  if (chip) chip.classList.add('wm-pred-active');
+  document.querySelectorAll('#wm-pred-list .wm-pred-row').forEach(r => {
+    r.style.display = (!cat || r.dataset.cat === cat) ? '' : 'none';
+  });
+}
 
 /* ─────────────────────────────────────────────────────────────────
    ENHANCED GEO·RISK TABS
@@ -1089,11 +1096,6 @@ document.addEventListener('DOMContentLoaded', wmInitAll);
    ══════════════════════════════════════════════════════════════════ */
 
 /* ── State ──────────────────────────────────────────────────────── */
-let wmIntelAlerts       = [];       // master list, newest first
-let wmIntelSeenIds      = new Set();
-let wmIntelPopupEnabled = false;
-let wmIntelBreaking     = true;
-let wmIntelFilter       = 'all';
 
 /* ── Map resource/event keyword → finterm topic ────────────────── */
 const WM_RESOURCE_TOPIC = {
@@ -1139,248 +1141,15 @@ function wmResourceToTopic(label) {
 }
 
 /* ── Build alert objects from bootstrap data ───────────────────── */
-function wmBuildIntelAlerts(d) {
-  const now  = Date.now();
-  const list = [];
-
-  // 1. Insights (highest priority)
-  const insights = d.insights?.insights || d.insights?.items || d.insights?.data || d.insights || [];
-  (Array.isArray(insights) ? insights : []).forEach((s, i) => {
-    const sev = s.severity || s.importance || s.level || s.priority || 'medium';
-    const id  = `insight-${s.id || s.timestamp || i}`;
-    list.push({
-      id, type:'insight', icon:'🧠',
-      severity: sev,
-      title: s.title || s.headline || s.summary || 'Intelligence signal',
-      subtitle: s.body || s.description || '',
-      detail: s.recommendation || s.action || '',
-      ts: s.timestamp || s.publishedAt || s.date || now,
-      ticker: s.ticker || s.symbol || s.asset || null,
-      tags:   s.tags || [],
-      resource: s.title || '',
-    });
-  });
-
-  // 2. Iran events (always high priority)
-  const irans = d.iranEvents?.events || d.iranEvents?.data || d.iranEvents || [];
-  (Array.isArray(irans) ? irans : []).forEach((e, i) => {
-    const id = `iran-${e.id || e.timestamp || i}`;
-    list.push({
-      id, type:'iran', icon:'🇮🇷',
-      severity: e.severity || e.level || 'high',
-      title: e.title || e.description || e.event || 'Iran event',
-      subtitle: e.location ? `📍 ${e.location}` : '',
-      detail: e.note || '',
-      ts: e.timestamp || e.date || now,
-      ticker: null,
-      resource: e.title || '',
-    });
-  });
-
-  // 3. Unrest events
-  const unrest = d.unrestEvents?.events || d.unrestEvents?.data || d.unrestEvents || [];
-  (Array.isArray(unrest) ? unrest : []).slice(0, 8).forEach((u, i) => {
-    const id = `unrest-${u.id || u.timestamp || i}`;
-    list.push({
-      id, type:'unrest', icon:'✊',
-      severity: u.severity || u.level || 'medium',
-      title: `"${u.country || u.location || u.topic || 'Unrest'}" Trending`,
-      subtitle: u.description || u.title || '',
-      detail: u.note || '',
-      ts: u.timestamp || u.eventDate || now,
-      ticker: null,
-      resource: u.country || '',
-    });
-  });
-
-  // 4. Risk score spikes (score > 60 = high, > 80 = critical)
-  const riskRaw = d.riskScores?.scores || d.riskScores?.data || d.riskScores || {};
-  const riskArr = Array.isArray(riskRaw) ? riskRaw :
-    Object.entries(riskRaw).map(([k, v]) => typeof v === 'object' ? { country: k, ...v } : { country: k, score: v });
-  riskArr.filter(r => (r.score ?? 0) >= 60).sort((a, b) => b.score - a.score).slice(0, 6).forEach((r, i) => {
-    const id  = `risk-${r.country || i}`;
-    const pct = Math.round(r.score ?? 0);
-    const sev = pct >= 80 ? 'critical' : 'high';
-    list.push({
-      id, type:'risk', icon:'🌡',
-      severity: sev,
-      title: `${r.country || r.code || 'Country'} Instability ${sev === 'critical' ? 'Critical' : 'Rising'}`,
-      subtitle: `Instability index ${pct}/100. ${r.driver || r.cause || r.note || ''}`,
-      detail: r.summary || '',
-      ts: r.updatedAt || now,
-      ticker: null,
-      resource: r.country || '',
-    });
-  });
-
-  // 5. Weather alerts
-  const wx = d.weatherAlerts?.alerts || d.weatherAlerts?.data || d.weatherAlerts || [];
-  (Array.isArray(wx) ? wx : []).filter(a => {
-    const sev = (a.severity || '').toLowerCase();
-    return ['extreme','severe','high','critical'].includes(sev);
-  }).slice(0, 5).forEach((a, i) => {
-    const id = `wx-${a.id || a.timestamp || i}`;
-    list.push({
-      id, type:'weather', icon:'🌪',
-      severity: a.severity || 'high',
-      title: a.headline || a.event || a.title || 'Severe Weather Alert',
-      subtitle: a.area || a.regions?.join(', ') || a.country || '',
-      detail: a.instruction || a.description || '',
-      ts: a.timestamp || a.onset || now,
-      ticker: null,
-      resource: a.event || 'weather',
-    });
-  });
-
-  // 6. Cyber threats
-  const cyber = d.cyberThreats?.threats || d.cyberThreats?.data || d.cyberThreats || [];
-  (Array.isArray(cyber) ? cyber : []).slice(0, 4).forEach((c, i) => {
-    const id = `cyber-${c.id || c.timestamp || i}`;
-    list.push({
-      id, type:'cyber', icon:'💻',
-      severity: c.severity || c.level || 'medium',
-      title: c.title || c.name || c.type || 'Cyber threat',
-      subtitle: c.target || c.sector || c.description || '',
-      detail: c.indicator || c.cve || '',
-      ts: c.timestamp || c.detectedAt || now,
-      ticker: null,
-      resource: c.sector || 'cyber',
-    });
-  });
-
-  // Sort: critical first, then by time
-  const sevOrd = { critical: 4, extreme: 4, high: 3, elevated: 3, medium: 2, low: 1 };
-  list.sort((a, b) => {
-    const sd = (sevOrd[b.severity?.toLowerCase()] || 1) - (sevOrd[a.severity?.toLowerCase()] || 1);
-    if (sd !== 0) return sd;
-    const at = a.ts > 1e12 ? a.ts : a.ts * 1000;
-    const bt = b.ts > 1e12 ? b.ts : b.ts * 1000;
-    return bt - at;
-  });
-
-  return list;
-}
-
 /* ── Render the intel feed ──────────────────────────────────────── */
-function wmRenderIntelFeed() {
-  const el = document.getElementById('intel-feed-list');
-  if (!el) return;
-
-  const filtered = wmIntelFilter === 'all' ? wmIntelAlerts :
-    wmIntelAlerts.filter(a => a.type === wmIntelFilter);
-
-  if (!filtered.length) {
-    el.innerHTML = `<div class="wm-intel-empty">No alerts in this category</div>`;
-    return;
-  }
-
-  const critCount = wmIntelAlerts.filter(a =>
-    ['critical','extreme'].includes(a.severity?.toLowerCase())).length;
-
-  const badge = document.getElementById('intel-feed-badge');
-  if (badge) {
-    badge.textContent = critCount > 0 ? `${critCount} CRITICAL` : `${wmIntelAlerts.length} ALERTS`;
-    badge.style.background = critCount > 0 ? '#ff4757' : '#ffa500';
-  }
-
-  el.innerHTML = filtered.map(alert => {
-    const col  = wmSeverityColor(alert.severity);
-    const time = wmRelTime(alert.ts);
-    const sevLabel = (alert.severity || 'INFO').toUpperCase();
-    const topic = wmResourceToTopic(alert.resource || alert.title || '');
-
-    return `<div class="wm-intel-card" data-id="${wmEsc(alert.id)}"
-        style="border-left:3px solid ${col.border}"
-        onclick="wmIntelCardClick(event, ${JSON.stringify(alert).replace(/"/g, '&quot;')})">
-      <div class="wm-ic-header">
-        <span class="wm-ic-icon">${alert.icon}</span>
-        <div class="wm-ic-title">${wmEsc(alert.title)}</div>
-        <span class="wm-ic-badge" style="background:${col.bg};color:${col.text};border-color:${col.border}">${sevLabel}</span>
-      </div>
-      ${alert.subtitle ? `<div class="wm-ic-sub">${wmEsc(alert.subtitle)}</div>` : ''}
-      ${alert.detail ? `<div class="wm-ic-detail">${wmEsc(alert.detail.slice(0, 120))}${alert.detail.length > 120 ? '…' : ''}</div>` : ''}
-      <div class="wm-ic-footer">
-        <span class="wm-ic-time">${time}</span>
-        ${alert.ticker ? `<span class="wm-ic-ticker" onclick="event.stopPropagation();wmResourceLink('${wmEsc(alert.ticker)}','${wmEsc(topic)}')">${wmEsc(alert.ticker)}</span>` : ''}
-        <span class="wm-ic-link" onclick="event.stopPropagation();wmResourceLink('${wmEsc(alert.resource || alert.title || '')}','${wmEsc(topic)}')">→ News &amp; Watchlist</span>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Popup toast for new breaking alerts
-  if (wmIntelBreaking && wmIntelPopupEnabled) {
-    const newOnes = filtered.filter(a => !wmIntelSeenIds.has(a.id) &&
-      ['critical','extreme','high'].includes(a.severity?.toLowerCase()));
-    newOnes.forEach(a => {
-      wmIntelSeenIds.add(a.id);
-      wmIntelToast(a);
-    });
-  }
-  filtered.forEach(a => wmIntelSeenIds.add(a.id));
-}
-
 /* ── Load & refresh intel data ──────────────────────────────────── */
-async function wmIntelLoad() {
-  const el = document.getElementById('intel-feed-list');
-  if (el && !wmIntelAlerts.length) el.innerHTML = wmSpinner('Scanning intelligence feeds…');
-
-  try {
-    const keys = ['insights', 'iranEvents', 'unrestEvents', 'riskScores', 'weatherAlerts', 'cyberThreats'];
-    const d = await wmBootstrap(keys);
-    wmIntelAlerts = wmBuildIntelAlerts(d);
-    wmRenderIntelFeed();
-  } catch(e) {
-    const el2 = document.getElementById('intel-feed-list');
-    if (el2) el2.innerHTML = wmError(e.message);
-  }
-}
-
 /* ── Toast notification ─────────────────────────────────────────── */
-function wmIntelToast(alert) {
-  const col = wmSeverityColor(alert.severity);
-  const t = document.createElement('div');
-  t.className = 'wm-toast';
-  t.style.cssText = `border-left:3px solid ${col.border};`;
-  t.innerHTML = `<div class="wm-toast-head">
-    <span>${alert.icon}</span>
-    <span class="wm-toast-sev" style="color:${col.text}">${(alert.severity||'').toUpperCase()}</span>
-    <span class="wm-toast-close" onclick="this.parentElement.parentElement.remove()">✕</span>
-  </div>
-  <div class="wm-toast-title">${wmEsc(alert.title)}</div>`;
-  document.body.appendChild(t);
-  setTimeout(() => { t.classList.add('wm-toast-fade'); setTimeout(() => t.remove(), 500); }, 5000);
-}
-
 /* ── Intel panel filter ─────────────────────────────────────────── */
-function wmIntelSetFilter(f) {
-  wmIntelFilter = f;
-  document.querySelectorAll('#panel-intel .wm-intel-tab').forEach(b =>
-    b.classList.toggle('active', b.dataset.type === f));
-  wmRenderIntelFeed();
-}
-
 /* ── Intel panel init ───────────────────────────────────────────── */
-function wmIntelInit() {
-  const panel = document.getElementById('panel-intel');
-  if (!panel) return;
-  if (typeof initDrag   === 'function') initDrag(panel);
-  if (typeof initResize === 'function') initResize(panel);
-  if (typeof bringToFront === 'function') bringToFront(panel);
-  wmIntelLoad();
-  // Refresh every 90s
-  setInterval(wmIntelLoad, 90_000);
-}
-
 /* ══════════════════════════════════════════════════════════════════
    RESOURCE LINK — click on any resource/chokepoint/mineral
    Opens a side drawer with news + sector watchlist
    ══════════════════════════════════════════════════════════════════ */
-
-function wmIntelCardClick(event, alert) {
-  // If click was on a specific button, handled by that button
-  if (event.target.closest('.wm-ic-link, .wm-ic-ticker')) return;
-  wmResourceLink(alert.resource || alert.title, wmResourceToTopic(alert.resource || alert.title));
-}
 
 function wmResourceLink(resourceLabel, topic) {
   // Open the resource drawer
@@ -1418,7 +1187,7 @@ function wmResourceDrawerOpen(resourceLabel, topic) {
     // Click outside to close
     document.addEventListener('click', (e) => {
       if (drawer && !drawer.contains(e.target) &&
-          !e.target.closest('[onclick*="wmResourceLink"],[onclick*="wmIntelCard"],[class*="wm-ic-"],[class*="wm-choke"],[class*="wm-min-"],[class*="wm-signal-"],[class*="wm-alert-"]'))
+          !e.target.closest('[onclick*="wmResourceLink"],[class*="wm-ic-"],[class*="wm-choke"],[class*="wm-min-"],[class*="wm-signal-"],[class*="wm-alert-"]'))
         wmResourceDrawerClose();
     }, { capture: true });
   }
@@ -1777,7 +1546,6 @@ document.addEventListener('DOMContentLoaded', () => {
 const _wmOrigInit = typeof wmInitAll === 'function' ? wmInitAll : null;
 function wmInitAll() {
   if (_wmOrigInit) _wmOrigInit();
-  wmIntelInit();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1964,19 +1732,16 @@ function wmInjectNewsEnrichment(sym, topic, signals, risk, geoEvents) {
   if (risk) {
     const c = wmScoreColor(risk.score||0);
     items.push({ icon:'🌡', title:`${risk.country||ctx?.country||''} risk: ${Math.round(risk.score||0)}/100`,
-      sub: risk.driver||risk.cause||'', col:c,
-      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Risk Feed' });
+      sub: risk.driver||risk.cause||'', col:c });
   }
   signals.forEach(s => {
     const c = wmSeverityColor(s.severity||'medium');
     items.push({ icon:'🧠', title: s.title||s.headline||'Signal',
-      sub: (s.body||s.description||'').slice(0,80), col:c,
-      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Intel' });
+      sub: (s.body||s.description||'').slice(0,80), col:c });
   });
   geoEvents.slice(0,1).forEach(e => {
     const c = wmSeverityColor(e.severity||'medium');
-    items.push({ icon:'✊', title: e.title||e.description||'Event', sub: e.location||'', col:c,
-      action:`wmIntelSetFilter('unrest');showPanel('intel')`, actionLabel:'→ Unrest' });
+    items.push({ icon:'✊', title: e.title||e.description||'Event', sub: e.location||'', col:c });
   });
   wmBanner(items, 'news', `wm-banner-news-${sym}`);
 }
@@ -1986,14 +1751,13 @@ function wmInjectQuoteEnrichment(sym, topic, risk, chokes, signals) {
   if (risk && (risk.score||0) >= 40) {
     const c = wmScoreColor(risk.score||0);
     items.push({ icon:'🌡', title:`${risk.country||''} Country Risk: ${Math.round(risk.score||0)}/100`,
-      sub: risk.driver||'Political/economic risk indicator', col:c,
-      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Details' });
+      sub: risk.driver||'Political/economic risk indicator', col:c });
   }
   chokes.forEach(ch => {
     const c = wmSeverityColor(ch.riskLevel||ch.risk||'medium');
     items.push({ icon:'🌊', title:`Chokepoint: ${ch.name||''}`,
       sub:`${(ch.affectedCommodities||[]).join(', ')}`, col:c,
-      action:`switchTab('supply','choke');showPanel('supply')`, actionLabel:'→ Supply' });
+      action:`switchTab('supply','choke');showPanel('supply')` });
   });
   signals.slice(0,1).forEach(s => {
     const c = wmSeverityColor(s.severity||'medium');
@@ -2007,8 +1771,7 @@ function wmInjectAnalystsEnrichment(sym, topic, signals, geoEvents) {
   signals.forEach(s => {
     const c = wmSeverityColor(s.severity||'medium');
     items.push({ icon:'🧠', title:s.title||'',
-      sub:(s.recommendation||s.body||'').slice(0,90), col:c,
-      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Signal' });
+      sub:(s.recommendation||s.body||'').slice(0,90), col:c });
   });
   geoEvents.forEach(e => {
     const c = wmSeverityColor(e.severity||'medium');
@@ -2024,7 +1787,7 @@ function wmInjectOwnershipEnrichment(sym, topic, risk, geoEvents) {
     const c = wmScoreColor(risk.score||0);
     items.push({ icon:'🌍', title:`Domicile risk — ${risk.country||''}`,
       sub:`Country instability index: ${Math.round(risk.score||0)}/100. May affect insider activity & disclosure.`,
-      col:c, action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Risk Feed' });
+      col:c });
   }
   geoEvents.forEach(e => {
     items.push({ icon:'✊', title:e.title||e.description||'', sub:e.location||'',
@@ -2037,14 +1800,13 @@ function wmInjectComparablesEnrichment(sym, topic, signals, chokes) {
   const items = [];
   signals.forEach(s => {
     const c = wmSeverityColor(s.severity||'medium');
-    items.push({ icon:'🧠', title:s.title||'', sub:(s.body||'').slice(0,80), col:c,
-      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Feed' });
+    items.push({ icon:'🧠', title:s.title||'', sub:(s.body||'').slice(0,80), col:c });
   });
   chokes.forEach(ch => {
     const c = wmSeverityColor(ch.riskLevel||ch.risk||'medium');
     items.push({ icon:'⛓', title:`Supply constraint: ${ch.name||''}`,
       sub:`Affects sector peers in: ${(ch.affectedCommodities||[]).join(', ')}`, col:c,
-      action:`switchTab('supply','choke');showPanel('supply')`, actionLabel:'→ Supply' });
+      action:`switchTab('supply','choke');showPanel('supply')` });
   });
   wmBanner(items, 'comparables', `wm-banner-comp-${sym}`);
 }
@@ -2058,13 +1820,11 @@ function wmInjectWatchlistEnrichment(sym, topic, signals, risk) {
   if (risk && (risk.score||0) >= 30) {
     const c = wmScoreColor(risk.score||0);
     items.push({ icon:'🌡', title:`Sector geo-risk: ${Math.round(risk.score||0)}/100`,
-      sub:`${topic} — ${risk.driver||'Regional instability'}`, col:c,
-      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Risk' });
+      sub:`${topic} — ${risk.driver||'Regional instability'}`, col:c });
   }
   signals.slice(0,2).forEach(s => {
     const c = wmSeverityColor(s.severity||'medium');
-    items.push({ icon:'🧠', title:s.title||'', sub:(s.body||'').slice(0,80), col:c,
-      action:`wmIntelSetFilter('insight');showPanel('intel')`, actionLabel:'→ Intel' });
+    items.push({ icon:'🧠', title:s.title||'', sub:(s.body||'').slice(0,80), col:c });
   });
 
   if (!items.length) return;
@@ -2105,14 +1865,13 @@ function wmInjectValuationEnrichment(sym, topic, risk, chokes, geoEvents, cyber)
                    pct >= 50 ? 'Elevated risk premium likely' :
                    pct >= 25 ? 'Moderate geopolitical discount' : 'Low geo-risk';
     items.push({ icon:'🌡', title:`Geo-risk: ${impact}`,
-      sub:`${risk.country||''} instability index ${pct}/100 — affects DCF discount rate & peer multiples`, col:c,
-      action:`wmIntelSetFilter('risk');showPanel('intel')`, actionLabel:'→ Details' });
+      sub:`${risk.country||''} instability index ${pct}/100 — affects DCF discount rate & peer multiples`, col:c });
   }
   chokes.forEach(ch => {
     const c = wmSeverityColor(ch.riskLevel||ch.risk||'medium');
     items.push({ icon:'⛓', title:`Supply chain disruption: ${ch.name||''}`,
       sub:'May compress margins and affect forward revenue estimates.', col:c,
-      action:`switchTab('supply','choke');showPanel('supply')`, actionLabel:'→ Supply' });
+      action:`switchTab('supply','choke');showPanel('supply')` });
   });
   geoEvents.slice(0,1).forEach(e => {
     items.push({ icon:'⚠', title:e.title||e.description||'Geopolitical event',
@@ -2120,8 +1879,7 @@ function wmInjectValuationEnrichment(sym, topic, risk, chokes, geoEvents, cyber)
   });
   cyber.forEach(c => {
     items.push({ icon:'💻', title:`Cyber exposure: ${c.title||c.sector||''}`,
-      sub:'Factor in operational risk and potential liability.', col:wmSeverityColor(c.severity||'medium'),
-      action:`wmIntelSetFilter('cyber');showPanel('intel')`, actionLabel:'→ Cyber' });
+      sub:'Factor in operational risk and potential liability.', col:wmSeverityColor(c.severity||'medium') });
   });
   wmBanner(items, 'valuation', `wm-banner-val-${sym}`);
 }
@@ -2266,87 +2024,7 @@ async function wmGeoMilOps() {
 }
 
 /* ── OREF Alerts (Israel sirens)  → Intel·Feed OREF tab ────────── */
-async function wmIntelOref() {
-  const el = document.getElementById('intel-oref');
-  if (!el) return;
-  el.innerHTML = wmSpinner('Loading OREF alerts…');
-  try {
-    const raw = await wmFetch('/api/oref-alerts');
-    const items = Array.isArray(raw) ? raw
-      : (raw?.alerts || raw?.data || raw?.events || []);
-
-    if (!items.length) {
-      el.innerHTML = `<div class="wm-oref-clear">
-        <span style="font-size:32px">🟢</span>
-        <div style="font-weight:600;margin-top:8px">No Active OREF Alerts</div>
-        <div style="color:var(--text-dim);font-size:12px">Israel Home Front Command — all clear</div>
-      </div>`;
-      return;
-    }
-
-    let html = `<div style="background:#ff2222;color:#fff;padding:6px 10px;font-weight:700;font-size:12px;letter-spacing:.5px">
-      🚨 ACTIVE OREF ALERTS — ${items.length} ZONE${items.length!==1?'S':''}
-    </div>`;
-    html += '<div class="wm-oref-list">';
-    for (const a of items) {
-      const zone     = wmEsc(a.city || a.zone || a.area || a.location || '');
-      const threat   = wmEsc(a.threat || a.type || a.category || 'Rocket');
-      const time     = wmEsc(a.time || a.timestamp || '');
-      const instrHE  = wmEsc(a.instructions_he || '');
-      const instrEN  = wmEsc(a.instructions_en || a.instructions || '');
-      html += `<div class="wm-oref-row">
-        <span class="wm-oref-icon">🚨</span>
-        <div class="wm-oref-body">
-          <div class="wm-oref-zone">${zone}</div>
-          <div class="wm-oref-meta">${threat} ${time ? '· '+time : ''}</div>
-          ${instrEN ? `<div class="wm-oref-instr">${instrEN}</div>` : ''}
-        </div>
-      </div>`;
-    }
-    html += '</div>';
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = wmError('OREF data unavailable: ' + e.message);
-  }
-}
-
 /* ── Telegram Breaking Feed  → Intel·Feed TELEGRAM tab ─────────── */
-async function wmIntelTelegram() {
-  const el = document.getElementById('intel-telegram');
-  if (!el) return;
-  el.innerHTML = wmSpinner('Loading Telegram intelligence…');
-  try {
-    const raw = await wmFetch('/api/telegram-feed');
-    const items = Array.isArray(raw) ? raw
-      : (raw?.messages || raw?.posts || raw?.data || []);
-
-    if (!items.length) { el.innerHTML = wmEmpty('No recent Telegram intel messages.'); return; }
-
-    let html = wmLiveBar('Telegram Intelligence Feed', `${items.length} messages`);
-    html += '<div class="wm-tg-list">';
-    for (const msg of items.slice(0,30)) {
-      const channel = wmEsc(msg.channel || msg.source || msg.from || '');
-      const text    = wmEsc(msg.text || msg.message || msg.content || '');
-      const ts      = wmEsc(msg.time || msg.timestamp || msg.date || '');
-      const lang    = wmEsc(msg.lang || '');
-      const tags    = Array.isArray(msg.tags) ? msg.tags : [];
-      html += `<div class="wm-tg-row">
-        <div class="wm-tg-head">
-          <span class="wm-tg-channel">📡 ${channel || 'Intel Channel'}</span>
-          ${lang ? `<span class="wm-tg-lang">${lang.toUpperCase()}</span>` : ''}
-          <span class="wm-tg-ts">${ts}</span>
-        </div>
-        <div class="wm-tg-text">${text}</div>
-        ${tags.length ? `<div class="wm-tg-tags">${tags.map(t=>`<span class="wm-intel-tag">${wmEsc(t)}</span>`).join('')}</div>` : ''}
-      </div>`;
-    }
-    html += '</div>';
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = wmError('Telegram feed unavailable: ' + e.message);
-  }
-}
-
 /* ══════════════════════════════════════════════════════════════════
    ETF FLOWS  — Major ETF performance & flow proxy
    Primary: FMP batch quote (needs key)
@@ -3662,8 +3340,6 @@ window.wmGeoResources = wmGeoResources;
     wmGeoGpsJam();
     wmGeoMilOps();
     // Intel Feed new tabs
-    wmIntelOref();
-    wmIntelTelegram();
     // Frankfurter rates in Forex panel
     frankfurterLoadRates();
 
@@ -3674,8 +3350,6 @@ window.wmGeoResources = wmGeoResources;
       wmMacroCrypto();
       wmGeoGpsJam();
       wmGeoMilOps();
-      wmIntelOref();
-      wmIntelTelegram();
       frankfurterLoadRates();
     }, 3 * 60 * 1000);  // 3 min for crypto + fast-moving data
   });
