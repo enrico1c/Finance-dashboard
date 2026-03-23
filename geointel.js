@@ -165,16 +165,6 @@ window.geoLoadTerror = async function() {
       </div>
 
       <div class="gi-footer">Source: <a href="https://www.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT Project</a> · 100% free, no API key · Updates every 15 min</div>`;
-.map(a => ({
-      type:     'terror',
-      icon:     '💥',
-      title:    a.title || '',
-      subtitle: a.sourcecountry || '',
-      severity: 'high',
-      ts:       a.seendate ? new Date(a.seendate).getTime()/1000 : Date.now()/1000,
-      resource: a.domain || 'GDELT',
-      url:      a.url,
-    })));
 
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading terrorism data: ${_giEsc(e.message)}</div>`;
@@ -311,15 +301,6 @@ window.geoLoadCyber = async function() {
         · <a href="https://www.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT</a>
         · No API key required
       </div>`;
-.map(v => ({
-      type:     'cyber',
-      icon:     '🔒',
-      title:    `${v.cveID}: ${v.vulnerabilityName||''}`,
-      subtitle: `${v.vendorProject||''} · ${v.product||''}`,
-      severity: v.knownRansomwareCampaignUse === 'Known' ? 'critical' : 'high',
-      ts:       v.dateAdded ? new Date(v.dateAdded).getTime()/1000 : Date.now()/1000,
-      resource: 'CISA KEV',
-    })));
 
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading cyber data: ${_giEsc(e.message)}</div>`;
@@ -461,15 +442,6 @@ window.geoLoadTravel = async function() {
         Source: <a href="https://travel.state.gov" target="_blank" class="geo-wm-link">US State Dept</a>
         · Updated continuously · No API key required
       </div>`;
-.map(item => ({
-      type:     'risk',
-      icon:     '🚫',
-      title:    item.title,
-      subtitle: 'US State Dept: Do Not Travel',
-      severity: 'critical',
-      ts:       item.pubDate ? new Date(item.pubDate).getTime()/1000 : Date.now()/1000,
-      resource: 'State Dept',
-    })));
 
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading travel advisories: ${_giEsc(e.message)}</div>`;
@@ -587,15 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Background fetch CISA KEV 3s after load (quiet, no UI update)
   setTimeout(async () => {
     try {
-      const kev = await fetchCISAKev();
-      if (kev?.vulnerabilities) {
-        const recent = kev.vulnerabilities
-          .sort((a,b) => (b.dateAdded||'').localeCompare(a.dateAdded||''))
-          .slice(0, 3);
-.getTime()/1000 : Date.now()/1000,
-          resource: 'CISA KEV',
-        })));
-      }
+      await fetchCISAKev();
     } catch {}
   }, 3000);
 
