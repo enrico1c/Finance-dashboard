@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v6-2026';
+const CACHE_VERSION  = 'finterm-v14-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -31,6 +31,38 @@ const APP_SHELL = [
   '/commodities.js',
   '/api.js',
   '/sbcache.js',
+  '/energy.js',
+  '/commodities.js',
+  '/minerals.js',
+  '/agriculture.js',
+  '/tradeflows.js',
+  '/positioning.js',
+  '/intel.js',
+  /* Phase 1 — Identity Infrastructure */
+  '/openfigi.js',
+  '/nasdaqdir.js',
+  '/gleif.js',
+  /* Phase 2 — Registry & Ownership */
+  '/companieshouse.js',
+  /* Phase 3 — Market Structure */
+  '/finra.js',
+  /* Phase 4 — Reference Data & Instrument Lifecycle */
+  '/esmafirds.js',
+  '/secdera.js',
+  /* Phase 5 — Fund & ETF Data Ecosystem */
+  '/xbrlenhance.js',
+  '/mfprospectus.js',
+  '/valuation-datasources.js',
+  '/valuation-data.js',
+  '/fred_credit_addition.js',
+  /* UARS Engine — Universal Asset Rating System */
+  '/valuation-missing-sources.js',
+  '/uars_engine.js',
+  '/uars-source-connector.js',
+  '/uars-peer-builder.js',
+  '/uars-widget.js',
+  '/uars-widget.css',
+  '/uars-integration.js',
 ];
 
 /* API hosts to cache with network-first strategy */
@@ -47,6 +79,28 @@ const API_HOSTS = [
   'api.allorigins.win',
   'air-quality-api.open-meteo.com',
   'api.waqi.info',
+  'www.eia.gov',
+  'agsi.gie.eu',
+  'transparency.entsog.eu',
+  'agridata.ec.europa.eu',
+  'fenixservices.fao.org',
+  'comtradeapi.un.org',
+  'api.bls.gov',
+  'api.gdeltproject.org',
+  'www.federalregister.gov',
+  /* Phase 1 — Identity Infrastructure */
+  'api.openfigi.com',
+  'api.gleif.org',
+  'www.nasdaqtrader.com',
+  /* Phase 2 — Registry & Ownership */
+  'api.company-information.service.gov.uk',
+  'bods-data.openownership.org',
+  /* Phase 3 — Market Structure */
+  'cdn.finra.org',
+  'services.finra.org',
+  /* Phase 4 — Reference Data & Instrument Lifecycle */
+  'registers.esma.europa.eu',
+  'api.twelvedata.com',
 ];
 
 /* ── Install: pre-cache app shell ────────────────────────────────── */

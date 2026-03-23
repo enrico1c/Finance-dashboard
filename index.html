@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FINTERM — Finance Dashboard</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="uars-widget.css" />
   <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
@@ -174,6 +175,7 @@
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <h3>▸ Price Chart — GP</h3>
         <div class="panel-actions">
+          <button class="icon-btn chart-analyse-btn" onclick="openAnalysts()" title="Open Analysts &amp; Evaluation for current ticker">🔬 Analyse</button>
           <button class="icon-btn" onclick="toggleChart2()" id="chart2Btn" title="Add second chart">⊕ 2nd</button>
           <button class="icon-btn close" onclick="hidePanel('chart')" title="Close">✕</button>
         </div>
@@ -201,7 +203,7 @@
       </div>
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="des"     onclick="switchTab('fundamentals','des');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';renderFundamentals(s)})()">DES</button>
-        <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-fa');if(el&&!el.dataset.loaded){if(typeof avRenderFA!=='undefined'&&typeof avLiveCache!=='undefined'&&avLiveCache[s]?.income?.length){avRenderFA(s,avLiveCache[s].income,avLiveCache[s].balance,avLiveCache[s].cashflow);el.dataset.loaded='av';}else if(typeof faLoadEdgarXBRL==='function'){faLoadEdgarXBRL(s,el);el.dataset.loaded='xbrl';}}})()">FA</button>
+        <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-fa');if(el&&!el.dataset.loaded){if(typeof fmpLoadFATab==='function'){fmpLoadFATab(s);el.dataset.loaded='fmp';}else if(typeof avRenderFA!=='undefined'&&typeof avLiveCache!=='undefined'&&avLiveCache[s]?.income?.length){avRenderFA(s,avLiveCache[s].income,avLiveCache[s].balance,avLiveCache[s].cashflow);el.dataset.loaded='av';}else if(typeof faLoadEdgarXBRL==='function'){faLoadEdgarXBRL(s,el);el.dataset.loaded='xbrl';}}})()">FA</button>
         <button class="tab-btn"        data-tab="ern"     onclick="switchTab('fundamentals','ern');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ern');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">ERN</button>
         <button class="tab-btn"        data-tab="ee"      onclick="switchTab('fundamentals','ee');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ee');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">EE</button>
         <button class="tab-btn"        data-tab="wacc"    onclick="switchTab('fundamentals','wacc');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-wacc');if(el&&!el.dataset.loaded){renderFundamentals(s);}})()">WACC</button>
@@ -276,7 +278,13 @@
           <button class="icon-btn close" onclick="hidePanel('news')">✕</button>
         </div>
       </div>
-      <div class="panel-content" id="news-feed"></div>
+      <!-- News sub-tabs: Ticker news | Intel/Policy feed -->
+      <div class="tab-bar" id="news-tab-bar" style="border-bottom:1px solid var(--border)">
+        <button class="tab-btn active" data-tab="news-feed" onclick="switchNewsTab('news-feed')">📰 NEWS</button>
+        <button class="tab-btn"        data-tab="news-intel" onclick="switchNewsTab('news-intel');if(typeof intelLoadAll==='function')intelLoadAll()">🔍 INTEL</button>
+      </div>
+      <div id="news-feed"  class="panel-content news-subpane active"></div>
+      <div id="news-intel" class="panel-content news-subpane" style="display:none"></div>
       <!-- legacy IDs kept invisible so API renderers don't crash -->
       <div id="news-cn"   style="display:none"></div>
       <div id="news-evts" style="display:none"></div>
@@ -302,9 +310,11 @@
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="hds"  onclick="switchTab('ownership','hds')">HDS</button>
         <button class="tab-btn"        data-tab="mgmt" onclick="switchTab('ownership','mgmt')">MGMT</button>
+        <button class="tab-btn"        data-tab="psc"  onclick="switchTab('ownership','psc');(function(){var t=typeof currentTicker!=='undefined'?currentTicker:'';if(t&&typeof chLoadForTicker==='function'&&!document.getElementById('own-psc')?.dataset.chLoaded){chLoadForTicker(t);document.getElementById('own-psc').dataset.chLoaded='1';}})()">PSC / BO</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="hds"  id="own-hds"></div>
       <div class="tab-pane        panel-content" data-tab="mgmt" id="own-mgmt"></div>
+      <div class="tab-pane        panel-content" data-tab="psc"  id="own-psc"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -312,28 +322,21 @@
       <div class="size-tooltip" id="tooltip-ownership"></div>
     </section>
 
-    <!-- ▸ ANALYSTS + VALUATION SCORECARD ─────────────────────── -->
-    <section class="panel hidden" id="panel-analysts" data-panel="analysts">
+    <!-- ▸ UARS ENGINE — Analysts & Evaluation ───────────────────── -->
+    <section class="panel" id="panel-analysts" data-panel="analysts">
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <h3>▸ Analysts &amp; Valuation</h3>
+        <h3>▸ Analysts &amp; Evaluation</h3>
         <div class="panel-actions">
           <button class="icon-btn close" onclick="hidePanel('analysts')">✕</button>
         </div>
       </div>
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="score" onclick="switchTab('analysts','score');renderScorecard(currentTicker)">SCORE</button>
-        <button class="tab-btn"        data-tab="anr"   onclick="switchTab('analysts','anr')">ANR</button>
-        <button class="tab-btn"        data-tab="brc"   onclick="switchTab('analysts','brc')">BRC</button>
-        <button class="tab-btn"        data-tab="val"   onclick="switchTab('analysts','val');renderValuation(currentValTicker||currentTicker)">VAL</button>
-      </div>
-      <div class="tab-pane active panel-content" data-tab="score" id="analysts-score">
-        <div class="no-data">// Load a ticker to see the Analyst Scorecard.</div>
-      </div>
-      <div class="tab-pane panel-content" data-tab="anr" id="analysts-anr"></div>
-      <div class="tab-pane panel-content" data-tab="brc" id="analysts-brc"></div>
-      <div class="tab-pane panel-content" data-tab="val" id="valuationBox">
-        <div class="no-data">// Click any stock in the Sector Watchlist<br>// to load valuation analysis here.</div>
+      <!-- uars-widget.js injects the tab-bar and panes here on DOMContentLoaded -->
+      <div id="uars-widget-mount">
+        <div class="uars-loading" style="height:80px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:#8b949e">
+          <div class="uars-spinner" style="width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:uars-spin 0.8s linear infinite"></div>
+          Initialising UARS Engine…
+        </div>
       </div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
@@ -429,9 +432,9 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars');if(typeof georiskLoadWars==='function'&&!document.getElementById('georisk-wars-content')?.dataset?.loaded){document.getElementById('georisk-wars-content').dataset.loaded='1';georiskLoadWars()}">WARS</button>
-        <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources');if(typeof georiskLoadResources==='function'&&!document.getElementById('georisk-resources-content')?.dataset?.loaded){document.getElementById('georisk-resources-content').dataset.loaded='1';georiskLoadResources()}">RESOURCES</button>
-        <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes');if(typeof georiskLoadRoutes==='function'&&!document.getElementById('georisk-routes-content')?.dataset?.loaded){document.getElementById('georisk-routes-content').dataset.loaded='1';georiskLoadRoutes()}">ROUTES</button>
+        <button class="tab-btn active" data-tab="wars"      onclick="switchTab('geopolitical','wars');(function(){var el=document.getElementById('georisk-wars-content');if(el&&!el.dataset.wmLoaded){el.dataset.wmLoaded='1';if(typeof wmGeoWars==='function')wmGeoWars();else if(typeof renderGeoWars==='function')renderGeoWars();}})()">WARS</button>
+        <button class="tab-btn"        data-tab="resources" onclick="switchTab('geopolitical','resources');(function(){var el=document.getElementById('georisk-resources-content');if(el&&!el.dataset.wmLoaded){el.dataset.wmLoaded='1';if(typeof wmGeoResources==='function')wmGeoResources();else if(typeof renderGeoResources==='function')renderGeoResources();}})()">RESOURCES</button>
+        <button class="tab-btn"        data-tab="routes"    onclick="switchTab('geopolitical','routes');(function(){var el=document.getElementById('georisk-routes-content');if(el&&!el.dataset.wmLoaded){el.dataset.wmLoaded='1';if(typeof wmGeoRoutes==='function')wmGeoRoutes();else if(typeof renderGeoRoutes==='function')renderGeoRoutes();}})()">ROUTES</button>
         <button class="tab-btn"        data-tab="intel"     onclick="switchTab('geopolitical','intel');wmGeoIntel()">INTEL</button>
         <button class="tab-btn"        data-tab="signals"   onclick="switchTab('geopolitical','signals');wmGeoSignals()">SIGNALS</button>
         <button class="tab-btn"        data-tab="quakes"    onclick="switchTab('geopolitical','quakes');wmGeoQuakes()">QUAKES</button>
@@ -752,7 +755,24 @@
       <div class="tab-pane        panel-content" data-tab="ship"     id="supply-ship"></div>
       <div class="tab-pane        panel-content" data-tab="minerals" id="supply-minerals"></div>
       <div class="tab-pane        panel-content" data-tab="flights"  id="supply-flights"></div>
-      <div class="tab-pane        panel-content" data-tab="energy"   id="supply-energy"></div>
+      <div class="tab-pane        panel-content" data-tab="energy"   id="supply-energy">
+        <div class="api-quicksetup-banner" id="energy-setup-banner">
+          <div class="api-qs-icon">⚡</div>
+          <div class="api-qs-body">
+            <div class="api-qs-title">Energy Intelligence — EIA + ENTSOG + GIE</div>
+            <div class="api-qs-desc">
+              WTI · Henry Hub · OPEC Basket · US Gas Storage · EU Gas Flows · EU Storage Levels<br>
+              <span style="color:var(--text-muted);font-size:9px">EIA bulk data requires no key · GIE: free registration at agsi.gie.eu</span>
+            </div>
+            <div class="api-qs-actions">
+              <button class="api-qs-btn-primary" onclick="if(typeof energyLoadAll==='function')energyLoadAll();this.closest('.api-quicksetup-banner').style.display='none'">⚡ Load Energy Data</button>
+              <a href="https://agsi.gie.eu/" target="_blank" class="api-qs-btn-link">GIE key ↗</a>
+              <a href="https://www.eia.gov/opendata/register.php" target="_blank" class="api-qs-btn-link">EIA key ↗</a>
+            </div>
+          </div>
+          <button class="api-qs-dismiss" onclick="this.closest('.api-quicksetup-banner').style.display='none'" title="Dismiss">✕</button>
+        </div>
+      </div>
       <div class="tab-pane        panel-content" data-tab="weather"  id="supply-weather"></div>
       <div class="tab-pane        panel-content" data-tab="agri"     id="supply-agri"></div>
       <div class="tab-pane        panel-content" data-tab="cot"      id="supply-cot"></div>
@@ -826,6 +846,10 @@
         <button class="tab-btn"        data-tab="global"   onclick="switchTab('macro','global');if(typeof macroLoadGlobal==='function')macroLoadGlobal()">🌐 GLOBAL</button>
         <button class="tab-btn"        data-tab="pmi"      onclick="switchTab('macro','pmi');if(typeof macroLoadPMI==='function')macroLoadPMI()">📊 PMI</button>
         <button class="tab-btn"        data-tab="cb"       onclick="switchTab('macro','cb');if(typeof macroLoadCentralBanks==='function')macroLoadCentralBanks()">🏦 BANKS</button>
+        <button class="tab-btn"        data-tab="energy"      onclick="switchTab('macro','energy');      if(typeof energyLoadAll==='function')energyLoadAll()">⚡ ENERGY</button>
+        <button class="tab-btn"        data-tab="commodities" onclick="switchTab('macro','commodities'); if(typeof commoditiesLoadAll==='function')commoditiesLoadAll()">📦 COMMOD.</button>
+        <button class="tab-btn"        data-tab="agri"        onclick="switchTab('macro','agri');        if(typeof agricultureLoadAll==='function')agricultureLoadAll()">🌾 AGRI</button>
+        <button class="tab-btn"        data-tab="positioning" onclick="switchTab('macro','positioning'); if(typeof positioningLoadAll==='function')positioningLoadAll()">📊 COT</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="signals" id="macro-signals"></div>
       <div class="tab-pane        panel-content" data-tab="comm"    id="macro-comm"></div>
@@ -840,7 +864,11 @@
       <div class="tab-pane        panel-content" data-tab="bonds"    id="bonds-content"></div>
       <div class="tab-pane        panel-content" data-tab="global"   id="macro-global"></div>
       <div class="tab-pane        panel-content" data-tab="pmi"      id="macro-pmi"></div>
-      <div class="tab-pane        panel-content" data-tab="cb"       id="macro-cb"></div>
+      <div class="tab-pane        panel-content" data-tab="cb"          id="macro-cb"></div>
+      <div class="tab-pane        panel-content" data-tab="energy"      id="macro-energy"></div>
+      <div class="tab-pane        panel-content" data-tab="commodities" id="macro-commodities"></div>
+      <div class="tab-pane        panel-content" data-tab="agri"        id="macro-agri"></div>
+      <div class="tab-pane        panel-content" data-tab="positioning" id="macro-positioning"></div>
       <div class="tab-pane        panel-content" data-tab="trending" id="macro-trending">
         <div id="yf-trending" class="panel-content"></div>
       </div>
@@ -1048,7 +1076,7 @@
   <script src="geointel.js"></script>
 <script src="macroglobal.js"></script>
   <script src="finterm-modules.js"></script>
-  <script src="commodities.js"></script>
+  <script src="commodities.js?v=3"></script>
 <script>
 /* Intel Feed — OREF / TELEGRAM sub-panel switcher */
 function wmIntelShowOref() {
@@ -1068,13 +1096,15 @@ function wmIntelShowTelegram() {
   if (typeof wmIntelTelegram === 'function') wmIntelTelegram();
 }
 /* Patch wmIntelSetFilter to restore main list when standard tabs clicked */
-const _origSetFilter = typeof wmIntelSetFilter === 'function' ? wmIntelSetFilter : null;
-function wmIntelSetFilter(type) {
-  document.getElementById('intel-feed-list').style.display = '';
-  document.getElementById('intel-oref').style.display      = 'none';
-  document.getElementById('intel-telegram').style.display  = 'none';
-  if (_origSetFilter) _origSetFilter(type);
-}
+(function() {
+  const _origSetFilter = window.wmIntelSetFilter; // capture worldmonitor.js version before overwriting
+  window.wmIntelSetFilter = function(type) {
+    document.getElementById('intel-feed-list').style.display = '';
+    document.getElementById('intel-oref').style.display      = 'none';
+    document.getElementById('intel-telegram').style.display  = 'none';
+    if (_origSetFilter) _origSetFilter(type);
+  };
+})();
 </script>
 <script>
 /* ══════════════════════════════════════════════════════════════════
@@ -1343,11 +1373,68 @@ function riskLevel(r){ return {CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[r]||0; }
 
 /* ─── INIT ──────────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
-  renderGeoWars();
-  renderGeoResources();
-  renderGeoRoutes();
+  // WARS: try live WM data first; static array is the fallback inside wmGeoWars()
+  if (typeof wmGeoWars === 'function') {
+    wmGeoWars();
+  } else {
+    renderGeoWars();
+  }
+  // RESOURCES: depends on _wmConflicts populated by wmGeoWars above
+  // Give wmGeoWars a tick to set window._wmConflicts before resources runs
+  setTimeout(() => {
+    if (typeof wmGeoResources === 'function') {
+      wmGeoResources();
+    } else {
+      renderGeoResources();
+    }
+  }, 200);
+  // ROUTES: reuses 'chokepoints' WM bootstrap key
+  if (typeof wmGeoRoutes === 'function') {
+    wmGeoRoutes();
+  } else {
+    renderGeoRoutes();
+  }
 });
 </script>
+  <!-- ── New data module scripts ──────────────────────────────── -->
+  <script src="energy.js"></script>
+  <script src="minerals.js"></script>
+  <script src="agriculture.js"></script>
+  <script src="tradeflows.js"></script>
+  <script src="positioning.js"></script>
+  <script src="intel.js"></script>
+
+  <!-- Phase 1 — Identity Infrastructure (load after smartsearch.js) -->
+  <script src="openfigi.js"></script>
+  <script src="nasdaqdir.js"></script>
+  <script src="gleif.js"></script>
+
+  <!-- Phase 2 — Registry & Ownership -->
+  <script src="companieshouse.js"></script>
+
+  <!-- Phase 3 — Market Structure -->
+  <script src="finra.js"></script>
+
+  <!-- Phase 4 — Reference Data & Instrument Lifecycle -->
+  <script src="esmafirds.js"></script>
+  <script src="secdera.js"></script>
+
+  <!-- Phase 5 — Fund & ETF Data Ecosystem -->
+  <script src="xbrlenhance.js"></script>
+  <script src="mfprospectus.js"></script>
+
+  <!-- switchNewsTab helper -->
+  <script>
+    function switchNewsTab(id) {
+      document.querySelectorAll('.news-subpane').forEach(p => {
+        p.style.display = p.id === id ? '' : 'none';
+      });
+      document.querySelectorAll('#news-tab-bar .tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === id);
+      });
+    }
+  </script>
+
   <!-- PWA: Service Worker registration -->
   <script>
     if ('serviceWorker' in navigator) {
@@ -1368,5 +1455,18 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
   </script>
+  <!-- Valuation Engine — Data Sources -->
+  <script src="fred_credit_addition.js"></script>
+  <script src="valuation-datasources.js"></script>
+  <script src="valuation-data.js"></script>
+ 
+  <!-- UARS Engine — Universal Asset Rating System -->
+  <!-- Load order is critical: engine → missing sources → connector → peers → widget → integration -->
+  <script src="valuation-missing-sources.js"></script>
+  <script src="uars_engine.js"></script>
+  <script src="uars-source-connector.js"></script>
+  <script src="uars-peer-builder.js"></script>
+  <script src="uars-widget.js"></script>
+  <script src="uars-integration.js"></script>
 </body>
 </html>

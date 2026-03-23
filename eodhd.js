@@ -376,10 +376,27 @@ function eodhdRenderFA(sym, f) {
     ${eodRow("Float",       f.sharesFloat ? Number(f.sharesFloat).toLocaleString() : "—")}`;
 }
 
-/* ── News tab (CN) ───────────────────────────────────────────────── */
+/* ── News — routes through renderNewsFeed for #news-feed ─────────── */
 function eodhdRenderNews(sym, articles) {
+  if (!articles?.length) return;
+  // Primary: shared pipeline → lands in #news-feed (the visible panel)
+  if (typeof renderNewsFeed === "function") {
+    const normalised = articles.map(a => ({
+      headline:  a.title,
+      source:    a.source,
+      datetime:  a.publishedAt,
+      sentiment: a.sentiment || null,
+      category:  null,
+      summary:   a.summary   || "",
+      url:       a.url,
+      image:     null,
+    }));
+    renderNewsFeed(sym, normalised, "eod");
+    return;
+  }
+  // Fallback legacy write to #news-cn
   const cn = document.getElementById("news-cn");
-  if (!cn || !articles?.length) return;
+  if (!cn) return;
   const sentClass = s => s === "Bullish" ? "pos" : s === "Bearish" ? "neg" : "neutral";
   cn.innerHTML = `
     <div class="av-live-badge">● LIVE — EODHD News  <span class="av-ts">${articles.length} articles</span></div>

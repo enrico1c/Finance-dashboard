@@ -8,6 +8,13 @@
 /* ── ⚙️  Keys are managed via the ⚙ API button in the UI ────────── */
 /* Use the modal to paste your FMP key — stored in localStorage.     */
 
+/* HTML escape helper — used throughout template literals */
+function fmpEsc(s) {
+  return typeof escapeHtml === 'function'
+    ? escapeHtml(String(s ?? ''))
+    : String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
 // Runtime key: config.js stores under finterm_key_fmp (via lsId = id => `finterm_key_${id}`)
 function getFmpKey() {
   return (window._KEYS && window._KEYS["fmp"])
@@ -67,7 +74,7 @@ async function fmpFetch(path, symbol, params = {}) {
 
   try {
     fmpIncrement();
-    const res  = await fetch(url);
+    const res  = await fetch(url, { signal: AbortSignal.timeout(7000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -225,6 +232,54 @@ async function fmpGetRatios(symbol) {
   };
 }
 
+/* ── WACC Inputs — Pre-tax cost of debt & effective tax rate ────── */
+async function fmpGetWACCInputs(symbol) {
+  /* Fetches the most recent income statement + balance sheet to derive:
+     • kdPct      = |interestExpense| / totalDebt * 100  (pre-tax cost of debt)
+     • taxRatePct = incomeTaxExpense / incomeBeforeTax * 100  (effective tax rate)
+     Both are stored in fmpLiveCache[sym].waccInputs for use in WACC renders.  */
+  try {
+    const key = getFmpKey();
+    if (!key) return null;
+
+    const [incData, balData] = await Promise.all([
+      fetch(`${FMP_BASE}/v3/income-statement/${symbol}?limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+      fetch(`${FMP_BASE}/v3/balance-sheet-statement/${symbol}?limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+    ]);
+
+    const inc = Array.isArray(incData) && incData.length ? incData[0] : null;
+    const bal = Array.isArray(balData) && balData.length ? balData[0] : null;
+
+    if (!inc || !bal) return null;
+
+    // Pre-tax cost of debt: |interestExpense| / totalDebt
+    // FMP reports interestExpense as negative (cash outflow) — use Math.abs
+    let kdPct = null;
+    const intExp   = Math.abs(parseFloat(inc.interestExpense || 0));
+    const totalDebt= Math.abs(parseFloat(bal.totalDebt || 0));
+    if (intExp > 0 && totalDebt > 1e6) {
+      const raw = (intExp / totalDebt) * 100;
+      // Sanity bounds: 1.5% – 25%; outside this range use fallback
+      if (raw >= 1.5 && raw <= 25) kdPct = parseFloat(raw.toFixed(2));
+    }
+
+    // Effective tax rate: incomeTaxExpense / incomeBeforeTax
+    let taxRatePct = null;
+    const taxExp    = parseFloat(inc.incomeTaxExpense    || 0);
+    const pretaxInc = parseFloat(inc.incomeBeforeTax     || 0);
+    if (pretaxInc > 0 && taxExp >= 0) {
+      const raw = (taxExp / pretaxInc) * 100;
+      // Sanity bounds: 5% – 45%
+      if (raw >= 5 && raw <= 45) taxRatePct = parseFloat(raw.toFixed(1));
+    }
+
+    return { kdPct, taxRatePct };
+  } catch(e) {
+    console.warn('[FMP] fmpGetWACCInputs error:', e.message);
+    return null;
+  }
+}
+
 /* ── Batch Quote (for Watchlist live prices) ────────────────────── */
 async function fmpGetBatchQuote(tickers) {
   if (!tickers.length) return null;
@@ -257,7 +312,7 @@ async function fmpLoadAll(ticker) {
     return;
   }
 
-  const [analystRaw, targets, estimates, insiders, institutional, mgmt, calendar, ratios] =
+  const [analystRaw, targets, estimates, insiders, institutional, mgmt, calendar, ratios, waccInputs] =
     await Promise.all([
       fmpGetAnalystRatings(sym),
       fmpGetPriceTargets(sym),
@@ -267,9 +322,10 @@ async function fmpLoadAll(ticker) {
       fmpGetManagement(sym),
       fmpGetEarningsCalendar(sym),
       fmpGetRatios(sym),
+      fmpGetWACCInputs(sym),
     ]);
 
-  const live = { sym, analystRaw, targets, estimates, insiders, institutional, mgmt, calendar, ratios };
+  const live = { sym, analystRaw, targets, estimates, insiders, institutional, mgmt, calendar, ratios, waccInputs };
   fmpLiveCache[sym] = live;
 
   // Render each panel
@@ -500,36 +556,73 @@ function fmpRenderRatios(sym, r) {
     renderValuation(currentValTicker);
   }
 
-  // Update WACC tab with live beta + D/E from FMP ratios
+  // Update WACC tab with live beta + D/E from FMP ratios + live Kd + tax rate
   const wc = document.getElementById("fund-wacc");
   if (wc) {
-    const beta    = parseFloat(r?.beta   || 1.0);
+    // Beta cascade: FMP ratios → Finnhub profile → AV overview → fallback 1.0
+    const fhLiveFmp  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+    const avBetaFmp  = (typeof avLiveCache !== 'undefined') ? (avLiveCache[sym]?.overview?.beta ?? null) : null;
+    const beta    = parseFloat(r?.beta || fhLiveFmp?.profile?.beta || avBetaFmp || 1.0);
+    const betaSrcFmp = r?.beta ? 'FMP' : fhLiveFmp?.profile?.beta ? 'Finnhub' : avBetaFmp ? 'AV' : 'estimated';
     const debtEq  = parseFloat(r?.debtEq || 0.3);
-    const _ty2 = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
-    const rf=_ty2['10Y']??4.5, erp=5.5;
+    const _ty2    = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
+    const rf      = _ty2['10Y'] ?? 4.5;
+    const erp     = window.DAMODARAN_ERP ?? 4.60;
     const ke      = (rf + beta * erp).toFixed(2);
-    const kd=_ty2['2Y'] ? parseFloat((_ty2['2Y'] + 2.0).toFixed(2)) : 5.5, tax=21;
-    const eqW     = Math.max(20, Math.round(100/(1+debtEq)));
-    const dW      = 100 - eqW;
-    const wacc    = (eqW/100*parseFloat(ke) + dW/100*kd*(1-tax/100)).toFixed(2);
+
+    // Use live Kd and tax rate from fmpGetWACCInputs if available in cache
+    const waccInputs = fmpLiveCache[sym]?.waccInputs;
+    const kd      = waccInputs?.kdPct      ?? 5.5;
+    const tax     = waccInputs?.taxRatePct ?? 21;
+    const kdSrc   = waccInputs?.kdPct      != null ? 'FMP' : 'est.';
+    const taxSrc  = waccInputs?.taxRatePct != null ? 'FMP' : 'statutory';
+
+    const eqW  = Math.max(20, Math.round(100/(1+debtEq)));
+    const dW   = 100 - eqW;
+    const wacc = (eqW/100*parseFloat(ke) + dW/100*kd*(1-tax/100)).toFixed(2);
+
+    // Terminal growth: read user override from sessionStorage, else 2.5%
+    const ssKey  = `wacc_termg_${sym}`;
+    const termG  = parseFloat(sessionStorage.getItem(ssKey) ?? 2.5);
+    const waccN  = parseFloat(wacc);
+    const exitMult = (waccN > termG)
+      ? ((1 + termG/100) / (waccN/100 - termG/100)).toFixed(1) + 'x'
+      : 'N/A (termG ≥ WACC)';
+
     wc.dataset.loaded = "fmp";
     wc.innerHTML = `
-      <div class="av-live-badge">● WACC · ${fmpEsc(sym)} · FMP live data</div>
+      <div class="av-live-badge">● WACC · ${fmpEsc(sym)} · beta:${fmpEsc(betaSrcFmp)} · Kd:${fmpEsc(kdSrc)} · tax:${fmpEsc(taxSrc)}</div>
       <div class="section-head">WACC Inputs</div>
-      ${mRow("Beta (levered)",         beta.toFixed(2))}
+      ${mRow("Beta (levered)",         beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+fmpEsc(betaSrcFmp)+')</span>')}
       ${mRow("D/E Ratio",              debtEq.toFixed(2))}
       ${mRow("Risk-Free Rate (10Y)",   rf+"%")}
-      ${mRow("Equity Risk Premium",    erp+"%")}
+      ${mRow("Equity Risk Premium",    erp+'% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
       ${mRow("Cost of Equity (Ke)",    ke+"%")}
-      ${mRow("Pre-Tax Cost of Debt",   kd+"%")}
-      ${mRow("Tax Rate",               tax+"%")}
+      ${mRow("Pre-Tax Cost of Debt",   kd.toFixed(2)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(kdSrc)+')</span>')}
+      ${mRow("Tax Rate",               tax.toFixed(1)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(taxSrc)+')</span>')}
       ${mRow("Equity Weight",          eqW+"%")}
       ${mRow("Debt Weight",            dW+"%")}
       <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
+      <div class="section-head">DCF Sensitivity</div>
+      <div class="metric">
+        <span>Terminal Growth Rate</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <input id="wacc-termg-${fmpEsc(sym)}" type="number" value="${termG}" min="0" max="10" step="0.1"
+            style="width:58px;background:var(--bg2,#161b22);border:1px solid var(--border,#30363d);color:var(--text,#e6edf3);border-radius:4px;padding:2px 5px;font-size:12px;font-family:monospace"
+            onchange="(function(el){
+              var s='${fmpEsc(sym)}';
+              sessionStorage.setItem('wacc_termg_'+s, el.value);
+              var wc2=document.getElementById('fund-wacc');
+              if(wc2){wc2.dataset.loaded='';if(typeof renderFundamentals==='function')renderFundamentals(s);}
+            })(this)" />
+          <span style="font-size:10px;opacity:.6">%</span>
+        </span>
+      </div>
+      ${mRow("Implied EV/EBITDA exit", exitMult)}
       ${r.roe    != null ? mRow("ROE",          r.roe.toFixed(1)+"%")    : ""}
       ${r.roa    != null ? mRow("ROA",          r.roa.toFixed(1)+"%")    : ""}
       ${r.netMgn != null ? mRow("Net Margin",   r.netMgn.toFixed(1)+"%") : ""}
-      <div class="av-note">// Beta & D/E from FMP TTM · Rf 4.5% · ERP 5.5%</div>`;
+      <div class="av-note">// Kd = interest expense / total debt (FMP). Tax = effective rate (FMP).<br>// ERP: Damodaran Jan 2026 · <a href="https://pages.stern.nyu.edu/~adamodar/" target="_blank" rel="noopener" style="color:var(--accent,#58a6ff)">stern.nyu.edu/adamodar ↗</a></div>`;
   }
 }
 

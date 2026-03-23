@@ -1,0 +1,648 @@
+/* ══════════════════════════════════════════════════════════════════
+   uars-widget.css  —  UARS Engine Widget Styles
+   Append to style.css  OR  load as a separate stylesheet.
+   Uses existing CSS variable palette from the terminal theme.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Root container ───────────────────────────────────────────────── */
+#uars-widget-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--color-text-primary, #e6edf3);
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────────── */
+.uars-tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px 0;
+  border-bottom: 1px solid var(--color-border, #21262d);
+  flex-shrink: 0;
+  background: var(--color-background, #0d1117);
+}
+.uars-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary, #8b949e);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 5px 10px 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.uars-tab-btn:hover  { color: var(--color-text-primary, #e6edf3); }
+.uars-tab-btn.active {
+  color: var(--color-accent, #58a6ff);
+  border-bottom-color: var(--color-accent, #58a6ff);
+}
+
+/* ── Pane ────────────────────────────────────────────────────────── */
+.uars-pane {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 10px 16px;
+}
+.uars-pane.active { display: block; }
+
+/* ── Loading / error states ──────────────────────────────────────── */
+.uars-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 120px;
+  color: var(--color-text-secondary, #8b949e);
+  font-size: 11px;
+}
+.uars-spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--color-border, #30363d);
+  border-top-color: var(--color-accent, #58a6ff);
+  border-radius: 50%;
+  animation: uars-spin 0.8s linear infinite;
+}
+@keyframes uars-spin { to { transform: rotate(360deg); } }
+
+.uars-no-data {
+  padding: 12px 8px;
+  color: var(--color-text-muted, #6e7681);
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TAB 1 — OVERVIEW
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Loading ticker name + step description ──────────────────────── */
+.uars-loading-ticker {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-accent, #58a6ff);
+  text-align: center;
+}
+#uars-status-text,
+.uars-loading-step {
+  font-size: 10px;
+  color: var(--color-text-secondary, #8b949e);
+  text-align: center;
+  max-width: 240px;
+  line-height: 1.5;
+}
+
+/* ── Section A: Consensus Rating ─────────────────────────────────── */
+.uars-consensus-block {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.uars-consensus-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.uars-consensus-score {
+  font-size: 36px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.uars-consensus-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.uars-consensus-rec {
+  font-size: 10px;
+  color: var(--color-text-secondary, #8b949e);
+  margin-left: auto;
+}
+.uars-consensus-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-border, #21262d);
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+.uars-consensus-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+.uars-consensus-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: var(--color-text-muted, #6e7681);
+  margin-bottom: 6px;
+}
+.uars-confidence-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--color-text-secondary, #8b949e);
+}
+.uars-confidence-badge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+.uars-conf-high   { background: rgba(63,185,80,.2);  color: #3fb950; }
+.uars-conf-medium { background: rgba(210,153,34,.2); color: #d29922; }
+.uars-conf-low    { background: rgba(248,81,73,.15); color: #f85149; }
+
+.uars-regime-tag {
+  font-size: 9px;
+  background: rgba(88,166,255,.12);
+  color: var(--color-accent, #58a6ff);
+  border: 0.5px solid rgba(88,166,255,.3);
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-left: auto;
+}
+
+/* ── Section A2: Wall St. Analyst Consensus ──────────────────────── */
+.uars-analyst-block {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.uars-analyst-count {
+  font-weight: 400;
+  color: var(--color-text-muted, #6e7681);
+  font-size: 10px;
+}
+.uars-analyst-bar-wrap { margin: 6px 0 4px; }
+.uars-analyst-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 1px;
+  background: var(--color-border, #21262d);
+}
+.uars-analyst-seg {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+.uars-analyst-seg.buy  { background: #3fb950; }
+.uars-analyst-seg.hold { background: #e3b341; }
+.uars-analyst-seg.sell { background: #f85149; }
+.uars-analyst-legend {
+  display: flex;
+  gap: 12px;
+  margin-top: 5px;
+  font-size: 10px;
+}
+.uars-analyst-legend .buy  { color: #3fb950; }
+.uars-analyst-legend .hold { color: #e3b341; }
+.uars-analyst-legend .sell { color: #f85149; }
+.uars-analyst-target {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 10px;
+  border-top: 0.5px solid var(--color-border, #21262d);
+  padding-top: 6px;
+}
+.uars-analyst-target-label { color: var(--color-text-muted, #6e7681); }
+.uars-analyst-target-value { font-weight: 600; color: var(--color-text-primary, #e6edf3); }
+.uars-analyst-target-upside.pos { color: #3fb950; }
+.uars-analyst-target-upside.neg { color: #f85149; }
+.uars-analyst-target-range { color: var(--color-text-muted, #6e7681); margin-left: auto; }
+
+/* ── Section B: Three model score badges ─────────────────────────── */
+.uars-model-badges {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.uars-model-badge {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-align: center;
+}
+.uars-model-badge-name {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #8b949e);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.uars-model-badge-score {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.uars-model-badge-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-border, #21262d);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.uars-model-badge-bar-fill { height: 100%; border-radius: 2px; }
+.uars-model-badge-desc {
+  font-size: 8px;
+  color: var(--color-text-muted, #6e7681);
+  line-height: 1.4;
+}
+
+/* ── Section C: Key Investor Metrics grid ────────────────────────── */
+.uars-section-head {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #8b949e);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 0 5px;
+  border-bottom: 0.5px solid var(--color-border, #21262d);
+  margin-bottom: 7px;
+}
+.uars-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.uars-kpi-tile {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+.uars-kpi-label {
+  font-size: 8px;
+  color: var(--color-text-muted, #6e7681);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.uars-kpi-value {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary, #e6edf3);
+  white-space: nowrap;
+}
+.uars-kpi-tile.pos .uars-kpi-value { color: #3fb950; }
+.uars-kpi-tile.neg .uars-kpi-value { color: #f85149; }
+.uars-kpi-tile.warn .uars-kpi-value { color: #d29922; }
+
+/* ── Section D: Dimension bar chart ─────────────────────────────── */
+.uars-dim-chart { margin-bottom: 10px; }
+.uars-dim-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  height: 18px;
+}
+.uars-dim-label {
+  width: 90px;
+  font-size: 9px;
+  color: var(--color-text-secondary, #8b949e);
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.uars-dim-bar-track {
+  flex: 1;
+  height: 10px;
+  background: var(--color-border, #21262d);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.uars-dim-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.uars-dim-score {
+  width: 28px;
+  text-align: right;
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.uars-dim-weight {
+  width: 30px;
+  font-size: 8px;
+  color: var(--color-text-muted, #6e7681);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+/* ── Section E: Verdict bullets ─────────────────────────────────── */
+.uars-verdict {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.uars-verdict-item {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  line-height: 1.5;
+  margin-bottom: 5px;
+  color: var(--color-text-primary, #e6edf3);
+}
+.uars-verdict-item:last-child { margin-bottom: 0; }
+.uars-verdict-icon { font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   TABS 2 / 3 / 4 — MODEL DETAIL TABLES
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Formula header ──────────────────────────────────────────────── */
+.uars-formula-block {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-family: var(--font-mono, 'SFMono-Regular', monospace);
+  color: var(--color-accent, #58a6ff);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.uars-formula-desc {
+  font-size: 9px;
+  font-family: inherit;
+  color: var(--color-text-muted, #6e7681);
+  margin-top: 3px;
+}
+
+/* ── Model score header card ─────────────────────────────────────── */
+.uars-model-score-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.uars-msh-score {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.uars-msh-label { font-size: 11px; font-weight: 600; }
+.uars-msh-rec   { font-size: 9px; color: var(--color-text-muted, #6e7681); }
+
+/* ── Dimension table ────────────────────────────────────────────── */
+.uars-dim-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 10px;
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+}
+.uars-dim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.uars-dim-table th {
+  background: var(--color-background-secondary, #161b22);
+  color: var(--color-text-secondary, #8b949e);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 0.5px solid var(--color-border, #21262d);
+  white-space: nowrap;
+}
+.uars-dim-table td {
+  padding: 5px 8px;
+  border-bottom: 0.5px solid var(--color-border, #21262d);
+  vertical-align: middle;
+  color: var(--color-text-primary, #e6edf3);
+  white-space: nowrap;
+}
+.uars-dim-table tr:last-child td { border-bottom: none; }
+.uars-dim-table tr:hover td { background: rgba(88,166,255,.04); }
+.uars-dim-table .uars-td-dim {
+  font-weight: 600;
+  color: var(--color-text-primary, #e6edf3);
+}
+.uars-dim-table .uars-td-vars {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  white-space: normal;
+  max-width: 160px;
+}
+.uars-score-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.uars-score-mini-bar {
+  width: 40px;
+  height: 5px;
+  background: var(--color-border, #21262d);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.uars-score-mini-fill { height: 100%; border-radius: 2px; }
+.uars-score-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+.uars-weight-changed {
+  background: rgba(88,166,255,.12);
+  border-radius: 2px;
+  padding: 1px 4px;
+  color: var(--color-accent, #58a6ff);
+}
+.uars-weight-same { color: var(--color-text-secondary, #8b949e); }
+
+/* ── Variable detail rows (expandable) ──────────────────────────── */
+.uars-var-rows { display: none; }
+.uars-var-rows.expanded { display: table-row-group; }
+.uars-var-row td {
+  background: rgba(88,166,255,.03);
+  padding: 3px 8px 3px 20px !important;
+  font-size: 9px;
+  color: var(--color-text-secondary, #8b949e);
+}
+.uars-var-id   { font-family: monospace; font-size: 8px; color: var(--color-text-muted, #6e7681); }
+.uars-var-raw  { font-variant-numeric: tabular-nums; }
+.uars-var-norm { font-variant-numeric: tabular-nums; font-weight: 600; }
+.uars-op-badge {
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+  background: rgba(163,113,247,.15);
+  color: #a371f7;
+}
+.uars-expand-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted, #6e7681);
+  cursor: pointer;
+  font-size: 9px;
+  padding: 0;
+}
+.uars-expand-btn:hover { color: var(--color-accent, #58a6ff); }
+
+/* ── Footer total row ────────────────────────────────────────────── */
+.uars-total-row td {
+  background: var(--color-background-secondary, #161b22) !important;
+  font-weight: 700;
+  border-top: 1px solid var(--color-border, #21262d);
+}
+
+/* ── Regime selector (Model 2) ───────────────────────────────────── */
+.uars-regime-selector {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.uars-regime-btn {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  background: var(--color-background-secondary, #161b22);
+  color: var(--color-text-secondary, #8b949e);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.uars-regime-btn:hover  { border-color: var(--color-accent, #58a6ff); color: var(--color-accent, #58a6ff); }
+.uars-regime-btn.active {
+  background: rgba(88,166,255,.12);
+  border-color: var(--color-accent, #58a6ff);
+  color: var(--color-accent, #58a6ff);
+  font-weight: 700;
+}
+
+/* ── Penalty panel (Model 3) ────────────────────────────────────── */
+.uars-penalty-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.uars-penalty-card {
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.uars-penalty-name {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #8b949e);
+  margin-bottom: 2px;
+}
+.uars-penalty-value {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 3px;
+}
+.uars-penalty-value.full { color: #3fb950; }
+.uars-penalty-value.warn { color: #d29922; }
+.uars-penalty-value.low  { color: #f85149; }
+.uars-penalty-source {
+  font-size: 8px;
+  color: var(--color-text-muted, #6e7681);
+  line-height: 1.4;
+}
+
+/* ── Score waterfall (Model 3) ───────────────────────────────────── */
+.uars-waterfall {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 10px;
+}
+.uars-wf-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.uars-wf-label {
+  font-size: 8px;
+  color: var(--color-text-muted, #6e7681);
+  white-space: nowrap;
+}
+.uars-wf-value {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.uars-wf-arrow {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  margin-top: 10px;
+}
+.uars-wf-penalty { color: #f85149; }
+.uars-wf-final   { color: var(--color-accent, #58a6ff); }
+
+/* ── Data quality row ─────────────────────────────────────────────── */
+.uars-dq-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  margin-bottom: 8px;
+}
+.uars-dq-item { display: flex; gap: 4px; }
+.uars-dq-val  { font-weight: 700; color: var(--color-text-primary, #e6edf3); }
+.uars-dq-warn { color: #d29922; }
+
+/* ── Score colour helpers ─────────────────────────────────────────── */
+.uars-c-exceptional   { color: #3fb950; }
+.uars-c-veryattractive{ color: #4a9eff; }
+.uars-c-attractive    { color: #58a6ff; }
+.uars-c-neutral       { color: #d29922; }
+.uars-c-weak          { color: #f0883e; }
+.uars-c-unattractive  { color: #f85149; }

@@ -127,7 +127,7 @@ async function _cFetch(url, opts = {}) {
    ══════════════════════════════════════════════════════════════════ */
 
 // Full WB indicator set from Pink Sheet documentation
-const WB_INDICATORS = [
+const _COMM_WB_INDICATORS = [
   // ── Energy ──────────────────────────────────────────────────────
   { id: 'POILBREUSDM', name: 'Brent Crude',      cat: 'energy',  unit: '$/bbl',    icon: '🛢' },
   { id: 'POILWTIUSDM', name: 'WTI Crude',        cat: 'energy',  unit: '$/bbl',    icon: '🛢' },
@@ -201,8 +201,8 @@ window.commFetchPinkSheet = async function(categories = null) {
   if (cached) return cached;
 
   const indicators = categories
-    ? WB_INDICATORS.filter(i => categories.includes(i.cat))
-    : WB_INDICATORS;
+    ? _COMM_WB_INDICATORS.filter(i => categories.includes(i.cat))
+    : _COMM_WB_INDICATORS;
 
   const results = await Promise.allSettled(
     indicators.map(async ind => {
@@ -1851,7 +1851,7 @@ window.commLoadNewsPanel = async function() {
   <div style="font-size:9px;color:var(--text-muted);padding:4px 10px 0;display:flex;gap:6px;flex-wrap:wrap">
     ${['Supply Disruptions','Energy Crisis','Critical Minerals','Food Security','Sanctions'].map((t,i) => {
       const keys = ['supply_disruption','energy_crisis','rare_earths','food_security','sanctions_trade'];
-      return \`<button onclick="commLoadGDELTTheme('\${keys[i]}')" class="comm-stab" style="font-size:8px;padding:2px 6px">\${t}</button>\`;
+      return `<button onclick="commLoadGDELTTheme('${keys[i]}')" class="comm-stab" style="font-size:8px;padding:2px 6px">${t}</button>`;
     }).join('')}
   </div>
   <div class="news-list">`;
@@ -1868,7 +1868,7 @@ window.commLoadNewsPanel = async function() {
       </div>
       <div style="font-size:9px;color:var(--text-muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <span>${_cEsc(a.source)}</span>
-        ${dateStr ? \`<span>· \${_cEsc(dateStr)}</span>\` : ''}
+        ${dateStr ? `<span>· ${_cEsc(dateStr)}</span>` : ''}
         <span style="color:${toneColor}">● Tone ${a.tone?.toFixed(1) ?? 'n/a'}</span>
         <span style="font-size:8px;margin-left:auto">GDELT · no key</span>
       </div>
@@ -1888,7 +1888,7 @@ window.commLoadNewsPanel = async function() {
           ${_cEsc((d.headline||'').slice(0,110))}
         </a>
         <div style="font-size:9px;color:var(--text-muted)">${_cEsc(d.source)} · ${_cEsc(d.agency||'')} · ${_cEsc(d.date)}</div>
-        ${d.abstract ? \`<div style="font-size:9px;color:var(--text-muted);margin-top:2px">\${_cEsc(d.abstract.slice(0,150))}…</div>\` : ''}
+        ${d.abstract ? `<div style="font-size:9px;color:var(--text-muted);margin-top:2px">${_cEsc(d.abstract.slice(0,150))}…</div>` : ''}
       </div>`;
     });
     html += '</div>';
@@ -1939,7 +1939,7 @@ window.commLoadGDELTTheme = async function(themeKey) {
       </div>
       <div style="font-size:9px;color:var(--text-muted);display:flex;gap:6px">
         <span>${_cEsc(a.source)}</span>
-        ${dateStr ? \`<span>· \${_cEsc(dateStr)}</span>\` : ''}
+        ${dateStr ? `<span>· ${_cEsc(dateStr)}</span>` : ''}
         <span style="color:${toneColor}">● Tone ${a.tone?.toFixed(1) ?? 'n/a'}</span>
       </div>
     </div>`;
@@ -1949,7 +1949,7 @@ window.commLoadGDELTTheme = async function(themeKey) {
     existing.innerHTML = html;
     // Update the live badge
     const badge = feed.querySelector('.av-live-badge');
-    if (badge) badge.textContent = \`● \${themeLabels[themeKey] || themeKey} · GDELT · No key\`;
+    if (badge) badge.textContent = `● ${themeLabels[themeKey] || themeKey} · GDELT · No key`;
   }
 };
 
@@ -2456,3 +2456,13 @@ window.commFetchEurostatTrade = window.commFetchEurostatTrade;
 window.commGetIEACriticalMinerals = window.commGetIEACriticalMinerals;
 window.commRenderOFACSanctions = window.commRenderOFACSanctions;
 window.commFetchWITS        = window.commFetchWITS;
+
+// Backward-compat alias: macro COMMOD. tab calls commoditiesLoadAll()
+window.commoditiesLoadAll = async function() {
+  const el = document.getElementById('macro-commodities');
+  if (el && !el.dataset.loaded) {
+    el.dataset.loaded = '1';
+    if (typeof window.commRenderGeoResources === 'function') await window.commRenderGeoResources();
+    else if (typeof window.commRenderIMFComm === 'function') await window.commRenderIMFComm();
+  }
+};

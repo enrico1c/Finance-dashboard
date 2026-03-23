@@ -581,22 +581,28 @@ function avRenderNews(sym, articles) {
 function avRenderWACC(sym, ov) {
   const wc = document.getElementById("fund-wacc");
   if (!wc) return;
+  /* renderFundamentals() (script.js) produces a richer WACC with FMP data, live
+     treasury yields, country-mapped terminal growth, and a user-editable input.
+     If it has already rendered, do not overwrite with this simpler AV version. */
+  if (wc.dataset.loaded) return;
 
   // Estimate WACC components — use live 10Y yield from Treasury Direct cache
   const beta        = ov.beta || 1.0;
-  // Try live 10Y from Treasury Direct (fredLoadTreasuryDirect caches it)
   const _td = typeof window._treasuryYields !== 'undefined' ? window._treasuryYields : null;
-  const riskFree    = _td?.['10Y'] ?? 4.5;  // Live US 10Y yield
-  const erp         = 5.5;  // Damodaran ERP estimate
+  const riskFree    = _td?.['10Y'] ?? 4.5;
+  // Use the global Damodaran ERP (kept in sync with script.js) rather than a stale hardcode
+  const erp         = (typeof window.DAMODARAN_ERP !== 'undefined') ? window.DAMODARAN_ERP : 4.60;
   const ke          = riskFree + beta * erp;
-  const kd          = _td?.['2Y'] ? (_td['2Y'] + 1.5) : 5.5;  // 2Y + credit spread
+  const kd          = _td?.['2Y'] ? (_td['2Y'] + 1.5) : 5.5;  // 2Y + credit spread proxy
   const taxRate     = 21;    // US corporate tax rate
   const mktCap      = ov.mktCap || 0;
-  const totalDebt   = 0;     // AV doesn't expose directly in OVERVIEW
-  const totalVal    = mktCap + totalDebt;
-  const eW          = totalVal > 0 ? ((mktCap / totalVal) * 100).toFixed(1) : 100;
-  const dW          = (100 - parseFloat(eW)).toFixed(1);
-  const wacc        = ((parseFloat(eW)/100 * ke) + (parseFloat(dW)/100 * kd * (1 - taxRate/100))).toFixed(2);
+  /* Prefer FMP D/E ratio (includes real balance-sheet debt) when available;
+     otherwise AV overview does not expose total debt so fall back to 0.3 */
+  const fmpDebtEq   = (typeof fmpGetLive === 'function') ? (fmpGetLive(sym)?.ratios?.debtEq ?? null) : null;
+  const debtEq      = fmpDebtEq != null ? fmpDebtEq : 0.3;
+  const eW          = Math.max(20, Math.round(100 / (1 + debtEq)));
+  const dW          = 100 - eW;
+  const wacc        = (eW/100 * ke + dW/100 * kd * (1 - taxRate/100)).toFixed(2);
   const tg          = 3.0;
   const fcfEst      = ov.ebitda ? ov.ebitda * 0.6 : null;
   const iv          = fcfEst ? fmtB(fcfEst * (1 + tg/100) / (wacc/100 - tg/100)) : "—";
@@ -611,13 +617,12 @@ function avRenderWACC(sym, ov) {
     ${mRow("Pre-Tax Cost of Debt",  kd+"%")}
     ${mRow("Tax Rate (assumed)",    taxRate+"%")}
     ${mRow("Equity Weight",         eW+"%")}
-    ${mRow("Debt Weight",           dW+"%")}
+    ${mRow("Debt Weight",           dW + "% " + (fmpDebtEq != null ? '<span style="font-size:9px;opacity:.6">(FMP D/E)</span>' : '<span style="font-size:9px;opacity:.6">(est.)</span>'))}
     <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
     ${sHead("DCF Sensitivity")}
     ${mRow("Terminal Growth Rate",  tg+"%")}
     ${mRow("EBITDA (TTM)",          fmtB(ov.ebitda))}
-    ${mRow("Implied Intrinsic Value", iv)}
-    <div class="av-note" style="margin-top:8px">// Debt weight uses market cap only (full balance sheet<br>// requires BALANCE_SHEET endpoint — loaded in FA tab).</div>`;
+    ${mRow("Implied Intrinsic Value", iv)}`;
 }
 
 /* ══════════════════════════════════════════════════════════════════

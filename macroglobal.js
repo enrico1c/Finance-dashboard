@@ -219,7 +219,7 @@ function oecdParseLatest(json) {
    ══════════════════════════════════════════════════════════════════ */
 const FOMC_URL   = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm';
 const ECB_URL    = 'https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html';
-const ALLORIGINS  = 'https://api.allorigins.win/get?url=';
+const _MG_ALLORIGINS = 'https://api.allorigins.win/get?url=';
 
 // Hardcoded 2025-2026 FOMC dates (publicly known, stable)
 const FOMC_DATES_2025_26 = [
@@ -235,7 +235,11 @@ const FOMC_DATES_2025_26 = [
   { date:'2026-03-18', type:'FOMC', decision:'SEP + Press conference' },
   { date:'2026-04-29', type:'FOMC', decision:'Rate decision' },
   { date:'2026-06-17', type:'FOMC', decision:'SEP + Press conference' },
-];
+  { date:'2026-07-29', type:'FOMC', decision:'Rate decision' },
+  { date:'2026-09-16', type:'FOMC', decision:'SEP + Press conference' },
+  { date:'2026-11-04', type:'FOMC', decision:'Rate decision' },
+  { date:'2026-12-16', type:'FOMC', decision:'SEP + Press conference' },
+]; // Last updated: March 2026. Source: federalreserve.gov/monetarypolicy/fomccalendars.htm
 
 const ECB_DATES_2025_26 = [
   { date:'2025-01-30', type:'ECB',  decision:'Governing Council' },
@@ -249,7 +253,12 @@ const ECB_DATES_2025_26 = [
   { date:'2026-01-29', type:'ECB',  decision:'Governing Council' },
   { date:'2026-03-05', type:'ECB',  decision:'Governing Council + Press' },
   { date:'2026-04-30', type:'ECB',  decision:'Governing Council' },
-];
+  { date:'2026-06-04', type:'ECB',  decision:'Governing Council + Press' },
+  { date:'2026-07-23', type:'ECB',  decision:'Governing Council' },
+  { date:'2026-09-10', type:'ECB',  decision:'Governing Council + Press' },
+  { date:'2026-10-29', type:'ECB',  decision:'Governing Council' },
+  { date:'2026-12-17', type:'ECB',  decision:'Governing Council + Press' },
+]; // Last updated: March 2026. Source: ecb.europa.eu/press/calendars
 
 const BOE_DATES_2025_26 = [
   { date:'2025-02-06', type:'BoE',  decision:'MPC Decision' },
@@ -262,7 +271,13 @@ const BOE_DATES_2025_26 = [
   { date:'2025-12-18', type:'BoE',  decision:'MPC Decision' },
   { date:'2026-02-05', type:'BoE',  decision:'MPC + MPR' },
   { date:'2026-03-19', type:'BoE',  decision:'MPC Decision' },
-];
+  { date:'2026-05-07', type:'BoE',  decision:'MPC + MPR' },
+  { date:'2026-06-18', type:'BoE',  decision:'MPC Decision' },
+  { date:'2026-08-06', type:'BoE',  decision:'MPC + MPR' },
+  { date:'2026-09-17', type:'BoE',  decision:'MPC Decision' },
+  { date:'2026-11-05', type:'BoE',  decision:'MPC + MPR' },
+  { date:'2026-12-17', type:'BoE',  decision:'MPC Decision' },
+]; // Last updated: March 2026. Source: bankofengland.co.uk/monetary-policy/the-interest-rate
 
 const BOJ_DATES_2025_26 = [
   { date:'2025-01-24', type:'BoJ',  decision:'MPM Decision' },
@@ -273,7 +288,15 @@ const BOJ_DATES_2025_26 = [
   { date:'2025-09-19', type:'BoJ',  decision:'MPM Decision' },
   { date:'2025-10-29', type:'BoJ',  decision:'Outlook Report' },
   { date:'2025-12-19', type:'BoJ',  decision:'MPM Decision' },
-];
+  { date:'2026-01-23', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-03-19', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-04-28', type:'BoJ',  decision:'Outlook Report' },
+  { date:'2026-06-16', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-07-30', type:'BoJ',  decision:'Outlook Report' },
+  { date:'2026-09-17', type:'BoJ',  decision:'MPM Decision' },
+  { date:'2026-10-28', type:'BoJ',  decision:'Outlook Report' },
+  { date:'2026-12-18', type:'BoJ',  decision:'MPM Decision' },
+]; // Last updated: March 2026. Source: boj.or.jp/en/mopo/mpmsche_mei
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER — 🌐 GLOBAL TAB
@@ -551,6 +574,44 @@ window.macroLoadCentralBanks = async function() {
     } catch {}
   }
 
+  // Attempt to enrich meeting dates from FMP economic calendar (if FMP key available)
+  // This supplements (not replaces) the hardcoded arrays above.
+  const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+  const fmpCalendarEvents = [];
+  if (fmpKey) {
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const future= new Date(Date.now() + 120*864e5).toISOString().slice(0,10);
+      const calRes = await fetch(
+        `https://financialmodelingprep.com/api/v3/economic_calendar?from=${today}&to=${future}&apikey=${fmpKey}`,
+        {signal:AbortSignal.timeout(6000)}
+      );
+      const calData = await calRes.json();
+      if (Array.isArray(calData)) {
+        const cbKeywords = ['federal reserve','fomc','fed rate','ecb','european central bank',
+                            'bank of england','boe','bank of japan','boj','pboc','peoples bank'];
+        calData.forEach(ev => {
+          const evName = (ev.event || ev.name || '').toLowerCase();
+          if (cbKeywords.some(kw => evName.includes(kw))) {
+            fmpCalendarEvents.push({
+              date:     ev.date?.slice(0,10) || '',
+              bank:     evName.includes('fomc') || evName.includes('federal') ? 'Fed'
+                      : evName.includes('ecb')  || evName.includes('european') ? 'ECB'
+                      : evName.includes('england') || evName.includes('boe') ? 'BoE'
+                      : evName.includes('japan')   || evName.includes('boj') ? 'BoJ'
+                      : 'CB',
+              event:    ev.event || ev.name || '',
+              actual:   ev.actual   ?? null,
+              estimate: ev.estimate ?? null,
+            });
+          }
+        });
+      }
+    } catch(e) {
+      console.warn('[macroLoadCentralBanks] FMP calendar fetch failed:', e.message);
+    }
+  }
+
   // Latest known rates as fallback (updated approx. to current policy)
   const RATES = [
     { bank:'Federal Reserve', country:'🇺🇸 USA',  rate: fedRate  ?? 4.33, currency:'USD', nextMeeting: nextMeeting(FOMC_DATES_2025_26), color:'#58a6ff', live: fedRate  != null },
@@ -560,20 +621,50 @@ window.macroLoadCentralBanks = async function() {
     { bank:'PBoC',            country:'🇨🇳 China', rate: pbocRate ?? 3.10, currency:'CNY', nextMeeting: null,                             color:'#a371f7', live: pbocRate != null },
   ];
 
-  // Merge all calendar events, sort chronologically
-  const allEvents = [
-    ...FOMC_DATES_2025_26.map(e => ({ ...e, bank:'Fed', color:'#58a6ff', flag:'🇺🇸' })),
-    ...ECB_DATES_2025_26.map(e  => ({ ...e, bank:'ECB', color:'#3fb950', flag:'🇪🇺' })),
-    ...BOE_DATES_2025_26.map(e  => ({ ...e, bank:'BoE', color:'#d29922', flag:'🇬🇧' })),
-    ...BOJ_DATES_2025_26.map(e  => ({ ...e, bank:'BoJ', color:'#f0883e', flag:'🇯🇵' })),
-  ].sort((a,b) => a.date.localeCompare(b.date));
+  const today = new Date().toISOString().slice(0,10);
 
-  const today      = new Date().toISOString().slice(0,10);
-  const upcoming   = allEvents.filter(e => e.date >= today).slice(0, 20);
-  const past3m     = allEvents.filter(e => {
-    const d = new Date(e.date);
-    return d < new Date() && d >= new Date(Date.now() - 90*864e5);
-  }).slice(-8).reverse();
+  // Build upcoming meetings: prefer live FMP calendar events; fall back to official schedules
+  let upcoming, past3m, calendarSource;
+  const bankColor = b => b==='Fed'?'#58a6ff':b==='ECB'?'#3fb950':b==='BoE'?'#d29922':b==='BoJ'?'#f0883e':'#a371f7';
+  const bankFlag  = b => b==='Fed'?'🇺🇸':b==='ECB'?'🇪🇺':b==='BoE'?'🇬🇧':b==='BoJ'?'🇯🇵':'🏦';
+
+  if (fmpCalendarEvents.length) {
+    // Use live FMP data as primary source
+    calendarSource = 'FMP Live Calendar';
+    const liveEvents = fmpCalendarEvents
+      .filter(ev => ev.date >= today)
+      .sort((a,b) => a.date.localeCompare(b.date))
+      .slice(0, 20)
+      .map(ev => ({
+        date:     ev.date,
+        bank:     ev.bank,
+        decision: ev.event,
+        color:    bankColor(ev.bank),
+        flag:     bankFlag(ev.bank),
+        actual:   ev.actual,
+        estimate: ev.estimate,
+      }));
+    upcoming = liveEvents;
+    const pastLive = fmpCalendarEvents
+      .filter(ev => { const d = new Date(ev.date); return d < new Date() && d >= new Date(Date.now() - 90*864e5); })
+      .sort((a,b) => b.date.localeCompare(a.date)).slice(0, 8)
+      .map(ev => ({ date:ev.date, bank:ev.bank, decision:ev.event, color:bankColor(ev.bank), flag:bankFlag(ev.bank) }));
+    past3m = pastLive;
+  } else {
+    // Fall back to official published schedules
+    calendarSource = 'Official CB Schedules';
+    const allHardcoded = [
+      ...FOMC_DATES_2025_26.map(e => ({ ...e, bank:'Fed', color:'#58a6ff', flag:'🇺🇸' })),
+      ...ECB_DATES_2025_26.map(e  => ({ ...e, bank:'ECB', color:'#3fb950', flag:'🇪🇺' })),
+      ...BOE_DATES_2025_26.map(e  => ({ ...e, bank:'BoE', color:'#d29922', flag:'🇬🇧' })),
+      ...BOJ_DATES_2025_26.map(e  => ({ ...e, bank:'BoJ', color:'#f0883e', flag:'🇯🇵' })),
+    ].sort((a,b) => a.date.localeCompare(b.date));
+    upcoming = allHardcoded.filter(e => e.date >= today).slice(0, 20);
+    past3m   = allHardcoded.filter(e => {
+      const d = new Date(e.date);
+      return d < new Date() && d >= new Date(Date.now() - 90*864e5);
+    }).slice(-8).reverse();
+  }
 
   el.innerHTML = `
     <div class="av-live-badge">● Central Bank Rates &amp; Calendar · ${fredKey?'FRED live rates · ':'Approximate rates · '}Free</div>
@@ -647,8 +738,10 @@ window.macroLoadCentralBanks = async function() {
 
     <div class="mg-footer">
       Rates: ${fredKey?'FRED live':'Approximate (add FRED key for live rates)'}
-      · Calendars: Official central bank published schedules
-    </div>`;
+      · Calendar: ${calendarSource}
+      ${!fmpKey ? ' · <a href="#" onclick="openApiConfig && openApiConfig(\'fmp\');return false" style="color:var(--accent,#58a6ff)">Add FMP key for live calendar ↗</a>' : ''}
+    </div>
+  `;
 };
 
 function nextMeeting(dates) {

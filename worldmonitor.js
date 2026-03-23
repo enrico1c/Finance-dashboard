@@ -399,137 +399,511 @@ function wmMacroInit() {
   wmMacroPredictions();
 }
 
-/* MACRO SIGNALS */
+/* ══════════════════════════════════════════════════════════════════
+   MACRO SIGNALS  — FRED (primary, 12 indicators) + Stooq free fallback
+   ══════════════════════════════════════════════════════════════════ */
 async function wmMacroSignals() {
   const el = document.getElementById('macro-signals');
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching macro signals…');
-  try {
-    const d = await wmBootstrap(['macroSignals']);
-    const signals = d.macroSignals?.signals || d.macroSignals?.data || d.macroSignals || [];
-    const arr = Array.isArray(signals) ? signals : Object.entries(signals).map(([k,v]) => ({ name: k, ...v }));
-    if (!arr.length) { el.innerHTML = wmError('No macro signals available'); return; }
 
-    el.innerHTML = wmLiveBar('Macro signals — economic intelligence') +
-      arr.slice(0, 20).map(s => {
-        const chg = s.change ?? s.delta ?? s.percentChange;
-        const isPos = chg > 0;
-        const trendCls = chg == null ? 'wm-flat' : isPos ? 'wm-up' : 'wm-dn';
-        const arrow = chg == null ? '' : isPos ? '▲' : '▼';
-        return `<div class="wm-macro-row">
-          <div class="wm-macro-label">${wmEsc(s.name || s.indicator || s.key || '')}</div>
-          <div class="wm-macro-val">${wmEsc(s.value != null ? String(s.value) : '—')}</div>
-          ${chg != null ? `<div class="${trendCls} wm-macro-chg">${arrow} ${Math.abs(chg).toFixed(2)}%</div>` : '<div class="wm-flat">—</div>'}
-          ${s.signal ? `<div class="wm-macro-sig">${wmEsc(s.signal)}</div>` : ''}
+  const FRED_SIGNALS = [
+    { id:'FEDFUNDS',     label:'Fed Funds Rate',      unit:'%',    group:'Monetary Policy', yoy:false,
+      desc:'FOMC target rate — central bank policy stance & borrowing cost benchmark',
+      sig:(v,p)=> v>p?{t:'TIGHTENING',c:'wm-dn',i:'🔺'}:v<p?{t:'EASING',c:'wm-up',i:'🔻'}:{t:'ON HOLD',c:'wm-flat',i:'→'} },
+    { id:'DGS10',        label:'10Y Treasury',        unit:'%',    group:'Rates',           yoy:false,
+      desc:'10-year yield — risk-free rate benchmark & equity valuation discount rate',
+      sig:(v,p)=> v>p?{t:'RISING',c:'wm-dn',i:'▲'}:v<p?{t:'FALLING',c:'wm-up',i:'▼'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+    { id:'T10Y2Y',       label:'10Y−2Y Spread',       unit:'%',    group:'Rates',           yoy:false,
+      desc:'Yield curve slope — inversion historically precedes recession by 12–18 months',
+      sig:(v)=> v<0?{t:'INVERTED ⚠',c:'wm-dn',i:'⚠'}:v<0.5?{t:'FLAT',c:'wm-warn',i:'▬'}:{t:'NORMAL',c:'wm-up',i:'✓'} },
+    { id:'T10YIE',       label:'Breakeven Inflation', unit:'%',    group:'Inflation',       yoy:false,
+      desc:'TIPS-implied 10Y inflation expectations — what bond market forecasts for CPI',
+      sig:(v)=> v>3?{t:'HIGH EXPECTED',c:'wm-dn',i:'🔥'}:v>2.2?{t:'ABOVE 2% TARGET',c:'wm-warn',i:'⚠'}:{t:'ANCHORED',c:'wm-up',i:'✓'} },
+    { id:'CPIAUCSL',     label:'CPI YoY',             unit:'%',    group:'Inflation',       yoy:true,
+      desc:'Consumer Price Index year-over-year — headline inflation measurement',
+      sig:(v)=> v>4?{t:'HIGH INFLATION',c:'wm-dn',i:'🔥'}:v>2.5?{t:'ELEVATED',c:'wm-warn',i:'⚠'}:{t:'NEAR TARGET',c:'wm-up',i:'✓'} },
+    { id:'UNRATE',       label:'Unemployment',        unit:'%',    group:'Labor Market',    yoy:false,
+      desc:'U.S. unemployment rate — lagging indicator of overall economic health',
+      sig:(v,p)=> v>p+0.3?{t:'DETERIORATING',c:'wm-dn',i:'📈'}:v<4.5?{t:'STRONG',c:'wm-up',i:'💪'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+    { id:'ICSA',         label:'Initial Claims',      unit:'K/wk', group:'Labor Market',    yoy:false, scale:0.001,
+      desc:'Weekly initial jobless claims — leading indicator of labor market direction',
+      sig:(v,p)=> v>p*1.2?{t:'RISING FAST',c:'wm-dn',i:'📈'}:v>p*1.05?{t:'RISING',c:'wm-warn',i:'▲'}:v<p*0.9?{t:'FALLING',c:'wm-up',i:'📉'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+    { id:'VIXCLS',       label:'VIX',                 unit:'pts',  group:'Market Risk',     yoy:false,
+      desc:'CBOE Volatility Index — market fear gauge. >30 = high stress, <15 = complacency',
+      sig:(v)=> v>30?{t:'HIGH FEAR',c:'wm-dn',i:'😱'}:v>20?{t:'ELEVATED',c:'wm-warn',i:'⚠'}:v<15?{t:'COMPLACENT',c:'wm-warn',i:'😴'}:{t:'NORMAL',c:'wm-up',i:'😊'} },
+    { id:'DCOILWTICO',   label:'WTI Crude Oil',       unit:'$/bbl',group:'Market Risk',     yoy:false,
+      desc:'West Texas Intermediate crude — energy cost driver & inflation input',
+      sig:(v,p)=> v>p*1.1?{t:'SURGING',c:'wm-dn',i:'🔺'}:v<p*0.9?{t:'FALLING',c:'wm-up',i:'🔻'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+    { id:'UMCSENT',      label:'Consumer Sentiment',  unit:'idx',  group:'Sentiment',       yoy:false,
+      desc:'U. Michigan Consumer Sentiment — household confidence & spending outlook',
+      sig:(v,p)=> v>80?{t:'CONFIDENT',c:'wm-up',i:'😊'}:v<60?{t:'PESSIMISTIC',c:'wm-dn',i:'😟'}:v>p?{t:'IMPROVING',c:'wm-up',i:'↑'}:{t:'DECLINING',c:'wm-dn',i:'↓'} },
+    { id:'BAMLH0A0HYM2', label:'HY OAS Spread',       unit:'bps',  group:'Credit',          yoy:false,
+      desc:'High-yield credit option-adjusted spread — risk appetite & default risk proxy',
+      sig:(v)=> v>600?{t:'CREDIT STRESS',c:'wm-dn',i:'⚠'}:v>450?{t:'ELEVATED',c:'wm-warn',i:'▲'}:v<300?{t:'VERY TIGHT',c:'wm-warn',i:'⬇'}:{t:'NORMAL',c:'wm-up',i:'✓'} },
+    { id:'M2SL',         label:'M2 Money Supply YoY', unit:'%',    group:'Liquidity',       yoy:true,
+      desc:'M2 monetary aggregate growth — systemic liquidity & monetary condition proxy',
+      sig:(v)=> v>10?{t:'EXPANDING',c:'wm-up',i:'💧'}:v<-2?{t:'CONTRACTING',c:'wm-dn',i:'🔥'}:{t:'MODERATE',c:'wm-flat',i:'→'} },
+  ];
+
+  const fmtNum = (v, unit) => {
+    if (unit === '%')     return v.toFixed(2) + '%';
+    if (unit === 'K/wk') return v.toFixed(0) + 'K';
+    if (unit === '$/bbl') return '$' + v.toFixed(2);
+    if (unit === 'bps')  return Math.round(v) + ' bps';
+    if (v >= 100)        return Math.round(v).toLocaleString();
+    return v.toFixed(2);
+  };
+
+  const spark = (vals, pos) => {
+    if (!vals || vals.length < 2) return '';
+    const rev = [...vals].reverse();
+    const mn = Math.min(...rev), mx = Math.max(...rev), rng = mx - mn || 1;
+    const w = 60, h = 18;
+    const pts = rev.map((v,i) => `${(i/(rev.length-1)*w).toFixed(1)},${(h-(v-mn)/rng*(h-2)-1).toFixed(1)}`).join(' ');
+    const col = pos ? '#3fb950' : '#f85149';
+    return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  };
+
+  const fredKey = (window._KEYS && window._KEYS['fred']) || localStorage.getItem('finterm_key_fred') || '';
+
+  if (!fredKey) {
+    // Free fallback: Stooq data for key market indicators (no API key needed)
+    const FREE_SIGNALS = [
+      { sym:'^vix',  label:'VIX',              unit:'pts',   group:'Risk',     emoji:'😱',
+        desc:'CBOE Volatility Index — market fear gauge (>30 = high stress)',
+        sig:(v,p)=> v>30?{t:'HIGH FEAR',c:'wm-dn',i:'😱'}:v>20?{t:'ELEVATED',c:'wm-warn',i:'⚠'}:{t:'CALM',c:'wm-up',i:'😊'} },
+      { sym:'cl.f',  label:'WTI Crude Oil',    unit:'$/bbl', group:'Commodities', emoji:'🛢️',
+        desc:'West Texas Intermediate crude oil — global energy benchmark',
+        sig:(v,p)=> v>p*1.05?{t:'RISING',c:'wm-warn',i:'🔺'}:v<p*0.95?{t:'FALLING',c:'wm-up',i:'🔻'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+      { sym:'gc.f',  label:'Gold',             unit:'$/oz',  group:'Risk',     emoji:'🥇',
+        desc:'Gold futures — flight-to-safety demand & inflation hedge',
+        sig:(v,p)=> v>p*1.02?{t:'RISING',c:'wm-up',i:'▲'}:v<p*0.98?{t:'FALLING',c:'wm-dn',i:'▼'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+      { sym:'ng.f',  label:'Natural Gas',      unit:'$/mmbtu',group:'Commodities',emoji:'🔥',
+        desc:'Henry Hub natural gas — energy & utility cost driver',
+        sig:(v,p)=> v>p*1.1?{t:'SURGING',c:'wm-dn',i:'🔺'}:v<p*0.9?{t:'FALLING',c:'wm-up',i:'🔻'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+      { sym:'hg.f',  label:'Copper',           unit:'$/lb',  group:'Commodities',emoji:'🔶',
+        desc:'Copper — "Dr. Copper" global growth & industrial demand barometer',
+        sig:(v,p)=> v>p*1.03?{t:'BULLISH (growth)',c:'wm-up',i:'▲'}:v<p*0.97?{t:'BEARISH (slowdown)',c:'wm-dn',i:'▼'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+      { sym:'si.f',  label:'Silver',           unit:'$/oz',  group:'Metals',   emoji:'🥈',
+        desc:'Silver — industrial + monetary metal, higher beta than gold',
+        sig:(v,p)=> v>p?{t:'RISING',c:'wm-up',i:'▲'}:v<p?{t:'FALLING',c:'wm-dn',i:'▼'}:{t:'STABLE',c:'wm-flat',i:'→'} },
+    ];
+
+    let html = wmLiveBar('Macro Market Signals', 'Stooq free data · 6 indicators') +
+      `<div style="padding:6px 10px 8px;margin-bottom:8px;background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.2);border-radius:4px;font-size:11px;color:#ffa500">
+        🔑 <a href="#" onclick="openApiConfig('fred');return false" style="color:var(--accent)">Add your free FRED key</a>
+        for the full 12-indicator dashboard: CPI, Unemployment, Yield Curve, Consumer Sentiment, HY Spreads, M2 and more.
+      </div>`;
+
+    const results = await Promise.allSettled(FREE_SIGNALS.map(async s => {
+      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${s.sym}&i=d`)}`;
+      const res   = await fetch(proxy, { signal: AbortSignal.timeout(9000) });
+      const text  = await res.text();
+      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+      if (lines.length < 2) throw new Error('no data');
+      const last = lines[lines.length-1].split(','), prev = lines[lines.length-2].split(',');
+      const vals = lines.slice(-8).map(l => +l.split(',')[4]).filter(v => !isNaN(v) && v > 0);
+      const cur = +last[4], prv = +prev[4];
+      if (!cur) throw new Error('zero price');
+      return { ...s, cur, prv, date: last[0], vals, chgPct: ((cur-prv)/prv)*100 };
+    }));
+
+    const groups = {};
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      const s = r.value;
+      const sig = s.sig(s.cur, s.prv);
+      if (!groups[s.group]) groups[s.group] = [];
+      groups[s.group].push({ ...s, sig });
+    }
+
+    for (const [grp, items] of Object.entries(groups)) {
+      html += `<div class="wm-sig-group">${grp}</div>`;
+      for (const s of items) {
+        const pos = s.chgPct >= 0;
+        html += `<div class="wm-macro-row wm-sig-row">
+          <div class="wm-sig-icon">${s.sig.i}</div>
+          <div class="wm-sig-info">
+            <div class="wm-macro-label">${wmEsc(s.label)}</div>
+            <div class="wm-sig-desc">${wmEsc(s.desc)}</div>
+          </div>
+          <div class="wm-sig-vals">
+            <div class="wm-macro-val">${wmEsc(fmtNum(s.cur, s.unit))}</div>
+            <div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${pos?'+':''}${s.chgPct.toFixed(2)}%</div>
+            <div class="wm-sig-spark">${spark(s.vals, pos)}</div>
+          </div>
+          <div class="wm-sig-badge ${s.sig.c}">${s.sig.t}</div>
         </div>`;
-      }).join('');
+      }
+    }
+    el.innerHTML = html;
+    return;
+  }
+
+  // Full FRED dashboard
+  try {
+    const fetches = await Promise.allSettled(FRED_SIGNALS.map(async s => {
+      const limit = s.yoy ? 16 : 6;
+      const obs = await fredFetch(s.id, { limit });
+      return { ...s, obs };
+    }));
+
+    const groups = {};
+    for (const r of fetches) {
+      if (r.status !== 'fulfilled') continue;
+      const { obs, yoy, scale=1, group, sig, label, unit, desc } = r.value;
+      if (!obs?.length) continue;
+      let vals = obs.map(o => parseFloat(o.value) * scale).filter(v => !isNaN(v));
+      let cur = vals[0], prev = vals[1] ?? cur;
+      if (yoy && vals.length >= 13) {
+        const toYoy = i => ((vals[i] - vals[i+12]) / Math.abs(vals[i+12])) * 100;
+        vals = vals.slice(0, 13).map((_,i) => i+12 < vals.length ? toYoy(i) : null).filter(v => v !== null);
+        cur = vals[0]; prev = vals[1] ?? cur;
+      }
+      const signal  = sig(cur, prev);
+      const chgAbs  = cur - prev;
+      const chgPct  = prev !== 0 ? (chgAbs / Math.abs(prev)) * 100 : 0;
+      const fmtCur  = fmtNum(cur, unit);
+      const fmtChg  = `${chgAbs >= 0 ? '+' : ''}${unit === 'bps' ? Math.round(chgAbs) : chgAbs.toFixed(2)} ${unit}`;
+      if (!groups[group]) groups[group] = [];
+      groups[group].push({ label, desc, unit, fmtCur, fmtChg, chgAbs, signal, vals: vals.slice(0,8), date: obs[0].date });
+    }
+
+    const all  = Object.values(groups).flat();
+    const nBull = all.filter(s => s.signal.c === 'wm-up').length;
+    const nBear = all.filter(s => s.signal.c === 'wm-dn').length;
+    const nWarn = all.filter(s => s.signal.c === 'wm-warn').length;
+    let html = wmLiveBar('Macro Economic Signals — FRED live data', `${all.length} indicators`);
+    html += `<div class="wm-sig-summary">
+      <span class="wm-up">▲ ${nBull} Bullish</span>
+      <span class="wm-warn">⚠ ${nWarn} Caution</span>
+      <span class="wm-dn">▼ ${nBear} Bearish</span>
+      <span class="wm-flat">→ ${all.length - nBull - nBear - nWarn} Neutral</span>
+    </div>`;
+
+    for (const [grp, items] of Object.entries(groups)) {
+      html += `<div class="wm-sig-group">${grp}</div>`;
+      for (const s of items) {
+        const pos = s.chgAbs >= 0;
+        html += `<div class="wm-macro-row wm-sig-row">
+          <div class="wm-sig-icon">${s.signal.i}</div>
+          <div class="wm-sig-info">
+            <div class="wm-macro-label">${wmEsc(s.label)}</div>
+            <div class="wm-sig-desc">${wmEsc(s.desc)}</div>
+          </div>
+          <div class="wm-sig-vals">
+            <div class="wm-macro-val">${wmEsc(s.fmtCur)}</div>
+            <div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${wmEsc(s.fmtChg)}</div>
+            <div class="wm-sig-spark">${spark(s.vals, pos)}</div>
+          </div>
+          <div class="wm-sig-badge ${s.signal.c}">${s.signal.t}</div>
+          <div class="wm-sig-date">${wmEsc(s.date)}</div>
+        </div>`;
+      }
+    }
+    el.innerHTML = html;
   } catch(e) {
-    el.innerHTML = wmError(e.message);
+    el.innerHTML = wmError('Macro signals error: ' + e.message);
   }
 }
 
-/* COMMODITIES from WM */
+/* ══════════════════════════════════════════════════════════════════
+   MACRO COMMODITIES  — 16 markets via Stooq (free, no API key)
+   Groups: Energy · Metals · Grains · Softs
+   ══════════════════════════════════════════════════════════════════ */
 async function wmMacroCommodities() {
   const el = document.getElementById('macro-comm');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching commodities…');
-  try {
-    const d = await wmBootstrap(['commodityQuotes']);
-    const quotes = d.commodityQuotes?.quotes || d.commodityQuotes?.data || d.commodityQuotes || [];
-    const arr = Array.isArray(quotes) ? quotes : Object.values(quotes);
-    if (!arr.length) { el.innerHTML = wmError('No commodity data available'); return; }
+  el.innerHTML = wmSpinner('Fetching commodity prices…');
 
-    const ts = d.commodityQuotes?.updatedAt || d.commodityQuotes?.timestamp;
-    el.innerHTML = wmLiveBar('Commodity prices', ts ? wmRelTime(ts) : '') +
-      `<div class="wm-comm-grid">` +
-      arr.slice(0, 24).map(q => {
-        const price = q.price ?? q.value ?? q.last ?? q.close;
-        const chg   = q.changePercent ?? q.change_pct ?? q.pctChange ?? q.change;
-        const isPos = chg >= 0;
-        return `<div class="wm-comm-card">
-          <div class="wm-comm-name">${wmEsc(q.name || q.symbol || q.ticker || '')}</div>
-          <div class="wm-comm-price">${price != null ? '$' + Number(price).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</div>
-          ${chg != null ? `<div class="${isPos ? 'wm-up' : 'wm-dn'}">${isPos ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%</div>` : ''}
-          ${q.unit ? `<div class="wm-comm-unit">${wmEsc(q.unit)}</div>` : ''}
-        </div>`;
-      }).join('') + `</div>`;
-  } catch(e) {
-    el.innerHTML = wmError(e.message);
+  const COMMS = [
+    // Energy
+    { sym:'cl.f',  label:'WTI Crude',     unit:'$/bbl',   group:'⚡ Energy',    emoji:'🛢️' },
+    { sym:'ng.f',  label:'Natural Gas',   unit:'$/mmbtu', group:'⚡ Energy',    emoji:'🔥' },
+    { sym:'ho.f',  label:'Heating Oil',   unit:'$/gal',   group:'⚡ Energy',    emoji:'⛽' },
+    { sym:'rb.f',  label:'RBOB Gasoline', unit:'$/gal',   group:'⚡ Energy',    emoji:'⛽' },
+    // Metals
+    { sym:'gc.f',  label:'Gold',          unit:'$/oz',    group:'🔩 Metals',    emoji:'🥇' },
+    { sym:'si.f',  label:'Silver',        unit:'$/oz',    group:'🔩 Metals',    emoji:'🥈' },
+    { sym:'hg.f',  label:'Copper',        unit:'$/lb',    group:'🔩 Metals',    emoji:'🔶' },
+    { sym:'pl.f',  label:'Platinum',      unit:'$/oz',    group:'🔩 Metals',    emoji:'⬜' },
+    { sym:'pa.f',  label:'Palladium',     unit:'$/oz',    group:'🔩 Metals',    emoji:'🔲' },
+    // Grains
+    { sym:'w.f',   label:'Wheat',         unit:'¢/bu',    group:'🌾 Grains',    emoji:'🌾' },
+    { sym:'c.f',   label:'Corn',          unit:'¢/bu',    group:'🌾 Grains',    emoji:'🌽' },
+    { sym:'s.f',   label:'Soybeans',      unit:'¢/bu',    group:'🌾 Grains',    emoji:'🫘' },
+    // Softs
+    { sym:'kc.f',  label:'Coffee',        unit:'¢/lb',    group:'☕ Softs',     emoji:'☕' },
+    { sym:'sb.f',  label:'Sugar',         unit:'¢/lb',    group:'☕ Softs',     emoji:'🍬' },
+    { sym:'ct.f',  label:'Cotton',        unit:'¢/lb',    group:'☕ Softs',     emoji:'🌿' },
+    { sym:'cc.f',  label:'Cocoa',         unit:'$/mt',    group:'☕ Softs',     emoji:'🍫' },
+  ];
+
+  const fmtPrice = (v, unit) => {
+    if (unit.startsWith('¢')) return v.toFixed(2) + '¢';
+    return '$' + v.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  };
+
+  const results = await Promise.allSettled(COMMS.map(async s => {
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${s.sym}&i=d`)}`;
+    const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+    const text  = await res.text();
+    const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+    if (lines.length < 2) throw new Error('no data');
+    const last  = lines[lines.length-1].split(',');
+    const prev  = lines[lines.length-2].split(',');
+    const cur = +last[4], prv = +prev[4];
+    if (!cur || !prv) throw new Error('zero price');
+    const chgPct = ((cur - prv) / prv) * 100;
+    const chgAbs = cur - prv;
+    return { ...s, cur, prv, chgPct, chgAbs, date: last[0] };
+  }));
+
+  const groups = {};
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    const s = r.value;
+    if (!groups[s.group]) groups[s.group] = [];
+    groups[s.group].push(s);
   }
+
+  const total = Object.values(groups).flat().length;
+  const rising = Object.values(groups).flat().filter(s => s.chgPct > 0).length;
+  const falling = total - rising;
+  let html = wmLiveBar('Commodity Prices — Stooq live data', `${total} markets · ${rising} ▲ rising · ${falling} ▼ falling`);
+
+  for (const [grp, items] of Object.entries(groups)) {
+    html += `<div class="wm-sig-group">${grp}</div><div class="wm-comm-grid">`;
+    for (const s of items) {
+      const pos = s.chgPct >= 0;
+      const pctStr = `${pos?'▲':'▼'} ${Math.abs(s.chgPct).toFixed(2)}%`;
+      html += `<div class="wm-comm-card ${pos?'wm-comm-pos':'wm-comm-neg'}">
+        <div class="wm-comm-emoji">${s.emoji}</div>
+        <div class="wm-comm-name">${wmEsc(s.label)}</div>
+        <div class="wm-comm-price">${wmEsc(fmtPrice(s.cur, s.unit))}</div>
+        <div class="${pos?'wm-up':'wm-dn'} wm-comm-chg">${pctStr}</div>
+        <div class="wm-comm-unit">${wmEsc(s.unit)}</div>
+        <div class="wm-comm-date">${wmEsc(s.date)}</div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  el.innerHTML = html || wmEmpty('No commodity data returned from Stooq');
 }
 
-/* RISK SCORES */
+/* ══════════════════════════════════════════════════════════════════
+   MACRO RISK  — World Bank Political Stability & Absence of Violence
+   Indicator: PV.EST  Range: -2.5 (unstable) to +2.5 (stable)
+   Converted to instability index 0-100 (0 = stable, 100 = unstable)
+   ══════════════════════════════════════════════════════════════════ */
 async function wmMacroRisk() {
   const el = document.getElementById('macro-risk');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching risk scores…');
+  el.innerHTML = wmSpinner('Fetching country risk scores…');
+
+  // ISO-3 codes for broad country coverage
+  const COUNTRIES = 'US;CN;RU;DE;GB;FR;JP;IN;BR;ZA;NG;EG;TR;SA;IR;UA;IL;PK;VE;MM;LY;SY;AF;ET;AZ;BY;KZ;MX;SD;SO;CD;DZ;IQ;YE;LB;CU;KP';
+  const ISO3_TO_2 = {
+    USA:'US',CHN:'CN',RUS:'RU',DEU:'DE',GBR:'GB',FRA:'FR',JPN:'JP',IND:'IN',BRA:'BR',ZAF:'ZA',
+    NGA:'NG',EGY:'EG',TUR:'TR',SAU:'SA',IRN:'IR',UKR:'UA',ISR:'IL',PAK:'PK',VEN:'VE',MMR:'MM',
+    LBY:'LY',SYR:'SY',AFG:'AF',ETH:'ET',AZE:'AZ',BLR:'BY',KAZ:'KZ',MEX:'MX',SDN:'SD',SOM:'SO',
+    COD:'CD',DZA:'DZ',IRQ:'IQ',YEM:'YE',LBN:'LB',CUB:'CU',PRK:'KP',
+  };
+  const FLAGS = {
+    US:'🇺🇸',CN:'🇨🇳',RU:'🇷🇺',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',JP:'🇯🇵',IN:'🇮🇳',BR:'🇧🇷',ZA:'🇿🇦',
+    NG:'🇳🇬',EG:'🇪🇬',TR:'🇹🇷',SA:'🇸🇦',IR:'🇮🇷',UA:'🇺🇦',IL:'🇮🇱',PK:'🇵🇰',VE:'🇻🇪',MM:'🇲🇲',
+    LY:'🇱🇾',SY:'🇸🇾',AF:'🇦🇫',ET:'🇪🇹',AZ:'🇦🇿',BY:'🇧🇾',KZ:'🇰🇿',MX:'🇲🇽',SD:'🇸🇩',SO:'🇸🇴',
+    CD:'🇨🇩',DZ:'🇩🇿',IQ:'🇮🇶',YE:'🇾🇪',LB:'🇱🇧',CU:'🇨🇺',KP:'🇰🇵',
+  };
+
   try {
-    const d = await wmBootstrap(['riskScores']);
-    const raw    = d.riskScores?.scores || d.riskScores?.data || d.riskScores || {};
-    const scores = Array.isArray(raw) ? raw :
-      Object.entries(raw).map(([k,v]) => typeof v === 'object' ? { country: k, ...v } : { country: k, score: v });
+    const url  = `https://api.worldbank.org/v2/country/${COUNTRIES}/indicator/PV.EST?format=json&mrv=1&per_page=60`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`World Bank API ${res.status}`);
+    const json = await res.json();
+    const raw  = Array.isArray(json[1]) ? json[1] : [];
 
-    if (!scores.length) { el.innerHTML = wmError('No risk scores available'); return; }
+    const scores = raw
+      .filter(d => d.value !== null && d.countryiso3code)
+      .map(d => {
+        const iso2 = ISO3_TO_2[d.countryiso3code] || d.countryiso3code.slice(0,2);
+        const wb   = parseFloat(d.value); // -2.5 to +2.5
+        return {
+          code:        d.countryiso3code,
+          iso2,
+          country:     d.country?.value || d.countryiso3code,
+          wbScore:     wb,
+          instability: Math.min(100, Math.max(0, ((-wb + 2.5) / 5) * 100)),
+          year:        d.date,
+          flag:        FLAGS[iso2] || '🌍',
+        };
+      })
+      .sort((a,b) => b.instability - a.instability);
 
-    scores.sort((a,b) => (b.score ?? b.value ?? 0) - (a.score ?? a.value ?? 0));
+    if (!scores.length) { el.innerHTML = wmEmpty('No World Bank data available'); return; }
 
-    el.innerHTML = wmLiveBar('Country instability index — risk scores') +
-      scores.slice(0, 25).map(s => {
-        const score = s.score ?? s.value ?? s.cii ?? 0;
-        const pct   = Math.min(100, Math.max(0, score));
-        const level = pct >= 75 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low';
-        const col   = wmSeverityColor(level);
-        return `<div class="wm-risk-row">
-          <span class="wm-risk-country">${wmEsc(s.country || s.code || s.name || '')}</span>
+    const yr = scores[0]?.year || '';
+    let html = wmLiveBar('Country Political Stability Risk — World Bank WGI', `${scores.length} countries · data year ${yr}`);
+    html += `<div style="padding:4px 10px 10px;font-size:11px;color:var(--muted)">
+      World Bank Political Stability & Absence of Violence/Terrorism (PV.EST).
+      Bar = instability index 0–100 (0 = very stable · 100 = very unstable). Score in parentheses = original WB value (−2.5 to +2.5).
+    </div>`;
+
+    const TIERS = [
+      { label:'🔴 Critical Risk (75–100)', min:75, max:101 },
+      { label:'🟠 High Risk (50–74)',       min:50, max:75  },
+      { label:'🟡 Moderate Risk (25–49)',   min:25, max:50  },
+      { label:'🟢 Low Risk (0–24)',          min:0,  max:25  },
+    ];
+
+    for (const tier of TIERS) {
+      const items = scores.filter(s => s.instability >= tier.min && s.instability < tier.max);
+      if (!items.length) continue;
+      html += `<div class="wm-sig-group">${tier.label} — ${items.length} countries</div>`;
+      for (const s of items) {
+        const pct = Math.round(s.instability);
+        const col = pct >= 75 ? '#ff4757' : pct >= 50 ? '#ffa500' : pct >= 25 ? '#e0c040' : '#00d4a0';
+        const sign = s.wbScore >= 0 ? '+' : '';
+        html += `<div class="wm-risk-row">
+          <span class="wm-risk-flag">${s.flag}</span>
+          <span class="wm-risk-country">${wmEsc(s.country)}</span>
           <div class="wm-risk-bar-wrap">
-            <div class="wm-risk-bar" style="width:${pct}%;background:${col.text}"></div>
+            <div class="wm-risk-bar" style="width:${pct}%;background:${col}"></div>
           </div>
-          <span class="wm-risk-score" style="color:${col.text}">${Math.round(pct)}</span>
+          <span class="wm-risk-score" style="color:${col}">${pct}</span>
+          <span class="wm-risk-raw">(${sign}${s.wbScore.toFixed(2)})</span>
         </div>`;
-      }).join('');
+      }
+    }
+
+    el.innerHTML = html;
   } catch(e) {
-    el.innerHTML = wmError(e.message);
+    el.innerHTML = wmError('Country risk data unavailable: ' + e.message);
   }
 }
 
-/* PREDICTION MARKETS */
+/* ══════════════════════════════════════════════════════════════════
+   MACRO PREDICTIONS  — Polymarket Gamma API (free, no key)
+   Fallback: Metaculus community forecasts
+   ══════════════════════════════════════════════════════════════════ */
 async function wmMacroPredictions() {
   const el = document.getElementById('macro-pred');
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching prediction markets…');
-  try {
-    const d = await wmBootstrap(['predictions']);
-    const preds = d.predictions?.predictions || d.predictions?.markets || d.predictions?.data || d.predictions || [];
-    const arr = Array.isArray(preds) ? preds : Object.values(preds);
-    if (!arr.length) { el.innerHTML = wmError('No prediction market data'); return; }
 
-    const ts = d.predictions?.updatedAt || d.predictions?.timestamp;
-    el.innerHTML = wmLiveBar('Prediction markets (Polymarket)', ts ? wmRelTime(ts) : '') +
-      arr.slice(0, 15).map(p => {
-        const prob  = p.probability ?? p.yes ?? p.yesPrice ?? p.outcome_probability;
-        const pct   = prob != null ? (prob <= 1 ? Math.round(prob * 100) : Math.round(prob)) : null;
-        const title = p.question || p.title || p.market || '';
-        const cat   = p.category || p.type || '';
-        const level = pct != null ? (pct >= 70 ? 'critical' : pct >= 40 ? 'high' : 'medium') : 'low';
-        const col   = wmSeverityColor(level);
-        return `<div class="wm-pred-row">
-          <div class="wm-pred-q">${wmEsc(title)}</div>
-          <div class="wm-pred-meta">
-            ${cat ? `<span class="wm-pred-cat">${wmEsc(cat)}</span>` : ''}
-            ${p.volume ? `<span>Vol $${Number(p.volume).toLocaleString()}</span>` : ''}
-            ${p.endDate ? `<span>Ends ${wmEsc(new Date(p.endDate).toLocaleDateString('en-GB', {day:'numeric',month:'short'}))}</span>` : ''}
-          </div>
-          ${pct != null ? `<div class="wm-pred-prob">
-            <div class="wm-pred-bar-bg">
-              <div class="wm-pred-bar-fill" style="width:${pct}%;background:${col.text}"></div>
-            </div>
-            <span class="wm-pred-pct" style="color:${col.text}">${pct}%</span>
-          </div>` : ''}
-        </div>`;
-      }).join('');
-  } catch(e) {
-    el.innerHTML = wmError(e.message);
+  let markets = [], source = 'Polymarket';
+  try {
+    // Try Polymarket Gamma API first
+    const res  = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=50', {
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) throw new Error(`Polymarket ${res.status}`);
+    const data = await res.json();
+    const raw  = Array.isArray(data) ? data : (data.markets || data.data || []);
+
+    markets = raw
+      .filter(m => m.question || m.title)
+      .map(m => {
+        let prob = null;
+        if (m.outcomePrices) {
+          try {
+            const arr = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
+            prob = parseFloat(arr[0]);
+          } catch {}
+        }
+        if (prob == null && m.tokens?.length) prob = parseFloat(m.tokens[0].price);
+        if (prob == null && m.probability != null) prob = parseFloat(m.probability);
+        if (prob != null && prob <= 1) prob = Math.round(prob * 100);
+        else if (prob != null) prob = Math.round(prob);
+        return {
+          question: m.question || m.title || '',
+          prob,
+          volume:   m.volume ?? m.volumeNum ?? null,
+          volume24h: m.volume24hr ?? m.volume24h ?? null,
+          endDate:  m.endDate || m.end_date_iso || null,
+          category: m.groupItemTitle || m.category || 'General',
+          url:      null,
+        };
+      })
+      .filter(m => m.question)
+      .sort((a,b) => (b.volume||0) - (a.volume||0));
+
+  } catch {
+    // Fallback: Metaculus
+    source = 'Metaculus';
+    try {
+      const res2 = await fetch('https://www.metaculus.com/api2/questions/?format=json&limit=25&order_by=-hotness&status=open&type__in=forecast', {
+        signal: AbortSignal.timeout(9000)
+      });
+      if (!res2.ok) throw new Error('Metaculus unavailable');
+      const data2 = await res2.json();
+      markets = (data2.results || [])
+        .filter(q => q.community_prediction?.q2 != null)
+        .map(q => ({
+          question: q.title || q.question?.title || '',
+          prob:     Math.round((q.community_prediction.q2) * 100),
+          volume:   q.forecasters_count || null,
+          endDate:  q.close_time || null,
+          category: q.categories?.[0]?.name || 'Forecast',
+          url:      q.page_url || null,
+        }));
+    } catch(e2) {
+      el.innerHTML = wmError('Prediction markets unavailable: ' + e2.message);
+      return;
+    }
   }
+
+  if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
+
+  const cats = [...new Set(markets.map(m => m.category).filter(Boolean))].slice(0, 8);
+  const totalVol = markets.reduce((a,m) => a + (m.volume||0), 0);
+  const volFmtTotal = totalVol >= 1e9 ? '$'+(totalVol/1e9).toFixed(1)+'B' : totalVol >= 1e6 ? '$'+(totalVol/1e6).toFixed(1)+'M' : null;
+
+  let html = wmLiveBar(`Prediction Markets — ${source}`, `${markets.length} active markets${volFmtTotal?' · '+volFmtTotal+' volume':''}`);
+
+  // Category filter chips
+  html += `<div class="wm-pred-cats">
+    <span class="wm-pred-cat-chip wm-pred-active" onclick="wmPredFilter(this,'')">All</span>
+    ${cats.map(c => `<span class="wm-pred-cat-chip" onclick="wmPredFilter(this,'${wmEsc(c)}')">${wmEsc(c)}</span>`).join('')}
+  </div>`;
+
+  html += `<div id="wm-pred-list">`;
+  for (const m of markets.slice(0, 30)) {
+    const pct    = m.prob;
+    const level  = pct != null ? (pct >= 70 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low') : 'low';
+    const col    = wmSeverityColor(level);
+    const volStr = m.volume >= 1e6 ? '$'+(m.volume/1e6).toFixed(1)+'M' :
+                   m.volume >= 1e3 ? '$'+(m.volume/1e3).toFixed(0)+'K' :
+                   m.volume ? '$'+Math.round(m.volume).toLocaleString() : null;
+    const endStr = m.endDate ? new Date(m.endDate).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}) : null;
+    html += `<div class="wm-pred-row" data-cat="${wmEsc(m.category||'')}">
+      <div class="wm-pred-q">${wmEsc(m.question)}</div>
+      <div class="wm-pred-meta">
+        ${m.category ? `<span class="wm-pred-cat">${wmEsc(m.category)}</span>` : ''}
+        ${volStr  ? `<span>💰 ${volStr} vol</span>` : ''}
+        ${endStr  ? `<span>📅 ${endStr}</span>` : ''}
+        ${m.url   ? `<a href="${wmEsc(m.url)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px">↗ open</a>` : ''}
+      </div>
+      ${pct != null ? `<div class="wm-pred-prob">
+        <div class="wm-pred-bar-bg">
+          <div class="wm-pred-bar-fill" style="width:${pct}%;background:${col.text}"></div>
+        </div>
+        <span class="wm-pred-pct" style="color:${col.text}">${pct}% YES</span>
+      </div>` : '<div class="wm-pred-prob"><span style="color:var(--muted);font-size:11px">No probability data</span></div>'}
+    </div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function wmPredFilter(chip, cat) {
+  document.querySelectorAll('.wm-pred-cat-chip').forEach(c => c.classList.remove('wm-pred-active'));
+  if (chip) chip.classList.add('wm-pred-active');
+  document.querySelectorAll('#wm-pred-list .wm-pred-row').forEach(r => {
+    r.style.display = (!cat || r.dataset.cat === cat) ? '' : 'none';
+  });
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -2061,119 +2435,298 @@ async function wmIntelTelegram() {
   }
 }
 
-/* ── ETF Flows  → Macro·Intel FLOWS tab ────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════
+   ETF FLOWS  — Major ETF performance & flow proxy
+   Primary: FMP batch quote (needs key)
+   Fallback: Stooq individual quotes (free, no key)
+   ══════════════════════════════════════════════════════════════════ */
 async function wmMacroEtfFlows() {
   const el = document.getElementById('macro-flows');
   if (!el) return;
-  el.innerHTML = wmSpinner('Loading ETF flow data…');
-  try {
-    const d = await wmBootstrap(['etfFlows']);
-    const raw = d.etfFlows?.data || d.etfFlows || [];
-    const items = Array.isArray(raw) ? raw : Object.values(raw);
+  el.innerHTML = wmSpinner('Loading ETF performance data…');
 
-    if (!items.length) { el.innerHTML = wmEmpty('No ETF flow data available.'); return; }
+  const ETF_LIST = [
+    // Broad market
+    { sym:'SPY',  name:'S&P 500',              cat:'🏛 Broad Market' },
+    { sym:'QQQ',  name:'Nasdaq-100',           cat:'🏛 Broad Market' },
+    { sym:'IWM',  name:'Russell 2000',         cat:'🏛 Broad Market' },
+    { sym:'DIA',  name:'Dow Jones 30',         cat:'🏛 Broad Market' },
+    { sym:'VTI',  name:'Total US Market',      cat:'🏛 Broad Market' },
+    // Sectors
+    { sym:'XLK',  name:'Technology',           cat:'📊 Sector' },
+    { sym:'XLF',  name:'Financials',           cat:'📊 Sector' },
+    { sym:'XLV',  name:'Health Care',          cat:'📊 Sector' },
+    { sym:'XLC',  name:'Comm. Services',       cat:'📊 Sector' },
+    { sym:'XLY',  name:'Consumer Discr.',      cat:'📊 Sector' },
+    { sym:'XLP',  name:'Consumer Staples',     cat:'📊 Sector' },
+    { sym:'XLI',  name:'Industrials',          cat:'📊 Sector' },
+    { sym:'XLE',  name:'Energy',               cat:'📊 Sector' },
+    { sym:'XLU',  name:'Utilities',            cat:'📊 Sector' },
+    { sym:'XLRE', name:'Real Estate',          cat:'📊 Sector' },
+    { sym:'XLB',  name:'Materials',            cat:'📊 Sector' },
+    // Fixed income
+    { sym:'TLT',  name:'20Y+ Treasury',        cat:'🏦 Fixed Income' },
+    { sym:'HYG',  name:'High Yield Corp.',     cat:'🏦 Fixed Income' },
+    { sym:'LQD',  name:'Invest. Grade Corp.',  cat:'🏦 Fixed Income' },
+    { sym:'EMB',  name:'EM Sovereign USD',     cat:'🏦 Fixed Income' },
+    { sym:'SHY',  name:'1-3Y Treasury',        cat:'🏦 Fixed Income' },
+    { sym:'TIP',  name:'TIPS (Infl. Protect)', cat:'🏦 Fixed Income' },
+    // Commodities & alternatives
+    { sym:'GLD',  name:'Gold ETF',             cat:'🔶 Alternatives' },
+    { sym:'SLV',  name:'Silver ETF',           cat:'🔶 Alternatives' },
+    { sym:'USO',  name:'US Oil ETF',           cat:'🔶 Alternatives' },
+    { sym:'VNQ',  name:'US REITs',             cat:'🔶 Alternatives' },
+    { sym:'BITO', name:'Bitcoin ETF',          cat:'🔶 Alternatives' },
+    // International
+    { sym:'EFA',  name:'Intl Developed Mkt',   cat:'🌍 International' },
+    { sym:'EEM',  name:'Emerging Markets',     cat:'🌍 International' },
+    { sym:'VGK',  name:'Europe ETF',           cat:'🌍 International' },
+    { sym:'FXI',  name:'China Large Cap',      cat:'🌍 International' },
+    { sym:'EWJ',  name:'Japan ETF',            cat:'🌍 International' },
+  ];
 
-    // Sort by absolute flow magnitude
-    const sorted = [...items].sort((a,b) => {
-      const af = Math.abs(parseFloat(a.flow || a.netFlow || a.amount || 0));
-      const bf = Math.abs(parseFloat(b.flow || b.netFlow || b.amount || 0));
-      return bf - af;
-    });
+  const meta = Object.fromEntries(ETF_LIST.map(e => [e.sym, e]));
+  let items  = [];
+  const fmpKey = (window._KEYS?.fmp) || localStorage.getItem('finterm_key_fmp') || '';
 
-    let html = wmLiveBar('ETF Institutional Flows', `${sorted.length} funds`);
-    html += '<div class="wm-flows-list">';
+  if (fmpKey) {
+    try {
+      const syms = ETF_LIST.map(e => e.sym).join(',');
+      const res  = await fetch(`https://financialmodelingprep.com/api/v3/quote/${syms}?apikey=${fmpKey}`, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`FMP ${res.status}`);
+      const data = await res.json();
+      items = data
+        .filter(q => q.changesPercentage != null)
+        .map(q => ({
+          sym:     q.symbol,
+          name:    meta[q.symbol]?.name || q.name || q.symbol,
+          cat:     meta[q.symbol]?.cat  || 'Other',
+          price:   q.price,
+          chgPct:  q.changesPercentage,
+          chgAbs:  q.change,
+          volume:  q.volume,
+          avgVol:  q.avgVolume,
+          mktCap:  q.marketCap,
+        }));
+    } catch {}
+  }
 
-    const fmtFlow = v => {
-      const n = parseFloat(v || 0);
-      const abs = Math.abs(n);
-      const fmt = abs >= 1e9 ? (n/1e9).toFixed(2)+'B' : abs >= 1e6 ? (n/1e6).toFixed(1)+'M' : n.toFixed(0);
-      return { fmt, pos: n >= 0 };
-    };
+  // Free Stooq fallback
+  if (!items.length) {
+    const STOOQ_LIST = ETF_LIST.slice(0, 20); // limit for free tier
+    const results = await Promise.allSettled(STOOQ_LIST.map(async e => {
+      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${e.sym.toLowerCase()}.us&i=d`)}`;
+      const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+      const text  = await res.text();
+      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+      if (lines.length < 2) throw new Error('no data');
+      const last = lines[lines.length-1].split(','), prev = lines[lines.length-2].split(',');
+      const price = +last[4], prv = +prev[4];
+      return { ...e, price, chgPct: ((price-prv)/prv)*100, chgAbs: price-prv, volume: +last[5]||0 };
+    }));
+    items = results.filter(r => r.status==='fulfilled').map(r => r.value);
+  }
 
-    for (const f of sorted.slice(0,25)) {
-      const name    = wmEsc(f.name   || f.ticker || f.fund || f.symbol || '');
-      const ticker  = wmEsc(f.ticker || f.symbol || '');
-      const { fmt, pos } = fmtFlow(f.flow || f.netFlow || f.amount);
-      const sector  = wmEsc(f.sector || f.category || f.type || '');
-      const period  = wmEsc(f.period || f.timeframe || '');
+  if (!items.length) { el.innerHTML = wmEmpty('No ETF data available. Add FMP API key for full ETF flow data.'); return; }
+
+  // Sort each category by chgPct desc
+  const catOrder = ['🏛 Broad Market','📊 Sector','🏦 Fixed Income','🔶 Alternatives','🌍 International'];
+  const bycat = {};
+  for (const f of items) {
+    if (!bycat[f.cat]) bycat[f.cat] = [];
+    bycat[f.cat].push(f);
+  }
+  for (const c of Object.keys(bycat)) bycat[c].sort((a,b) => b.chgPct - a.chgPct);
+
+  // Summary
+  const rising  = items.filter(f => f.chgPct > 0).length;
+  const falling = items.filter(f => f.chgPct < 0).length;
+  const spy     = items.find(f => f.sym === 'SPY');
+  const tlt     = items.find(f => f.sym === 'TLT');
+  const gld     = items.find(f => f.sym === 'GLD');
+  const riskOn  = spy?.chgPct > 0;
+
+  let html = wmLiveBar('Major ETF Performance — Flow Proxy', `${items.length} ETFs · ${rising} ▲ inflow · ${falling} ▼ outflow`);
+  if (spy || tlt || gld) {
+    html += `<div class="wm-sig-summary">
+      ${spy ? `<span class="${spy.chgPct>=0?'wm-up':'wm-dn'}">SPY ${spy.chgPct>=0?'▲':'▼'}${Math.abs(spy.chgPct).toFixed(2)}%</span>` : ''}
+      ${tlt ? `<span class="${tlt.chgPct>=0?'wm-up':'wm-dn'}">TLT ${tlt.chgPct>=0?'▲':'▼'}${Math.abs(tlt.chgPct).toFixed(2)}%</span>` : ''}
+      ${gld ? `<span class="${gld.chgPct>=0?'wm-up':'wm-dn'}">GLD ${gld.chgPct>=0?'▲':'▼'}${Math.abs(gld.chgPct).toFixed(2)}%</span>` : ''}
+      <span style="color:var(--muted)">${riskOn ? '⚡ Risk-On regime' : '🛡 Risk-Off regime'}</span>
+    </div>`;
+  }
+
+  for (const cat of catOrder) {
+    const catItems = bycat[cat];
+    if (!catItems?.length) continue;
+    html += `<div class="wm-sig-group">${cat}</div><div class="wm-flows-list">`;
+    for (const f of catItems) {
+      const pos    = f.chgPct >= 0;
+      const volFmt = f.volume >= 1e9 ? (f.volume/1e9).toFixed(1)+'B' :
+                     f.volume >= 1e6 ? (f.volume/1e6).toFixed(0)+'M' :
+                     f.volume >= 1e3 ? (f.volume/1e3).toFixed(0)+'K' : null;
+      const rvol   = (f.avgVol > 0) ? (f.volume / f.avgVol).toFixed(1) : null;
       html += `<div class="wm-flows-row">
-        <span class="wm-flows-ticker" ${ticker ? `onclick="if(typeof loadTicker==='function')loadTicker('${ticker}')" style="cursor:pointer"` : ''}>${ticker || name}</span>
-        <span class="wm-flows-name">${name !== ticker ? name : sector}</span>
-        <span class="wm-flows-flow ${pos ? 'wm-pos' : 'wm-neg'}">${pos ? '▲ +' : '▼ '}$${fmt}</span>
-        ${period ? `<span class="wm-flows-period">${period}</span>` : ''}
+        <span class="wm-flows-ticker" onclick="if(typeof loadTicker==='function')loadTicker('${wmEsc(f.sym)}')" style="cursor:pointer">${wmEsc(f.sym)}</span>
+        <span class="wm-flows-name">${wmEsc(f.name)}</span>
+        <span class="wm-flows-flow ${pos?'wm-pos':'wm-neg'}">${pos?'▲':'▼'} ${Math.abs(f.chgPct).toFixed(2)}%</span>
+        ${f.price  ? `<span class="wm-flows-price">$${f.price >= 100 ? f.price.toFixed(2) : f.price.toFixed(2)}</span>` : ''}
+        ${volFmt   ? `<span class="wm-flows-vol">Vol: ${volFmt}${rvol ? ` <span style="color:var(--muted)">(${rvol}×avg)</span>` : ''}</span>` : ''}
       </div>`;
     }
     html += '</div>';
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = wmError('ETF flow data unavailable: ' + e.message);
   }
+  el.innerHTML = html;
 }
 
-/* ── Sector Performance  → Macro·Intel SECTORS tab ─────────────── */
+/* ══════════════════════════════════════════════════════════════════
+   SECTOR PERFORMANCE  — Multi-timeframe heat map
+   Primary:  Alpha Vantage SECTOR (needs AV key) — 8 timeframes
+   Fallback: FMP sectors-performance (needs FMP key) — 1D
+   Last:     Stooq sector ETF quotes (free, no key)
+   ══════════════════════════════════════════════════════════════════ */
 async function wmMacroSectors() {
   const el = document.getElementById('macro-sectors');
   if (!el) return;
-  el.innerHTML = wmSpinner('Loading sector data…');
-  try {
-    const d = await wmBootstrap(['sectors']);
-    const raw = d.sectors?.data || d.sectors || [];
-    const items = Array.isArray(raw) ? raw : Object.values(raw);
+  el.innerHTML = wmSpinner('Loading sector performance…');
 
-    if (!items.length) { el.innerHTML = wmEmpty('No sector data available.'); return; }
+  const SECTOR_ETF = {
+    'Information Technology':'XLK','Technology':'XLK',
+    'Health Care':'XLV','Healthcare':'XLV',
+    'Financials':'XLF','Financial Services':'XLF',
+    'Communication Services':'XLC','Comm. Services':'XLC',
+    'Consumer Discretionary':'XLY','Consumer Disc.':'XLY',
+    'Consumer Staples':'XLP',
+    'Industrials':'XLI',
+    'Energy':'XLE',
+    'Utilities':'XLU',
+    'Real Estate':'XLRE',
+    'Materials':'XLB',
+  };
 
-    // Sort by performance descending
-    const sorted = [...items].sort((a,b) => {
-      const ap = parseFloat(a.change || a.performance || a.change1d || a.changePercent || 0);
-      const bp = parseFloat(b.change || b.performance || b.change1d || b.changePercent || 0);
-      return bp - ap;
-    });
+  let sectors = [], source = '', hasMulti = false;
+  const avKey  = (window._KEYS?.av)  || localStorage.getItem('finterm_key_av')  || '';
+  const fmpKey = (window._KEYS?.fmp) || localStorage.getItem('finterm_key_fmp') || '';
 
-    let html = wmLiveBar('Sector Performance', `${sorted.length} sectors`);
-
-    // Heatmap bar
-    const maxAbs = Math.max(...sorted.map(s => Math.abs(parseFloat(s.change || s.performance || 0))), 1);
-    html += '<div class="wm-sector-heatmap">';
-    for (const s of sorted) {
-      const name = wmEsc(s.name || s.sector || s.label || '');
-      const chg  = parseFloat(s.change || s.performance || s.change1d || 0);
-      const pct  = (chg / maxAbs * 100).toFixed(1);
-      const positive = chg >= 0;
-      const color = positive
-        ? `rgba(76,175,80,${0.2 + Math.abs(chg)/maxAbs * 0.8})`
-        : `rgba(244,67,54,${0.2 + Math.abs(chg)/maxAbs * 0.8})`;
-      const ticker = wmEsc(s.ticker || s.etf || '');
-      html += `<div class="wm-sector-cell" style="background:${color}" 
-          title="${name}: ${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%"
-          ${ticker ? `onclick="if(typeof loadTicker==='function')loadTicker('${ticker}')"` : ''}>
-        <div class="wm-sector-name">${name}</div>
-        <div class="wm-sector-chg ${positive ? 'wm-pos' : 'wm-neg'}">${positive?'+':''}${chg.toFixed(2)}%</div>
-        ${ticker ? `<div class="wm-sector-etf">${ticker}</div>` : ''}
-      </div>`;
-    }
-    html += '</div>';
-
-    // Detailed list
-    html += '<div class="wm-sector-list">';
-    for (const s of sorted) {
-      const name     = wmEsc(s.name || s.sector || '');
-      const chg      = parseFloat(s.change || s.performance || 0);
-      const volume   = s.volume ? wmEsc(String(s.volume)) : null;
-      const mktCap   = s.marketCap ? wmEsc(String(s.marketCap)) : null;
-      const leader   = wmEsc(s.topStock || s.leader || '');
-      const positive = chg >= 0;
-      html += `<div class="wm-sector-row">
-        <span class="wm-sector-row-name">${name}</span>
-        <span class="wm-sector-row-chg ${positive?'wm-pos':'wm-neg'}">${positive?'+':''}${chg.toFixed(2)}%</span>
-        ${leader  ? `<span class="wm-sector-leader">${leader}</span>` : ''}
-        ${volume  ? `<span class="wm-sector-vol">Vol: ${volume}</span>` : ''}
-      </div>`;
-    }
-    html += '</div>';
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = wmError('Sector data unavailable: ' + e.message);
+  // ── Alpha Vantage SECTOR (all timeframes) ──────────────────────
+  if (avKey && !sectors.length) {
+    try {
+      const res  = await fetch(`https://www.alphavantage.co/query?function=SECTOR&apikey=${avKey}`, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`AV ${res.status}`);
+      const data = await res.json();
+      if (data['Note'] || data['Information']) throw new Error('AV rate limit');
+      const pct  = s => parseFloat((s||'0%').replace('%',''));
+      const rt   = data['Rank A: Real-Time Performance']            || {};
+      const d1   = data['Rank B: 1 Day Performance']               || {};
+      const d5   = data['Rank C: 5 Day Performance']               || {};
+      const m1   = data['Rank D: 1 Month Performance']             || {};
+      const m3   = data['Rank E: 3 Month Performance']             || {};
+      const ytd  = data['Rank F: Year-to-Date (YTD) Performance']  || {};
+      const y1   = data['Rank G: 1 Year Performance']              || {};
+      const y3   = data['Rank H: 3 Year Performance']              || {};
+      sectors = Object.keys(rt).map(k => ({
+        name:      k,
+        change1d:  pct(d1[k]  || rt[k]),
+        change5d:  pct(d5[k]),
+        change1m:  pct(m1[k]),
+        change3m:  pct(m3[k]),
+        changeYTD: pct(ytd[k]),
+        change1y:  pct(y1[k]),
+        change3y:  pct(y3[k]),
+        etf: SECTOR_ETF[k] || '',
+      }));
+      source = 'Alpha Vantage'; hasMulti = true;
+    } catch {}
   }
+
+  // ── FMP sectors-performance (1D only) ─────────────────────────
+  if (fmpKey && !sectors.length) {
+    try {
+      const res  = await fetch(`https://financialmodelingprep.com/api/v3/stock/sectors-performance?apikey=${fmpKey}`, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`FMP ${res.status}`);
+      const data = await res.json();
+      const arr  = data.sectorPerformance || (Array.isArray(data) ? data : []);
+      sectors = arr.map(s => ({
+        name:      s.sector,
+        change1d:  parseFloat((s.changesPercentage||'0').replace('%','')),
+        etf: SECTOR_ETF[s.sector] || '',
+      }));
+      source = 'FMP'; hasMulti = false;
+    } catch {}
+  }
+
+  // ── Free Stooq fallback (sector ETF prices) ───────────────────
+  if (!sectors.length) {
+    const STOOQ_SECTS = [
+      {sym:'xlk.us', name:'Information Technology', etf:'XLK'},
+      {sym:'xlf.us', name:'Financials',             etf:'XLF'},
+      {sym:'xlv.us', name:'Health Care',            etf:'XLV'},
+      {sym:'xlc.us', name:'Comm. Services',         etf:'XLC'},
+      {sym:'xly.us', name:'Consumer Discretionary', etf:'XLY'},
+      {sym:'xlp.us', name:'Consumer Staples',       etf:'XLP'},
+      {sym:'xli.us', name:'Industrials',            etf:'XLI'},
+      {sym:'xle.us', name:'Energy',                 etf:'XLE'},
+      {sym:'xlu.us', name:'Utilities',              etf:'XLU'},
+      {sym:'xlre.us',name:'Real Estate',            etf:'XLRE'},
+      {sym:'xlb.us', name:'Materials',              etf:'XLB'},
+    ];
+    const results = await Promise.allSettled(STOOQ_SECTS.map(async s => {
+      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${s.sym}&i=d`)}`;
+      const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+      const text  = await res.text();
+      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
+      if (lines.length < 2) throw new Error('no data');
+      const last = lines[lines.length-1].split(','), prev = lines[lines.length-2].split(',');
+      return { ...s, change1d: ((+last[4] - +prev[4]) / +prev[4]) * 100 };
+    }));
+    sectors = results.filter(r => r.status==='fulfilled').map(r => r.value);
+    source = 'Stooq (free)'; hasMulti = false;
+  }
+
+  if (!sectors.length) {
+    el.innerHTML = wmEmpty('No sector data. Add Alpha Vantage or FMP key for sector performance.');
+    return;
+  }
+
+  const sorted  = [...sectors].sort((a,b) => b.change1d - a.change1d);
+  const maxAbs  = Math.max(...sorted.map(s => Math.abs(s.change1d)), 1);
+  const nUp     = sorted.filter(s => s.change1d > 0).length;
+  const nDn     = sorted.filter(s => s.change1d < 0).length;
+  let html = wmLiveBar('US Sector Performance', `${sorted.length} sectors · ${nUp} ▲ up · ${nDn} ▼ down · ${source}`);
+
+  // Heatmap
+  html += '<div class="wm-sector-heatmap">';
+  for (const s of sorted) {
+    const chg  = s.change1d;
+    const pos  = chg >= 0;
+    const inten = 0.15 + (Math.abs(chg) / maxAbs) * 0.85;
+    const bg   = pos ? `rgba(76,175,80,${inten.toFixed(2)})` : `rgba(244,67,54,${inten.toFixed(2)})`;
+    html += `<div class="wm-sector-cell" style="background:${bg}" title="${wmEsc(s.name)}: ${pos?'+':''}${chg.toFixed(2)}%"
+        ${s.etf ? `onclick="if(typeof loadTicker==='function')loadTicker('${wmEsc(s.etf)}')" style="cursor:pointer"` : ''}>
+      <div class="wm-sector-name">${wmEsc(s.name)}</div>
+      <div class="wm-sector-chg ${pos?'wm-pos':'wm-neg'}">${pos?'+':''}${chg.toFixed(2)}%</div>
+      ${s.etf ? `<div class="wm-sector-etf">${wmEsc(s.etf)}</div>` : ''}
+    </div>`;
+  }
+  html += '</div>';
+
+  // Detailed table
+  const f = v => v == null ? '<span style="color:var(--muted)">—</span>' :
+    `<span class="${v>=0?'wm-pos':'wm-neg'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+  html += `<table class="wm-sector-table"><thead><tr>
+    <th>Sector</th><th>ETF</th><th>1D</th>
+    ${hasMulti ? '<th>5D</th><th>1M</th><th>3M</th><th>YTD</th><th>1Y</th>' : ''}
+  </tr></thead><tbody>`;
+  for (const s of sorted) {
+    html += `<tr>
+      <td>${wmEsc(s.name)}</td>
+      <td>${s.etf ? `<span class="wm-flows-ticker" onclick="if(typeof loadTicker==='function')loadTicker('${wmEsc(s.etf)}')" style="cursor:pointer">${wmEsc(s.etf)}</span>` : '—'}</td>
+      <td>${f(s.change1d)}</td>
+      ${hasMulti ? `<td>${f(s.change5d)}</td><td>${f(s.change1m)}</td><td>${f(s.change3m)}</td><td>${f(s.changeYTD)}</td><td>${f(s.change1y)}</td>` : ''}
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -2966,6 +3519,221 @@ async function frankfurterHistory(base, target, days = 90) {
     el.innerHTML = ``;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   GEO·RISK LIVE DATA — ROUTES / WARS / RESOURCES
+   These three functions replace the static inline arrays in index.html
+   (renderGeoRoutes / renderGeoWars / renderGeoResources) with live
+   WorldMonitor bootstrap data, falling back gracefully to the static
+   versions when WM data is unavailable.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── ROUTES tab: live chokepoints (reuses 'chokepoints' bootstrap key) ── */
+async function wmGeoRoutes() {
+  const el = document.getElementById('georisk-routes-content');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading chokepoint data…');
+  try {
+    // 'chokepoints' key is already fetched by wmSupplyChokepoints() for the
+    // Supply panel — if that ran first this is an instant WM_CACHE hit.
+    const d     = await wmBootstrap(['chokepoints']);
+    const items = d.chokepoints?.chokepoints || d.chokepoints?.data || d.chokepoints || [];
+
+    if (!Array.isArray(items) || !items.length) {
+      // Fall back to static renderGeoRoutes()
+      if (typeof renderGeoRoutes === 'function') renderGeoRoutes();
+      return;
+    }
+
+    el.innerHTML = wmLiveBar('Strategic chokepoints & trade route disruption', `${items.length} monitored`) +
+      items.map(c => {
+        const risk       = c.riskLevel || c.risk_level || c.status || 'unknown';
+        const col        = wmSeverityColor(risk);
+        const disruption = c.disruption_pct ?? c.disruptionPct ?? c.throughputReduction ?? null;
+        const delay      = c.avgDelayDays ?? c.delay_days ?? null;
+        const traffic    = c.dailyVessels || c.vessel_count || null;
+        return `<div class="wm-choke-card" style="border-left:3px solid ${col.border}">
+          <div class="wm-choke-header">
+            <span class="wm-choke-icon">${wmEsc(c.emoji || c.icon || '🌊')}</span>
+            <div class="wm-choke-info">
+              <span class="wm-choke-name">${wmEsc(c.name)}</span>
+              <span class="wm-choke-region">${wmEsc(c.region || c.location || '')}</span>
+            </div>
+            ${wmBadge(risk.toUpperCase(), risk)}
+          </div>
+          <div class="wm-choke-stats">
+            ${disruption != null ? `<span class="wm-stat-chip">📉 ${disruption}% disruption</span>` : ''}
+            ${delay      != null ? `<span class="wm-stat-chip">⏱ +${delay}d delay</span>` : ''}
+            ${traffic    != null ? `<span class="wm-stat-chip">🚢 ${traffic} vessels/day</span>` : ''}
+            ${c.tradePct           ? `<span class="wm-stat-chip">📦 ${c.tradePct}% global trade</span>` : ''}
+          </div>
+          ${c.note || c.description
+            ? `<div class="wm-choke-note">${wmEsc(c.note || c.description)}</div>` : ''}
+          ${c.affectedCommodities?.length
+            ? `<div class="wm-choke-commodities">${c.affectedCommodities.map(x => `<span class="wm-comm-chip">${wmEsc(x)}</span>`).join('')}</div>` : ''}
+          ${c.conflicts?.length
+            ? `<div class="wm-choke-note" style="font-size:9px;opacity:.65">Conflicts: ${c.conflicts.map(wmEsc).join(', ')}</div>` : ''}
+        </div>`;
+      }).join('');
+  } catch(e) {
+    console.warn('[WM] wmGeoRoutes error:', e.message);
+    if (typeof renderGeoRoutes === 'function') renderGeoRoutes();
+  }
+}
+window.wmGeoRoutes = wmGeoRoutes;
+
+/* ── Shared risk-level sorter (mirrors inline riskLevel() in index.html) ── */
+function _wmRiskLevel(r) { return {CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[String(r).toUpperCase()] || 0; }
+
+/* ── WARS tab: live active conflicts ─────────────────────────────────── */
+async function wmGeoWars() {
+  const el = document.getElementById('georisk-wars-content');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading conflict data…');
+  try {
+    const d     = await wmBootstrap(['conflicts']);
+    const items = d.conflicts?.conflicts || d.conflicts?.data || d.conflicts || [];
+
+    if (!Array.isArray(items) || !items.length) {
+      if (typeof renderGeoWars === 'function') renderGeoWars();
+      return;
+    }
+
+    // Cache for RESOURCES tab to reuse without a second fetch
+    window._wmConflicts = items;
+
+    const RISK_COLOR_WM = {
+      CRITICAL: { bg:'rgba(255,71,87,.15)', border:'rgba(255,71,87,.4)', text:'#ff4757' },
+      HIGH:     { bg:'rgba(255,165,0,.12)',  border:'rgba(255,165,0,.35)',  text:'#ffa500' },
+      MEDIUM:   { bg:'rgba(26,107,255,.12)', border:'rgba(26,107,255,.3)',  text:'#3d8bff' },
+      LOW:      { bg:'rgba(0,212,160,.1)',   border:'rgba(0,212,160,.25)',  text:'#00d4a0' },
+    };
+
+    el.innerHTML = wmLiveBar('Live conflict data — WorldMonitor.app', `${items.length} active conflicts`) +
+      items.map(c => {
+        const intensity  = (c.intensity || c.riskLevel || c.severity || 'MEDIUM').toUpperCase();
+        const rc         = RISK_COLOR_WM[intensity] || RISK_COLOR_WM.LOW;
+        const resources  = c.resources || c.commodities || [];
+        const critCount  = resources.filter(r => (r.risk||r.riskLevel||'').toUpperCase() === 'CRITICAL').length;
+        const highCount  = resources.filter(r => (r.risk||r.riskLevel||'').toUpperCase() === 'HIGH').length;
+        const icolor     = rc.text;
+        const flag       = c.flag || c.emoji || '';
+        const flag2      = c.flag2 || c.flag_b || '';
+
+        return `<div class="geo-conflict-card" onclick="this.classList.toggle('geo-expanded')">
+          <div class="geo-conflict-header">
+            <div class="geo-conflict-left">
+              <span class="geo-intensity-dot" style="background:${icolor};box-shadow:0 0 6px ${icolor}"></span>
+              <div>
+                <div class="geo-conflict-name">${wmEsc(flag)} ${wmEsc(flag2)} ${wmEsc(c.name || c.title || '')}</div>
+                <div class="geo-conflict-meta">${wmEsc(c.region || c.location || '')}
+                  ${c.since ? ` &nbsp;·&nbsp; Since ${wmEsc(c.since)}` : ''}
+                  ${c.phase ? ` &nbsp;·&nbsp; ${wmEsc(c.phase)}` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="geo-conflict-right">
+              <span class="geo-badge geo-badge-intensity" style="color:${icolor};border-color:${icolor}40;background:${icolor}15">${intensity}</span>
+              ${critCount > 0 ? `<span class="geo-badge geo-badge-crit">${critCount} CRITICAL</span>` : ''}
+              ${highCount > 0 ? `<span class="geo-badge geo-badge-high">${highCount} HIGH</span>` : ''}
+            </div>
+          </div>
+          <div class="geo-conflict-summary">${wmEsc(c.summary || c.description || '')}</div>
+          <div class="geo-conflict-stats">
+            ${c.casualties ? `<span>💀 ${wmEsc(c.casualties)}</span>` : ''}
+            ${c.displaced  ? `<span>🏚 ${wmEsc(c.displaced)} displaced</span>` : ''}
+            ${c.wm_url     ? `<a href="${wmEsc(c.wm_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="geo-wm-link-small">WorldMonitor ↗</a>` : ''}
+          </div>
+          ${resources.length ? `<div class="geo-resources-mini">
+            ${resources.slice(0,4).map(r => {
+              const rRisk = (r.risk || r.riskLevel || 'LOW').toUpperCase();
+              const rrc   = RISK_COLOR_WM[rRisk] || RISK_COLOR_WM.LOW;
+              return `<span class="geo-res-chip" style="background:${rrc.bg};border-color:${rrc.border};color:${rrc.text}">${wmEsc(r.icon||r.emoji||'⛏')} ${wmEsc(r.name||r.commodity||'')}</span>`;
+            }).join('')}
+            ${resources.length > 4 ? `<span class="geo-res-chip-more">+${resources.length-4} more</span>` : ''}
+          </div>` : ''}
+        </div>`;
+      }).join('');
+  } catch(e) {
+    console.warn('[WM] wmGeoWars error:', e.message);
+    if (typeof renderGeoWars === 'function') renderGeoWars();
+  }
+}
+window.wmGeoWars = wmGeoWars;
+
+/* ── RESOURCES tab: live commodity risk aggregated across conflicts ─── */
+async function wmGeoResources() {
+  const el = document.getElementById('georisk-resources-content');
+  if (!el) return;
+  el.innerHTML = wmSpinner('Loading resource risk data…');
+  try {
+    // Prefer already-cached conflicts from wmGeoWars(); otherwise fetch
+    let items = window._wmConflicts;
+    if (!Array.isArray(items) || !items.length) {
+      const d = await wmBootstrap(['conflicts']);
+      items   = d.conflicts?.conflicts || d.conflicts?.data || d.conflicts || [];
+      if (Array.isArray(items) && items.length) window._wmConflicts = items;
+    }
+
+    if (!Array.isArray(items) || !items.length) {
+      if (typeof renderGeoResources === 'function') renderGeoResources();
+      return;
+    }
+
+    const RISK_COLOR_WM = {
+      CRITICAL: { bg:'rgba(255,71,87,.15)', border:'rgba(255,71,87,.4)', text:'#ff4757' },
+      HIGH:     { bg:'rgba(255,165,0,.12)',  border:'rgba(255,165,0,.35)',  text:'#ffa500' },
+      MEDIUM:   { bg:'rgba(26,107,255,.12)', border:'rgba(26,107,255,.3)',  text:'#3d8bff' },
+      LOW:      { bg:'rgba(0,212,160,.1)',   border:'rgba(0,212,160,.25)',  text:'#00d4a0' },
+    };
+
+    // Flatten all resources across conflicts, deduplicate by name (keep highest risk)
+    const allRes = {};
+    items.forEach(c => {
+      const resources = c.resources || c.commodities || [];
+      resources.forEach(r => {
+        const name    = r.name || r.commodity || '';
+        const rRisk   = (r.risk || r.riskLevel || 'LOW').toUpperCase();
+        const cName   = c.name || c.title || '';
+        const cFlag   = c.flag || c.emoji || '';
+        if (!allRes[name] || _wmRiskLevel(rRisk) > _wmRiskLevel(allRes[name].risk)) {
+          allRes[name] = { ...r, risk: rRisk, conflicts: [cName], conflictFlags: [cFlag] };
+        } else if (allRes[name]) {
+          allRes[name].conflicts.push(cName);
+          allRes[name].conflictFlags.push(cFlag);
+        }
+      });
+    });
+
+    const sorted = Object.values(allRes).sort((a,b) => _wmRiskLevel(b.risk) - _wmRiskLevel(a.risk));
+
+    if (!sorted.length) {
+      if (typeof renderGeoResources === 'function') renderGeoResources();
+      return;
+    }
+
+    el.innerHTML = wmLiveBar('Supply chain disruption risk by commodity') +
+      `<div class="geo-section-head">Critical Commodities at Risk</div>` +
+      sorted.map(r => {
+        const rc = RISK_COLOR_WM[r.risk] || RISK_COLOR_WM.LOW;
+        return `<div class="geo-resource-row" style="border-left:3px solid ${rc.border}">
+          <div class="geo-resource-top">
+            <span class="geo-resource-icon">${wmEsc(r.icon || r.emoji || '⛏')}</span>
+            <div class="geo-resource-info">
+              <span class="geo-resource-name">${wmEsc(r.name || r.commodity || '')}</span>
+              <span class="geo-resource-conflicts">${r.conflictFlags.join(' ')} ${r.conflicts.map(wmEsc).join(', ')}</span>
+            </div>
+            <span class="geo-risk-badge" style="color:${rc.text};background:${rc.bg};border-color:${rc.border}">${r.risk}</span>
+          </div>
+          <div class="geo-resource-note">${wmEsc(r.note || r.description || '')}</div>
+        </div>`;
+      }).join('');
+  } catch(e) {
+    console.warn('[WM] wmGeoResources error:', e.message);
+    if (typeof renderGeoResources === 'function') renderGeoResources();
+  }
+}
+window.wmGeoResources = wmGeoResources;
 
 /* ══════════════════════════════════════════════════════════════════
    EXTEND wmInitAll with all new endpoints

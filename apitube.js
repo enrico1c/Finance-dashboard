@@ -151,11 +151,30 @@ function aptDateFmt(iso) {
   catch(_) { return iso.slice(0,10); }
 }
 
-/* ── CN tab: Financial News ──────────────────────────────────────── */
+/* ── CN tab: Financial News — routes through renderNewsFeed ─────── */
 function apitubeRenderNews(sym, articles) {
-  const cn = document.getElementById("news-cn");
-  if (!cn || !articles?.length) return;
+  if (!articles?.length) return;
 
+  // Primary: use the shared renderNewsFeed pipeline so news always
+  // lands in #news-feed (the visible panel) with full niCard formatting.
+  if (typeof renderNewsFeed === "function") {
+    const normalised = articles.map(a => ({
+      headline:  a.title,
+      source:    a.source,
+      datetime:  a.publishedAt,
+      sentiment: a.sentiment || null,
+      category:  a.category  || null,
+      summary:   a.summary   || "",
+      url:       a.url,
+      image:     a.image     || null,
+    }));
+    renderNewsFeed(sym, normalised, "apitube");
+    return;
+  }
+
+  // Fallback: legacy #news-cn write (kept for safety)
+  const cn = document.getElementById("news-cn");
+  if (!cn) return;
   cn.innerHTML = `
     <div class="av-live-badge">● LIVE — APITube News  <span class="av-ts">${articles.length} articles</span></div>
     <div class="news-list">
@@ -201,10 +220,26 @@ function apitubeRenderVideos(sym, articles) {
     </div>`;
 }
 
-/* ── Topic news (called from searchTopicNews override) ───────────── */
+/* ── Topic news — routes through renderNewsFeed ──────────────────── */
 function apitubeRenderTopicNews(topic, articles) {
+  if (!articles?.length) return;
+  if (typeof renderNewsFeed === "function") {
+    const normalised = articles.map(a => ({
+      headline: a.title,
+      source:   a.source,
+      datetime: a.publishedAt,
+      summary:  a.summary || "",
+      url:      a.url,
+      image:    a.image   || null,
+      category: null,
+      sentiment:null,
+    }));
+    renderNewsFeed(topic, normalised, "apitube");
+    return;
+  }
+  // Fallback legacy
   const cn = document.getElementById("news-cn");
-  if (!cn || !articles?.length) return;
+  if (!cn) return;
   cn.innerHTML = `
     <div class="av-live-badge">● LIVE — APITube · Topic: ${aptEsc(topic)}</div>
     <div class="news-list">

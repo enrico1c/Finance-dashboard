@@ -384,6 +384,13 @@ function fredLazyEcon() {
 document.addEventListener('DOMContentLoaded', () => {
   // Only load if key already exists — otherwise wait for saveKey callback
   if (getFredKey()) fredInitAll();
+  // Always fetch TreasuryDirect (no key required) to populate window._treasuryYields
+  // for the WACC risk-free rate — runs silently in background
+  setTimeout(() => {
+    if (typeof fredLoadTreasuryDirect === 'function') {
+      fredLoadTreasuryDirect().catch(() => {});
+    }
+  }, 3000); // 3s delay — after page fully settles, non-blocking
   // Refresh every 30 min
   setInterval(() => {
     if (!getFredKey()) return;
@@ -392,3 +399,126 @@ document.addEventListener('DOMContentLoaded', () => {
     fredLoadMacroIndicators();
   }, 30 * 60 * 1000);
 });
+/* ══════════════════════════════════════════════════════════════════
+   STEP 1 ADDITION — append this block to the end of fred.js
+   Adds: fredGetCreditSpreads() for valuation engine credit pipeline
+   Series fetched:
+     BAMLC0A0CM      — Investment Grade OAS spread (bps)
+     BAMLH0A0HYM2    — High Yield OAS spread (bps)
+     BAMLC0A4CBBB    — BBB-rated OAS spread (bps)
+     BAMLC0A1CAAAEY  — AAA effective yield (%)
+     DGS10           — 10Y Treasury yield / risk-free rate (%)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Credit Spread Series definitions ──────────────────────────── */
+const FRED_CREDIT_SERIES = [
+  { id: 'BAMLC0A0CM',     label: 'IG OAS',      unit: 'bps',  tier: 'ig'  },
+  { id: 'BAMLH0A0HYM2',   label: 'HY OAS',      unit: 'bps',  tier: 'hy'  },
+  { id: 'BAMLC0A4CBBB',   label: 'BBB OAS',     unit: 'bps',  tier: 'bbb' },
+  { id: 'BAMLC0A1CAAAEY', label: 'AAA Yield',   unit: '%',    tier: 'aaa' },
+  { id: 'DGS10',          label: '10Y Yield',   unit: '%',    tier: 'rfr' },
+];
+
+/* ── In-memory credit cache (24h TTL — spreads are slow-moving) ── */
+const _fredCreditCache = { data: null, ts: 0 };
+const FRED_CREDIT_TTL  = 24 * 60 * 60 * 1000;   // 24 hours
+
+/**
+ * fredGetCreditSpreads()
+ * Fetches all five FRED credit/yield series in parallel.
+ * Returns a structured object consumed by valuation-datasources.js.
+ *
+ * @returns {Promise<{
+ *   igOAS: number,        // IG OAS spread in bps
+ *   hyOAS: number,        // HY OAS spread in bps
+ *   bbbOAS: number,       // BBB OAS spread in bps
+ *   aaaYield: number,     // AAA effective yield %
+ *   riskFreeRate: number, // 10Y Treasury yield %
+ *   timestamp: string,    // date of most recent observation
+ *   raw: object           // keyed by series id for debugging
+ * } | null>}
+ */
+window.fredGetCreditSpreads = async function fredGetCreditSpreads() {
+  /* L1 memory cache */
+  if (_fredCreditCache.data && Date.now() - _fredCreditCache.ts < FRED_CREDIT_TTL) {
+    return _fredCreditCache.data;
+  }
+
+  if (!getFredKey()) {
+    /* Graceful degradation — return null so callers can use proxies */
+    console.warn('[FRED] No key — credit spreads unavailable. Using synthetic fallback.');
+    return null;
+  }
+
+  try {
+    const results = await Promise.allSettled(
+      FRED_CREDIT_SERIES.map(s =>
+        fredLatest(s.id).then(obs => ({
+          id:    s.id,
+          tier:  s.tier,
+          label: s.label,
+          unit:  s.unit,
+          value: obs ? parseFloat(obs.value) : null,
+          date:  obs?.date || null,
+        }))
+      )
+    );
+
+    const raw = {};
+    let latestDate = '';
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      raw[r.value.id] = r.value;
+      if (r.value.date > latestDate) latestDate = r.value.date;
+    }
+
+    const out = {
+      igOAS:        raw['BAMLC0A0CM']?.value     ?? null,
+      hyOAS:        raw['BAMLH0A0HYM2']?.value   ?? null,
+      bbbOAS:       raw['BAMLC0A4CBBB']?.value   ?? null,
+      aaaYield:     raw['BAMLC0A1CAAAEY']?.value ?? null,
+      riskFreeRate: raw['DGS10']?.value           ?? null,
+      timestamp:    latestDate,
+      raw,
+    };
+
+    /* Store in global treasury yields for WACC reuse */
+    if (out.riskFreeRate !== null) {
+      window._treasuryYields = window._treasuryYields || {};
+      window._treasuryYields['10Y'] = out.riskFreeRate;
+    }
+
+    /* Cache result */
+    _fredCreditCache.data = out;
+    _fredCreditCache.ts   = Date.now();
+
+    /* Also persist to sessionStorage for cross-session reuse */
+    try {
+      sessionStorage.setItem('fred_credit_spreads', JSON.stringify({
+        data: out, ts: Date.now()
+      }));
+    } catch (_) { /* quota */ }
+
+    return out;
+
+  } catch (e) {
+    console.warn('[FRED] fredGetCreditSpreads error:', e.message);
+    return null;
+  }
+};
+
+/**
+ * fredGetCreditSpreadsSync()
+ * Synchronous read from sessionStorage cache — used by
+ * valuation-datasources.js when it needs a non-async fallback.
+ * Returns null if cache is cold.
+ */
+window.fredGetCreditSpreadsSync = function fredGetCreditSpreadsSync() {
+  try {
+    const raw = sessionStorage.getItem('fred_credit_spreads');
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > FRED_CREDIT_TTL) return null;
+    return data;
+  } catch (_) { return null; }
+};

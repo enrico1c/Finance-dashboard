@@ -87,6 +87,26 @@ const SBC_TTL = {
   // OER
   'oer:rates':            60 * 60,
   'oer:history':          6  * 3600,
+  // Phase 1 — Identity Infrastructure
+  'openfigi:ticker':      24 * 3600,  // FIGIs stable; only change on corporate actions
+  'gleif:lei':            24 * 3600,  // entity identity changes rarely
+  'gleif:parent':         24 * 3600,
+  // Phase 2 — Registry & Ownership
+  'ch:company':           6  * 3600,  // CH profile (status, address)
+  'ch:officers':          6  * 3600,
+  'ch:psc':               6  * 3600,
+  // Phase 3 — Market Structure
+  'finra:ssv':            4  * 3600,  // daily short sale volume (daily file)
+  'finra:si':             12 * 3600,  // short interest (twice-monthly)
+  // Phase 4 — Reference Data
+  'esma:firds':           24 * 3600,  // instrument reference (stable)
+  'edgar:nport':          6  * 3600,  // N-PORT quarterly holdings
+  'edgar:ncen':           6  * 3600,  // N-CEN annual census
+  'twelvedata:dividends': 24 * 3600,
+  'twelvedata:splits':    24 * 3600,
+  // Phase 5 — Fund & ETF Ecosystem
+  'edgar:xbrl':           6  * 3600,  // companyfacts (quarterly XBRL)
+  'edgar:prosp':          12 * 3600,  // prospectus (changes only on amendment)
   // Generic
   'default':              30 * 60,
 };
@@ -437,7 +457,75 @@ function sbcInstallInterceptors() {
     );
   }
 
-  console.log('[SBC] Interceptors installed on: fmpFetch, fhFetch, avFetch, fredFetch, oerFetch, techFetchCandles');
+  /* ── Phase 1 — OpenFIGI figiGetForTicker(ticker) ── */
+  if (typeof figiGetForTicker === 'function') {
+    window._sbcOrig_figiGetForTicker = figiGetForTicker;
+    window.figiGetForTicker = wrap(
+      figiGetForTicker,
+      'openfigi',
+      (ticker) => 'ticker',
+      (ticker) => ticker.replace(/.*:/, '').toUpperCase(),
+      () => null
+    );
+  }
+
+  /* ── Phase 1 — GLEIF gleifGetLei(ticker) ── */
+  if (typeof gleifGetLei === 'function') {
+    window._sbcOrig_gleifGetLei = gleifGetLei;
+    window.gleifGetLei = wrap(
+      gleifGetLei,
+      'gleif',
+      () => 'lei',
+      (ticker) => ticker.replace(/.*:/, '').toUpperCase(),
+      () => null
+    );
+  }
+
+  /* ── Phase 1 — GLEIF gleifGetParentChain(lei) ── */
+  if (typeof gleifGetParentChain === 'function') {
+    window._sbcOrig_gleifGetParentChain = gleifGetParentChain;
+    window.gleifGetParentChain = wrap(
+      gleifGetParentChain,
+      'gleif',
+      () => 'parent',
+      (lei) => lei || null,
+      () => null
+    );
+  }
+
+  /* ── Phase 3 — FINRA finraGetSSV(sym) ── */
+  if (typeof finraGetSSV === 'function') {
+    window._sbcOrig_finraGetSSV = finraGetSSV;
+    window.finraGetSSV = wrap(
+      finraGetSSV,
+      'finra',
+      () => 'ssv',
+      (sym) => sym,
+      () => null
+    );
+  }
+
+  /* ── Phase 3 — FINRA finraGetShortInterest(sym) ── */
+  if (typeof finraGetShortInterest === 'function') {
+    window._sbcOrig_finraGetShortInterest = finraGetShortInterest;
+    window.finraGetShortInterest = wrap(
+      finraGetShortInterest,
+      'finra',
+      () => 'si',
+      (sym) => sym,
+      () => null
+    );
+  }
+
+  /* ── Phase 4 — Twelve Data _tdFetch(endpoint, params) ── */
+  if (typeof window._tdFetchRaw === 'function') {
+    /* _tdFetch is internal; expose a wrapped version if available */
+  }
+
+  const wrappedProviders = ['fmpFetch','fhFetch','avFetch','fredFetch','oerFetch',
+    'techFetchCandles','figiGetForTicker','gleifGetLei','gleifGetParentChain',
+    'finraGetSSV','finraGetShortInterest'].filter(n => typeof window[n] === 'function');
+  console.log('[SBC] Interceptors installed on: ' + wrappedProviders.join(', '));
 }
 
 /* ══════════════════════════════════════════════════════════════════

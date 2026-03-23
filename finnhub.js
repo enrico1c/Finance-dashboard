@@ -43,7 +43,7 @@ async function fhFetch(path, params = {}) {
 
   fhBump();
   try {
-    const r = await fetch(url.toString());
+    const r = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
     if (!r.ok) return null;
     const data = await r.json();
     sessionStorage.setItem(cacheKey, JSON.stringify(data));
@@ -458,9 +458,13 @@ function fhRenderMgmt(sym, profile) {
 }
 
 /* ── Render: Comparables RV tab ──────────────────────────────────── */
-function fhRenderComparables(sym, peers, peerData, mainProfile, mainQuote) {
+function fhRenderComparables(sym, peers, peerData, mainProfile, mainQuote, peerRatios) {
   const rv = document.getElementById("comp-rv");
   if (!rv) return;
+
+  // peerRatios is an optional map: { TICKER: { pe, pb, evEbitda, roe, divYield } }
+  // populated by finnhubLoadAll via Promise.allSettled(fmpGetRatios per peer)
+  const ratiosMap = peerRatios || {};
 
   const mainMktCap = mainProfile?.mktCap || null;
 
@@ -470,30 +474,49 @@ function fhRenderComparables(sym, peers, peerData, mainProfile, mainQuote) {
     return Math.abs((a.mktCap||0) - mainMktCap) - Math.abs((b.mktCap||0) - mainMktCap);
   }).slice(0, 10);
 
+  // Main ticker ratios from fmpLiveCache if available
+  const mainRatios = (typeof fmpGetLive === 'function') ? fmpGetLive(sym)?.ratios : null;
+
   // Include main ticker at top
   const allRows = [
     { ticker: sym, name: mainProfile?.name||sym, mktCap: mainMktCap,
       price: mainQuote?.price, change: mainQuote?.changePct, sector: mainProfile?.sector,
-      isCurrent: true },
-    ...sorted.map(p => ({ ...p, isCurrent: false }))
+      isCurrent: true, ratios: mainRatios },
+    ...sorted.map(p => ({ ...p, isCurrent: false, ratios: ratiosMap[p.ticker?.toUpperCase()] || null }))
   ];
 
-  const rows = allRows.map(r => `<tr class="${r.isCurrent ? "current-row" : ""}">
-    <td><strong>${fhEsc(r.ticker)}</strong></td>
-    <td>${fhEsc(r.name)}</td>
-    <td>${fhFmtB(r.mktCap)}</td>
-    <td>${fhEsc(r.sector||'—')}</td>
-    <td>${r.price != null ? "$"+fhFmt(r.price) : "—"}</td>
-    <td class="${r.change > 0 ? "pos" : r.change < 0 ? "neg" : ""}">${r.change != null ? (r.change>0?"+":"")+fhFmt(r.change,2)+"%" : "—"}</td>
-  </tr>`).join("");
+  // Determine whether to show ratios columns (only if at least one peer has data)
+  const hasRatios = allRows.some(r => r.ratios != null);
+
+  const rows = allRows.map(r => {
+    const ra = r.ratios;
+    return `<tr class="${r.isCurrent ? "current-row" : ""}">
+      <td><strong>${fhEsc(r.ticker)}</strong></td>
+      <td>${fhEsc(r.name)}</td>
+      <td>${fhFmtB(r.mktCap)}</td>
+      <td>${fhEsc(r.sector||'—')}</td>
+      <td>${r.price != null ? "$"+fhFmt(r.price) : "—"}</td>
+      <td class="${(r.change||0) > 0 ? "pos" : (r.change||0) < 0 ? "neg" : ""}">${r.change != null ? (r.change>0?"+":"")+fhFmt(r.change,2)+"%" : "—"}</td>
+      ${hasRatios ? `
+      <td>${ra?.pe      != null ? fhFmt(ra.pe,1)         : "—"}</td>
+      <td>${ra?.pb      != null ? fhFmt(ra.pb,2)         : "—"}</td>
+      <td>${ra?.evEbitda!= null ? fhFmt(ra.evEbitda,1)   : "—"}</td>
+      <td>${ra?.roe     != null ? fhFmt(ra.roe,1)+"%"    : "—"}</td>
+      <td>${ra?.divYield!= null ? fhFmt(ra.divYield,2)+"%" : "—"}</td>
+      ` : ''}
+    </tr>`;
+  }).join("");
 
   rv.innerHTML = `
-    <div class="av-live-badge">● LIVE — Finnhub Peers · ${fhEsc(mainProfile?.sector||'')} sector · 10 closest by market cap</div>
+    <div class="av-live-badge">● LIVE — Finnhub Peers${hasRatios ? ' + FMP Ratios' : ''} · ${fhEsc(mainProfile?.sector||'')} sector</div>
     <div class="fin-table-wrap"><table class="fin-table rv-table">
-      <thead><tr><th>Ticker</th><th>Company</th><th>Mkt Cap</th><th>Sector</th><th>Price</th><th>Day Chg%</th></tr></thead>
+      <thead><tr>
+        <th>Ticker</th><th>Company</th><th>Mkt Cap</th><th>Sector</th><th>Price</th><th>Day Chg%</th>
+        ${hasRatios ? '<th>P/E</th><th>P/B</th><th>EV/EBITDA</th><th>ROE</th><th>Div Yield</th>' : ''}
+      </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
-    <div class="av-note">// Peers identified by Finnhub as same industry. Sorted by proximity to ${fhEsc(sym)} market cap.</div>`;
+    <div class="av-note">// Peers via Finnhub · Ratios via FMP (TTM) · Sorted by proximity to ${fhEsc(sym)} market cap.</div>`;
 }
 
 /* ── Render: Earnings ERN tab ────────────────────────────────────── */
@@ -580,12 +603,29 @@ async function finnhubLoadAll(rawTicker) {
   // Render news
   if (news?.length) fhRenderNews(sym, news);
 
-  // Render comparables — fetch peer profiles
+  // Render comparables — fetch peer profiles + FMP ratios per peer
   if (peers?.length) {
     showApiToast(`↻ Finnhub: loading ${peers.length} peer profiles…`, "info");
-    const peerData = await fhGetBatchProfiles(peers.slice(0, 10));
-    fhRenderComparables(sym, sym, peerData, profile, quote);
-    fhLiveCache[sym].peerData = peerData;
+    const peerList = peers.slice(0, 10);
+    const peerData = await fhGetBatchProfiles(peerList);
+
+    // Fetch FMP ratios per peer in parallel — use Promise.allSettled so a
+    // single failed call does not abort the entire render
+    let peerRatios = {};
+    if (typeof fmpGetRatios === 'function' && typeof getFmpKey === 'function' && getFmpKey()) {
+      const ratiosResults = await Promise.allSettled(
+        peerList.map(p => fmpGetRatios(p).then(r => ({ sym: p.toUpperCase(), ratios: r })))
+      );
+      ratiosResults.forEach(res => {
+        if (res.status === 'fulfilled' && res.value?.ratios) {
+          peerRatios[res.value.sym] = res.value.ratios;
+        }
+      });
+    }
+
+    fhRenderComparables(sym, sym, peerData, profile, quote, peerRatios);
+    fhLiveCache[sym].peerData   = peerData;
+    fhLiveCache[sym].peerRatios = peerRatios;
   }
 
   const loaded = [recs, target, upgrades, insiders, institutional, news, peers, profile, quote].filter(Boolean).length;
