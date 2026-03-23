@@ -739,7 +739,6 @@ async function wmMacroPredictions() {
     el.innerHTML = wmError('Prediction markets unavailable: ' + e.message);
     return;
   }
-  }
 
   if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
 
