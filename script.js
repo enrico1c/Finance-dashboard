@@ -388,6 +388,9 @@ function switchTab(panelId, tabId){
 function mRow(label,value,cls=""){
   return `<div class="metric ${cls}"><span>${escapeHtml(String(label))}</span><span>${escapeHtml(String(value))}</span></div>`;
 }
+function mRowHtml(label,value,cls=""){
+  return `<div class="metric ${cls}"><span>${escapeHtml(String(label))}</span><span>${value}</span></div>`;
+}
 function sHead(t){ return `<div class="section-head">${escapeHtml(t)}</div>`; }
 function noData(t){ return `<div class="no-data">// No local data for <strong>${escapeHtml(t)}</strong>.<br>Connect an API to populate live data.</div>`; }
 
@@ -643,11 +646,11 @@ function renderFundamentals(ticker) {
         <div class="av-live-badge">● WACC · ${escapeHtml(sym)} · beta:${betaSrc} · Kd:${kdSrc} · tax:${taxSrc}</div>
         ${sHead('WACC Inputs')}
         ${mRow('Risk-Free Rate (10Y)',       rf + '%')}
-        ${mRow('Equity Risk Premium',        erp + '% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
-        ${mRow('Beta (levered)',             beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+betaSrc+')</span>')}
+        ${mRowHtml('Equity Risk Premium',        erp + '% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
+        ${mRowHtml('Beta (levered)',             beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+betaSrc+')</span>')}
         ${mRow('Cost of Equity (Ke)',        ke + '%')}
-        ${mRow('Pre-Tax Cost of Debt (Kd)',  kd.toFixed(2) + '% <span style="font-size:9px;opacity:.6">('+kdSrc+')</span>')}
-        ${mRow('Tax Rate',                   tax.toFixed(1) + '% <span style="font-size:9px;opacity:.6">('+taxSrc+')</span>')}
+        ${mRowHtml('Pre-Tax Cost of Debt (Kd)',  kd.toFixed(2) + '% <span style="font-size:9px;opacity:.6">('+kdSrc+')</span>')}
+        ${mRowHtml('Tax Rate',                   tax.toFixed(1) + '% <span style="font-size:9px;opacity:.6">('+taxSrc+')</span>')}
         ${mRow('D/E Ratio',                  debtEq.toFixed(2))}
         ${mRow('Equity Weight',              eqW + '%')}
         ${mRow('Debt Weight',                debtW + '%')}

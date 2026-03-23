@@ -593,13 +593,13 @@ function fmpRenderRatios(sym, r) {
     wc.innerHTML = `
       <div class="av-live-badge">● WACC · ${fmpEsc(sym)} · beta:${fmpEsc(betaSrcFmp)} · Kd:${fmpEsc(kdSrc)} · tax:${fmpEsc(taxSrc)}</div>
       <div class="section-head">WACC Inputs</div>
-      ${mRow("Beta (levered)",         beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+fmpEsc(betaSrcFmp)+')</span>')}
+      ${mRowHtml("Beta (levered)",         beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+fmpEsc(betaSrcFmp)+')</span>')}
       ${mRow("D/E Ratio",              debtEq.toFixed(2))}
       ${mRow("Risk-Free Rate (10Y)",   rf+"%")}
-      ${mRow("Equity Risk Premium",    erp+'% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
+      ${mRowHtml("Equity Risk Premium",    erp+'% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
       ${mRow("Cost of Equity (Ke)",    ke+"%")}
-      ${mRow("Pre-Tax Cost of Debt",   kd.toFixed(2)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(kdSrc)+')</span>')}
-      ${mRow("Tax Rate",               tax.toFixed(1)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(taxSrc)+')</span>')}
+      ${mRowHtml("Pre-Tax Cost of Debt",   kd.toFixed(2)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(kdSrc)+')</span>')}
+      ${mRowHtml("Tax Rate",               tax.toFixed(1)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(taxSrc)+')</span>')}
       ${mRow("Equity Weight",          eqW+"%")}
       ${mRow("Debt Weight",            dW+"%")}
       <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>

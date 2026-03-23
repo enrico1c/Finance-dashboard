@@ -717,15 +717,14 @@ async function wmMacroPredictions() {
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching prediction markets…');
 
-  let markets = [], source = 'Polymarket';
+  let markets = [], source = 'Manifold Markets';
   try {
     const res = await fetch('https://api.manifold.markets/v0/markets?limit=40', {
       signal: AbortSignal.timeout(10000)
     });
     if (!res.ok) throw new Error(`Manifold ${res.status}`);
     const raw = await res.json();
-
-    const markets = raw
+    markets = raw
       .filter(m => m.question && !m.isResolved)
       .map(m => ({
         question: m.question,
@@ -736,8 +735,10 @@ async function wmMacroPredictions() {
         url:      m.url || null,
       }))
       .sort((a,b) => (b.volume||0) - (a.volume||0));
-
-    if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
+  } catch(e) {
+    el.innerHTML = wmError('Prediction markets unavailable: ' + e.message);
+    return;
+  }
 
     const cats = [...new Set(markets.map(m => m.category).filter(Boolean))].slice(0, 8);
     let html = wmLiveBar('Prediction Markets — Manifold Markets', `${markets.length} open questions`);
@@ -773,8 +774,6 @@ async function wmMacroPredictions() {
   } catch(e) {
     el.innerHTML = wmError('Prediction markets unavailable: ' + e.message);
   }
-  html += '</div>';
-  el.innerHTML = html;
 }
 
 function wmPredFilter(chip, cat) {
@@ -785,13 +784,7 @@ function wmPredFilter(chip, cat) {
   });
 }
 
-function wmPredFilter(chip, cat) {
-  document.querySelectorAll('.wm-pred-cat-chip').forEach(c => c.classList.remove('wm-pred-active'));
-  if (chip) chip.classList.add('wm-pred-active');
-  document.querySelectorAll('#wm-pred-list .wm-pred-row').forEach(r => {
-    r.style.display = (!cat || r.dataset.cat === cat) ? '' : 'none';
-  });
-}
+
 
 /* ─────────────────────────────────────────────────────────────────
    ENHANCED GEO·RISK TABS
