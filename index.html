@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="uars-widget.css" />
   <script src="https://s3.tradingview.com/tv.js"></script>
+  <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 </head>
 <body>
   <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
@@ -788,27 +789,27 @@
       <div class="panel-head">
         <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <div class="panel-title-row">
-          <h3>▸ Alert·Feed — Global Events</h3>
-          <div class="mode-label">Weather · Quakes · Unrest · Fires</div>
+          <h3>▸ Alert·Feed — @DeItaone</h3>
+          <div class="mode-label">Real-time market alerts</div>
         </div>
         <div class="panel-actions">
           <button class="icon-btn close" onclick="hidePanel('alert')">✕</button>
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="wm"    onclick="switchTab('alert','wm')">ALL</button>
+        <button class="tab-btn active" data-tab="wm"    onclick="switchTab('alert','wm')">📰 @DeItaone</button>
         <button class="tab-btn"        data-tab="noaa"  onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
         <button class="tab-btn"        data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
       </div>
-      <!-- WM sub-filter bar shown only on WM tab -->
-      <div class="wm-filter-bar" id="alert-wm-filters">
-        <button class="wm-filter-btn active" data-filter="all"     onclick="wmAlertLoad('all')">ALL</button>
-        <button class="wm-filter-btn"        data-filter="weather" onclick="wmAlertLoad('weather')">🌪 WEATHER</button>
-        <button class="wm-filter-btn"        data-filter="quake"   onclick="wmAlertLoad('quake')">🏔 QUAKES</button>
-        <button class="wm-filter-btn"        data-filter="unrest"  onclick="wmAlertLoad('unrest')">✊ UNREST</button>
-        <button class="wm-filter-btn"        data-filter="fire"    onclick="wmAlertLoad('fire')">🔥 FIRES</button>
+      <div class="tab-pane active panel-content" data-tab="wm" id="alert-feed" style="overflow:hidden;padding:0">
+        <a class="twitter-timeline"
+           data-theme="dark"
+           data-chrome="noheader nofooter noborders transparent"
+           data-tweet-limit="20"
+           href="https://twitter.com/DeItaone">
+          Tweets by @DeItaone
+        </a>
       </div>
-      <div class="tab-pane active panel-content" data-tab="wm"    id="alert-feed"></div>
       <div class="tab-pane        panel-content" data-tab="noaa"  id="alert-noaa"></div>
       <div class="tab-pane        panel-content" data-tab="eonet" id="alert-eonet"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
@@ -1071,7 +1072,7 @@
 <script src="technical.js"></script>
 <script src="yahoo.js"></script>
 <script src="sbcache.js"></script>
-<script src="finterm-extras.js"></script>
+<script src="finterm-extras.js?v=3"></script>
 <script src="warmonitor.js"></script>
   <script src="geointel.js"></script>
 <script src="macroglobal.js"></script>

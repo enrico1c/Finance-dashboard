@@ -6050,6 +6050,8 @@ body.panel-dragging iframe, body.panel-resizing iframe {
   transition: border-color .15s, background .15s;
 }
 .aps-row:hover { border-color: var(--accent, #58a6ff); background: rgba(88,166,255,.05); }
+@keyframes aps-flash { 0%,100%{background:var(--bg-primary,#0d1117);border-color:var(--border,#30363d)} 40%{background:rgba(63,185,80,.15);border-color:#3fb950} }
+.aps-row-flash { animation: aps-flash 1.6s ease; }
 
 .aps-row-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .aps-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }

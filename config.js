@@ -95,6 +95,20 @@ const KNOWN_PROVIDERS = [
     limitMax:   null,
   },
 
+  /* ── OWNERSHIP & REGISTRY ───────────────────────────────────── */
+  { id:"openfigi", name:"OpenFIGI — Instrument IDs", badge:"FIGI", group:"Ownership & Registry",
+    desc:"Map tickers → FIGI/ISIN/CUSIP/SEDOL · Multi-exchange instrument lookup · Identity infrastructure for Ownership panel",
+    limit:"250 req/min (free, no key) · higher with key", docsUrl:"https://www.openfigi.com/api",
+    sessionKey:"openfigi_call_count", limitWarn:null, limitMax:null },
+  { id:"companieshouse", name:"Companies House UK", badge:"CH", group:"Ownership & Registry",
+    desc:"UK corporate registry: PSC (Persons with Significant Control) · Directors · Registered office · Accounts · Filing history",
+    limit:"600 req/5min (free key)", docsUrl:"https://developer.company-information.service.gov.uk/",
+    sessionKey:"ch_call_count", limitWarn:null, limitMax:null },
+  { id:"twelvedata", name:"Twelve Data", badge:"12D", group:"Market Data",
+    desc:"Dividend enrichment · Splits · Earnings dates · 70+ exchanges · Real-time quotes · Technical indicators",
+    limit:"800 req/day (free)", docsUrl:"https://twelvedata.com/apikey",
+    sessionKey:"td_call_count", limitWarn:700, limitMax:800 },
+
   /* ── CRYPTO & ON-CHAIN ──────────────────────────────────────── */
   {
     id:         'defillama',
@@ -389,6 +403,17 @@ function saveKey(id) {
   setStatus(id, "&#10003; Saved &mdash; " + mask(val), "ok");
   renderProviderList();
   renderTopbarBadges();
+
+  /* Highlight the newly-configured provider in the API status sidebar */
+  setTimeout(() => {
+    openApiStatus();
+    const row = document.querySelector(`#apiStatusList .aps-row[onclick*="${CSS.escape(id)}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.classList.add("aps-row-flash");
+      setTimeout(() => row.classList.remove("aps-row-flash"), 1600);
+    }
+  }, 150);
 
   // Auto-reload live data immediately after saving a key
   const ticker = (typeof currentTicker !== "undefined") ? currentTicker.replace(/.*:/,"").toUpperCase() : null;
