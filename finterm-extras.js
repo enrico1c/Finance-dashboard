@@ -8,7 +8,7 @@
    5. Bonds / Credit   — FRED DAAA/DBAA spreads (existing FRED key)
    ══════════════════════════════════════════════════════════════════ */
 
-const _esc = s => typeof escapeHtml === 'function'
+const _FEXT_esc = s => typeof escapeHtml === 'function'
   ? escapeHtml(String(s ?? ''))
   : String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':"&quot;"}[c]));
 const _fmt = (n, d=2) => n == null || isNaN(n) ? '—'
@@ -38,7 +38,7 @@ const _fhKey  = () => (typeof getFinnhubKey === 'function' ? getFinnhubKey() : '
 async function fhLoadShortInterest(sym) {
   const el = document.getElementById('fund-short');
   if (!el) return;
-  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest for ${_esc(sym)}…</div>`;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest for ${_FEXT_esc(sym)}…</div>`;
 
   let shortData = null, src = '';
 
@@ -113,13 +113,13 @@ async function fhLoadShortInterest(sym) {
   // ── Render ──────────────────────────────────────────────────────
   if (!shortData?.length) {
     el.innerHTML = `
-      <div class="av-live-badge">● Short Interest · ${_esc(sym)}</div>
+      <div class="av-live-badge">● Short Interest · ${_FEXT_esc(sym)}</div>
       <div class="no-data" style="margin-top:8px">
-        // No short interest data found for <strong>${_esc(sym)}</strong>.<br>
+        // No short interest data found for <strong>${_FEXT_esc(sym)}</strong>.<br>
         // External sources:&nbsp;
-        <a href="https://iborrowdesk.com/report/${_esc(sym)}" target="_blank" class="geo-wm-link">iBorrowDesk ↗</a>&nbsp;·&nbsp;
+        <a href="https://iborrowdesk.com/report/${_FEXT_esc(sym)}" target="_blank" class="geo-wm-link">iBorrowDesk ↗</a>&nbsp;·&nbsp;
         <a href="https://finra-markets.morningstar.com/MarketData/EquityOptions/detail.jsp" target="_blank" class="geo-wm-link">FINRA ↗</a>&nbsp;·&nbsp;
-        <a href="https://stockanalysis.com/stocks/${_esc(sym.toLowerCase())}/short-interest/" target="_blank" class="geo-wm-link">StockAnalysis ↗</a>
+        <a href="https://stockanalysis.com/stocks/${_FEXT_esc(sym.toLowerCase())}/short-interest/" target="_blank" class="geo-wm-link">StockAnalysis ↗</a>
       </div>`;
     return;
   }
@@ -135,14 +135,14 @@ async function fhLoadShortInterest(sym) {
 
   const fmtSI = v => v == null ? '—' : v >= 1e9 ? (v/1e9).toFixed(2)+'B' : v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : String(v);
 
-  let html = `<div class="av-live-badge">● Short Interest · ${_esc(sym)} · ${_esc(src)}</div>`;
+  let html = `<div class="av-live-badge">● Short Interest · ${_FEXT_esc(sym)} · ${_FEXT_esc(src)}</div>`;
 
   // KPI row
   html += `<div class="si-kpi-row">
     <div class="si-kpi"><span class="si-kpi-label">Short Volume</span><span class="si-kpi-val">${fmtSI(latest.shortVolume)}</span></div>
     ${latest.shortFloat != null ? `<div class="si-kpi"><span class="si-kpi-label">Short Float %</span><span class="si-kpi-val ${latest.shortFloat > 20 ? 'wm-neg' : ''}">${parseFloat(latest.shortFloat).toFixed(2)}%</span></div>` : ''}
     ${latest.shortRatio != null ? `<div class="si-kpi"><span class="si-kpi-label">Days to Cover</span><span class="si-kpi-val">${parseFloat(latest.shortRatio).toFixed(1)}d</span></div>` : ''}
-    <div class="si-kpi"><span class="si-kpi-label">As of</span><span class="si-kpi-val" style="font-size:11px">${_esc(latest.date?.slice(0,10)||'—')}</span></div>
+    <div class="si-kpi"><span class="si-kpi-label">As of</span><span class="si-kpi-val" style="font-size:11px">${_FEXT_esc(latest.date?.slice(0,10)||'—')}</span></div>
   </div>`;
 
   // Sparkline
@@ -160,7 +160,7 @@ async function fhLoadShortInterest(sym) {
     <thead><tr><th>Date</th><th>Short Volume</th>${latest.shortFloat!=null?'<th>Float %</th>':''}${latest.shortRatio!=null?'<th>Days to Cover</th>':''}</tr></thead>
     <tbody>
     ${shortData.slice(0,12).map(r=>`<tr>
-      <td style="font-family:var(--font-mono)">${_esc(r.date?.slice(0,10)||'—')}</td>
+      <td style="font-family:var(--font-mono)">${_FEXT_esc(r.date?.slice(0,10)||'—')}</td>
       <td>${fmtSI(r.shortVolume)}</td>
       ${r.shortFloat!=null?`<td class="${parseFloat(r.shortFloat)>20?'wm-neg':''}">${parseFloat(r.shortFloat).toFixed(2)}%</td>`:''}
       ${r.shortRatio!=null?`<td>${parseFloat(r.shortRatio).toFixed(1)}d</td>`:''}
@@ -168,7 +168,7 @@ async function fhLoadShortInterest(sym) {
     </tbody></table></div>`;
 
   html += `<div class="av-note" style="margin-top:6px">
-    Data: ${_esc(src)} · FINRA settlement dates · 
+    Data: ${_FEXT_esc(src)} · FINRA settlement dates · 
     <a href="https://www.finra.org/finra-data/browse-catalog/equity-short-interest" target="_blank" class="geo-wm-link">FINRA ↗</a>
   </div>`;
 
@@ -203,7 +203,7 @@ async function _loadFTDData(sym, container) {
         const d = h._source;
         return `<div class="si-ftd-row">
           <span class="si-ftd-date">${(d?.period_of_report||d?.file_date||'').slice(0,10)}</span>
-          <a href="https://www.sec.gov${d?.file_path||'#'}" target="_blank" class="geo-wm-link si-ftd-link">${_esc((d?.display_names?.[0]||'SEC filing').slice(0,40))}</a>
+          <a href="https://www.sec.gov${d?.file_path||'#'}" target="_blank" class="geo-wm-link si-ftd-link">${_FEXT_esc((d?.display_names?.[0]||'SEC filing').slice(0,40))}</a>
         </div>`;
       }).join('')}
       <div style="font-size:9px;color:var(--text-muted);margin-top:4px">
@@ -679,17 +679,17 @@ async function portRender() {
       </tr></thead>
       <tbody>
         ${enriched.map(p=>`
-        <tr class="port-row" onclick="if(typeof changeTicker==='function')changeTicker('${_esc(p.sym)}')" style="cursor:pointer">
-          <td><strong class="port-sym">${_esc(p.sym)}</strong></td>
-          <td><span class="port-type-badge">${_esc(p.assetType||'stock')}</span></td>
+        <tr class="port-row" onclick="if(typeof changeTicker==='function')changeTicker('${_FEXT_esc(p.sym)}')" style="cursor:pointer">
+          <td><strong class="port-sym">${_FEXT_esc(p.sym)}</strong></td>
+          <td><span class="port-type-badge">${_FEXT_esc(p.assetType||'stock')}</span></td>
           <td>${typeof p.shares==='number'?p.shares.toFixed(p.shares<1?6:2):p.shares}</td>
           <td>$${f2(p.avgCost)}</td>
-          <td class="port-live-price" data-ticker="${_esc(p.sym)}">${p.price!=null?'$'+f2(p.price):'—'}</td>
+          <td class="port-live-price" data-ticker="${_FEXT_esc(p.sym)}">${p.price!=null?'$'+f2(p.price):'—'}</td>
           <td>${p.curVal!=null?'$'+fm(p.curVal):'—'}</td>
           <td class="${fclr(p.pnl)}">${p.pnl!=null?(p.pnl>=0?'+':'')+' $'+fm(Math.abs(p.pnl)):'—'}</td>
           <td class="${fclr(p.pnlPct)}">${p.pnlPct!=null?(p.pnlPct>=0?'+':'')+f2(p.pnlPct*100)+'%':'—'}</td>
           <td>${totalVal&&p.curVal?f2(p.curVal/totalVal*100)+'%':'—'}</td>
-          <td><button class="port-del-btn" onclick="event.stopPropagation();portDeleteById('${_esc(p.id||'')}')">✕</button></td>
+          <td><button class="port-del-btn" onclick="event.stopPropagation();portDeleteById('${_FEXT_esc(p.id||'')}')">✕</button></td>
         </tr>`).join('')}
       </tbody>
     </table>
@@ -746,7 +746,7 @@ async function portRender() {
       <div class="port-analytics-title">📊 Portfolio Breakdown</div>
       ${enriched.sort((a,b)=>(b.curVal||0)-(a.curVal||0)).map(p=>`
         <div class="port-analytics-row">
-          <span><strong>${_esc(p.sym)}</strong></span>
+          <span><strong>${_FEXT_esc(p.sym)}</strong></span>
           <span class="${fclr(p.pnlPct)}">${p.pnlPct!=null?(p.pnlPct>=0?'+':'')+f2(p.pnlPct*100)+'%':'—'}</span>
         </div>`).join('')}
     </div>
@@ -764,12 +764,12 @@ async function portRender() {
         ${[...txAll].sort((a,b)=>b.executedAt-a.executedAt).map(t=>`
         <tr>
           <td style="white-space:nowrap">${new Date(t.executedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}</td>
-          <td><strong class="port-sym">${_esc(t.ticker)}</strong></td>
+          <td><strong class="port-sym">${_FEXT_esc(t.ticker)}</strong></td>
           <td><span class="port-type-badge port-tx-${t.type}">${t.type}</span></td>
           <td>${typeof t.shares==='number'?t.shares.toFixed(t.shares<1?6:2):t.shares}</td>
           <td>$${f2(t.price)}</td>
           <td>$${f2(t.total)}</td>
-          <td style="font-size:9px;color:var(--text-muted)">${_esc(t.notes||'')}</td>
+          <td style="font-size:9px;color:var(--text-muted)">${_FEXT_esc(t.notes||'')}</td>
         </tr>`).join('')}
       </tbody>
     </table>
@@ -790,7 +790,7 @@ ${divs?`<!-- ══ DIVIDENDS TAB ══ -->
       <thead><tr><th>Ticker</th><th>Total Received</th><th>Payments</th></tr></thead>
       <tbody>
         ${divs.byTicker.sort((a,b)=>b.total-a.total).map(d=>`
-        <tr><td><strong class="port-sym">${_esc(d.ticker)}</strong></td>
+        <tr><td><strong class="port-sym">${_FEXT_esc(d.ticker)}</strong></td>
             <td class="pos">$${f2(d.total)}</td><td>${d.count}</td></tr>`).join('')}
       </tbody>
     </table>
@@ -1302,7 +1302,7 @@ async function screenerRunInstitutional() {
         <tbody>
           ${consensus.map((c,i)=>`<tr>
             <td>${i+1}</td>
-            <td><strong>${_esc(c.name.slice(0,30))}</strong></td>
+            <td><strong>${_FEXT_esc(c.name.slice(0,30))}</strong></td>
             <td style="text-align:center"><span style="font-size:14px;font-weight:800;color:var(--accent)">${c.funds.length}</span></td>
             <td>${_fmt(c.total)}</td>
             <td style="font-size:9px;color:var(--text-muted)">${c.funds.join(' · ')}</td>
@@ -1384,9 +1384,9 @@ function screenerRenderResults() {
   if (!el || !_screenerResults.length) return;
 
   const COLS = [
-    { key:'symbol',      label:'Ticker',   fmt:r=>`<strong class="port-sym" style="cursor:pointer" onclick="if(typeof changeTicker==='function')changeTicker('${r.symbol}')">${_esc(r.symbol)}</strong>` },
-    { key:'companyName', label:'Company',  fmt:r=>`<span title="${_esc(r.name||'')}">${_esc((r.name||'').slice(0,20))}</span>` },
-    { key:'sector',      label:'Sector',   fmt:r=>_esc((r.sector||'').slice(0,13)) },
+    { key:'symbol',      label:'Ticker',   fmt:r=>`<strong class="port-sym" style="cursor:pointer" onclick="if(typeof changeTicker==='function')changeTicker('${r.symbol}')">${_FEXT_esc(r.symbol)}</strong>` },
+    { key:'companyName', label:'Company',  fmt:r=>`<span title="${_FEXT_esc(r.name||'')}">${_FEXT_esc((r.name||'').slice(0,20))}</span>` },
+    { key:'sector',      label:'Sector',   fmt:r=>_FEXT_esc((r.sector||'').slice(0,13)) },
     { key:'price',       label:'Price',    fmt:r=>r.price!=null?'$'+r.price.toFixed(2):'—' },
     { key:'mktcap',      label:'Mkt Cap',  fmt:r=>r.marketCap?_fmt(r.marketCap):'—' },
     { key:'pe',          label:'P/E',      fmt:r=>r.pe!=null?(r.pe>0?r.pe.toFixed(1):'neg'):'—', cls:r=>r.pe>0&&r.pe<15?'pos':r.pe>30?'neg':'' },
@@ -1396,7 +1396,7 @@ function screenerRenderResults() {
     { key:'dividendYield',label:'Div%',   fmt:r=>r.dividendYield!=null?r.dividendYield.toFixed(1)+'%':'—', cls:r=>r.dividendYield>=3?'pos':'' },
     { key:'_piotroski',  label:'F-Score', fmt:r=>r._piotroski!=null?r._piotroski+'/9':'—', cls:r=>r._piotroski>=7?'pos':r._piotroski<=3?'neg':'' },
     { key:'_score',      label:'Score',   fmt:r=>r._score||'—', cls:r=>(+r._score)>=5?'pos':(+r._score)<2?'neg':'' },
-    { key:'_actions',    label:'',        fmt:r=>`<button class="port-del-btn" title="Add to watchlist" onclick="screenerAddToWatchlist('${_esc(r.symbol)}')">⭐</button>` },
+    { key:'_actions',    label:'',        fmt:r=>`<button class="port-del-btn" title="Add to watchlist" onclick="screenerAddToWatchlist('${_FEXT_esc(r.symbol)}')">⭐</button>` },
   ];
 
   const cmpKey = _screenerSort.col;
@@ -1409,7 +1409,7 @@ function screenerRenderResults() {
 
   el.innerHTML = `
     <div class="scr-results-header">
-      <div class="av-live-badge">● ${sorted.length} stocks · ${_esc(_screenerPreset)} screen</div>
+      <div class="av-live-badge">● ${sorted.length} stocks · ${_FEXT_esc(_screenerPreset)} screen</div>
       <div class="scr-results-actions">
         <button class="wh-btn-secondary" style="font-size:9px;padding:3px 8px" onclick="screenerExportCSV()">📥 CSV</button>
         <button class="wh-btn-secondary" style="font-size:9px;padding:3px 8px" onclick="screenerSavePreset()">💾 Save Preset</button>
@@ -1487,7 +1487,7 @@ function _screenerRenderPresetBar() {
   ).join('')
   + `<button class="scr-preset-btn" data-preset="inst" onclick="screenerRunInstitutional()">🏦 Institutional</button>`
   + Object.keys(custom).map(n=>
-    `<button class="scr-preset-btn scr-preset-custom" onclick="screenerLoadCustom('${_esc(n)}')" title="${_esc(n)}">★ ${_esc(n.slice(0,14))}</button>`
+    `<button class="scr-preset-btn scr-preset-custom" onclick="screenerLoadCustom('${_FEXT_esc(n)}')" title="${_FEXT_esc(n)}">★ ${_FEXT_esc(n.slice(0,14))}</button>`
   ).join('');
 }
 

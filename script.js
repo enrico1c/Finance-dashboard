@@ -784,18 +784,18 @@ function niSourceLinks(sym) {
   const shown  = isCommodity ? sources : sources.filter(s => s.cat === 'general');
   const hidden = isCommodity ? [] : sources.filter(s => s.cat !== 'general');
 
-  const toggleId = \`ni-more-${sym.replace(/[^a-z0-9]/gi,'')}\`;
+  const toggleId = `ni-more-${sym.replace(/[^a-z0-9]/gi,'')}`;
 
-  return \`<div class="ni-sources-wrap">
+  return `<div class="ni-sources-wrap">
     <div class="ni-sources-label">// Search without API key${isCommodity ? ' · Commodity mode' : ''}</div>
     <div class="ni-sources-list">
-      \${shown.filter(s=>s.cat!=='gdelt').map(s => \`<a href="\${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn\${s.cat==='commodity'?' ni-src-comm':s.cat==='energy'?' ni-src-energy':s.cat==='supply'?' ni-src-supply':''}">\${escapeHtml(s.name)}</a>\`).join("")}
+      ${shown.filter(s=>s.cat!=='gdelt').map(s => `<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn${s.cat==='commodity'?' ni-src-comm':s.cat==='energy'?' ni-src-energy':s.cat==='supply'?' ni-src-supply':''}">${escapeHtml(s.name)}</a>`).join("")}
     </div>
-    \${!isCommodity ? \`<button onclick="document.getElementById('\${toggleId}').style.display=document.getElementById('\${toggleId}').style.display==='none'?'flex':'none'" class="ni-comm-toggle" style="font-size:9px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0">▶ Show commodity &amp; resource news sources</button>
-    <div id="\${toggleId}" style="display:none;flex-wrap:wrap;gap:3px;margin-top:4px">
-      \${sources.filter(s=>s.cat!=='general'&&s.cat!=='gdelt').map(s=>\`<a href="\${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn ni-src-comm">\${escapeHtml(s.name)}</a>\`).join("")}
-    </div>\` : ''}
-  </div>\`;
+    ${!isCommodity ? `<button onclick="document.getElementById('${toggleId}').style.display=document.getElementById('${toggleId}').style.display==='none'?'flex':'none'" class="ni-comm-toggle" style="font-size:9px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0">▶ Show commodity &amp; resource news sources</button>
+    <div id="${toggleId}" style="display:none;flex-wrap:wrap;gap:3px;margin-top:4px">
+      ${sources.filter(s=>s.cat!=='general'&&s.cat!=='gdelt').map(s=>`<a href="${s.url}" target="_blank" rel="noopener noreferrer" class="ni-src-btn ni-src-comm">${escapeHtml(s.name)}</a>`).join("")}
+    </div>` : ''}
+  </div>`;
 }
 
 /* Central render function — ALL API providers call this */
