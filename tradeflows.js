@@ -98,7 +98,7 @@ async function eurostatFetch(dataset, params={}, cacheKey, ttlMs=12*60*60*1000) 
 /* EU extra-trade in critical minerals */
 async function eurostatGetMineralTrade() {
   /* DS-018995 = EU trade by commodity (SITC) */
-  return eurostatFetch('DS-018995', { sitc06:'27','2','28','5','68', geo:'EU27_2020', time:'2023', flow:'1' }, 'estat_minerals');
+  return eurostatFetch('DS-018995', { sitc06:'27+2+28+5+68', geo:'EU27_2020', time:'2023', flow:'1' }, 'estat_minerals');
 }
 
 /* ══════════════════════════════════════════════════════════════════
