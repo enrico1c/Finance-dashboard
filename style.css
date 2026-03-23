@@ -2432,11 +2432,6 @@ textarea::placeholder { color:var(--text-muted); }
   color: #ff4757;
 }
 
-/* ── IRAN EVENTS / INTEL ROWS ────────────────────────────────────── */
-
-
-
-
 /* ── SIGNALS TAB ─────────────────────────────────────────────────── */
 .wm-signal-row {
   padding: 7px 10px; border-bottom: 1px solid var(--border);
@@ -2501,6 +2496,66 @@ textarea::placeholder { color:var(--text-muted); }
 }
 .wm-nat-title { font-size: 11px; color: var(--text); margin-bottom: 3px; }
 .wm-nat-meta { display: flex; gap: 8px; font-size: 9px; color: var(--text-muted); }
+
+/* ══════════════════════════════════════════════════════════════════
+   RESOURCE DRAWER
+   ══════════════════════════════════════════════════════════════════ */
+#wm-resource-drawer {
+  position: fixed; top: 0; right: -420px; width: 400px; height: 100vh;
+  background: var(--bg-panel); border-left: 1px solid var(--border);
+  z-index: 8000; display: flex; flex-direction: column;
+  transition: right .25s cubic-bezier(.4,0,.2,1);
+  box-shadow: -4px 0 24px rgba(0,0,0,.5);
+}
+#wm-resource-drawer.open { right: 0; }
+
+.wm-drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  background: var(--bg-input); gap: 8px; flex-shrink: 0;
+}
+.wm-drawer-title-wrap {
+  display: flex; align-items: center; gap: 7px; min-width: 0;
+}
+#wm-drawer-icon { font-size: 18px; flex-shrink: 0; }
+#wm-drawer-title {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wm-drawer-actions {
+  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+}
+.wm-drawer-act-btn {
+  padding: 4px 8px; font-size: 10px; font-weight: 600;
+  background: transparent; border: 1px solid var(--accent);
+  color: var(--accent); border-radius: 3px; cursor: pointer;
+  white-space: nowrap; transition: all .15s;
+}
+.wm-drawer-act-btn:hover { background: var(--accent); color: #000; }
+.wm-drawer-close {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 14px; cursor: pointer; padding: 2px 6px;
+}
+.wm-drawer-close:hover { color: var(--text); }
+
+.wm-drawer-tabs {
+  display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.wm-drawer-tab {
+  flex: 1; padding: 7px 4px; font-size: 10px; font-weight: 700;
+  background: transparent; border: none;
+  color: var(--text-muted); cursor: pointer; transition: all .15s;
+  border-bottom: 2px solid transparent;
+}
+.wm-drawer-tab:hover { color: var(--text); }
+.wm-drawer-tab.active {
+  color: var(--accent); border-bottom-color: var(--accent);
+}
+
+.wm-drawer-body {
+  flex: 1; overflow-y: auto; padding: 0;
+}
+.wm-drawer-body.hidden { display: none; }
 
 /* Drawer news pane */
 .wm-drawer-news-head {
@@ -4502,13 +4557,6 @@ textarea::placeholder { color:var(--text-muted); }
 .yf-hist-chart  { width: 100%; height: 50px; display: block; margin: 4px 0; }
 .yf-hist-range  { font-size: 11px; color: var(--muted, #6e7681); }
 
-
-/* ══════════════════════════════════════════════════════════════════
-   TASK 1 — Intel Feed tab click fix (z-index over resize handles)
-   ══════════════════════════════════════════════════════════════════ */
-
-
-/* ══════════════════════════════════════════════════════════════════
    TASK 2 — Dual Chart
    ══════════════════════════════════════════════════════════════════ */
 .chart-split-wrap {
@@ -5035,6 +5083,10 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 .bonds-spread-pill   { display:inline-block; margin-top:8px; padding:4px 10px; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:10px; font-size:11px; font-weight:700; font-family:var(--font-mono); }
 .bonds-interp        { display:flex; flex-direction:column; gap:5px; }
 .bonds-interp-row    { display:flex; gap:8px; font-size:10px; color:var(--text-muted); line-height:1.4; align-items:flex-start; }
+
+/* ══════════════════════════════════════════════════════════════════
+   GEOINTEL MODULE — Terror / Cyber / Travel
+   ══════════════════════════════════════════════════════════════════ */
 
 /* Shared section layout */
 .gi-section      { padding: 8px 12px; border-bottom: 1px solid var(--border); }
@@ -6122,6 +6174,199 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 .ag-pos{color:#3fb950} .ag-neg{color:#f85149} .ag-muted{color:var(--text-muted,#8b949e)}
 .ag-footer{padding:8px 12px;font-size:10px;color:var(--text-muted,#8b949e);
   border-top:1px solid var(--border,#30363d)}
+
+/* ══════════════════════════════════════════════════════════════════
+   INTEL MODULE  (intel.js → #news-intel)
+   ══════════════════════════════════════════════════════════════════ */
+.intel-live-bar{display:flex;align-items:center;gap:7px;padding:7px 12px;
+  background:rgba(248,81,73,.07);border-bottom:1px solid rgba(248,81,73,.2);
+  font-size:10px;font-weight:600;color:#f85149;flex-shrink:0}
+.intel-section{padding:8px 12px 4px;font-size:10px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text-muted,#8b949e);border-bottom:1px solid var(--border,#30363d)}
+.intel-event{background:var(--bg-primary,#0d1117);border:0.5px solid var(--border,#30363d);
+  border-radius:6px;padding:9px 11px;margin:4px 10px;cursor:pointer;transition:border-color .15s}
+.intel-event:hover{border-color:var(--accent,#58a6ff)}
+.intel-event-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:4px}
+.intel-event-type{font-size:9px;font-weight:700;letter-spacing:.05em;padding:1px 6px;
+  border-radius:3px;flex-shrink:0;text-transform:uppercase}
+.intel-event-title{font-size:11px;font-weight:600;color:var(--text-primary,#e6edf3);flex:1;line-height:1.4}
+.intel-event-date{font-size:9px;color:var(--text-muted,#8b949e);flex-shrink:0}
+.intel-event-body{font-size:10px;color:var(--text-secondary,#8b949e);line-height:1.5;
+  border-top:1px solid var(--border,#30363d);padding-top:5px;margin-top:4px}
+.intel-event-link{font-size:10px;color:var(--accent,#58a6ff);text-decoration:none;display:inline-block;margin-top:4px}
+.intel-event-link:hover{text-decoration:underline}
+.intel-type-policy{background:rgba(248,81,73,.12);color:#f85149;border:0.5px solid rgba(248,81,73,.3)}
+.intel-type-export{background:rgba(210,153,34,.12);color:#d29922;border:0.5px solid rgba(210,153,34,.3)}
+.intel-type-event{background:rgba(88,166,255,.12);color:#58a6ff;border:0.5px solid rgba(88,166,255,.25)}
+.intel-type-default{background:rgba(48,54,61,.5);color:var(--text-muted,#8b949e);border:0.5px solid var(--border,#30363d)}
+.intel-nodata{padding:14px 12px;font-size:11px;color:var(--text-muted,#8b949e);font-style:italic}
+.intel-footer{padding:8px 12px;font-size:10px;color:var(--text-muted,#8b949e);
+  border-top:1px solid var(--border,#30363d)}
+
+/* ══════════════════════════════════════════════════════════════════
+   NEWS SUB-TABS  (news panel with ticker/intel tabs)
+   ══════════════════════════════════════════════════════════════════ */
+.news-subpane{display:block}
+.news-subpane[style*="display:none"]{display:none !important}
+#news-tab-bar{padding:0 8px;background:var(--bg-secondary,#161b22)}
+#news-tab-bar .tab-btn{font-size:10px;padding:5px 10px}
+
+/* ══════════════════════════════════════════════════════════════════
+   PROVIDER badge label  (news feed header — ni-badge-apitube)
+   ══════════════════════════════════════════════════════════════════ */
+.ni-badge-apitube{background:rgba(163,113,247,.15);color:#a371f7;border:1px solid rgba(163,113,247,.3)}
+/* ══════════════════════════════════════════════════════════════════
+   phase1_styles.css — CSS additions for Phase 1 Identity modules
+   Append this to the end of style.css
+   Covers: openfigi.js · nasdaqdir.js · gleif.js
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   SHARED — Identity & Reference section head badge
+   ───────────────────────────────────────────────────────────────── */
+.gleif-head,
+.of-id-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gleif-src-badge,
+.of-id-src {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6e7681);
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   OPENFIGI — Identifiers block in #fund-des
+   ───────────────────────────────────────────────────────────────── */
+.of-identifiers-block {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #58a6ff;
+  border-radius: 0 6px 6px 0;
+}
+
+.of-id-grid {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.of-id-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.of-id-label {
+  font-size: 10px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.of-id-value {
+  font-size: 11px;
+  color: var(--color-text-primary, #e6edf3);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.of-id-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.of-id-link {
+  font-size: 10px;
+  color: var(--color-accent, #58a6ff);
+  text-decoration: none;
+}
+.of-id-link:hover { text-decoration: underline; }
+
+/* ─────────────────────────────────────────────────────────────────
+   NASDAQ DIRECTORY — DES listing block
+   ───────────────────────────────────────────────────────────────── */
+.ndq-dir-block {
+  margin: 8px 0 6px;
+  padding: 8px 12px;
+  background: var(--color-background-secondary, #161b22);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-left: 2px solid #3fb950;
+  border-radius: 0 6px 6px 0;
+}
+
+.ndq-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ndq-dir-label {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+.ndq-dir-vals {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.ndq-type-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.4px;
+}
+.ndq-etf    { background: rgba(88,166,255,0.15); color: #58a6ff; border: 0.5px solid rgba(88,166,255,0.35); }
+.ndq-mf     { background: rgba(162,94,247,0.15); color: #a371f7; border: 0.5px solid rgba(162,94,247,0.35); }
+.ndq-equity { background: rgba(63,185,80,0.12);  color: #3fb950; border: 0.5px solid rgba(63,185,80,0.3);  }
+
+.ndq-exch-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #8b949e);
+  background: var(--color-border, #21262d);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.ndq-cat-badge,
+.ndq-fund-fam,
+.ndq-fund-cat {
+  font-size: 9px;
+  color: var(--color-text-muted, #6e7681);
+  background: rgba(110,118,129,0.1);
+  border: 0.5px solid var(--color-border-secondary, #30363d);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
 
 /* Action / corp-action banners inside DES */
 .ndq-action-alert {
