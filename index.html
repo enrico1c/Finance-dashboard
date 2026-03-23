@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="uars-widget.css" />
   <script src="https://s3.tradingview.com/tv.js"></script>
-  <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 </head>
 <body>
   <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
@@ -753,14 +752,12 @@
         <button class="tab-btn"        data-tab="noaa"  onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
         <button class="tab-btn"        data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
       </div>
-      <div class="tab-pane active panel-content" data-tab="wm" id="alert-feed" style="overflow:hidden;padding:0">
+      <div class="tab-pane active panel-content" data-tab="wm" id="alert-feed" style="overflow:hidden;padding:0;height:100%">
         <a class="twitter-timeline"
            data-theme="dark"
            data-chrome="noheader nofooter noborders transparent"
-           data-tweet-limit="20"
-           href="https://twitter.com/DeItaone">
-          Tweets by @DeItaone
-        </a>
+           href="https://twitter.com/DeItaone?ref_src=twsrc%5Etfw">Tweets by DeItaone</a>
+        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
       </div>
       <div class="tab-pane        panel-content" data-tab="noaa"  id="alert-noaa"></div>
       <div class="tab-pane        panel-content" data-tab="eonet" id="alert-eonet"></div>
