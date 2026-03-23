@@ -2536,7 +2536,8 @@ function whStartPolling() {
           _whLog(sym, a.condition, a.value, a.url, res.status);
         } catch (e) { _whLog(sym, a.condition, a.value, a.url, 'ERR'); }
       }
-      // Toast notification    }
+      // Toast notification
+    }
     whRenderAlerts();
   }, 60000);
 }
@@ -2557,7 +2558,6 @@ const PANEL_META = {
   supply:        { label:'Supply·Chain', icon:'⛓'  },
   alert:         { label:'Alert·Feed',   icon:'⚡' },
   macro:         { label:'Macro·Intel',  icon:'📡' },
-  intel:         { label:'Intel·Feed',   icon:'🧠' },
   webhooks:      { label:'Webhooks',     icon:'🔔' },
   portfolio:     { label:'Portfolio',    icon:'💼' },
   screener:      { label:'Screener',     icon:'🔍' },
