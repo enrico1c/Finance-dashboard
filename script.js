@@ -388,9 +388,6 @@ function switchTab(panelId, tabId){
 function mRow(label,value,cls=""){
   return `<div class="metric ${cls}"><span>${escapeHtml(String(label))}</span><span>${escapeHtml(String(value))}</span></div>`;
 }
-function mRowHtml(label,value,cls=""){
-  return `<div class="metric ${cls}"><span>${escapeHtml(String(label))}</span><span>${value}</span></div>`;
-}
 function sHead(t){ return `<div class="section-head">${escapeHtml(t)}</div>`; }
 function noData(t){ return `<div class="no-data">// No local data for <strong>${escapeHtml(t)}</strong>.<br>Connect an API to populate live data.</div>`; }
 
@@ -646,11 +643,11 @@ function renderFundamentals(ticker) {
         <div class="av-live-badge">● WACC · ${escapeHtml(sym)} · beta:${betaSrc} · Kd:${kdSrc} · tax:${taxSrc}</div>
         ${sHead('WACC Inputs')}
         ${mRow('Risk-Free Rate (10Y)',       rf + '%')}
-        ${mRowHtml('Equity Risk Premium',        erp + '% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
-        ${mRowHtml('Beta (levered)',             beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+betaSrc+')</span>')}
+        ${mRow('Equity Risk Premium',        erp + '% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
+        ${mRow('Beta (levered)',             beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+betaSrc+')</span>')}
         ${mRow('Cost of Equity (Ke)',        ke + '%')}
-        ${mRowHtml('Pre-Tax Cost of Debt (Kd)',  kd.toFixed(2) + '% <span style="font-size:9px;opacity:.6">('+kdSrc+')</span>')}
-        ${mRowHtml('Tax Rate',                   tax.toFixed(1) + '% <span style="font-size:9px;opacity:.6">('+taxSrc+')</span>')}
+        ${mRow('Pre-Tax Cost of Debt (Kd)',  kd.toFixed(2) + '% <span style="font-size:9px;opacity:.6">('+kdSrc+')</span>')}
+        ${mRow('Tax Rate',                   tax.toFixed(1) + '% <span style="font-size:9px;opacity:.6">('+taxSrc+')</span>')}
         ${mRow('D/E Ratio',                  debtEq.toFixed(2))}
         ${mRow('Equity Weight',              eqW + '%')}
         ${mRow('Debt Weight',                debtW + '%')}
@@ -1513,8 +1510,6 @@ function computeDefaultLayout(){
   // ── SECONDARY (initially hidden or floating) ───────────────
   // Watchlist (floats over bottom-left when shown)
   panelLayout.watchlist    = {x: 0,                       y: botY, w: Math.round(W*0.25), h: rowB};
-  // Intel Feed (center, shown over bottom row)
-  panelLayout.intel        = {x: botW+G,                  y: botY, w: Math.round(W*0.35), h: rowB};
   // Macro Intel (right side of bottom)
   panelLayout.macro        = {x: (botW+G)*3,              y: botY, w: Math.round(W*0.26), h: rowB};
   // Notes (floating center)
@@ -2541,11 +2536,7 @@ function whStartPolling() {
           _whLog(sym, a.condition, a.value, a.url, res.status);
         } catch (e) { _whLog(sym, a.condition, a.value, a.url, 'ERR'); }
       }
-      // Toast notification
-      if (typeof wmIntelToast === 'function') {
-        wmIntelToast({ title: `🔔 Alert: ${sym}`, detail: `${whCondLabel(a.condition)} ${a.value} — current $${p.toFixed(2)}`, severity: 'high', icon: '🔔' });
-      }
-    }
+      // Toast notification    }
     whRenderAlerts();
   }, 60000);
 }

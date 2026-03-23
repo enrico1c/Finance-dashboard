@@ -165,9 +165,7 @@ window.geoLoadTerror = async function() {
       </div>
 
       <div class="gi-footer">Source: <a href="https://www.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT Project</a> · 100% free, no API key · Updates every 15 min</div>`;
-
-    // Auto-inject critical events into Intel Feed
-    _injectToIntelFeed(unique.slice(0,5).map(a => ({
+.map(a => ({
       type:     'terror',
       icon:     '💥',
       title:    a.title || '',
@@ -313,9 +311,7 @@ window.geoLoadCyber = async function() {
         · <a href="https://www.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT</a>
         · No API key required
       </div>`;
-
-    // Inject critical CVEs into Intel Feed
-    _injectToIntelFeed(recent.slice(0,3).map(v => ({
+.map(v => ({
       type:     'cyber',
       icon:     '🔒',
       title:    `${v.cveID}: ${v.vulnerabilityName||''}`,
@@ -465,9 +461,7 @@ window.geoLoadTravel = async function() {
         Source: <a href="https://travel.state.gov" target="_blank" class="geo-wm-link">US State Dept</a>
         · Updated continuously · No API key required
       </div>`;
-
-    // Inject Level 4 countries into Intel Feed
-    _injectToIntelFeed(level4.slice(0,3).map(item => ({
+.map(item => ({
       type:     'risk',
       icon:     '🚫',
       title:    item.title,
@@ -583,43 +577,7 @@ async function geoLoadInstabilityScores() {
   }
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   HELPER — Inject events into Intel Feed (wmIntelAlerts)
-   ══════════════════════════════════════════════════════════════════ */
-function _injectToIntelFeed(events) {
-  if (!Array.isArray(events) || !events.length) return;
-  if (typeof wmIntelAlerts === 'undefined' || !Array.isArray(wmIntelAlerts)) return;
 
-  events.forEach(evt => {
-    // Build id from title hash to avoid duplicates
-    const id = 'gi_' + Math.abs(
-      (evt.title||'').split('').reduce((h,c) => ((h<<5)-h+c.charCodeAt(0))|0, 0)
-    ).toString(36);
-
-    if (wmIntelAlerts.find(a => a.id === id)) return; // already present
-
-    wmIntelAlerts.unshift({
-      id, icon: evt.icon || '⚡',
-      type:     evt.type || 'intel',
-      title:    evt.title || '',
-      subtitle: evt.subtitle || '',
-      detail:   evt.detail || '',
-      severity: evt.severity || 'high',
-      ts:       evt.ts || Math.floor(Date.now()/1000),
-      resource: evt.resource || 'GeoIntel',
-      ticker:   evt.ticker || null,
-    });
-  });
-
-  // Re-render feed if visible
-  if (typeof wmRenderIntelFeed === 'function') wmRenderIntelFeed();
-  if (typeof sbSave === 'function') {
-    sbSave(events.map(e => ({
-      type: e.type||'intel', title: e.title||'', ts: e.ts,
-      sev: e.severity||'high', src: e.resource||'GeoIntel',
-    }))).catch(()=>{});
-  }
-}
 
 /* ══════════════════════════════════════════════════════════════════
    INIT — auto-load cyber on startup (quiet background fetch)
@@ -631,17 +589,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const kev = await fetchCISAKev();
       if (kev?.vulnerabilities) {
-        // Inject latest 3 critical CVEs into Intel Feed silently
         const recent = kev.vulnerabilities
           .sort((a,b) => (b.dateAdded||'').localeCompare(a.dateAdded||''))
           .slice(0, 3);
-        _injectToIntelFeed(recent.map(v => ({
-          type:     'cyber',
-          icon:     '🔒',
-          title:    `${v.cveID}: ${v.vulnerabilityName||''}`,
-          subtitle: `${v.vendorProject||''} ${v.product||''} · Due ${v.dueDate||''}`,
-          severity: v.knownRansomwareCampaignUse==='Known' ? 'critical' : 'high',
-          ts:       v.dateAdded ? new Date(v.dateAdded).getTime()/1000 : Date.now()/1000,
+.getTime()/1000 : Date.now()/1000,
           resource: 'CISA KEV',
         })));
       }
