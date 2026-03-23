@@ -17,9 +17,9 @@ const _fmt = (n, d=2) => n == null || isNaN(n) ? '—'
   : Math.abs(n)>=1e6  ? (n/1e6).toFixed(1)+'M'
   : Math.abs(n)>=1e3  ? (n/1e3).toFixed(1)+'K'
   : Number(n).toFixed(d);
-const _pct = n => n == null ? '—' : (n*100).toFixed(2)+'%';
+const _FEXT_pct = n => n == null ? '—' : (n*100).toFixed(2)+'%';
 const _clr = n => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
-const _fmpKey = () => (typeof getFmpKey === 'function' ? getFmpKey() : '') || '';
+const _FEXT_fmpKey = () => (typeof getFmpKey === 'function' ? getFmpKey() : '') || '';
 const _fhKey  = () => (typeof getFinnhubKey === 'function' ? getFinnhubKey() : '') || '';
 
 /* ══════════════════════════════════════════════════════════════════
@@ -371,7 +371,7 @@ async function portFetchPrices(tickers) {
   const cryptos = tickers.filter(t => !stocks.includes(t));
 
   // 1. FMP batch quote
-  const fmpKey = _fmpKey();
+  const fmpKey = _FEXT_fmpKey();
   if (fmpKey && stocks.length) {
     try {
       const res = await fetch(`https://financialmodelingprep.com/api/v3/quote/${stocks.join(',')}?apikey=${fmpKey}`);
@@ -1001,7 +1001,7 @@ function _scrSavePresets(p){ try{localStorage.setItem('scr_presets',JSON.stringi
 
 /* ── FMP Screener (primary) ───────────────────────────────────────── */
 async function _screenerFMP(params) {
-  const key = _fmpKey();
+  const key = _FEXT_fmpKey();
   if (!key) return null;
   try {
     const p = { ...params, isEtf:'false', isActivelyTrading:'true', limit:'250', apikey:key };
