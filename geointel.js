@@ -687,13 +687,24 @@ async function _fetchUCDPActive() {
   const cached = _giGet(cacheKey, _GW_CACHE_MS);
   if (cached) return cached;
   try {
-    // UCDP GED API — active dyads (conflict pairs) current year
+    // UCDP GED API — try direct, fallback to allorigins proxy (CORS)
     const year = new Date().getFullYear();
-    const url  = `https://ucdpapi.pcr.uu.se/api/gedevents/${year}?pagesize=100&page=1`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    const json = await res.json();
+    const ucdpUrl = `https://ucdpapi.pcr.uu.se/api/gedevents/${year}?pagesize=100&page=1`;
+    let json = null;
+    try {
+      const res = await fetch(ucdpUrl, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) json = await res.json();
+    } catch {}
+    // CORS fallback via allorigins
+    if (!json?.Result) {
+      try {
+        const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(ucdpUrl)}`;
+        const res2  = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+        if (res2.ok) json = await res2.json();
+      } catch {}
+    }
     const data = json?.Result || [];
-    _giSet(cacheKey, data, _GW_CACHE_MS);
+    if (data.length) _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
   } catch { return []; }
 }
@@ -858,9 +869,20 @@ async function _fetchWorldBankCommodities() {
 
     const results = await Promise.allSettled(
       indicators.map(async ind => {
-        const url = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(ind.id)}?downloadformat=json&mrv=3&format=json`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-        const json = await res.json();
+        const wbUrl = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(ind.id)}?downloadformat=json&mrv=3&format=json`;
+        let wbRes = null;
+        try {
+          const r = await fetch(wbUrl, { signal: AbortSignal.timeout(6000) });
+          if (r.ok) wbRes = await r.json();
+        } catch {}
+        if (!wbRes?.[1]) {
+          try {
+            const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(wbUrl)}`;
+            const r2 = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+            if (r2.ok) wbRes = await r2.json();
+          } catch {}
+        }
+        const json = wbRes;
         const obs = json?.[1]?.filter(o => o.value != null) || [];
         return { ...ind, latest: obs[0]?.value, prev: obs[1]?.value, date: obs[0]?.date };
       })

@@ -27,159 +27,195 @@ const _fhKey  = () => (typeof getFinnhubKey === 'function' ? getFinnhubKey() : '
    Sources: Finnhub /stock/short-interest (free key)
             SEC FTD text files (public, no key)
    ══════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════
+   PUNTO 4 — SHORT INTEREST  v2  (FINRA no-key + FMP + Finnhub)
+   Sources:
+   1. FINRA equity short interest JSON  (no key)
+   2. FMP /short-float                  (existing key)
+   3. Finnhub /stock/short-interest     (existing key)
+   ══════════════════════════════════════════════════════════════════ */
+
 async function fhLoadShortInterest(sym) {
   const el = document.getElementById('fund-short');
   if (!el) return;
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest for ${_esc(sym)}…</div>`;
 
-  const key = _fhKey();
-  let shortData = null, ftdData = null;
+  let shortData = null, src = '';
 
-  // ── Finnhub short interest ──────────────────────────────────────
-  if (key) {
-    try {
-      const from = new Date(Date.now() - 180*864e5).toISOString().slice(0,10);
-      const to   = new Date().toISOString().slice(0,10);
-      const res  = await fetch(`https://finnhub.io/api/v1/stock/short-interest?symbol=${sym}&from=${from}&to=${to}&token=${key}`);
-      const json = await res.json();
-      shortData  = json?.data || json || null;
-      if (Array.isArray(shortData) && shortData.length === 0) shortData = null;
-    } catch {}
-  }
-
-  // ── SEC FTD (Fails-to-Deliver) ─────────────────────────────────
-  // SEC publishes monthly FTD files at sec.gov (plain text, CORS-ok via proxy)
-  // We use the current month's file
+  // ── 1. FINRA Short Interest API (no key) ─────────────────────────
   try {
-    const now = new Date();
-    const yr  = now.getFullYear();
-    const mo  = String(now.getMonth() + 1).padStart(2,'0');
-    // SEC FTD files are published twice/month (1st-15th, 16th-end)
-    const half = now.getDate() <= 16 ? '01' : '16';
-    const fname = `cnsfails${yr}${mo}${half}.zip`;
-    // SEC doesn't support CORS directly — use their public FTP endpoint text version
-    // Available as: https://www.sec.gov/files/data/fails-deliver-data/cnsfails{YYYYMM}{half}.zip
-    // Since we can't unzip in browser easily, parse the previous month's known text file
-    const prevMo = String(now.getMonth()).padStart(2,'0') || '12';
-    const prevYr = now.getMonth() === 0 ? yr-1 : yr;
-    const ftdUrl = `https://www.sec.gov/files/data/fails-deliver-data/cnsfails${prevYr}${prevMo}b.zip`;
-    // Skip actual SEC fetch — just show link (CORS restrictions on zip)
-    ftdData = { url: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${sym}&type=&dateb=&owner=include&count=40&search_text=`, sym };
+    // FINRA publishes bi-monthly short interest via public JSON
+    // Direct API: https://services.finra.org/api/v1/otcmarket/short/queries/... 
+    // Also: https://www.finra.org/finra-data/browse-catalog/equity-short-interest/data
+    const finraUrl = `https://services.finra.org/api/v1/otcmarket/short/queries/shortinterest?Symbol=${encodeURIComponent(sym)}&SortField=SettlementDate&SortType=DESC&ResultCount=12`;
+    const res = await fetch(finraUrl, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const rows = json?.rows || json?.result?.rows || json;
+      if (Array.isArray(rows) && rows.length) {
+        shortData = rows.map(r => ({
+          date:          r.settlementDate || r.SettlementDate || r.date,
+          shortVolume:   parseInt(r.shortInterestQty || r.ShortInterestQty || r.shortVolume || 0),
+          totalVolume:   parseInt(r.totalVolume || r.TotalVolume || 0),
+          shortRatio:    parseFloat(r.daysToCover || r.DaysToCover || 0),
+          _src: 'FINRA',
+        }));
+        src = 'FINRA (no key)';
+      }
+    }
   } catch {}
 
-  // ── Render ──────────────────────────────────────────────────────
-  if (!key) {
-    el.innerHTML = `<div class="no-data">// Add Finnhub key in ⚙ Settings for live short interest data.</div>`;
-    return;
+  // ── 2. FMP /short-float (key) ───────────────────────────────────
+  if (!shortData?.length) {
+    const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+    if (fmpKey) {
+      try {
+        const res  = await fetch(`https://financialmodelingprep.com/api/v4/short-float?symbol=${sym}&apikey=${fmpKey}`, { signal: AbortSignal.timeout(7000) });
+        const json = await res.json();
+        if (Array.isArray(json) && json.length) {
+          shortData = json.map(r => ({
+            date:        r.date,
+            shortVolume: r.shortFloat ? Math.round(r.shortFloat * (r.sharesOutstanding||1)/100) : null,
+            shortRatio:  r.shortRatio || r.daysTocover || null,
+            shortFloat:  r.shortFloat,
+            _src: 'FMP',
+          }));
+          src = 'FMP';
+        }
+      } catch {}
+    }
   }
 
-  if (!shortData) {
+  // ── 3. Finnhub /stock/short-interest (key) ──────────────────────
+  if (!shortData?.length) {
+    const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : (typeof _fhKey === 'function' ? _fhKey() : '');
+    if (fhKey) {
+      try {
+        const from = new Date(Date.now() - 180*864e5).toISOString().slice(0,10);
+        const to   = new Date().toISOString().slice(0,10);
+        const res  = await fetch(`https://finnhub.io/api/v1/stock/short-interest?symbol=${sym}&from=${from}&to=${to}&token=${fhKey}`, { signal: AbortSignal.timeout(7000) });
+        const json = await res.json();
+        const rows = json?.data;
+        if (Array.isArray(rows) && rows.length) {
+          shortData = rows.map(r => ({
+            date: r.date, shortVolume: r.shortInterest,
+            shortRatio: r.daysTocover || null, _src: 'Finnhub',
+          }));
+          src = 'Finnhub';
+        }
+      } catch {}
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────────────────
+  if (!shortData?.length) {
     el.innerHTML = `
       <div class="av-live-badge">● Short Interest · ${_esc(sym)}</div>
       <div class="no-data" style="margin-top:8px">
-        // No short interest data available for <strong>${_esc(sym)}</strong>.<br>
-        // This is common for non-US or small-cap stocks.<br><br>
-        // Alternative sources:<br>
-        // <a href="https://finra-markets.morningstar.com/MarketData/EquityOptions/detail.jsp?query=14:0P0000006A" target="_blank" class="geo-wm-link">FINRA ↗</a>
-        &nbsp;·&nbsp; <a href="https://iborrowdesk.com/report/${_esc(sym)}" target="_blank" class="geo-wm-link">iBorrowDesk ↗</a>
-        &nbsp;·&nbsp; <a href="https://stockanalysis.com/stocks/${_esc(sym.toLowerCase())}/short-interest/" target="_blank" class="geo-wm-link">StockAnalysis ↗</a>
+        // No short interest data found for <strong>${_esc(sym)}</strong>.<br>
+        // External sources:&nbsp;
+        <a href="https://iborrowdesk.com/report/${_esc(sym)}" target="_blank" class="geo-wm-link">iBorrowDesk ↗</a>&nbsp;·&nbsp;
+        <a href="https://finra-markets.morningstar.com/MarketData/EquityOptions/detail.jsp" target="_blank" class="geo-wm-link">FINRA ↗</a>&nbsp;·&nbsp;
+        <a href="https://stockanalysis.com/stocks/${_esc(sym.toLowerCase())}/short-interest/" target="_blank" class="geo-wm-link">StockAnalysis ↗</a>
       </div>`;
     return;
   }
 
-  // Sort by date descending
-  const sorted = [...shortData].sort((a,b) => (b.date||b.settleDate||'') > (a.date||a.settleDate||'') ? 1 : -1);
-  const latest = sorted[0];
-  const prev   = sorted[1];
+  // Sort by date desc
+  shortData.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  const latest = shortData[0];
 
-  const si     = latest?.shortInterest ?? latest?.short_interest ?? null;
-  const prev_si= prev?.shortInterest   ?? prev?.short_interest   ?? null;
-  const avgVol = latest?.avgVolume ?? latest?.averageDailyVolume ?? null;
-  const dtc    = (si && avgVol) ? (si / avgVol) : null;
-  const chgPct = (si && prev_si) ? ((si - prev_si) / prev_si) : null;
-  const float  = latest?.float ?? latest?.sharesFloat ?? null;
-  const siPct  = (si && float) ? (si / float) : null;
+  // Mini sparkline SVG of short volume over time
+  const volumes = shortData.slice(0,12).map(r => r.shortVolume||0).reverse();
+  const maxV = Math.max(...volumes, 1);
+  const sparkPts = volumes.map((v,i) => `${(i/(volumes.length-1)*200).toFixed(0)},${(30-(v/maxV*28)).toFixed(0)}`).join(' ');
 
-  // Signal
-  let signal = '—', sigColor = 'var(--text-muted)';
-  if (siPct !== null) {
-    if (siPct > 0.20)      { signal = '🐻 Very High Short'; sigColor = '#f85149'; }
-    else if (siPct > 0.10) { signal = '⚠️ High Short';       sigColor = '#f0883e'; }
-    else if (siPct < 0.03) { signal = '🐂 Low Short';        sigColor = '#3fb950'; }
-    else                   { signal = 'Moderate';            sigColor = '#d29922'; }
-  }
-  if (dtc !== null && dtc > 5) signal += ` · ${dtc.toFixed(1)}d to cover`;
+  const fmtSI = v => v == null ? '—' : v >= 1e9 ? (v/1e9).toFixed(2)+'B' : v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : String(v);
 
-  // Mini sparkline of short interest history
-  const vals = sorted.slice(0,12).reverse().map(d => d.shortInterest ?? d.short_interest ?? 0).filter(Boolean);
-  let spark = '';
-  if (vals.length >= 3) {
-    const mn = Math.min(...vals), mx = Math.max(...vals), rng = mx-mn || 1;
-    const pts = vals.map((v,i) => `${(i/(vals.length-1))*120},${20-((v-mn)/rng)*18}`).join(' ');
-    spark = `<svg viewBox="0 0 120 22" class="si-spark">
-      <polyline points="${pts}" fill="none" stroke="#58a6ff" stroke-width="1.5" stroke-linejoin="round"/>
-    </svg>`;
-  }
+  let html = `<div class="av-live-badge">● Short Interest · ${_esc(sym)} · ${_esc(src)}</div>`;
 
-  el.innerHTML = `
-    <div class="av-live-badge">● Short Interest · ${_esc(sym)} · Finnhub</div>
-    <div class="si-signal" style="color:${sigColor}">${signal}</div>
+  // KPI row
+  html += `<div class="si-kpi-row">
+    <div class="si-kpi"><span class="si-kpi-label">Short Volume</span><span class="si-kpi-val">${fmtSI(latest.shortVolume)}</span></div>
+    ${latest.shortFloat != null ? `<div class="si-kpi"><span class="si-kpi-label">Short Float %</span><span class="si-kpi-val ${latest.shortFloat > 20 ? 'wm-neg' : ''}">${parseFloat(latest.shortFloat).toFixed(2)}%</span></div>` : ''}
+    ${latest.shortRatio != null ? `<div class="si-kpi"><span class="si-kpi-label">Days to Cover</span><span class="si-kpi-val">${parseFloat(latest.shortRatio).toFixed(1)}d</span></div>` : ''}
+    <div class="si-kpi"><span class="si-kpi-label">As of</span><span class="si-kpi-val" style="font-size:11px">${_esc(latest.date?.slice(0,10)||'—')}</span></div>
+  </div>`;
 
-    <div class="si-kpi-grid">
-      <div class="si-kpi">
-        <span class="si-kpi-lbl">Short Interest</span>
-        <span class="si-kpi-val">${si != null ? _fmt(si,0) : '—'}</span>
-        ${chgPct != null ? `<span class="si-kpi-chg ${_clr(chgPct)}">${chgPct>=0?'+':''}${(chgPct*100).toFixed(1)}% vs prev</span>` : ''}
-      </div>
-      <div class="si-kpi">
-        <span class="si-kpi-lbl">% of Float</span>
-        <span class="si-kpi-val ${siPct>0.2?'neg':siPct<0.03?'pos':''}">${siPct != null ? (siPct*100).toFixed(2)+'%' : '—'}</span>
-      </div>
-      <div class="si-kpi">
-        <span class="si-kpi-lbl">Days to Cover</span>
-        <span class="si-kpi-val ${dtc>5?'neg':dtc<2?'pos':''}">${dtc != null ? dtc.toFixed(2) : '—'}</span>
-        <span class="si-kpi-chg">Avg Volume ${avgVol ? _fmt(avgVol,0) : '—'}</span>
-      </div>
-      <div class="si-kpi">
-        <span class="si-kpi-lbl">Shares Float</span>
-        <span class="si-kpi-val">${float != null ? _fmt(float,0) : '—'}</span>
-      </div>
-    </div>
-
-    <div class="si-spark-wrap">
-      <span class="si-spark-lbl">Short Interest Trend (6M)</span>
-      ${spark || '<span class="si-spark-na">Not enough data</span>'}
-    </div>
-
-    <div class="section-head" style="margin-top:10px">History</div>
-    <div style="overflow-x:auto">
-      <table class="yf-fin-table">
-        <thead><tr><th>Date</th><th>Short Int.</th><th>Avg Vol</th><th>Days to Cover</th></tr></thead>
-        <tbody>
-          ${sorted.slice(0,10).map(r => {
-            const d  = r.date || r.settleDate || '';
-            const si = r.shortInterest ?? r.short_interest;
-            const av = r.avgVolume ?? r.averageDailyVolume;
-            const dt = (si && av) ? (si/av).toFixed(2) : '—';
-            return `<tr>
-              <td>${_esc(d)}</td>
-              <td>${si != null ? _fmt(si,0) : '—'}</td>
-              <td>${av != null ? _fmt(av,0)  : '—'}</td>
-              <td>${dt}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="si-links">
-      <span style="font-size:9px;color:var(--text-muted)">External:</span>
-      <a href="https://iborrowdesk.com/report/${_esc(sym)}" target="_blank" class="geo-wm-link">iBorrowDesk ↗</a>
-      <a href="https://stockanalysis.com/stocks/${_esc(sym.toLowerCase())}/short-interest/" target="_blank" class="geo-wm-link">StockAnalysis ↗</a>
-      <a href="https://finviz.com/quote.ashx?t=${_esc(sym)}" target="_blank" class="geo-wm-link">Finviz ↗</a>
+  // Sparkline
+  if (volumes.length > 1) {
+    html += `<div class="si-spark-wrap">
+      <svg viewBox="0 0 200 34" width="100%" height="34" preserveAspectRatio="none" style="display:block">
+        <polyline points="${sparkPts}" fill="none" stroke="#f85149" stroke-width="1.5" stroke-linejoin="round"/>
+        <text x="2" y="10" font-size="7" fill="#6e7681">Short volume trend</text>
+      </svg>
     </div>`;
+  }
+
+  // History table
+  html += `<div style="overflow-x:auto;max-height:220px;overflow-y:auto"><table class="port-table" style="font-size:10px">
+    <thead><tr><th>Date</th><th>Short Volume</th>${latest.shortFloat!=null?'<th>Float %</th>':''}${latest.shortRatio!=null?'<th>Days to Cover</th>':''}</tr></thead>
+    <tbody>
+    ${shortData.slice(0,12).map(r=>`<tr>
+      <td style="font-family:var(--font-mono)">${_esc(r.date?.slice(0,10)||'—')}</td>
+      <td>${fmtSI(r.shortVolume)}</td>
+      ${r.shortFloat!=null?`<td class="${parseFloat(r.shortFloat)>20?'wm-neg':''}">${parseFloat(r.shortFloat).toFixed(2)}%</td>`:''}
+      ${r.shortRatio!=null?`<td>${parseFloat(r.shortRatio).toFixed(1)}d</td>`:''}
+    </tr>`).join('')}
+    </tbody></table></div>`;
+
+  html += `<div class="av-note" style="margin-top:6px">
+    Data: ${_esc(src)} · FINRA settlement dates · 
+    <a href="https://www.finra.org/finra-data/browse-catalog/equity-short-interest" target="_blank" class="geo-wm-link">FINRA ↗</a>
+  </div>`;
+
+  // ── Append SEC FTD data async ────────────────────────────────────
+  el.innerHTML = html;
+  _loadFTDData(sym, el);
 }
+
+/* ── SEC EDGAR Failure-to-Deliver (FTD) data ───────────────────── */
+async function _loadFTDData(sym, container) {
+  try {
+    // SEC FTD files: published twice monthly, txt pipe-delimited
+    // https://www.sec.gov/data/fails-deliver-data/cnsfails{YYYYMM}b.zip → proxy via EDGAR EFTS
+    // Use EDGAR company search as lightweight alternative
+    const now   = new Date();
+    const yyyymm= `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}`;
+    // Check EDGAR for recent FTD mentions (regulatory filings reference FTD)
+    const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=%22${encodeURIComponent(sym)}%22+%22failure+to+deliver%22&dateRange=custom&startdt=${new Date(Date.now()-90*86400000).toISOString().slice(0,10)}&forms=REG+SHO`;
+    const res = await fetch(searchUrl, {
+      headers: { 'User-Agent':'FINTERM dashboard@finterm.io' },
+      signal: AbortSignal.timeout(8000)
+    });
+    const data = await res.json();
+    const hits = data?.hits?.hits || [];
+    if (!hits.length) return;
+
+    const ftdSection = document.createElement('div');
+    ftdSection.className = 'si-ftd-section';
+    ftdSection.innerHTML = `
+      <div class="si-ftd-title">📋 SEC FTD Mentions (Reg SHO Threshold)</div>
+      ${hits.slice(0,4).map(h => {
+        const d = h._source;
+        return `<div class="si-ftd-row">
+          <span class="si-ftd-date">${(d?.period_of_report||d?.file_date||'').slice(0,10)}</span>
+          <a href="https://www.sec.gov${d?.file_path||'#'}" target="_blank" class="geo-wm-link si-ftd-link">${_esc((d?.display_names?.[0]||'SEC filing').slice(0,40))}</a>
+        </div>`;
+      }).join('')}
+      <div style="font-size:9px;color:var(--text-muted);margin-top:4px">
+        <a href="https://www.sec.gov/data/fails-deliver-data" target="_blank" class="geo-wm-link">SEC FTD Data Portal ↗</a>
+      </div>`;
+    container.appendChild(ftdSection);
+  } catch {}
+}
+
 window.fhLoadShortInterest = fhLoadShortInterest;
+
+
 
 /* ══════════════════════════════════════════════════════════════════
    MODULE 2 — PORTFOLIO P&L TRACKER  v2.0
@@ -546,6 +582,10 @@ async function portRender() {
   const dailyRet = sortedSnaps.length>1
     ? sortedSnaps.slice(1).map((s,i)=>(s.totalValue-sortedSnaps[i].totalValue)/sortedSnaps[i].totalValue)
     : [];
+  // ── First-time user: snapshots accumulate daily — analytics need ≥30 days
+  const _snapCount = sortedSnaps.length;
+  const _needsMoreSnaps = _snapCount < 30;
+
   const sharpe   = _portCalcSharpe(dailyRet);
   const sortino  = _portCalcSortino(dailyRet);
   const maxDD    = _portCalcMaxDD(dailyRet);
@@ -580,6 +620,10 @@ async function portRender() {
       <small>(${totalPnlPct>=0?'+':''}${f2(totalPnlPct*100)}%)</small>
     </span>
   </div>
+  ${_needsMoreSnaps?`<div class="port-sum-block" style="grid-column:1/-1">
+    <span class="port-sum-lbl" style="color:var(--text-muted)">📈 Building analytics history…</span>
+    <span class="port-sum-val" style="font-size:11px;color:var(--text-muted)">${_snapCount}/30 daily snapshots — Sharpe, Sortino & Max Drawdown unlock after 30 trading days.</span>
+  </div>`:''}
   ${sharpe!=null?`<div class="port-sum-block">
     <span class="port-sum-lbl">Sharpe Ratio</span>
     <span class="port-sum-val ${sharpe>=1?'pos':sharpe<0?'neg':''}">${f2(sharpe)}</span>
@@ -980,6 +1024,67 @@ async function _screenerFMP(params) {
 }
 
 /* ── Yahoo Screener fallback (no key) ────────────────────────────── */
+/* ── NASDAQ Public Screener (no key) ────────────────────────────── */
+async function _screenerNASDAQ(params={}) {
+  // api.nasdaq.com/api/screener/stocks — no auth required
+  // Params: exchange, marketcap, sector, country, ipoyear, volume, limit
+  try {
+    const url = new URL('https://api.nasdaq.com/api/screener/stocks');
+    url.searchParams.set('tableonly', 'true');
+    url.searchParams.set('limit', '250');
+    url.searchParams.set('offset', '0');
+
+    // Map our standard params to NASDAQ API
+    if (params.exchange)          url.searchParams.set('exchange', params.exchange);
+    if (params.sector)            url.searchParams.set('sector',   params.sector);
+    if (params.marketCapMoreThan) url.searchParams.set('marketcap', _mktCapLabel(params.marketCapMoreThan));
+    if (params.country)           url.searchParams.set('country',   params.country);
+
+    const res = await fetch(url.toString(), {
+      headers: { 'User-Agent':'Mozilla/5.0', 'Accept':'application/json', 'Referer':'https://www.nasdaq.com/' },
+      signal: AbortSignal.timeout(9000)
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const rows = json?.data?.table?.rows || json?.data?.rows || [];
+    if (!rows.length) return null;
+
+    return rows.map(r => ({
+      symbol:      r.symbol,
+      name:        r.name        || r.companyName || '',
+      sector:      r.sector      || '',
+      exchange:    r.exchange    || params.exchange || 'NASDAQ',
+      price:       parseFloat(r.lastsale?.replace(/[$,]/g,'')  || r.price   || 0) || null,
+      marketCap:   _parseNasdaqMktCap(r.marketCap || r.mktcap  || ''),
+      volume:      parseInt((r.volume||'0').replace(/,/g,''))    || null,
+      country:     r.country     || 'US',
+      pe:          null, roe:null, roa:null, debtEq:null, netMargin:null,
+      dividendYield: parseFloat(r.annualDividend||0)||null,
+      _src:        'NASDAQ (no key)',
+    }));
+  } catch(e) {
+    console.warn('[NASDAQ Screener]', e.message);
+    return null;
+  }
+}
+
+function _mktCapLabel(minVal) {
+  if (minVal >= 200e9) return 'mega';
+  if (minVal >= 10e9)  return 'large';
+  if (minVal >= 2e9)   return 'mid';
+  if (minVal >= 300e6) return 'small';
+  return 'micro';
+}
+
+function _parseNasdaqMktCap(s) {
+  if (!s || s === 'N/A') return null;
+  const m = s.match(/([\d.]+)([BTMK]?)/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  const u = m[2].toUpperCase();
+  return n * ({ B:1e9, T:1e12, M:1e6, K:1e3 }[u] || 1);
+}
+
 async function _screenerYahoo(criteria={}) {
   try {
     const ops = [];
@@ -1140,6 +1245,7 @@ async function screenerRunPreset(key) {
 
   let results = await _screenerFMP(preset.fmp);
   if (!results?.length) results = await _screenerYahoo(preset.fmp) || [];
+  if (!results?.length) results = await _screenerNASDAQ(preset.fmp) || [];
 
   if (preset.post) results = preset.post(results);
 
@@ -1234,10 +1340,11 @@ async function screenerRun() {
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Screening stocks…</div>`;
   if (status) status.textContent = '';
 
-  // Try FMP then Yahoo
+  // Try FMP → Yahoo → NASDAQ (no key)
   let arr = await _screenerFMP(params);
-  const src = arr?.length ? 'FMP' : 'Yahoo';
-  if (!arr?.length) arr = await _screenerYahoo(params) || [];
+  let src = arr?.length ? 'FMP' : '';
+  if (!arr?.length) { arr = await _screenerYahoo(params) || []; if (arr.length) src = 'Yahoo'; }
+  if (!arr?.length) { arr = await _screenerNASDAQ(params) || []; if (arr.length) src = 'NASDAQ'; }
 
   if (!arr.length) {
     el.innerHTML = `<div class="no-data">// No stocks match. Try relaxing the filters.</div>`;
@@ -1411,136 +1518,188 @@ window.screenerRunInstitutional = screenerRunInstitutional;
 
 
 /* ══════════════════════════════════════════════════════════════════
-   MODULE 5 — BONDS / CREDIT SPREADS
-   Source: FRED DAAA, DBAA, DGS10 (existing FRED key)
-           + yield curve enhancement
+   MODULE 5 — BONDS / CREDIT SPREADS  v2
+   Sources:
+   • FRED BAMLC0A0CM (IG OAS), BAMLH0A0HYM2 (HY OAS),
+     BAMLC0A4CBBB (BBB OAS), T10YIE (Inflation Breakeven)
+     DGS10, DGS2, DGS30, T10Y2Y  (all via existing FRED key)
+   • US Treasury Direct XML  (no key — official daily data)
    ══════════════════════════════════════════════════════════════════ */
+
 async function bondsLoadSpreads() {
   const el = document.getElementById('bonds-content');
   if (!el) return;
-  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading credit spreads…</div>`;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading bond spreads…</div>`;
 
   const fredKey = (typeof getFredKey === 'function') ? getFredKey() : '';
-  if (!fredKey) {
-    el.innerHTML = `<div class="no-data">// Add FRED key in ⚙ Settings for bond spread data (free at fred.stlouisfed.org).</div>`;
+
+  // ── Always try US Treasury Direct (no key) first for yield curve ─
+  let treasuryData = null;
+  if (typeof fredLoadTreasuryDirect === 'function') {
+    treasuryData = await fredLoadTreasuryDirect();
+  }
+
+  if (!fredKey && !treasuryData) {
+    el.innerHTML = `<div class="no-data">// Add FRED key in ⚙ Settings for credit spread data (free at fred.stlouisfed.org).</div>`;
     return;
   }
 
   const SERIES = [
-    { id:'DGS10',    label:'10Y Treasury',     color:'#58a6ff', group:'treasury' },
-    { id:'DGS2',     label:'2Y Treasury',       color:'#4dbbff', group:'treasury' },
-    { id:'DGS30',    label:'30Y Treasury',      color:'#7c9',    group:'treasury' },
-    { id:'DGS1MO',   label:'1M T-Bill',         color:'#6e7681', group:'treasury' },
-    { id:'DAAA',     label:'AAA Corporate',     color:'#3fb950', group:'corp'    },
-    { id:'DBAA',     label:'BAA Corporate',     color:'#d29922', group:'corp'    },
-    { id:'BAMLH0A0HYM2', label:'HY OAS Spread', color:'#f85149', group:'spread'  },
-    { id:'T10Y2Y',   label:'10Y-2Y Spread',     color:'#a371f7', group:'spread'  },
+    { id:'DGS10',        label:'10Y Treasury',   color:'#58a6ff', group:'treasury' },
+    { id:'DGS2',         label:'2Y Treasury',    color:'#4dbbff', group:'treasury' },
+    { id:'DGS30',        label:'30Y Treasury',   color:'#7c9',    group:'treasury' },
+    { id:'DGS1MO',       label:'1M T-Bill',      color:'#6e7681', group:'treasury' },
+    { id:'BAMLC0A0CM',   label:'IG OAS',         color:'#3fb950', group:'spread'   },
+    { id:'BAMLC0A4CBBB', label:'BBB OAS',        color:'#d29922', group:'spread'   },
+    { id:'BAMLH0A0HYM2', label:'HY OAS',         color:'#f85149', group:'spread'   },
+    { id:'T10YIE',       label:'10Y Breakeven',  color:'#a371f7', group:'inflation'},
+    { id:'T5YIE',        label:'5Y Breakeven',   color:'#b483f7', group:'inflation'},
+    { id:'T10Y2Y',       label:'10Y-2Y Spread',  color:'#f0883e', group:'curve'    },
   ];
 
-  try {
-    const fetchSeries = async id => {
-      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${fredKey}&file_type=json&sort_order=desc&limit=60`;
-      const res  = await fetch(url);
-      const json = await res.json();
-      const obs  = (json.observations||[]).filter(o=>o.value!=='.');
-      return { id, latest: obs[0], history: obs.slice(0,30).reverse() };
+  let map = {};
+
+  // ── Fetch FRED series (if key) ────────────────────────────────────
+  if (fredKey) {
+    const fetchS = async id => {
+      try {
+        const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${fredKey}&file_type=json&sort_order=desc&limit=60`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const json = await res.json();
+        const obs = (json.observations||[]).filter(o=>o.value!=='.');
+        return { id, latest: obs[0], history: obs.slice(0,30).reverse() };
+      } catch { return { id, latest:null, history:[] }; }
     };
-
-    const results = await Promise.all(SERIES.map(s => fetchSeries(s.id).catch(() => ({ id:s.id, latest:null, history:[] }))));
-    const map = {};
-    results.forEach(r => { map[r.id] = r; });
-
-    const tsy10  = parseFloat(map['DGS10']?.latest?.value);
-    const tsy2   = parseFloat(map['DGS2']?.latest?.value);
-    const aaa    = parseFloat(map['DAAA']?.latest?.value);
-    const baa    = parseFloat(map['DBAA']?.latest?.value);
-    const hy     = parseFloat(map['BAMLH0A0HYM2']?.latest?.value);
-    const spread = parseFloat(map['T10Y2Y']?.latest?.value);
-
-    const aaaSpr = (aaa && tsy10) ? (aaa - tsy10).toFixed(2) : '—';
-    const baaSpr = (baa && tsy10) ? (baa - tsy10).toFixed(2) : '—';
-    const inv    = spread < 0 ? '🔴 INVERTED' : spread > 0.5 ? '🟢 Normal' : '🟡 Flat';
-
-    // Mini SVG line for a series
-    const miniLine = (history, color) => {
-      const vals = history.map(h => parseFloat(h.value)).filter(v => !isNaN(v));
-      if (vals.length < 3) return '';
-      const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||0.01;
-      const pts = vals.map((v,i)=>`${(i/(vals.length-1))*80},${16-((v-mn)/rng)*14}`).join(' ');
-      return `<svg viewBox="0 0 80 18" style="display:block"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
-    };
-
-    el.innerHTML = `
-      <div class="av-live-badge">● FRED Bond Data · ${map['DGS10']?.latest?.date||''}</div>
-
-      <!-- Yield curve summary -->
-      <div class="bonds-section">
-        <div class="bonds-section-title">Yield Curve</div>
-        <div class="bonds-kpi-grid">
-          ${[['1M',map['DGS1MO']],['2Y',map['DGS2']],['10Y',map['DGS10']],['30Y',map['DGS30']]].map(([lbl,d])=>{
-            const v = parseFloat(d?.latest?.value);
-            return `<div class="bonds-kpi">
-              <span class="bonds-kpi-lbl">${lbl}</span>
-              <span class="bonds-kpi-val">${isNaN(v)?'—':v.toFixed(2)+'%'}</span>
-              ${miniLine(d?.history||[],'#58a6ff')}
-            </div>`;
-          }).join('')}
-        </div>
-        <div class="bonds-spread-pill" style="color:${spread<0?'#f85149':'#3fb950'}">
-          10Y-2Y: ${isNaN(spread)?'—':spread.toFixed(2)+'%'} ${isNaN(spread)?'':inv}
-        </div>
-      </div>
-
-      <!-- Corporate spreads -->
-      <div class="bonds-section">
-        <div class="bonds-section-title">Credit Spreads (vs 10Y Treasury)</div>
-        <div class="bonds-kpi-grid">
-          <div class="bonds-kpi">
-            <span class="bonds-kpi-lbl">AAA Corp</span>
-            <span class="bonds-kpi-val">${isNaN(aaa)?'—':aaa.toFixed(2)+'%'}</span>
-            <span class="bonds-kpi-spread">+${aaaSpr}% spread</span>
-            ${miniLine(map['DAAA']?.history||[],'#3fb950')}
-          </div>
-          <div class="bonds-kpi">
-            <span class="bonds-kpi-lbl">BAA Corp</span>
-            <span class="bonds-kpi-val">${isNaN(baa)?'—':baa.toFixed(2)+'%'}</span>
-            <span class="bonds-kpi-spread">+${baaSpr}% spread</span>
-            ${miniLine(map['DBAA']?.history||[],'#d29922')}
-          </div>
-          <div class="bonds-kpi">
-            <span class="bonds-kpi-lbl">HY OAS Spread</span>
-            <span class="bonds-kpi-val ${hy>600?'neg':hy<300?'pos':''}">${isNaN(hy)?'—':hy.toFixed(0)+' bps'}</span>
-            <span class="bonds-kpi-spread">${hy>600?'🔴 Stress':hy>400?'🟡 Elevated':'🟢 Normal'}</span>
-            ${miniLine(map['BAMLH0A0HYM2']?.history||[],'#f85149')}
-          </div>
-        </div>
-      </div>
-
-      <!-- Interpretation -->
-      <div class="bonds-section">
-        <div class="bonds-section-title">Interpretation</div>
-        <div class="bonds-interp">
-          ${[
-            spread < 0 ? { icon:'🔴', text: 'Yield curve inverted — historically precedes recession by 12-18 months.' } : null,
-            spread < 0.3 && spread >= 0 ? { icon:'🟡', text: 'Yield curve flat — growth slowdown signal.' } : null,
-            !isNaN(hy) && hy > 600 ? { icon:'🔴', text: 'High-yield spreads elevated — credit market stress.' } : null,
-            !isNaN(hy) && hy < 300 ? { icon:'🟢', text: 'HY spreads tight — credit markets healthy.' } : null,
-            !isNaN(baaSpr) && parseFloat(baaSpr) > 2 ? { icon:'🟡', text: 'BAA spread > 200bps — corporate funding costs rising.' } : null,
-          ].filter(Boolean).map(i => `<div class="bonds-interp-row"><span>${i.icon}</span><span>${i.text}</span></div>`).join('')
-          || '<div style="color:var(--text-muted);font-size:10px">// Normal market conditions.</div>'}
-        </div>
-      </div>`;
-  } catch (e) {
-    el.innerHTML = `<div class="no-data">// Bond data error: ${_esc(e.message)}</div>`;
+    const results = await Promise.allSettled(SERIES.map(s => fetchS(s.id)));
+    results.forEach(r => { if (r.status==='fulfilled') map[r.value.id]=r.value; });
   }
-}
-window.bondsLoadSpreads = bondsLoadSpreads;
 
-/* Auto-load when panels become active */
-document.addEventListener('DOMContentLoaded', () => {
-  // Portfolio: auto-render on tab open
-  document.addEventListener('click', e => {
+  // ── Overlay US Treasury Direct data (fills gaps without FRED key) ─
+  if (treasuryData?.yields) {
+    const tdMap = { DGS10:'10Y', DGS2:'2Y', DGS30:'30Y', DGS1MO:'1M' };
+    Object.entries(tdMap).forEach(([fredId, tdKey]) => {
+      const v = treasuryData.yields[tdKey];
+      if (v && !map[fredId]?.latest) {
+        map[fredId] = { id:fredId, latest:{ value:String(v), date: treasuryData.date }, history:[], _tdSrc:true };
+      }
+    });
+  }
+
+  const val = id => map[id]?.latest?.value != null ? parseFloat(map[id].latest.value) : null;
+  const fmt = v => v != null ? v.toFixed(2)+'%' : '—';
+
+  const tsy10  = val('DGS10');
+  const tsy2   = val('DGS2');
+  const igOAS  = val('BAMLC0A0CM');
+  const bbbOAS = val('BAMLC0A4CBBB');
+  const hyOAS  = val('BAMLH0A0HYM2');
+  const bei10  = val('T10YIE');
+  const bei5   = val('T5YIE');
+  const spread = tsy10!=null && tsy2!=null ? tsy10-tsy2 : null;
+
+  const src = fredKey ? 'FRED' : (treasuryData ? 'US Treasury Direct (no key)' : '—');
+
+  let html = `<div class="av-live-badge">● Bond Market · ${src}</div>`;
+
+  // ── Section 1: Yield Curve Snapshot ──────────────────────────────
+  html += `<div class="bonds-section-head">📈 Yield Curve (US Treasuries)</div>`;
+
+  // Treasury bar chart from Treasury Direct or FRED
+  const yldPairs = [
+    ['1M', map['DGS1MO']], ['2Y', map['DGS2']], ['10Y', map['DGS10']], ['30Y', map['DGS30']],
+  ];
+  const yldVals = yldPairs.map(([,d]) => d?.latest?.value != null ? parseFloat(d.latest.value) : null).filter(v=>v!=null);
+  const yldMax  = Math.max(...yldVals, 0.01);
+
+  html += `<div class="bonds-yield-bars">`;
+  yldPairs.forEach(([label, d]) => {
+    const v = d?.latest?.value != null ? parseFloat(d.latest.value) : null;
+    const pct = v!=null ? (v/yldMax*85).toFixed(0) : 0;
+    html += `<div class="bonds-yield-row">
+      <span class="bonds-yield-label">${label}</span>
+      <div class="bonds-yield-bar-wrap"><div class="bonds-yield-bar" style="width:${pct}%"></div></div>
+      <span class="bonds-yield-val">${v!=null?v.toFixed(2)+'%':'—'}</span>
+    </div>`;
+  });
+  html += `</div>`;
+
+  if (spread != null) {
+    const inverted = spread < 0;
+    html += `<div class="bonds-spread-tag ${inverted?'bonds-inverted':'bonds-normal'}">
+      10Y-2Y Spread: <strong>${spread>=0?'+':''}${spread.toFixed(2)}%</strong>
+      ${inverted ? ' ⚠ Inverted — recession signal' : ' ✓ Normal curve'}
+    </div>`;
+  }
+
+  // ── Section 2: Credit Spreads ─────────────────────────────────────
+  if (fredKey) {
+    html += `<div class="bonds-section-head" style="margin-top:12px">💳 Credit Spreads (ICE BofA OAS)</div>`;
+    html += `<div class="bonds-credit-grid">`;
+    [
+      { label:'IG OAS',       val:igOAS,  color:'#3fb950', desc:'Investment Grade' },
+      { label:'BBB OAS',      val:bbbOAS, color:'#d29922', desc:'BBB-rated IG'     },
+      { label:'HY OAS',       val:hyOAS,  color:'#f85149', desc:'High Yield'       },
+    ].forEach(s => {
+      const bps = s.val != null ? (s.val*100).toFixed(0) : null;
+      html += `<div class="bonds-credit-card" style="border-left:3px solid ${s.color}">
+        <div class="bonds-credit-label">${s.label}</div>
+        <div class="bonds-credit-val" style="color:${s.color}">${bps!=null?bps+'bps':'—'}</div>
+        <div class="bonds-credit-desc">${s.desc}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // Spread sparklines
+    const sparkSeries = [
+      { id:'BAMLC0A0CM', label:'IG OAS',  color:'#3fb950' },
+      { id:'BAMLH0A0HYM2', label:'HY OAS', color:'#f85149' },
+    ];
+    html += `<div class="bonds-sparks-row">`;
+    sparkSeries.forEach(s => {
+      const hist = map[s.id]?.history || [];
+      if (hist.length < 3) return;
+      const vals = hist.map(o=>parseFloat(o.value)).filter(v=>!isNaN(v));
+      const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||0.01;
+      const pts = vals.map((v,i) => `${(i/(vals.length-1)*180).toFixed(0)},${(26-(v-mn)/rng*24).toFixed(0)}`).join(' ');
+      html += `<div class="bonds-spark-cell">
+        <div class="bonds-spark-label">${s.label}</div>
+        <svg viewBox="0 0 180 28" width="100%" height="28" style="display:block">
+          <polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        <div class="bonds-spark-range" style="font-size:8px;color:var(--text-muted)">${(mn*100).toFixed(0)}–${(mx*100).toFixed(0)}bps (30 obs)</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ── Section 3: Inflation Breakevens ──────────────────────────────
+  if (fredKey && (bei5!=null || bei10!=null)) {
+    html += `<div class="bonds-section-head" style="margin-top:12px">🌡 Inflation Breakevens (TIPS)</div>`;
+    html += `<div class="bonds-bei-row">`;
+    [['5Y Breakeven',bei5,'#b483f7'],['10Y Breakeven',bei10,'#a371f7']].forEach(([lbl,v,col])=>{
+      if (v==null) return;
+      html += `<div class="bonds-bei-card">
+        <div class="bonds-bei-label">${lbl}</div>
+        <div class="bonds-bei-val" style="color:${col}">${v.toFixed(2)}%</div>
+        <div class="bonds-bei-note">Market-implied inflation</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // No-key nudge
+  if (!fredKey && treasuryData) {
+    html += `<div class="av-note" style="margin-top:8px">
+      Showing US Treasury Direct data (no key). Add a <a href="#" onclick="openApiConfig('fred');return false" style="color:var(--accent)">FRED key</a> (free) for full credit spreads and inflation breakevens.
+    </div>`;
+  }
+
+  html += `<div class="bonds-footer">Data: ${src} · ${map['DGS10']?.latest?.date||treasuryData?.date||''}</div>`;
+  el.innerHTML = html;
+}
+
+
+document.addEventListener('click', e => {
     if (e.target.dataset?.tab === 'portfolio') setTimeout(portRender, 50);
     if (e.target.dataset?.tab === 'bonds')     setTimeout(bondsLoadSpreads, 50);
   });
-});

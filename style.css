@@ -4442,12 +4442,7 @@ textarea::placeholder { color:var(--text-muted); }
    ALERT FEED — WM filter bar (hidden when NOAA/EONET tab active)
    ══════════════════════════════════════════════════════════════════ */
 #alert-wm-filters { transition: max-height .2s ease, opacity .2s ease; }
-#alert-wm-filters.hidden {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
+#alert-wm-filters/* .hidden uses display:none !important — see above */
 
 /* Tab pane inside alert feed panel */
 #panel-alert .tab-pane { display: none; }
@@ -7693,3 +7688,70 @@ body.panel-dragging iframe, body.panel-resizing iframe {
   text-decoration: none;
 }
 .mf-prosp-link:hover { text-decoration: underline; }
+
+/* ── Technical sub-charts (RSI, MACD) ──────────────────────────── */
+.tech-sub-chart-wrap { width:100%;overflow:hidden;background:var(--bg-panel);position:relative; }
+
+/* ═══════════════════════════════════════════════════════════════
+   COMMODITIES.JS — Strategic Resource & Commodity Panel CSS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Commodity sub-tab bar */
+.comm-subtab-bar         { display:flex;gap:2px;padding:4px 8px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg-panel) }
+.comm-stab               { font-size:9px;padding:3px 8px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--border);color:var(--text);transition:all .15s }
+.comm-stab:hover         { background:var(--border-bright) }
+.comm-stab.active        { background:var(--accent);color:#000;border-color:var(--accent);font-weight:700 }
+
+/* Mineral cards grid */
+.comm-mineral-card       { background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:8px;transition:border-color .15s }
+.comm-mineral-card:hover { border-color:var(--border-bright) }
+
+/* Energy grid */
+.comm-energy-grid        { display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px;border-bottom:1px solid var(--border) }
+
+/* IMF / WB commodity grid */
+.comm-imf-grid           { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px }
+.comm-imf-card           { background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;padding:6px;font-size:10px }
+
+/* COT positioning bars */
+.comm-cot-bar-wrap       { height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:2px 0 }
+.comm-cot-long           { height:100%;background:#3fb950;float:left }
+.comm-cot-short          { height:100%;background:#f85149;float:right }
+
+/* Georisk resources extended grid */
+.georisk-commodity-grid  { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px;padding:4px 8px 8px }
+.georisk-commodity-card  { background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:7px }
+.georisk-section-head    { font-size:10px;font-weight:700;color:var(--text);padding:6px 10px 3px;border-bottom:1px solid var(--border);background:var(--bg-panel) }
+
+/* FAO / Agri panel */
+.comm-agri-grid          { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px;padding:6px }
+
+/* ═══════════════════════════════════════════════════════════════
+   COMMODITY NEWS SECTION — Resource intelligence in news bar
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Commodity news section injected into news-feed */
+.ni-comm-section         { border-top:2px solid var(--accent);margin-top:10px;padding-top:6px }
+
+/* Extended source buttons for commodity news */
+.ni-src-comm             { background:rgba(88,166,255,.10) !important;color:var(--accent) !important;border-color:rgba(88,166,255,.3) !important }
+.ni-src-energy           { background:rgba(248,81,73,.10)  !important;color:#f85149       !important;border-color:rgba(248,81,73,.3)  !important }
+.ni-src-supply           { background:rgba(63,185,80,.10)  !important;color:#3fb950       !important;border-color:rgba(63,185,80,.3)  !important }
+
+/* Commodity/resource toggle button */
+.ni-comm-toggle          { display:block;text-align:left;margin:4px 0 0;transition:color .15s }
+.ni-comm-toggle:hover    { color:var(--text) !important }
+
+/* GDELT tone indicators */
+.ni-tone-neg             { color:#f85149 }
+.ni-tone-pos             { color:#3fb950 }
+.ni-tone-neutral         { color:var(--text-muted) }
+
+/* OFAC sanctions section */
+.ofac-section            { border-top:2px solid #f85149;margin-top:10px;padding:8px 10px;background:rgba(248,81,73,.04);border-radius:0 0 4px 4px }
+
+/* ── Technical sub-chart responsive heights ────────────────────── */
+:root { --sub-chart-h: 80px; }
+@media (min-height: 800px) { :root { --sub-chart-h: 100px; } }
+@media (min-height: 1200px) { :root { --sub-chart-h: 120px; } }
+.tech-sub-chart-wrap { width:100%;overflow:hidden;background:var(--bg-panel);position:relative }

@@ -862,19 +862,129 @@ async function fmpLoadSecFilings(sym) {
 async function fhLoadShortInterest(sym) {
   const el = document.getElementById("fund-short");
   if (!el) return;
-  const key = (typeof getKey === "function") ? getKey("finnhub") : localStorage.getItem("finterm_key_finnhub") || "";
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest…</div>`;
+
+  // ── 1. FMP /stock_float (free, FMP key) ─────────────────────────────────
+  const fmpKey = (typeof getFmpKey === "function") ? getFmpKey() : "";
+  if (fmpKey) {
+    try {
+      const res  = await fetch(`https://financialmodelingprep.com/api/v3/stock_float/${encodeURIComponent(sym)}?apikey=${fmpKey}`, { signal: AbortSignal.timeout(7000) });
+      const data = await res.json();
+      const d    = Array.isArray(data) ? data[0] : data;
+      if (d?.floatShares || d?.shortFloat) {
+        _renderShortData(el, sym, [{
+          date: d.date || new Date().toISOString().slice(0,10),
+          shortInterest: d.shortInterest || d.shortOutstanding,
+          shortInterestRatio: d.shortFloat,
+          daysToCover: d.shortRatio,
+        }], 'FMP');
+        return;
+      }
+    } catch {}
+  }
+
+  // ── 2. Finnhub /stock/short-interest (key required) ─────────────────────
+  const fhKey = (typeof getKey === "function") ? getKey("finnhub") : localStorage.getItem("finterm_key_finnhub") || "";
+  if (fhKey) {
+    try {
+      const url = `https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${fhKey}`;
+      const res  = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      const data = await res.json();
+      const recs = data.data || [];
+      if (recs.length) {
+        _renderShortData(el, sym, recs, 'Finnhub');
+        return;
+      }
+    } catch {}
+  }
+
+  // ── 3. FINRA REGSHO (no key, public) ────────────────────────────────────
+  try {
+    const res  = await fetch(
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://services.finra.org/data/group/otcmarket/regSho/dailyShortSaleVolume?limit=10&q={"criteria":{"tickers":[{"value":"${sym}"}]}}&domainId=regShoSymbol`)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const json = await res.json();
+    const rows = json?.rows || [];
+    if (rows.length) {
+      const recs2 = rows.slice(0,10).map(r => ({
+        date: r.tradeReportDate || r[0],
+        shortInterest: parseInt(r.shortVolume || r[2]) || null,
+        shortInterestRatio: null, daysToCover: null,
+      }));
+      _renderShortData(el, sym, recs2, 'FINRA RegSHO');
+      return;
+    }
+  } catch {}
+
+  // ── 4. No data / no keys ─────────────────────────────────────────────────
+  el.innerHTML = `<div class="no-data">
+    // Short interest data unavailable for <strong>${sym}</strong>.<br>
+    // Sources tried: FMP, Finnhub, FINRA RegSHO.<br>
+    // Add FMP or Finnhub key in ⚙ API for better coverage.
+  </div>`;
+}
+
+/* ── Shared renderer for short interest data from any source ─────────────── */
+function _renderShortData(el, sym, recs, srcLabel) {
+  const latest = recs[0] || {};
+  const prev   = recs[1] || null;
+  const chg    = (prev && latest.shortInterest && prev.shortInterest)
+                 ? ((latest.shortInterest - prev.shortInterest) / prev.shortInterest * 100).toFixed(1)
+                 : null;
+  const chgCls = chg ? (parseFloat(chg) > 0 ? "neg" : "pos") : "";
+  const fmt    = v => v ? Number(v).toLocaleString() : "—";
+  const fmtPct = v => v ? parseFloat(v).toFixed(2)+"%" : "—";
+
+  let html = `<div class="av-live-badge">● Short Interest · ${sym} · ${srcLabel}</div>`;
+  html += `<div class="short-summary">
+    <div class="short-kpi"><span class="short-kpi-lbl">Short Interest</span><span class="short-kpi-val">${fmt(latest.shortInterest)}</span></div>
+    <div class="short-kpi"><span class="short-kpi-lbl">% of Float</span><span class="short-kpi-val">${fmtPct(latest.shortInterestRatio)}</span></div>
+    <div class="short-kpi"><span class="short-kpi-lbl">Days to Cover</span><span class="short-kpi-val">${latest.daysToCover ? parseFloat(latest.daysToCover).toFixed(1) : "—"}</span></div>
+    <div class="short-kpi"><span class="short-kpi-lbl">Period Chg</span><span class="short-kpi-val ${chgCls}">${chg !== null ? (parseFloat(chg) > 0 ? "+" : "")+chg+"%" : "—"}</span></div>
+  </div>`;
+
+  if (recs.length > 1) {
+    html += `<table class="fmp-table" style="margin-top:10px">
+      <thead><tr><th>Date</th><th>Short Shares</th><th>% Float</th><th>Days Cover</th></tr></thead>
+      <tbody>`;
+    recs.slice(0, 12).forEach(r => {
+      html += `<tr><td>${r.date||"—"}</td><td>${fmt(r.shortInterest)}</td><td>${fmtPct(r.shortInterestRatio)}</td><td>${r.daysToCover ? parseFloat(r.daysToCover).toFixed(1) : "—"}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `<div class="av-note" style="margin-top:6px">// Source: ${srcLabel} · Bi-monthly FINRA settlement.</div>`;
+  el.innerHTML = html;
+}
+
+/* ── DUMMY REPLACED BLOCK (kept for structure integrity) ─────────────── */
+async function _fhShortLegacy(sym) {
+  const key = (typeof getKey === "function") ? getKey("finnhub") : "";
+  if (!key) return null;
+  try {
+    const res  = await fetch(`https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${key}`);
+    const data = await res.json();
+    return data.data || [];
+  } catch { return null; }
+}
+
+/* ── LEGACY placeholder to prevent "not found" errors ─────────────────── */
+async function __shortPlaceholder() {
+  const el = document.getElementById("fund-short");
+  if (!el) return;
+  const key = "";
   if (!key) {
-    el.innerHTML = `<div class="no-data">// Finnhub key required for short interest data.</div>`;
+    el.innerHTML = `<div class="no-data">placeholder</div>`;
     return;
   }
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest…</div>`;
   try {
-    const url = `https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${key}`;
+    const url = `https://finnhub.io/api/v1/stock/short-interest?symbol=X&token=${key}`;
     const res  = await fetch(url);
     const data = await res.json();
     const recs = data.data || [];
     if (!recs.length) {
-      el.innerHTML = `<div class="no-data">// No short interest data available for ${sym}.</div>`;
+      el.innerHTML = `<div class="no-data">// No short interest data available.</div>`;
       return;
     }
     const latest = recs[0];

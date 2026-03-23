@@ -715,6 +715,12 @@ async function techLoadFull(sym, resolution) {
 <!-- ══ Main chart ══ -->
 <div id="techChartWrap" class="tech-chart-wrap"></div>
 
+<!-- ══ RSI sub-chart ══ -->
+<div id="techRsiWrap" class="tech-sub-chart-wrap" style="height:var(--sub-chart-h,80px);min-height:60px;border-top:1px solid var(--border)"></div>
+
+<!-- ══ MACD sub-chart ══ -->
+<div id="techMacdWrap" class="tech-sub-chart-wrap" style="height:var(--sub-chart-h,80px);min-height:60px;border-top:1px solid var(--border)"></div>
+
 <!-- ══ Aggregate signal ══ -->
 <div class="tech-signal-bar">
   <div class="tech-signal-verdict" style="color:${aggr.vColor}">${aggr.verdict}</div>
@@ -985,11 +991,166 @@ ${patterns.length ? `
     };
     _renderCandleChart(wrap, candles, ov, _techPeriod);
     _techOverlays = { sma20, sma50, sma200, ema12, ema9, ema21, bbR, vwapArr, ichR };
+
+    // ── RSI sub-chart ───────────────────────────────────────────────────
+    const rsiWrap = document.getElementById('techRsiWrap');
+    if (rsiWrap) _renderSubRSI(rsiWrap, rsiArr, stochR, 14);
+
+    // ── MACD sub-chart ──────────────────────────────────────────────────
+    const macdWrap = document.getElementById('techMacdWrap');
+    if (macdWrap) _renderSubMACD(macdWrap, macdR);
   }, 60);
 }
 
 /* ── Redraw chart with current overlay checkboxes ──────────────── */
 let _techOverlays = {};
+/* ── RSI sub-chart canvas renderer ──────────────────────────────────── */
+function _renderSubRSI(el, rsiArr, stochR, period) {
+  el.innerHTML = '';
+  const W = el.clientWidth || 700, H = el.clientHeight || 70;
+  const canvas = document.createElement('canvas');
+  canvas.width  = W * 2; canvas.height = H * 2;
+  canvas.style.cssText = `width:${W}px;height:${H}px;display:block`;
+  el.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  const vals = rsiArr.filter(v => v != null);
+  const nonNull = rsiArr.map((v,i) => ({v,i})).filter(x => x.v != null);
+  if (!nonNull.length) return;
+  const N = rsiArr.length;
+  const PAD = { l:36, r:8, t:6, b:14 };
+  const cW = W - PAD.l - PAD.r, cH = H - PAD.t - PAD.b;
+
+  // Zones
+  ctx.fillStyle = 'rgba(248,81,73,.06)';
+  ctx.fillRect(PAD.l, PAD.t, cW, (1 - 70/100)*cH);
+  ctx.fillStyle = 'rgba(63,185,80,.06)';
+  ctx.fillRect(PAD.l, PAD.t + (1-30/100)*cH, cW, (30/100)*cH);
+
+  // Reference lines
+  [[70,'#f8514944'],[30,'#3fb95044'],[50,'#30363d55']].forEach(([v,col]) => {
+    ctx.strokeStyle = col; ctx.lineWidth=1; ctx.setLineDash([3,2]);
+    const y = PAD.t + (1-v/100)*cH;
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+cW,y); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // RSI line
+  ctx.beginPath(); ctx.strokeStyle='#3b82f6'; ctx.lineWidth=1.5;
+  nonNull.forEach(({v,i},idx) => {
+    const x = PAD.l + (i/(N-1))*cW;
+    const y = PAD.t + (1-v/100)*cH;
+    idx===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Stochastic %K
+  if (stochR?.k) {
+    ctx.beginPath(); ctx.strokeStyle='#f59e0b'; ctx.lineWidth=1;
+    const sk = stochR.k;
+    sk.forEach((v,i) => {
+      if (v==null) return;
+      const x = PAD.l+(i/(N-1))*cW;
+      const y = PAD.t+(1-v/100)*cH;
+      i===0||sk.slice(0,i).every(x=>x==null) ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  }
+
+  // Current RSI value label
+  const lastRSI = vals[vals.length-1];
+  const rsiColor = lastRSI>=70?'#f85149':lastRSI<=30?'#3fb950':'#58a6ff';
+  ctx.fillStyle=rsiColor; ctx.font='bold 10px ui-monospace,monospace';
+  ctx.fillText(`RSI ${lastRSI.toFixed(1)}`, PAD.l+2, PAD.t+10);
+
+  // Stoch label
+  if (stochR?.k) {
+    const lastK = stochR.k.filter(v=>v!=null).slice(-1)[0];
+    if (lastK!=null) {
+      ctx.fillStyle='#f59e0b'; ctx.font='9px ui-monospace,monospace';
+      ctx.fillText(`%K ${lastK.toFixed(1)}`, PAD.l+60, PAD.t+10);
+    }
+  }
+
+  // Y axis labels
+  ctx.fillStyle='#8b949e'; ctx.font='9px ui-monospace,monospace'; ctx.textAlign='right';
+  [70,50,30].forEach(v => {
+    const y = PAD.t+(1-v/100)*cH;
+    ctx.fillText(v, PAD.l-3, y+3);
+  });
+  ctx.textAlign='left';
+}
+
+/* ── MACD sub-chart canvas renderer ─────────────────────────────────── */
+function _renderSubMACD(el, macdR) {
+  el.innerHTML = '';
+  const W = el.clientWidth || 700, H = el.clientHeight || 70;
+  const canvas = document.createElement('canvas');
+  canvas.width  = W * 2; canvas.height = H * 2;
+  canvas.style.cssText = `width:${W}px;height:${H}px;display:block`;
+  el.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  const hist = macdR.hist, line = macdR.line, sig = macdR.sigLine;
+  if (!hist||!line) return;
+  const N = hist.length;
+  const PAD = { l:36, r:8, t:6, b:14 };
+  const cW = W - PAD.l - PAD.r, cH = H - PAD.t - PAD.b;
+
+  const allVals = [...hist,...line,...(sig||[])].filter(v=>v!=null);
+  const MX = Math.max(...allVals.map(Math.abs)) * 1.15 || 1;
+  const toY = v => PAD.t + (0.5 - (v??0)/(2*MX))*cH;
+
+  // Zero line
+  ctx.strokeStyle='#30363d'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PAD.l,toY(0)); ctx.lineTo(PAD.l+cW,toY(0)); ctx.stroke();
+
+  // Histogram
+  const barW = Math.max(1, cW/N - 0.5);
+  hist.forEach((v,i) => {
+    if (v==null) return;
+    const x = PAD.l + (i/(N-1))*cW;
+    const y0=toY(0), y1=toY(v);
+    ctx.fillStyle = v>=0 ? 'rgba(63,185,80,.55)' : 'rgba(248,81,73,.55)';
+    ctx.fillRect(x-barW/2, Math.min(y0,y1), barW, Math.abs(y1-y0));
+  });
+
+  // MACD line
+  const drawLine = (arr, color, lw=1.5) => {
+    ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=lw;
+    let first=true;
+    arr.forEach((v,i) => {
+      if(v==null) return;
+      const x=PAD.l+(i/(N-1))*cW, y=toY(v);
+      first?ctx.moveTo(x,y):ctx.lineTo(x,y); first=false;
+    });
+    ctx.stroke();
+  };
+  drawLine(line,'#3b82f6');
+  if (sig) drawLine(sig,'#f59e0b',1.2);
+
+  // Labels
+  const lastLine = line.filter(v=>v!=null).slice(-1)[0];
+  const lastHist = hist.filter(v=>v!=null).slice(-1)[0];
+  ctx.fillStyle='#3b82f6'; ctx.font='bold 10px ui-monospace,monospace';
+  ctx.fillText(`MACD ${lastLine!=null?lastLine.toFixed(3):''}`, PAD.l+2, PAD.t+10);
+  if (lastHist!=null) {
+    ctx.fillStyle=lastHist>=0?'#3fb950':'#f85149';
+    ctx.font='9px ui-monospace,monospace';
+    ctx.fillText(`H ${lastHist.toFixed(3)}`, PAD.l+90, PAD.t+10);
+  }
+
+  // Y axis
+  ctx.fillStyle='#8b949e'; ctx.font='9px ui-monospace,monospace'; ctx.textAlign='right';
+  [MX,0,-MX].forEach(v => {
+    const y = toY(v);
+    ctx.fillText(v===0?'0':v.toFixed(1), PAD.l-3, y+3);
+  });
+  ctx.textAlign='left';
+}
+
 function techRedraw() {
   const wrap = document.getElementById('techChartWrap');
   if (!wrap || !_techCandles) return;

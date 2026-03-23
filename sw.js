@@ -27,6 +27,8 @@ const APP_SHELL = [
   '/config.js',
   '/yahoo.js',
   '/geointel.js',
+  '/finterm-modules.js',
+  '/commodities.js',
   '/api.js',
   '/sbcache.js',
   '/energy.js',
