@@ -1,0 +1,525 @@
+/* ══════════════════════════════════════════════════════════════════
+   BLOOMBERG TERMINAL TRANSFORM
+   Applied AFTER style.css — overrides visual language only.
+   Preserves all layout, functionality, and color palette.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── CSS variable overrides: eliminate softness ─────────────────── */
+:root {
+  --radius-sm:  0px;
+  --radius-md:  0px;
+  --radius-lg:  0px;
+  --border:        #1e2d3d;
+  --border-bright: #2a4a66;
+}
+
+/* Hide empty module-tray icon spans (emojis removed) */
+.mti-icon { display: none !important; }
+
+/* ── Base: tighter global font ───────────────────────────────────── */
+html, body {
+  font-size: 12px;
+  line-height: 1.3;
+  font-family: var(--font-mono);
+}
+
+/* ── Remove radial glow from app shell ───────────────────────────── */
+.app-shell {
+  background: var(--bg-base);
+  padding: 4px;
+  gap: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOPBAR — terminal command bar
+   ═══════════════════════════════════════════════════════════════════ */
+.topbar {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--accent);
+  padding: 0 10px;
+  max-height: 72px;
+  animation: none;
+}
+.topbar::before { display: none; }
+.topbar.collapsed { max-height: 32px; }
+
+.topbar-row { height: 32px; gap: 6px; }
+.topbar-row-2.compact { height: 28px; min-height: 28px; padding: 0 6px; }
+.topbar-row-2 { border-top: 1px solid var(--border); }
+
+/* Brand — terminal header style */
+h1 {
+  font-size: 13px;
+  letter-spacing: .18em;
+  font-weight: 700;
+}
+.brand-sub {
+  font-size: 8px;
+  letter-spacing: .22em;
+  margin-top: 0;
+}
+
+/* Search groups — sharp, tight */
+.search-group {
+  border-radius: 0;
+  border: 1px solid var(--border-bright);
+  background: var(--bg-input);
+}
+.search-group:focus-within {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+.search-group input {
+  font-size: 11px;
+  padding: 4px 8px;
+  width: 140px;
+}
+.search-label {
+  font-size: 8px;
+  padding: 0 7px;
+  border-radius: 0;
+}
+.search-group button {
+  font-size: 9px;
+  padding: 0 10px;
+  border-radius: 0;
+  letter-spacing: .1em;
+}
+
+/* Exchange hint */
+.exchange-hint {
+  border-radius: 0;
+  font-size: 8px;
+  padding: 2px 6px;
+}
+
+/* Module checklist */
+.checklist label {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 0;
+  letter-spacing: .08em;
+  gap: 4px;
+}
+.checklist-title { font-size: 8px; letter-spacing: .18em; }
+
+/* Topbar collapse button */
+.topbar-collapse-btn {
+  border-radius: 0;
+  width: 20px; height: 20px;
+  font-size: 8px;
+}
+
+/* API button */
+.api-config-btn {
+  border-radius: 0 !important;
+  font-size: 9px;
+  padding: 2px 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PANELS — terminal modules
+   ═══════════════════════════════════════════════════════════════════ */
+.panel {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  box-shadow: none;
+  animation: none;
+}
+/* top border accent line — terminal identification bar */
+.panel::before {
+  background: var(--border-bright);
+  opacity: 1;
+}
+.panel:hover {
+  border-color: var(--border-bright);
+}
+.panel:hover::before {
+  background: var(--accent);
+  opacity: .7;
+}
+.panel.dragging {
+  box-shadow: none;
+  border-color: var(--accent) !important;
+  opacity: 1;
+}
+.panel.resizing {
+  box-shadow: none;
+}
+
+/* Panel header — compact terminal strip */
+.panel-head {
+  padding: 4px 8px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  min-height: 26px;
+}
+.panel-head h3 {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  color: var(--text-secondary);
+}
+.panel-title-row { gap: 1px; }
+.mode-label { font-size: 8px; letter-spacing: .06em; }
+
+/* Icon buttons — tight, flat */
+.icon-btn {
+  width: 18px; height: 18px;
+  border-radius: 0;
+  font-size: 10px;
+  border: 1px solid var(--border);
+}
+.icon-btn.chart-analyse-btn {
+  width: auto;
+  padding: 0 5px;
+  font-size: 9px;
+  letter-spacing: .06em;
+}
+
+/* Panel content — tighter padding */
+.panel-content {
+  padding: 6px 8px;
+}
+
+/* Drag grip — smaller */
+.drag-grip span {
+  width: 2px; height: 2px;
+  border-radius: 0;
+}
+
+/* Size tooltip */
+.size-tooltip {
+  border-radius: 0;
+  font-size: 9px;
+  padding: 2px 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB SYSTEM — rectangular, functional
+   ═══════════════════════════════════════════════════════════════════ */
+.tab-bar {
+  gap: 0;
+  padding: 0 0 0 0;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  padding: 4px 8px 4px;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--bg-base);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tab-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+.tab-btn.active {
+  background: var(--bg-surface);
+  border-color: var(--border);
+  border-top: 2px solid var(--accent);
+  color: var(--accent-bright);
+  margin-bottom: 0;
+  padding-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FINANCIAL TABLES — terminal density
+   ═══════════════════════════════════════════════════════════════════ */
+.fin-table-wrap {
+  border-radius: 0;
+  margin-bottom: 6px;
+}
+.fin-table {
+  font-size: 10px;
+}
+.fin-table th {
+  padding: 3px 8px;
+  font-size: 8px;
+  letter-spacing: .08em;
+  background: var(--bg-base);
+}
+.fin-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.fin-table tbody tr:hover { background: var(--bg-hover); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   METRICS — tighter rows
+   ═══════════════════════════════════════════════════════════════════ */
+.metric {
+  padding: 4px 0;
+}
+.metric span:first-child { font-size: 9px; }
+.metric span:last-child  { font-size: 11px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   NEWS CARDS — denser, flatter
+   ═══════════════════════════════════════════════════════════════════ */
+.news-list { gap: 1px; }
+.news-item {
+  border-radius: 0;
+  border-left: 2px solid transparent;
+}
+.news-item:hover { border-left-color: var(--accent); }
+.news-item.ni-open { border-left-color: var(--accent-bright); }
+
+.ni-row { padding: 5px 8px; gap: 5px; }
+.ni-headline { font-size: 10.5px; line-height: 1.3; }
+.ni-meta     { font-size: 8px; }
+.ni-sent {
+  font-size: 7px;
+  border-radius: 0;
+  padding: 1px 4px;
+}
+.ni-drawer { padding: 0 8px 8px; }
+.ni-summary { font-size: 10px; line-height: 1.5; margin: 6px 0 8px; }
+.ni-link {
+  border-radius: 0;
+  font-size: 8px;
+  padding: 3px 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONSENSUS BAR — flat, no radius
+   ═══════════════════════════════════════════════════════════════════ */
+.consensus-bar {
+  border-radius: 0;
+  height: 22px;
+  gap: 1px;
+  margin-bottom: 6px;
+}
+.cb-seg { font-size: 9px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESEARCH ITEMS — sharp left border only
+   ═══════════════════════════════════════════════════════════════════ */
+.research-item {
+  border-radius: 0;
+  padding: 7px 8px;
+  margin-bottom: 4px;
+  border-left: 2px solid var(--accent);
+  border-right: none;
+  border-top: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+.research-item:hover { background: var(--bg-hover); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION HEADS
+   ═══════════════════════════════════════════════════════════════════ */
+.section-head {
+  font-size: 8px;
+  letter-spacing: .16em;
+  padding: 6px 0 4px;
+  margin-bottom: 4px;
+}
+
+/* Description block */
+.desc-block {
+  border-radius: 0;
+  margin-top: 6px;
+  padding: 7px 8px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LAYOUT SIDEBAR — terminal control strip
+   ═══════════════════════════════════════════════════════════════════ */
+.layout-sidebar {
+  border-radius: 0 !important;
+}
+.layout-sidebar-toggle {
+  border-radius: 0 !important;
+  width: 22px;
+  font-size: 12px;
+}
+.lsb-section-title {
+  font-size: 8px !important;
+  letter-spacing: .18em !important;
+}
+.lsb-preset-btn, .lsb-action-btn {
+  border-radius: 0 !important;
+  font-size: 9px !important;
+  padding: 4px 8px !important;
+  letter-spacing: .08em;
+}
+.lsb-preset-icon {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 8px !important;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--accent);
+  opacity: .8;
+  min-width: 22px;
+}
+.lsb-divider { margin: 5px 0 !important; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODULES TRAY — flat overlay
+   ═══════════════════════════════════════════════════════════════════ */
+.modules-tray {
+  border-radius: 0 !important;
+  border: 1px solid var(--border) !important;
+  border-top: 2px solid var(--accent) !important;
+}
+.modules-tray-btn {
+  border-radius: 0 !important;
+  font-size: 9px !important;
+}
+.modules-tray-item {
+  border-radius: 0 !important;
+  font-size: 9px !important;
+}
+.modules-expand-btn {
+  border-radius: 0 !important;
+}
+.modules-side-tab {
+  border-radius: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VALUATION METRICS — tighter
+   ═══════════════════════════════════════════════════════════════════ */
+.val-metric-row {
+  padding: 5px 10px;
+}
+.val-metric-name { font-size: 10px; }
+.val-metric-note { font-size: 10px; }
+.val-metric-value { font-size: 12px; }
+.val-signal {
+  border-radius: 0;
+  font-size: 8px;
+  padding: 1px 5px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WATCHLIST — tighter rows
+   ═══════════════════════════════════════════════════════════════════ */
+.wl-chart-btn {
+  border-radius: 0;
+  width: 18px; height: 18px;
+  font-size: 8px;
+}
+.wl-chart-btn:hover { transform: none; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   API CONFIG BANNER
+   ═══════════════════════════════════════════════════════════════════ */
+.api-quicksetup-banner {
+  border-radius: 0 !important;
+  border-left: 2px solid var(--accent) !important;
+  padding: 8px !important;
+}
+.api-qs-btn-primary {
+  border-radius: 0 !important;
+  font-size: 9px !important;
+}
+.api-qs-icon { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SNAP GRID — sharper
+   ═══════════════════════════════════════════════════════════════════ */
+#snapOverlay {
+  background-image:
+    linear-gradient(rgba(30,45,61,.6) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30,45,61,.6) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MISC UTILITY OVERRIDES
+   ═══════════════════════════════════════════════════════════════════ */
+/* Scrollbar — terminal style */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-thumb { border-radius: 0; background: var(--border-bright); }
+
+/* Mini input */
+.mini-input {
+  border-radius: 0;
+  font-size: 10px;
+  padding: 3px 6px;
+}
+
+/* Forex timeframe buttons */
+.fx-tf-btn { border-radius: 0; font-size: 9px; padding: 2px 7px; }
+
+/* Event items */
+.event-title { font-size: 11px; }
+.event-note  { font-size: 10px; }
+.event-date  { font-size: 9px; }
+
+/* Source buttons */
+.ni-src-btn {
+  border-radius: 0;
+  font-size: 8px;
+  padding: 2px 6px;
+}
+
+/* No-data placeholders */
+.no-data { font-size: 10px; padding: 10px; }
+
+/* Val chart link */
+.val-chart-link-btn { border-radius: 0 !important; }
+
+/* Textarea in notes — keep mono, tighten */
+textarea { font-size: 11px; line-height: 1.5; }
+
+/* Panel actions gap tighter */
+.panel-actions { gap: 3px; }
+
+/* Provider tags */
+.ni-prov-tag { border-radius: 0; font-size: 7px; }
+
+/* Category badges */
+.ni-cat { border-radius: 0; font-size: 7px; }
+
+/* ─── Remove panel entry animation ──────────────────────────────── */
+@keyframes fadeIn { from{opacity:1;transform:none;} to{opacity:1;transform:none;} }
+@keyframes slideDown { from{opacity:1;transform:none;} to{opacity:1;transform:none;} }
+
+/* ═══════════════════════════════════════════════════════════════════
+   UARS WIDGET — terminal overrides
+   ═══════════════════════════════════════════════════════════════════ */
+.uars-tab-btn {
+  font-size: 8px;
+  padding: 3px 8px 3px;
+  letter-spacing: .12em;
+}
+.uars-pane { padding: 6px 8px 10px; }
+
+/* Flatten all border-radius in UARS */
+.uars-score-ring,
+.uars-score-card,
+.uars-factor-bar,
+.uars-factor-bar-fill,
+.uars-model-badge-bar,
+.uars-model-badge-bar-fill,
+.uars-score-mini,
+.uars-score-mini-fill,
+.uars-badge,
+.uars-tag,
+.uars-peer-row,
+.uars-section { border-radius: 0 !important; }
+
+/* UARS button flattening */
+[class*="uars-btn"],
+[class*="uars-action"],
+[class*="uars-tab"] { border-radius: 0 !important; }
