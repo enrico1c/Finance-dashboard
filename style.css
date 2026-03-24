@@ -4310,6 +4310,7 @@ textarea::placeholder { color:var(--text-muted); }
 #alert-wm-filters/* .hidden uses display:none !important — see above */
 
 /* Tab pane inside alert feed panel */
+#panel-alert { min-width: 320px; min-height: 300px; }
 #panel-alert .tab-pane { display: none; }
 #panel-alert .tab-pane.active { display: block; height: calc(100% - 80px); }
 
