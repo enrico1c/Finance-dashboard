@@ -4315,7 +4315,7 @@ textarea::placeholder { color:var(--text-muted); }
 
 /* Twitter timeline iframe fills the alert-feed tab pane */
 #alert-feed { overflow: hidden; }
-#alert-feed iframe.twitter-timeline-rendered {
+#alert-feed iframe {
   width: 100% !important;
   height: 100% !important;
   border: none !important;
