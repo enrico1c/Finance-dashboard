@@ -1881,6 +1881,11 @@ function showPanel(id){
   if(id==="geopolitical") setTimeout(_autoLoadGeoPanel, 300);
   if(id==="chart") setTimeout(()=>loadChart(resolveSymbol(currentTicker)),80);
   if(id==="forex") setTimeout(()=>loadForexChart(),80);
+  if(id==="alert") setTimeout(()=>{
+    const feed=document.getElementById('alert-feed');
+    if(feed && typeof twttr!=='undefined' && !feed.querySelector('iframe'))
+      twttr.widgets.load(feed);
+  },300);
 }
 function setupChecklist(){
   document.querySelectorAll(".panel-toggle").forEach(cb=>{
