@@ -4311,7 +4311,15 @@ textarea::placeholder { color:var(--text-muted); }
 
 /* Tab pane inside alert feed panel */
 #panel-alert .tab-pane { display: none; }
-#panel-alert .tab-pane.active { display: block; }
+#panel-alert .tab-pane.active { display: block; height: calc(100% - 80px); }
+
+/* Twitter timeline iframe fills the alert-feed tab pane */
+#alert-feed { overflow: hidden; }
+#alert-feed iframe.twitter-timeline-rendered {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    NOAA Active Alerts  (extended — more detail rows)

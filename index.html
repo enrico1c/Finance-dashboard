@@ -748,16 +748,22 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="wm"    onclick="switchTab('alert','wm')">📰 @DeItaone</button>
-        <button class="tab-btn"        data-tab="noaa"  onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
-        <button class="tab-btn"        data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
+        <button class="tab-btn active" data-tab="wm" onclick="switchTab('alert','wm')">📰 @DeItaone</button>
+        <button class="tab-btn" data-tab="noaa" onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
+        <button class="tab-btn" data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
       </div>
-      <div class="tab-pane active panel-content" data-tab="wm" id="alert-feed" style="overflow:hidden;padding:0;height:100%">
-        <a class="twitter-timeline" href="https://twitter.com/DeItaone?ref_src=twsrc%5Etfw">Tweets by DeItaone</a>
+      <div class="tab-pane active panel-content" data-tab="wm" id="alert-feed" style="overflow:hidden; padding:0; height: calc(100% - 80px);">
+        <a class="twitter-timeline"
+           data-theme="dark"
+           data-chrome="noheader nofooter noborders transparent noscrollbar"
+           data-height="100%"
+           href="https://twitter.com/DeItaone?ref_src=twsrc%5Etfw">
+           Tweets by @DeItaone
+        </a>
         <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
       </div>
-      <div class="tab-pane        panel-content" data-tab="noaa"  id="alert-noaa"></div>
-      <div class="tab-pane        panel-content" data-tab="eonet" id="alert-eonet"></div>
+      <div class="tab-pane panel-content" data-tab="noaa" id="alert-noaa"></div>
+      <div class="tab-pane panel-content" data-tab="eonet" id="alert-eonet"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
