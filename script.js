@@ -1874,14 +1874,23 @@ function openAnalysts(){
 function showPanel(id){
   const el=document.getElementById(`panel-${id}`); if(!el) return;
   el.classList.remove("hidden"); applyPanelPosition(id); bringToFront(el);
+  
   if(id==="geopolitical") setTimeout(_autoLoadGeoPanel, 300);
   if(id==="chart") setTimeout(()=>loadChart(resolveSymbol(currentTicker)),80);
   if(id==="forex") setTimeout(()=>loadForexChart(),80);
-  if(id==="alert") setTimeout(()=>{
-    const feed=document.getElementById('alert-feed');
-    if(feed && typeof twttr!=='undefined' && !feed.querySelector('iframe'))
-      twttr.widgets.load(feed);
-  },300);
+  
+  if(id==="alert") {
+    setTimeout(() => {
+      const feed = document.getElementById('alert-feed');
+      // Force Twitter to scan the specific 'alert-feed' div
+      if (typeof twttr !== 'undefined' && twttr.widgets) {
+        twttr.widgets.load(feed);
+      } else {
+        // If Twitter script isn't ready yet, try one more time in 1 second
+        setTimeout(() => { if(window.twttr) twttr.widgets.load(feed); }, 1000);
+      }
+    }, 300);
+  }
 }
 function setupChecklist(){
   document.querySelectorAll(".panel-toggle").forEach(cb=>{
