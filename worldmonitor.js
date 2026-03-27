@@ -261,8 +261,96 @@ function wmAlertInit() {
   wmAlertLoad('all');
 }
 
-function wmAlertLoad(filter = 'all') {
-  // Alert feed now shows @DeItaone Twitter timeline — rendered in index.html
+/* ─── internal state ────────────────────────────────────────────── */
+var _alertLoaded = false;
+var _alertTimer  = null;
+
+async function wmAlertLoad(filter) {
+  filter = filter || "all";
+  var el = document.getElementById("alert-feed-inner");
+  if (!el) return;
+  if (_alertLoaded && filter === "all") return;
+  _alertLoaded = true;
+
+  el.innerHTML = "<div class=\"av-live-badge\">&#9679; Market Alerts &middot; Loading&hellip;</div>";
+
+  function _esc(s) {
+    return String(s || "").replace(/[<>&"]/g, function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]; });
+  }
+  function _ago(ts) {
+    if (!ts) return "";
+    var d = (Date.now() - new Date(ts)) / 1000;
+    if (d < 60)    return Math.floor(d)      + "s ago";
+    if (d < 3600)  return Math.floor(d/60)   + "m ago";
+    if (d < 86400) return Math.floor(d/3600) + "h ago";
+    return new Date(ts).toLocaleDateString();
+  }
+
+  var articles = null;
+
+  /* 1 — APITube */
+  if (!articles && typeof apitubeFetch === "function" && typeof getApitubeKey === "function" && getApitubeKey()) {
+    try {
+      var d = await apitubeFetch("/news/everything", {
+        categories: "business,finance,markets",
+        "language.code": "en",
+        per_page: 30, sort_by: "published_at", sort_direction: "desc"
+      });
+      if (d && d.results && d.results.length) {
+        articles = d.results.map(function(a) {
+          return { title: a.title, url: a.url, source: (a.source && (a.source.name || a.source.domain)) || "",
+                   publishedAt: a.published_at, summary: a.summary || a.description || "" };
+        });
+      }
+    } catch(e) { console.warn("[AlertFeed/APITube]", e.message); }
+  }
+
+  /* 2 — Finnhub general news */
+  if (!articles && typeof fhFetch === "function" && typeof getFinnhubKey === "function" && getFinnhubKey()) {
+    try {
+      var fhd = await fhFetch("/news", { category: "general" });
+      if (Array.isArray(fhd) && fhd.length) {
+        articles = fhd.map(function(n) {
+          return { title: n.headline, url: n.url, source: n.source,
+                   publishedAt: new Date(n.datetime * 1000).toISOString(), summary: n.summary };
+        });
+      }
+    } catch(e) { console.warn("[AlertFeed/Finnhub]", e.message); }
+  }
+
+  /* 3 — Tiingo via apifallback.js */
+  if (!articles && window.FB && window.FB.tiingo && window.FB.tiingo.getNews) {
+    try {
+      var td = await window.FB.tiingo.getNews("market");
+      if (Array.isArray(td) && td.length) articles = td;
+    } catch(e) { console.warn("[AlertFeed/Tiingo]", e.message); }
+  }
+
+  if (!articles || !articles.length) {
+    el.innerHTML = "<div class=\"no-data\">// Market alerts unavailable.<br>"
+      + "<small style=\"color:#444\">Configure APITube or Finnhub key for live feed.</small><br>"
+      + "<button onclick=\"_alertLoaded=false;wmAlertLoad()\" style=\"margin-top:8px;padding:3px 8px;border-radius:4px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer;font-size:11px\">&#8635; Retry</button></div>";
+    return;
+  }
+
+  var html = "<div class=\"av-live-badge\">&#9679; Market Alerts &middot; " + articles.length + " items</div>";
+  html += "<div style=\"display:flex;gap:6px;padding:4px 0 8px;align-items:center\">"
+        + "<button onclick=\"_alertLoaded=false;wmAlertLoad()\" style=\"padding:3px 8px;border-radius:4px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer;font-size:11px\">&#8635; Refresh</button>"
+        + "<span style=\"font-size:10px;color:#444\">Auto-refresh 5 min</span></div>";
+
+  articles.slice(0, 35).forEach(function(a) {
+    html += "<div style=\"padding:8px 0;border-bottom:1px solid #21262d\">"
+          + "<a href=\"" + _esc(a.url) + "\" target=\"_blank\" rel=\"noopener\" style=\"color:#e6edf3;text-decoration:none;font-size:12px;font-weight:500;line-height:1.4;display:block\">" + _esc(a.title) + "</a>"
+          + (a.summary ? "<p style=\"color:#8b949e;font-size:11px;margin:3px 0 0;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden\">" + _esc(a.summary) + "</p>" : "")
+          + "<span style=\"color:#444;font-size:10px;margin-top:3px;display:block\">" + _esc(a.source) + (a.source && a.publishedAt ? " &middot; " : "") + _ago(a.publishedAt) + "</span>"
+          + "</div>";
+  });
+
+  el.innerHTML = html;
+
+  /* auto-refresh every 5 min */
+  if (_alertTimer) clearTimeout(_alertTimer);
+  _alertTimer = setTimeout(function(){ _alertLoaded = false; wmAlertLoad(); }, 5 * 60 * 1000);
 }
 
 /* ─────────────────────────────────────────────────────────────────
