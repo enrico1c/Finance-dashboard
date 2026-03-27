@@ -214,9 +214,26 @@ window.noaaLoadAlerts = async function() {
 window.eonetLoadEvents = async function() {
   const el = document.getElementById("alert-eonet");
   if (!el) return;
-  const data = await gdFetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60", "eonet_events");
-  if (!data?.events) { el.innerHTML = `<div class="no-data">// NASA EONET unavailable.</div>`; return; }
 
+  el.innerHTML = "<div class=\"av-live-badge\">&#9679; NASA EONET &middot; Loading&hellip;</div>";
+
+  /* try direct first; EONET v3 has CORS headers but can be slow */
+  let data = await gdFetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60", "eonet_events");
+
+  /* CORS-proxy fallback */
+  if (!data || !data.events) {
+    try {
+      const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60");
+      const pr = await fetch(proxy, { signal: AbortSignal.timeout(12000) });
+      if (pr.ok) { data = await pr.json(); if (data) gdCacheSet("eonet_events", data); }
+    } catch(e) { console.warn("[EONET proxy]", e.message); }
+  }
+
+  if (!data || !data.events) {
+    el.innerHTML = "<div class=\"no-data\">// NASA EONET unavailable.<br>"
+      + "<button onclick=\"eonetLoadEvents()\" style=\"margin-top:8px;padding:3px 8px;border-radius:4px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer;font-size:11px\">&#8635; Retry</button></div>";
+    return;
+  }
   const catColor = id => ({
     wildfires:     "#e55",
     volcanoes:     "#f90",
