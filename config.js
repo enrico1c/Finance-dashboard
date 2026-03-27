@@ -140,6 +140,25 @@ const KNOWN_PROVIDERS = [
     limitWarn:  null,
     limitMax:   null,
   },
+  /* ── FALLBACK PROVIDERS (apifallback.js) ─────────────────────── */
+  { id:"tiingo", name:"Tiingo", badge:"TNG", group:"Market Data",
+    desc:"News · Fundamentals (PE, PB, EPS, DivYield) · EOD prices · Fallback chain Tier 1",
+    limit:"500 req/day (free)", docsUrl:"https://www.tiingo.com/account/api/token",
+    sessionKey:"tiingo_call_count", limitWarn:450, limitMax:500 },
+  { id:"polygon", name:"Polygon.io", badge:"PLY", group:"Market Data",
+    desc:"Real-time trades · Aggregates (OHLCV) · High-quality price fallback · Tier 2",
+    limit:"5 req/min (free)", docsUrl:"https://polygon.io/dashboard/api-keys",
+    sessionKey:"polygon_call_count", limitWarn:4, limitMax:5 },
+  { id:"marketstack", name:"Marketstack", badge:"MSK", group:"Market Data",
+    desc:"EOD · Intraday · 70+ global exchanges · Global EOD fallback · Tier 2",
+    limit:"1,000 req/month (free)", docsUrl:"https://marketstack.com/dashboard",
+    sessionKey:"marketstack_call_count", limitWarn:900, limitMax:1000 },
+  { id:"stooq", name:"Stooq", badge:"STQ", group:"Market Data",
+    noKey: true,
+    desc:"EOD · Historical prices · No API key required · Lightweight price fallback · Tier 3",
+    limit:"Unlimited (unofficial · throttling possible)", docsUrl:"https://stooq.com/",
+    sessionKey:"stooq_call_count", limitWarn:null, limitMax:null },
+
 ];
 
 window._KEYS = {};
@@ -171,6 +190,12 @@ function getOpenFigiKey()       { return getKey("openfigi");       }
 function getCompaniesHouseKey() { return getKey("companieshouse"); }
 /* Phase 4 — Reference Data */
 function getTwelvedataKey()     { return getKey("twelvedata");     }
+
+/* Fallback providers (apifallback.js) */
+function getTiingoKey()      { return getKey("tiingo");      }
+function getPolygonKey()     { return getKey("polygon");     }
+function getMarketstackKey() { return getKey("marketstack"); }
+
 /* Persistence */
 function getSbKey()             { return getKey("supabase");       }
 
