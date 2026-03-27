@@ -326,6 +326,52 @@ async function wmAlertLoad(filter) {
     } catch(e) { console.warn("[AlertFeed/Tiingo]", e.message); }
   }
 
+  /* 4 — Yahoo Finance JSON search (keyless — direct, no proxy needed) */
+  if (!articles) {
+    try {
+      var yfr = await fetch("https://query1.finance.yahoo.com/v1/finance/search?q=stock+market+news&newsCount=25&lang=en-US&region=US", {
+        signal: AbortSignal.timeout(8000), headers: { Accept: "application/json" }
+      });
+      if (yfr.ok) {
+        var yfd = await yfr.json();
+        if (yfd && yfd.news && yfd.news.length) {
+          articles = yfd.news.map(function(n) {
+            return { title: n.title, url: n.link, source: n.publisher,
+                     publishedAt: new Date(n.providerPublishTime * 1000).toISOString(), summary: "" };
+          });
+        }
+      }
+    } catch(e) { console.warn("[AlertFeed/YahooJSON]", e.message); }
+  }
+
+  /* 5 — Yahoo Finance RSS (keyless — parse XML in browser) */
+  if (!articles) {
+    var rssAttempts = [
+      "https://feeds.finance.yahoo.com/rss/2.0/headline?s=SPY%2CAAPL%2CMSFT%2CGOOG%2CNVDA&region=US&lang=en-US",
+      "https://corsproxy.io/?https://feeds.finance.yahoo.com/rss/2.0/headline?s=SPY%2CAAPL%2CMSFT&region=US&lang=en-US"
+    ];
+    for (var ri = 0; ri < rssAttempts.length && !articles; ri++) {
+      try {
+        var rr = await fetch(rssAttempts[ri], { signal: AbortSignal.timeout(8000) });
+        if (!rr.ok) continue;
+        var rtext = await rr.text();
+        var rxml = new DOMParser().parseFromString(rtext, "text/xml");
+        var ritems = Array.from(rxml.querySelectorAll("item"));
+        if (ritems.length > 0) {
+          articles = ritems.map(function(item) {
+            return {
+              title: item.querySelector("title") ? item.querySelector("title").textContent : "",
+              url: item.querySelector("link") ? item.querySelector("link").textContent : "",
+              source: "Yahoo Finance",
+              publishedAt: item.querySelector("pubDate") ? item.querySelector("pubDate").textContent : "",
+              summary: item.querySelector("description") ? item.querySelector("description").textContent.replace(/<[^>]+>/g,"").slice(0,120) : ""
+            };
+          });
+        }
+      } catch(e) { console.warn("[AlertFeed/YahooRSS]", e.message); }
+    }
+  }
+
   if (!articles || !articles.length) {
     el.innerHTML = "<div class=\"no-data\">// Market alerts unavailable.<br>"
       + "<small style=\"color:#444\">Configure APITube or Finnhub key for live feed.</small><br>"
