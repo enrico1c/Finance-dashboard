@@ -165,7 +165,15 @@ const KNOWN_PROVIDERS = [
 // getKey() returns a truthy sentinel so API modules proceed normally.
 // proxy-client.js intercepts every fetch to a known API domain, strips the key
 // param/header, and re-routes the call through the secure backend proxy.
-window._KEYS = {};
+// Populate _KEYS with proxy sentinels for every provider.
+// Individual modules (finnhub.js, api.js, fred.js, fmp.js…) check window._KEYS["id"]
+// FIRST — if truthy, they skip the localStorage fallback. This ensures their local
+// getFinnhubKey() / getAvKey() / getFredKey() etc. return "proxy-managed" (truthy),
+// so all `if (!key) return` guards pass. The fetch interceptor then strips the sentinel
+// and re-routes the actual call through the secure backend proxy.
+window._KEYS = Object.fromEntries(
+  KNOWN_PROVIDERS.filter(p => !p.noKey).map(p => [p.id, 'proxy-managed'])
+);
 const getKey = () => "proxy-managed";          // always truthy — actual key is server-side
 const setKey = () => {};                        // no-op — keys are set on Vercel, not here
 const delKey = () => {};                        // no-op

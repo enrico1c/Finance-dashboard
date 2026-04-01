@@ -1544,7 +1544,7 @@ async function fmpLoadForm4(sym) {
 
     if (!hits.length) {
       // Fallback: Finnhub insider transactions (if key set)
-      const fhKey = localStorage.getItem("finterm_key_finnhub") || "";
+      const fhKey = (window._KEYS && window._KEYS["finnhub"]) || localStorage.getItem("finterm_key_finnhub") || "";
       if (fhKey) {
         await fhLoadInsiderTransactions(sym);
         return;
@@ -1581,7 +1581,7 @@ async function fmpLoadForm4(sym) {
     el.dataset.loaded = "1";
   } catch(e) {
     // Fallback to Finnhub if EDGAR fails
-    const fhKey = localStorage.getItem("finterm_key_finnhub") || "";
+    const fhKey = (window._KEYS && window._KEYS["finnhub"]) || localStorage.getItem("finterm_key_finnhub") || "";
     if (fhKey) { await fhLoadInsiderTransactions(sym); return; }
     el.innerHTML = `<div class="no-data">// Form 4 error: ${e.message}</div>`;
   }
@@ -1590,7 +1590,7 @@ async function fmpLoadForm4(sym) {
 /* Finnhub fallback for insider transactions */
 async function fhLoadInsiderTransactions(sym) {
   const el  = document.getElementById("fund-form4");
-  const key = localStorage.getItem("finterm_key_finnhub") || "";
+  const key = (window._KEYS && window._KEYS["finnhub"]) || localStorage.getItem("finterm_key_finnhub") || "";
   if (!el || !key) return;
   try {
     const data = await fetch(`https://finnhub.io/api/v1/stock/insider-transactions?symbol=${sym}&token=${key}`).then(r=>r.json());
