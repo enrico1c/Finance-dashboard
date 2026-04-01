@@ -622,12 +622,13 @@ window.yfLoadTrending = async function() {
         fetch(`https://financialmodelingprep.com/api/v3/gainers?apikey=${_fmpKey()}`).then(r=>r.json()),
         fetch(`https://financialmodelingprep.com/api/v3/losers?apikey=${_fmpKey()}`).then(r=>r.json()),
       ]);
-      mData={actives:act||[],gainers:gain||[],losers:lose||[]};
+      const toArr = v => Array.isArray(v) ? v : (Array.isArray(v?.data) ? v.data : []);
+      mData={actives:toArr(act),gainers:toArr(gain),losers:toArr(lose)};
       _yhCacheSet("fmp-movers", mData);
     } catch { el.innerHTML=`<div class="no-data">// Could not load market movers.</div>`; return; }
   }
   const sec=(title,items,fixCls)=>`<div class="section-head" style="margin:10px 0 5px">${_yhEsc(title)}</div>`
-    +items.slice(0,8).map(t=>{
+    +(Array.isArray(items)?items:[]).slice(0,8).map(t=>{
       const chg=parseFloat(t.changesPercentage??t.change??0);
       const cls=fixCls||(chg>=0?"pos":"neg");
       return `<div class="yf-trend-row" onclick="if(typeof changeTicker==='function')changeTicker('${_yhEsc(t.ticker||t.symbol)}')">

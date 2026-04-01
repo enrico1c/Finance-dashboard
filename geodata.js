@@ -214,54 +214,154 @@ window.noaaLoadAlerts = async function() {
 window.eonetLoadEvents = async function() {
   const el = document.getElementById("alert-eonet");
   if (!el) return;
-  const data = await gdFetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60", "eonet_events");
-  if (!data?.events) { el.innerHTML = `<div class="no-data">// NASA EONET unavailable.</div>`; return; }
 
-  const catColor = id => ({
-    wildfires:     "#e55",
-    volcanoes:     "#f90",
-    severeStorms:  "#fc6",
-    floods:        "#4a9eff",
-    seaLakeIce:    "#8cf",
-    drought:       "#c90",
-    earthquakes:   "#a86",
-    landslides:    "#b75",
-    temperatureExtremes: "#f6a",
-    waterColor:    "#4cf",
-    dustHaze:      "#cc8",
-  })[id] || "#888";
+  el.innerHTML = "<div class=\"av-live-badge\">&#9679; GDACS &middot; Natural Disasters &middot; Loading&hellip;</div>";
 
-  const events = data.events;
-  const byCategory = {};
-  events.forEach(e => {
-    const cat = e.categories?.[0]?.id || "other";
-    if (!byCategory[cat]) byCategory[cat] = [];
-    byCategory[cat].push(e);
+  /* ── GDACS JSON API (Global Disaster Alert & Coordination System) ── */
+  const today = new Date().toISOString().slice(0, 10);
+  const from  = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const gdacsUrl = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH"
+    + "?fromDate=" + from + "&toDate=" + today
+    + "&alertlevel=Green;Orange;Red&eventtype=EQ;TC;FL;VO;WF&limit=50";
+
+  let geojson = null;
+  try {
+    const r = await fetch(gdacsUrl, { signal: AbortSignal.timeout(12000) });
+    if (r.ok) geojson = await r.json();
+  } catch(e) { console.warn("[GDACS]", e.message); }
+
+  /* ── Fallback: GDACS RSS via proxy ── */
+  if (!geojson || !geojson.features || !geojson.features.length) {
+    try {
+      const rssProxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://www.gdacs.org/xml/rss.xml");
+      const rr = await fetch(rssProxy, { signal: AbortSignal.timeout(12000) });
+      if (rr.ok) {
+        const text = await rr.text();
+        const xml  = new DOMParser().parseFromString(text, "text/xml");
+        const items = Array.from(xml.querySelectorAll("item"));
+        if (items.length) {
+          const ns = "https://www.gdacs.org/";
+          geojson = {
+            _rss: true,
+            features: items.map(function(it) {
+              const get = function(tag) { return (it.querySelector(tag) || {}).textContent || ""; };
+              const getNS = function(tag) {
+                const el = it.getElementsByTagNameNS("*", tag)[0] || it.querySelector(tag);
+                return el ? el.textContent : "";
+              };
+              const lat = parseFloat(getNS("lat") || getNS("point") || "0");
+              const lon = parseFloat(getNS("long") || "0");
+              return { _rss: true,
+                properties: {
+                  name:       get("title"),
+                  eventtype:  getNS("eventtype") || "OTHER",
+                  alertlevel: getNS("alertlevel") || "Green",
+                  severity:   getNS("severity") || "",
+                  fromdate:   get("pubDate"),
+                  affectedcountries: getNS("country") ? [getNS("country")] : [],
+                  url:        get("link"),
+                },
+                geometry: { coordinates: [lon, lat] }
+              };
+            })
+          };
+        }
+      }
+    } catch(e) { console.warn("[GDACS RSS]", e.message); }
+  }
+
+  /* ── Last resort: NASA EONET (may be down) ── */
+  if (!geojson || !geojson.features || !geojson.features.length) {
+    try {
+      const eoproxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60");
+      const er = await fetch(eoproxy, { signal: AbortSignal.timeout(10000) });
+      if (er.ok) {
+        const eodata = await er.json();
+        if (eodata && eodata.events && eodata.events.length) {
+          geojson = {
+            _eonet: true,
+            features: eodata.events.map(function(e) {
+              const geo = e.geometry && e.geometry[0];
+              return { _eonet: true,
+                properties: {
+                  name:       e.title,
+                  eventtype:  (e.categories && e.categories[0] && e.categories[0].id) || "other",
+                  alertlevel: "Green",
+                  severity:   "",
+                  fromdate:   geo ? geo.date : "",
+                  affectedcountries: [],
+                  url:        e.sources && e.sources[0] ? e.sources[0].url : "",
+                },
+                geometry: { coordinates: geo ? geo.coordinates : [0, 0] }
+              };
+            })
+          };
+        }
+      }
+    } catch(e) { console.warn("[EONET]", e.message); }
+  }
+
+  if (!geojson || !geojson.features || !geojson.features.length) {
+    el.innerHTML = "<div class=\"no-data\">// Natural disaster feed unavailable.<br>"
+      + "<button onclick=\"eonetLoadEvents()\" style=\"margin-top:8px;padding:3px 8px;border-radius:4px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer;font-size:11px\">&#8635; Retry</button></div>";
+    return;
+  }
+
+  const typeLabel = { EQ:"Earthquake", TC:"Tropical Cyclone", FL:"Flood", VO:"Volcano", WF:"Wildfire", DR:"Drought", LS:"Landslide", OTHER:"Event" };
+  const typeColor = { EQ:"#a86", TC:"#fc6", FL:"#4a9eff", VO:"#f90", WF:"#e55", DR:"#c90", LS:"#b75", OTHER:"#888" };
+  const alertColor = { Red:"#e55", Orange:"#f90", Green:"#4caf50" };
+
+  const features = geojson.features;
+  const byType = {};
+  features.forEach(function(f) {
+    const t = (f.properties.eventtype || "OTHER").toUpperCase();
+    if (!byType[t]) byType[t] = [];
+    byType[t].push(f);
   });
 
-  let html = `<div class="av-live-badge">● NASA EONET · Active Natural Events · Live</div>`;
-  html += `<div class="eonet-stats">`;
-  Object.entries(byCategory).sort(([,a],[,b]) => b.length-a.length).forEach(([cat, evts]) => {
-    const label = cat.replace(/([A-Z])/g," $1").replace(/^./,s=>s.toUpperCase());
-    html += `<span class="eonet-cat-pill" style="border-color:${catColor(cat)};color:${catColor(cat)}">${label}: <strong>${evts.length}</strong></span>`;
+  const src = geojson._eonet ? "NASA EONET" : geojson._rss ? "GDACS RSS" : "GDACS";
+  let html = "<div class=\"av-live-badge\">&#9679; " + src + " &middot; Active Natural Events &middot; Live</div>";
+  html += "<div class=\"eonet-stats\">";
+  Object.entries(byType).sort(function(a,b){ return b[1].length - a[1].length; }).forEach(function(kv) {
+    const t = kv[0], evts = kv[1];
+    const label = typeLabel[t] || t;
+    const color = typeColor[t] || "#888";
+    html += "<span class=\"eonet-cat-pill\" style=\"border-color:" + color + ";color:" + color + "\">" + label + ": <strong>" + evts.length + "</strong></span>";
   });
-  html += `</div><div class="eonet-list">`;
+  html += "</div><div class=\"eonet-list\">";
 
-  events.slice(0, 25).forEach(e => {
-    const cat   = e.categories?.[0]?.id || "other";
-    const geo   = e.geometry?.[0];
-    const coord = geo?.coordinates ? `${geo.coordinates[1].toFixed(1)}°N ${geo.coordinates[0].toFixed(1)}°E` : "";
-    const date  = geo?.date ? geo.date.slice(0,10) : e.geometry?.[e.geometry.length-1]?.date?.slice(0,10) || "";
-    html += `<div class="eonet-row">
-      <span class="eonet-dot" style="background:${catColor(cat)}"></span>
-      <div class="eonet-info">
-        <span class="eonet-title">${e.title}</span>
-        <span class="eonet-meta">${coord} · ${date}</span>
-      </div>
-      ${e.sources?.[0]?.url ? `<a href="${e.sources[0].url}" target="_blank" rel="noopener" class="usgs-link">↗</a>` : ""}
-    </div>`;
+  features.slice(0, 30).forEach(function(f) {
+    const p    = f.properties;
+    const t    = (p.eventtype || "OTHER").toUpperCase();
+    const dot  = typeColor[t] || "#888";
+    const alrt = alertColor[p.alertlevel] || "#888";
+    const coords = f.geometry && f.geometry.coordinates;
+    const coord  = (coords && coords[1] && coords[0])
+      ? (parseFloat(coords[1]).toFixed(1) + "\u00b0N " + parseFloat(coords[0]).toFixed(1) + "\u00b0E")
+      : "";
+    const dateStr = p.fromdate ? String(p.fromdate).slice(0, 10) : "";
+    const countries = Array.isArray(p.affectedcountries)
+      ? p.affectedcountries.map(function(c){ return typeof c === "object" ? (c.countryname || c.iso3 || "") : c; }).filter(Boolean).join(", ")
+      : (p.affectedcountries || "");
+    const sev = p.severity ? String(p.severity).slice(0, 20) : "";
+    const linkUrl = p.url || "";
+
+    html += "<div class=\"eonet-row\">"
+          + "<span class=\"eonet-dot\" style=\"background:" + dot + "\"></span>"
+          + "<div class=\"eonet-info\">"
+          + "<span class=\"eonet-title\">" + (p.name || "") + "</span>"
+          + "<span class=\"eonet-meta\">"
+          + (sev ? sev + " &middot; " : "")
+          + (countries ? countries + " &middot; " : "")
+          + (coord ? coord + " &middot; " : "")
+          + dateStr
+          + " <span style=\"color:" + alrt + ";font-size:10px;font-weight:600\">" + (p.alertlevel || "") + "</span>"
+          + "</span></div>"
+          + (linkUrl ? "<a href=\"" + linkUrl + "\" target=\"_blank\" rel=\"noopener\" class=\"usgs-link\">\u2197</a>" : "")
+          + "</div>";
   });
-  html += `</div>`;
+
+  html += "</div>";
   el.innerHTML = html;
 };
 

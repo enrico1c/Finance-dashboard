@@ -31,7 +31,7 @@
 /* ── Constants ──────────────────────────────────────────────────── */
 const GLEIF_API      = "https://api.gleif.org/api/v1";
 const GLEIF_TTL      = 24 * 60 * 60 * 1000;  // 24 h
-const SESSION_KEY    = "gleif_call_count";
+const _GLEIF_SESSION_KEY = "gleif_call_count";
 
 /* ── In-memory cache: ticker → LEI result ───────────────────────── */
 const _GL_CACHE = {};
@@ -45,8 +45,8 @@ function _esc(s) {
     ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
 }
 function _inc() {
-  const n = parseInt(sessionStorage.getItem(SESSION_KEY) || "0") + 1;
-  sessionStorage.setItem(SESSION_KEY, n);
+  const n = parseInt(sessionStorage.getItem(_GLEIF_SESSION_KEY) || "0") + 1;
+  sessionStorage.setItem(_GLEIF_SESSION_KEY, n);
   if (typeof renderTopbarBadges === "function") renderTopbarBadges();
   return n;
 }

@@ -164,21 +164,8 @@ const MINERAL_PRODUCER_COUNTRIES = {
   'Guinea':        ['bauxite','lithium'],
 };
 
-/* Recent geopolitical risk events (curated from UCDP/ACLED patterns) */
-const CONFLICT_RISK_DATA = [
-  { country:'Myanmar', region:'Kachin/Shan States', minerals:['rare_earths','tin'], risk:'High', type:'Armed conflict', note:'Ongoing civil war disrupts REE mining; Myanmar now #2 REE exporter' },
-  { country:'DRC',     region:'Kivu provinces',     minerals:['cobalt','coltan'],   risk:'High', type:'Armed groups', note:'Eastern DRC artisanal cobalt mines affected by armed group activity' },
-  { country:'Russia',  region:'Kola Peninsula',     minerals:['nickel','cobalt','palladium'], risk:'Elevated', type:'Sanctions', note:'Western sanctions reduce access to Russian nickel/palladium' },
-  { country:'Mali',    region:'Sahel',              minerals:['lithium','gold'],    risk:'High', type:'Coup/instability', note:'Post-coup political instability; mining concessions under review' },
-  { country:'Niger',   region:'Agadez',             minerals:['uranium'],          risk:'High', type:'Coup/instability', note:'2023 coup disrupted uranium supply; France withdrew Orano operations' },
-  { country:'Burkina Faso', region:'Sahel',         minerals:['manganese'],        risk:'High', type:'Armed groups', note:'Jihadist activity affects mine-to-port transport routes' },
-  { country:'Ethiopia',region:'Tigray/Afar',        minerals:['graphite','tantalum'], risk:'Moderate', type:'Post-conflict', note:'Peace agreement 2022; reconstruction phase; mining recovering' },
-  { country:'Sudan',   region:'Darfur/Kordofan',    minerals:['gold','chromium'],  risk:'Critical', type:'Civil war', note:'2023 civil war severely disrupts all mining and export operations' },
-  { country:'Guinea',  region:'Conakry',            minerals:['bauxite'],          risk:'Elevated', type:'Political transition', note:'Coup 2021; Chinese bauxite contracts renegotiated under military rule' },
-  { country:'Chile',   region:'Atacama',            minerals:['lithium','copper'],  risk:'Low', type:'Policy risk', note:'Nationalization debates; new mining royalty law 2023; stable operations' },
-  { country:'Indonesia', region:'Papua',            minerals:['nickel'],           risk:'Moderate', type:'Policy', note:'Export bans accelerate domestic refining; HPAL capacity building' },
-  { country:'Bolivia', region:'Salar de Uyuni',     minerals:['lithium'],          risk:'Moderate', type:'Political', note:'State control of lithium; YLB contracts with China/Russia' },
-];
+/* Mineral producer country monitoring list — used for live GDELT queries */
+/* CONFLICT_RISK_DATA removed: now fetched live from GDELT per country */
 
 /* ══════════════════════════════════════════════════════════════════
    RENDER — news-intel tab
@@ -289,10 +276,13 @@ async function intelLoadAll() {
   html += `</div>`;
 
   el.innerHTML = html;
+
+  /* Kick off async live sanctions feed now that DOM is ready */
+  intelLoadSanctionsImpact();
 }
 
 function intelRenderSanctionsHTML() {
-  return `<div class="av-live-badge">● Sanctions Intelligence · OFAC SDN · UK Sanctions List · No API Key</div>
+  return `<div class="av-live-badge">● Sanctions Intelligence · OFAC SDN · UK Sanctions List · Federal Register · No API Key</div>
   <div class="av-note" style="margin-bottom:8px">OFAC SDN list (US Treasury) and UK FCDO sanctions list are machine-readable and updated in real-time. Sanctioned entities directly affect commodity supply chains — particularly for cobalt (DRC/Russia), nickel (Russia), titanium (Russia), and neon (Russia/China).</div>
 
   <div class="section-head">🇺🇸 OFAC SDN List — U.S. Treasury</div>
@@ -313,57 +303,163 @@ function intelRenderSanctionsHTML() {
     <a href="https://assets.publishing.service.gov.uk/media/uk-sanctions-list.csv" target="_blank" rel="noopener" class="energy-entsog-link">↗ Download CSV</a>
   </div>
 
-  <div class="section-head" style="margin-top:12px">⚠ Sanctions Impact on Critical Mineral Supply Chains</div>
-  <div class="fin-table-wrap"><table class="fin-table">
-    <thead><tr><th>Sanctioned Entity/Country</th><th>Affected Minerals</th><th>Regime</th><th>Supply Risk</th></tr></thead>
-    <tbody>
-      <tr><td>Russia (state entities)</td><td>Nickel, Cobalt, Palladium, Titanium, Neon</td><td>US/EU/UK (Ukraine)</td><td class="neg">High</td></tr>
-      <tr><td>Russian aluminum entities</td><td>Aluminum (Rusal)</td><td>US OFAC (partial)</td><td class="warn">Elevated</td></tr>
-      <tr><td>DRC armed groups</td><td>Cobalt, Coltan, Cassiterite</td><td>US/EU conflict minerals</td><td class="warn">Elevated</td></tr>
-      <tr><td>Iran (state entities)</td><td>Uranium, Copper, Zinc</td><td>US/EU comprehensive</td><td class="neg">Critical</td></tr>
-      <tr><td>North Korea</td><td>Coal, Iron, Gold, Rare Earths</td><td>UN/US/EU comprehensive</td><td class="neg">Critical</td></tr>
-      <tr><td>Myanmar military entities</td><td>Rare Earth Elements, Jade, Rubies</td><td>US/EU/UK</td><td class="warn">Elevated</td></tr>
-    </tbody>
-  </table></div>`;
+  <div class="section-head" style="margin-top:12px">📡 Live Sanctions & Export Control Notices — Federal Register</div>
+  <div id="sanctions-live-impact"><div class="av-loading"><span class="av-spinner"></span>Loading live sanctions notices…</div></div>`;
+}
+
+async function intelLoadSanctionsImpact() {
+  const el = document.getElementById('sanctions-live-impact');
+  if (!el) return;
+  try {
+    const [sanctionsData, exportData, gdeltSanctions] = await Promise.all([
+      fedRegGetCriticalMaterialsNotices(),
+      fedRegGetExportControlNotices(),
+      gdeltGetSupplyChainNews('sanctions minerals export ban supply chain critical', 'ArtList', 10),
+    ]);
+
+    let html = '';
+
+    /* Federal Register — recent sanctions/export control notices */
+    const fedDocs = [
+      ...(sanctionsData?.results || []),
+      ...(exportData?.results || []),
+    ].sort((a,b) => new Date(b.publication_date) - new Date(a.publication_date)).slice(0, 8);
+
+    if (fedDocs.length) {
+      html += `<div class="news-list">`;
+      for (const doc of fedDocs) {
+        const type = doc.type === 'RULE' ? '📜 Final Rule' : doc.type === 'PRULE' ? '📋 Proposed Rule' : '📢 Notice';
+        const agencies = (doc.agencies || []).map(a => a.name || a.raw_name || '').filter(Boolean).join(', ');
+        html += `<div class="news-item">
+          <a href="${_itEsc(doc.html_url||'#')}" target="_blank" rel="noopener noreferrer">${_itEsc(doc.title||'—')}</a>
+          <div class="news-meta">
+            ${type} &nbsp;·&nbsp; ${_itDate(doc.publication_date||'')}
+            ${agencies ? `&nbsp;·&nbsp; ${_itEsc(agencies)}` : ''}
+          </div>
+          ${doc.abstract ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${_itEsc(doc.abstract.slice(0,180))}…</div>` : ''}
+        </div>`;
+      }
+      html += `</div>`;
+    } else {
+      html += `<div class="no-data">// Federal Register data loading…</div>`;
+    }
+
+    /* GDELT sanctions news */
+    const gdeltArts = gdeltSanctions?.articles || [];
+    if (gdeltArts.length) {
+      html += `<div class="section-head" style="margin-top:10px">📰 Live Sanctions News — GDELT</div><div class="news-list">`;
+      for (const a of gdeltArts.slice(0, 5)) {
+        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch { return '—'; } })();
+        html += `<div class="news-item">
+          <a href="${_itEsc(a.url||'#')}" target="_blank" rel="noopener noreferrer">${_itEsc(a.title||'—')}</a>
+          <div class="news-meta">${_itEsc(domain)} · ${_itDate(a.seendate||a.publishdate||'')}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <a href="https://www.federalregister.gov/" target="_blank" rel="noopener" class="energy-entsog-link">↗ Federal Register</a>
+      <a href="https://ofac.treasury.gov/" target="_blank" rel="noopener" class="energy-entsog-link">↗ OFAC</a>
+    </div>`;
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="no-data">// Sanctions feed error: ${_itEsc(e.message)}</div>`;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   RENDER — Geo panel CONFLICT RISK section
+   RENDER — Geo panel CONFLICT RISK section (GDELT live)
    ══════════════════════════════════════════════════════════════════ */
-function intelRenderConflictRisk() {
+async function intelRenderConflictRisk() {
   const el = document.getElementById('geo-conflict-risk');
   if (!el) return;
 
-  const riskColor = r => r==='Critical'?'#f85149':r==='High'?'#f0883e':r==='Elevated'?'#d29922':r==='Moderate'?'#58a6ff':'#3fb950';
+  el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading live conflict intelligence from GDELT…</div>';
 
-  let html = `<div class="av-live-badge">● Geopolitical Risk · Critical Mineral Producer Countries · UCDP/ACLED informed</div>`;
-  html += `<div class="av-note" style="margin-bottom:8px">Conflict risk overlay for countries producing USGS/EU critical minerals. Sourced from UCDP GED patterns and regional risk assessments. Annual refresh.</div>`;
+  try {
+    const countries = Object.keys(MINERAL_PRODUCER_COUNTRIES);
+    const countryQ  = countries.map(c => `"${c}"`).join(' OR ');
+    const query     = `(${countryQ}) (conflict OR military OR sanctions OR "export ban" OR coup OR instability OR mining) sourcelang:english`;
+    const data      = await gdeltGetSupplyChainNews(query, 'ArtList', 30);
+    const articles  = data?.articles || [];
 
-  for (const event of CONFLICT_RISK_DATA.sort((a,b) => {
-    const o = {Critical:0,High:1,Elevated:2,Moderate:3,Low:4};
-    return (o[a.risk]||5)-(o[b.risk]||5);
-  })) {
-    const color = riskColor(event.risk);
-    const minerals = event.minerals.map(m => `<span class="min-badge min-badge-usgs">${m.replace('_',' ')}</span>`).join('');
-    html += `<div class="conflict-card" style="border-left:3px solid ${color}">
-      <div class="conflict-header">
-        <span class="conflict-country">${_itEsc(event.country)}</span>
-        <span class="conflict-region" style="color:var(--text-muted)">${_itEsc(event.region)}</span>
-        <span class="conflict-risk" style="color:${color}">${_itEsc(event.risk)}</span>
-        <span class="conflict-type">${_itEsc(event.type)}</span>
-      </div>
-      <div class="conflict-minerals">${minerals}</div>
-      <div class="conflict-note">${_itEsc(event.note)}</div>
+    let html = `<div class="av-live-badge">● GDELT Live · Critical Mineral Producer Countries · Conflict & Risk Events · Updates every 15 min</div>`;
+    html += `<div class="av-note" style="margin-bottom:8px">Live news events from GDELT covering ${countries.length} critical mineral producer countries. GDELT monitors 100+ languages across 65,000+ sources worldwide.</div>`;
+
+    if (!articles.length) {
+      html += `<div class="no-data">// No recent events detected via GDELT. API updates every 15 minutes.<br>
+        <a href="https://api.gdeltproject.org/" target="_blank" rel="noopener" style="color:var(--accent)">↗ GDELT Project</a></div>`;
+      el.innerHTML = html;
+      return;
+    }
+
+    /* Group articles by detected mineral producer country */
+    const byCountry = {};
+    for (const a of articles) {
+      const text = ((a.title || '') + ' ' + (a.url || '')).toLowerCase();
+      let matched = null;
+      for (const country of countries) {
+        if (text.includes(country.toLowerCase())) { matched = country; break; }
+      }
+      const key = matched || '_other';
+      if (!byCountry[key]) byCountry[key] = [];
+      byCountry[key].push(a);
+    }
+
+    /* Render matched countries */
+    let hasCountry = false;
+    for (const country of countries) {
+      const arts = byCountry[country];
+      if (!arts?.length) continue;
+      hasCountry = true;
+      const minerals = (MINERAL_PRODUCER_COUNTRIES[country] || [])
+        .map(m => `<span class="min-badge min-badge-usgs">${_itEsc(m.replace(/_/g,' '))}</span>`).join('');
+      html += `<div class="conflict-card" style="border-left:3px solid #f0883e;margin-bottom:6px">
+        <div class="conflict-header">
+          <span class="conflict-country">${_itEsc(country)}</span>
+          <span style="margin-left:8px;font-size:10px;color:var(--text-muted)">${arts.length} live event${arts.length>1?'s':''} · GDELT</span>
+        </div>
+        <div class="conflict-minerals">${minerals}</div>`;
+      for (const a of arts.slice(0, 2)) {
+        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch { return '—'; } })();
+        html += `<div class="news-item" style="padding:3px 0;border-bottom:1px solid var(--border)">
+          <a href="${_itEsc(a.url||'#')}" target="_blank" rel="noopener noreferrer" style="font-size:11px">${_itEsc(a.title||'—')}</a>
+          <div class="news-meta">${_itEsc(domain)} · ${_itDate(a.seendate||a.publishdate||'')}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    /* Unmatched articles */
+    const otherArts = byCountry['_other'] || [];
+    if (otherArts.length) {
+      html += `<div class="section-head" style="margin-top:8px">📡 Additional Supply Chain Events</div><div class="news-list">`;
+      for (const a of otherArts.slice(0, 4)) {
+        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch { return '—'; } })();
+        html += `<div class="news-item">
+          <a href="${_itEsc(a.url||'#')}" target="_blank" rel="noopener noreferrer">${_itEsc(a.title||'—')}</a>
+          <div class="news-meta">${_itEsc(domain)} · ${_itDate(a.seendate||a.publishdate||'')}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    if (!hasCountry && !otherArts.length) {
+      html += `<div class="no-data">// GDELT returned results but no country matches found. Try again in 15 minutes.</div>`;
+    }
+
+    html += `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <a href="https://api.gdeltproject.org/" target="_blank" rel="noopener" class="energy-entsog-link">↗ GDELT Project</a>
+      <a href="https://ucdp.uu.se/downloads/" target="_blank" rel="noopener" class="energy-entsog-link">↗ UCDP Conflict Data</a>
+      <a href="https://acleddata.com/" target="_blank" rel="noopener" class="energy-entsog-link">↗ ACLED Live Events</a>
     </div>`;
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="no-data">// Conflict intelligence error: ${_itEsc(e.message)}</div>`;
   }
-
-  html += `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-    <a href="https://ucdp.uu.se/downloads/" target="_blank" rel="noopener" class="energy-entsog-link">↗ UCDP Data Download (free CSV)</a>
-    <a href="https://www.globalconflicttracker.org/" target="_blank" rel="noopener" class="energy-entsog-link">↗ Global Conflict Tracker</a>
-  </div>`;
-  html += `<div class="av-note" style="margin-top:6px">Source: UCDP Georeferenced Event Dataset (no key) · ACLED informed patterns · Annual publication. For live conflict events: <a href="https://acleddata.com/" target="_blank" rel="noopener" style="color:var(--accent)">ACLED (free account)</a>.</div>`;
-
-  el.innerHTML = html;
 }
 
 /* ══════════════════════════════════════════════════════════════════

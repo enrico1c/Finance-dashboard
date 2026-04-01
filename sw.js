@@ -7,7 +7,7 @@
    • Static assets:             Stale-While-Revalidate
    ══════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION  = 'finterm-v13-2026';
+const CACHE_VERSION  = 'finterm-v24-2026';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const API_CACHE      = `${CACHE_VERSION}-api`;
 
@@ -27,6 +27,8 @@ const APP_SHELL = [
   '/config.js',
   '/yahoo.js',
   '/geointel.js',
+  '/finterm-modules.js',
+  '/commodities.js',
   '/api.js',
   '/sbcache.js',
   '/energy.js',
