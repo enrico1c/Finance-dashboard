@@ -10,9 +10,40 @@
   <title>FINTERM — Finance Dashboard</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="uars-widget.css" />
+  <link rel="stylesheet" href="auth/login.css" />
   <script src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
+
+<!-- ══ LOGIN OVERLAY — covers entire page until authenticated ══ -->
+<div id="finterm-login-overlay" role="dialog" aria-modal="true" aria-label="FINTERM Authentication">
+  <div class="finterm-login-card">
+    <div class="finterm-login-logo">
+      <div class="finterm-login-logo-icon">📈</div>
+      <div>
+        <div class="finterm-login-title">FINTERM</div>
+        <div class="finterm-login-subtitle">Finance Intelligence Dashboard</div>
+      </div>
+    </div>
+    <form id="finterm-login-form" novalidate autocomplete="off">
+      <div>
+        <label class="finterm-field-label" for="finterm-password">Master Password</label>
+        <div class="finterm-password-wrapper">
+          <input type="password" id="finterm-password" name="password" placeholder="Enter your password" autocomplete="current-password" spellcheck="false" required />
+          <button type="button" class="finterm-pw-toggle" aria-label="Toggle password visibility" onclick="(function(){var i=document.getElementById('finterm-password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈';}).call(this)">👁</button>
+        </div>
+      </div>
+      <div id="finterm-error-msg" class="finterm-hidden" role="alert"></div>
+      <button type="submit" id="finterm-submit-btn">Unlock Dashboard</button>
+    </form>
+    <div class="finterm-login-footer">
+      <strong>🔒 Secure</strong> — API keys stored server-side only.<br>
+      Session expires automatically after 8 hours.
+    </div>
+  </div>
+</div>
+<!-- ══ END LOGIN OVERLAY ══════════════════════════════════════ -->
+
   <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
   <div class="app-shell">
   <!-- ══ LEFT LAYOUT SIDEBAR ════════════════════════════════════ -->
@@ -998,6 +1029,13 @@
   <div id="apiToast" class="api-toast"></div>
 
 </div><!-- /app-shell -->
+
+<!-- Backend URL — must be set before proxy-client.js loads -->
+<script>window.FINTERM_BACKEND_URL = 'https://finterm-backend.vercel.app';</script>
+<!-- Fetch interceptor — MUST load before config.js and all API modules -->
+<script src="proxy-client.js"></script>
+<!-- Auth module — manages login overlay and session -->
+<script src="auth/auth.js"></script>
 
 <!-- Scripts — config.js must load before api.js/fmp.js, after script.js -->
 <script src="config.js"></script>
