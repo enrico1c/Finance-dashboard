@@ -617,7 +617,7 @@ function avRenderWACC(sym, ov) {
     ${mRow("Pre-Tax Cost of Debt",  kd+"%")}
     ${mRow("Tax Rate (assumed)",    taxRate+"%")}
     ${mRow("Equity Weight",         eW+"%")}
-    ${mRow("Debt Weight",           dW + "% " + (fmpDebtEq != null ? '<span style="font-size:9px;opacity:.6">(FMP D/E)</span>' : '<span style="font-size:9px;opacity:.6">(est.)</span>'))}
+    ${mRowHtml("Debt Weight",           dW + "% " + (fmpDebtEq != null ? '<span style="font-size:9px;opacity:.6">(FMP D/E)</span>' : '<span style="font-size:9px;opacity:.6">(est.)</span>'))}
     <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
     ${sHead("DCF Sensitivity")}
     ${mRow("Terminal Growth Rate",  tg+"%")}

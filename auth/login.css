@@ -1,0 +1,299 @@
+/**
+ * login.css — FINTERM login overlay styles.
+ *
+ * Dark-themed overlay matching a finance dashboard aesthetic.
+ * Covers the entire viewport until authentication succeeds.
+ * Uses CSS variables so it inherits the dashboard theme if set.
+ */
+
+/* ── Variables ──────────────────────────────────────────────────────────────── */
+:root {
+  --ft-login-bg: rgba(10, 12, 18, 0.97);
+  --ft-login-card-bg: #0f1319;
+  --ft-login-card-border: #1e2633;
+  --ft-login-accent: #3b82f6;        /* blue */
+  --ft-login-accent-hover: #2563eb;
+  --ft-login-text: #e2e8f0;
+  --ft-login-text-muted: #64748b;
+  --ft-login-input-bg: #161c27;
+  --ft-login-input-border: #2a3547;
+  --ft-login-input-border-focus: #3b82f6;
+  --ft-login-error: #ef4444;
+  --ft-login-success: #22c55e;
+  --ft-login-radius: 12px;
+  --ft-login-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Overlay (full-screen backdrop) ────────────────────────────────────────── */
+#finterm-login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ft-login-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: opacity 0.25s ease;
+}
+
+#finterm-login-overlay.finterm-hidden {
+  display: none;
+}
+
+/* ── Login card ──────────────────────────────────────────────────────────────── */
+.finterm-login-card {
+  background: var(--ft-login-card-bg);
+  border: 1px solid var(--ft-login-card-border);
+  border-radius: var(--ft-login-radius);
+  box-shadow: var(--ft-login-shadow);
+  padding: 48px 44px;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle top accent line */
+.finterm-login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--ft-login-accent), transparent);
+}
+
+/* ── Logo / header ───────────────────────────────────────────────────────────── */
+.finterm-login-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.finterm-login-logo-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--ft-login-accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.finterm-login-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ft-login-text);
+  letter-spacing: -0.3px;
+}
+
+.finterm-login-subtitle {
+  font-size: 12px;
+  color: var(--ft-login-text-muted);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* ── Form ─────────────────────────────────────────────────────────────────────── */
+#finterm-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.finterm-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ft-login-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+
+.finterm-password-wrapper {
+  position: relative;
+}
+
+#finterm-password {
+  width: 100%;
+  padding: 12px 44px 12px 14px;
+  background: var(--ft-login-input-bg);
+  border: 1px solid var(--ft-login-input-border);
+  border-radius: 8px;
+  color: var(--ft-login-text);
+  font-size: 15px;
+  letter-spacing: 2px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+#finterm-password:focus {
+  border-color: var(--ft-login-input-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+#finterm-password::placeholder {
+  letter-spacing: normal;
+  color: var(--ft-login-text-muted);
+  opacity: 0.6;
+}
+
+#finterm-password:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Show/hide password toggle */
+.finterm-pw-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ft-login-text-muted);
+  padding: 4px;
+  line-height: 1;
+  font-size: 16px;
+  transition: color 0.15s ease;
+}
+
+.finterm-pw-toggle:hover {
+  color: var(--ft-login-text);
+}
+
+/* ── Submit button ───────────────────────────────────────────────────────────── */
+#finterm-submit-btn {
+  width: 100%;
+  padding: 13px;
+  background: var(--ft-login-accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease, opacity 0.2s ease;
+  letter-spacing: 0.2px;
+  margin-top: 4px;
+}
+
+#finterm-submit-btn:hover:not(:disabled) {
+  background: var(--ft-login-accent-hover);
+}
+
+#finterm-submit-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+#finterm-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Error message ───────────────────────────────────────────────────────────── */
+#finterm-error-msg {
+  font-size: 13px;
+  color: var(--ft-login-error);
+  text-align: center;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+#finterm-error-msg.finterm-hidden {
+  display: none;
+}
+
+/* ── Footer note ─────────────────────────────────────────────────────────────── */
+.finterm-login-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ft-login-text-muted);
+  line-height: 1.5;
+}
+
+.finterm-login-footer strong {
+  color: var(--ft-login-success);
+  font-weight: 500;
+}
+
+/* ── Shake animation (wrong password) ───────────────────────────────────────── */
+@keyframes finterm-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-8px); }
+  40%       { transform: translateX(8px); }
+  60%       { transform: translateX(-5px); }
+  80%       { transform: translateX(5px); }
+}
+
+.finterm-shake {
+  animation: finterm-shake 0.45s ease;
+}
+
+/* ── Session indicator (small badge, top-right corner of dashboard) ─────────── */
+.finterm-session-indicator {
+  position: fixed;
+  top: 8px;
+  right: 12px;
+  z-index: 9999;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  pointer-events: none;
+  letter-spacing: 0.3px;
+}
+
+.finterm-session-active {
+  color: var(--ft-login-success);
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.finterm-session-inactive {
+  color: var(--ft-login-error);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* ── Logout button (injected into toolbar) ───────────────────────────────────── */
+.finterm-logout-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--ft-login-card-border);
+  border-radius: 4px;
+  color: var(--ft-login-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.finterm-logout-btn:hover {
+  color: var(--ft-login-text);
+  border-color: var(--ft-login-text-muted);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .finterm-login-card {
+    margin: 16px;
+    padding: 36px 28px;
+  }
+}

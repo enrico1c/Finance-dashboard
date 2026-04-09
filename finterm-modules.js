@@ -333,6 +333,7 @@ window.vixLoadWidget = async function(containerId) {
       <span class="vix-value">—</span>
       <span class="vix-src">CBOE CDN unavailable</span>
     </div>`;
+    if (typeof showApiToast === 'function') showApiToast('VIX data unavailable — CBOE CDN unreachable', 'info');
     return;
   }
 
@@ -389,6 +390,11 @@ window.vixLoadWidget = async function(containerId) {
         <canvas id="vix-spark-${Date.now()}" class="vix-sparkline"></canvas>
       </div>` : ''}
     </div>`;
+
+  if (typeof showApiToast === 'function') {
+    const chgStr = (data.changePct >= 0 ? '+' : '') + data.changePct.toFixed(2) + '%';
+    showApiToast(`VIX ${data.current.toFixed(2)} ${chgStr} · ${data._src}`, 'ok');
+  }
 
   // Draw sparkline if history available
   if (data.history?.length > 5) {
@@ -760,36 +766,13 @@ window.BlackScholes = {
    * otherwise uses built-in implementation.
    */
   greeks(type, S, K, T, r, sigma) {
+    // Delegate exclusively to _bsGreeks() in yahoo.js (P18: no duplicate BS)
     if (typeof _bsGreeks === 'function') {
       return _bsGreeks(S, K, T, r, sigma, type === 'call');
     }
-    // Fallback inline implementation
-    if (!S || !K || !T || !sigma || T <= 0 || sigma <= 0) return null;
-    const sq = Math.sqrt(T);
-    const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sq);
-    const d2 = d1 - sigma * sq;
-    const N  = x => {
-      const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.330274429,p=0.2316419;
-      const sign = x < 0 ? -1 : 1;
-      const ax = Math.abs(x);
-      const t_ = 1 / (1 + p * ax);
-      return 0.5 * (1 + sign * (1 - (((((a5*t_+a4)*t_+a3)*t_+a2)*t_+a1)*t_)*Math.exp(-ax*ax)));
-    };
-    const n = x => Math.exp(-0.5*x*x) / Math.sqrt(2*Math.PI);
-    const Nd1 = N(d1), Nd2 = N(d2), nd1 = n(d1);
-    return type === 'call' ? {
-      delta: Nd1,
-      gamma: nd1 / (S * sigma * sq),
-      vega:  S * nd1 * sq / 100,
-      theta: (-(S * nd1 * sigma) / (2 * sq) - r * K * Math.exp(-r * T) * Nd2) / 365,
-      rho:   K * T * Math.exp(-r * T) * Nd2 / 100,
-    } : {
-      delta: Nd1 - 1,
-      gamma: nd1 / (S * sigma * sq),
-      vega:  S * nd1 * sq / 100,
-      theta: (-(S * nd1 * sigma) / (2 * sq) + r * K * Math.exp(-r * T) * N(-d2)) / 365,
-      rho:   -K * T * Math.exp(-r * T) * N(-d2) / 100,
-    };
+    // _bsGreeks not loaded yet — return null gracefully
+    console.warn('[BlackScholes] _bsGreeks not available — ensure yahoo.js is loaded first');
+    return null;
   },
 
   /**
@@ -845,6 +828,7 @@ window.OptionsChainUI = {
     const chain = await this._fetchChain(ticker);
     if (!chain) {
       el.innerHTML = `<div class="no-data">// Options data unavailable for ${ticker}.<br>// Nasdaq API keyless, fallback: Yahoo Finance v7.</div>`;
+    if (typeof showApiToast === 'function') showApiToast(`Options chain unavailable for ${ticker}`, 'info');
       return;
     }
     this._chain = chain;
@@ -1206,6 +1190,7 @@ window.techLoadPlotly = async function(sym, resolution) {
       document.head.appendChild(s);
     }).catch(() => {
       // Fallback to existing renderer
+      if (typeof showApiToast === 'function') showApiToast('Plotly CDN unavailable — using SVG chart', 'info');
       if (typeof techLoadFull === 'function') techLoadFull(sym, resolution);
       return;
     });
@@ -1389,27 +1374,74 @@ window.RateLimiter = RateLimiter;
 
 (function _fmInit() {
   function _run() {
-    // 1. Extend screener presets
-    _extendScreenerPresets();
+    // 1. Extend screener presets — delay 600ms so finterm-extras.js
+    //    DOMContentLoaded handler has already run _screenerRenderPresetBar()
+    setTimeout(() => {
+      _extendScreenerPresets();
+      _screenerRenderPresetBar && _screenerRenderPresetBar();
+    }, 600);
 
-    // 2. Add extra filter inputs
-    _addScreenerFilters();
+    // 2. Add extra filter inputs — delay 300ms for panel HTML to exist
+    setTimeout(_addScreenerFilters, 300);
 
-    // 3. Patch screenerRun with extra filters
-    _patchScreenerRun();
+    // 3. Patch screenerRun — retry until window.screenerRun is defined (max 3s)
+    (function _retryPatch(attempt) {
+      if (typeof screenerRun === 'function') {
+        _patchScreenerRun();
+      } else if (attempt < 10) {
+        setTimeout(() => _retryPatch(attempt + 1), 300);
+      }
+    })(0);
 
-    // 4. Inject VIX widget into macro-econ panel
-    // (Done lazily on macro panel open to avoid race with macroglobal.js)
-    const macroPanel = document.getElementById('panel-macro');
-    if (macroPanel) {
-      const observer = new MutationObserver(() => {
+    // 4. Inject VIX widget — watch macro-econ panel for visibility changes
+    // Uses MutationObserver on the panel + direct check if already visible
+    (function _setupVixWatcher() {
+      const macroPanel = document.getElementById('panel-macro');
+      if (!macroPanel) return;
+
+      // Try immediately in case macro panel is already open
+      if (!macroPanel.classList.contains('hidden')) {
+        setTimeout(_injectVixWidget, 200);
+      }
+
+      // Watch for panel becoming visible
+      const obs = new MutationObserver(() => {
         if (!macroPanel.classList.contains('hidden') &&
             !document.getElementById('vix-widget-root')) {
           _injectVixWidget();
         }
       });
-      observer.observe(macroPanel, { attributes: true, attributeFilter: ['class'] });
-    }
+      obs.observe(macroPanel, { attributes: true, attributeFilter: ['class', 'style'] });
+
+      // Hook into switchTab — add typeof guard + retry if not yet defined
+      function _hookSwitchTab() {
+        if (typeof window.switchTab !== 'function') {
+          setTimeout(_hookSwitchTab, 300); // retry until script.js defines switchTab
+          return;
+        }
+        const origSwitch = window.switchTab;
+        // Don't double-patch if already wrapped
+        if (origSwitch._commVixPatched) return;
+        const patched = function(panel, tab) {
+          origSwitch.apply(this, arguments);
+          if (panel === 'macro' && tab === 'econ' && !document.getElementById('vix-widget-root')) {
+            setTimeout(_injectVixWidget, 100);
+          }
+          // Refresh VIX stale data (>10 min) when macro panel is revisited
+          if (panel === 'macro' && window._vixLive) {
+            const age = Date.now() - (window._vixLive._ts || 0);
+            if (age > 10 * 60 * 1000) {
+              ProviderRegistry.cboe.getVIX().then(d => {
+                if (d) vixLoadWidget('vix-widget-root');
+              }).catch(() => {});
+            }
+          }
+        };
+        patched._commVixPatched = true;
+        window.switchTab = patched;
+      }
+      _hookSwitchTab();
+    })();
 
     // 5. Add "Plotly" button to the tech tab bar in fundamentals
     _addPlotlyButton();
@@ -1428,30 +1460,40 @@ window.RateLimiter = RateLimiter;
 })();
 
 function _addPlotlyButton() {
-  // Find the tech tab button in fundamentals
-  const techBtn = document.querySelector('[data-tab="tech"]');
-  if (!techBtn) return;
+  function _tryInsert() {
+    // Find any tech tab button (may be in fundamentals or elsewhere)
+    const techBtn = document.querySelector('[data-tab="tech"]');
+    if (!techBtn) return false;
+    const tabBar = techBtn.closest('.tab-bar');
+    if (!tabBar) return false;
+    if (tabBar.querySelector('.plotly-launch-btn')) return true; // already added
 
-  // Look for the tech tab bar
-  const tabBar = techBtn.closest('.tab-bar');
-  if (!tabBar) return;
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn plotly-launch-btn';
+    btn.textContent = '📊 Plotly';
+    btn.title = 'Advanced chart with Plotly.js (SMA20/50/200 + RSI sub-panel)';
+    btn.style.cssText = 'background:rgba(88,166,255,.1);border-color:var(--accent)';
+    btn.onclick = () => {
+      if (typeof switchTab === 'function') switchTab('fundamentals', 'tech');
+      const sym = (typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL')
+        .replace(/.*:/, '').toUpperCase();
+      techLoadPlotly(sym);
+    };
+    tabBar.appendChild(btn);
+    return true;
+  }
 
-  // Don't add twice
-  if (tabBar.querySelector('.plotly-launch-btn')) return;
+  // Try immediately
+  if (_tryInsert()) return;
 
-  const btn = document.createElement('button');
-  btn.className = 'tab-btn plotly-launch-btn';
-  btn.textContent = '📊 Plotly';
-  btn.title = 'Advanced chart with Plotly.js (SMA, RSI overlay)';
-  btn.style.cssText = 'background:rgba(88,166,255,.1);border-color:var(--accent)';
-  btn.onclick = () => {
-    // Switch to tech tab first
-    if (typeof switchTab === 'function') switchTab('fundamentals', 'tech');
-    const sym = (typeof currentTicker !== 'undefined' ? currentTicker : 'AAPL')
-      .replace(/.*:/, '').toUpperCase();
-    techLoadPlotly(sym);
-  };
-  tabBar.appendChild(btn);
+  // If not found yet, watch DOM for panel-fundamentals to appear
+  const obs = new MutationObserver((mutations, observer) => {
+    if (_tryInsert()) observer.disconnect();
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+
+  // Stop watching after 10 seconds (safety)
+  setTimeout(() => obs.disconnect(), 10000);
 }
 
 /* ──────────────────────────────────────────────────────────────────

@@ -571,8 +571,38 @@ window.chLoadForTicker = async function chLoadForTicker(ticker) {
        a) it's a UK ticker (certain) — always try CH
        b) GLEIF identified a UK entity — try CH
        c) A CH key is set — can try to search for any entity
-     For non-UK entities without key, skip silently. */
-  if (!isUK && !hasKey) return;
+     For non-UK entities without key, show informational setup banner. */
+  if (!isUK && !hasKey) {
+    const pane = document.getElementById("own-psc");
+    if (pane && !pane.innerHTML.trim()) {
+      pane.innerHTML = `
+        <div class="ch-setup-banner">
+          <div class="ch-setup-icon">🏛</div>
+          <div class="ch-setup-body">
+            <div class="ch-setup-title">PSC / Beneficial Ownership Data</div>
+            <div class="ch-setup-desc">
+              <strong>PSC (Persons with Significant Control)</strong> data is published by the
+              UK Companies House registry for UK-registered entities (LSE, AIM, AQSE tickers).<br><br>
+              <strong>For any company</strong>, add a free Companies House API key to search the
+              UK registry and cross-reference beneficial ownership via Open Ownership BODS.
+            </div>
+            <div class="ch-setup-actions">
+              <button class="ch-setup-btn" onclick="openApiConfig('companieshouse')">
+                ⚙ Configure Companies House Key
+              </button>
+              <a href="https://developer.company-information.service.gov.uk/"
+                 target="_blank" rel="noopener" class="ch-setup-link">
+                Get free key ↗
+              </a>
+            </div>
+            <div class="av-note" style="margin-top:10px">
+              For UK tickers (LSE:, AIM:), PSC data loads automatically with or without a key.
+            </div>
+          </div>
+        </div>`;
+    }
+    return;
+  }
 
   /* Small delay: let gleif.js run first so _currentLEI is populated */
   await new Promise(r => setTimeout(r, 2000));

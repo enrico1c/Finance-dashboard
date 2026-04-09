@@ -11,7 +11,8 @@ const OER_CACHE   = {};
 const OER_TTL     = 60 * 60 * 1000; // 1 hour (respect monthly limit)
 
 function oerGetKey() {
-  return localStorage.getItem("finterm_key_openexchange") || "";
+  return (window._KEYS && window._KEYS["openexchange"])
+    || localStorage.getItem("finterm_key_openexchange") || "";
 }
 
 function oerCacheGet(key) {

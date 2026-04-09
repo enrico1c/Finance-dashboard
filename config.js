@@ -95,6 +95,20 @@ const KNOWN_PROVIDERS = [
     limitMax:   null,
   },
 
+  /* ── OWNERSHIP & REGISTRY ───────────────────────────────────── */
+  { id:"openfigi", name:"OpenFIGI — Instrument IDs", badge:"FIGI", group:"Ownership & Registry",
+    desc:"Map tickers → FIGI/ISIN/CUSIP/SEDOL · Multi-exchange instrument lookup · Identity infrastructure for Ownership panel",
+    limit:"250 req/min (free, no key) · higher with key", docsUrl:"https://www.openfigi.com/api",
+    sessionKey:"openfigi_call_count", limitWarn:null, limitMax:null },
+  { id:"companieshouse", name:"Companies House UK", badge:"CH", group:"Ownership & Registry",
+    desc:"UK corporate registry: PSC (Persons with Significant Control) · Directors · Registered office · Accounts · Filing history",
+    limit:"600 req/5min (free key)", docsUrl:"https://developer.company-information.service.gov.uk/",
+    sessionKey:"ch_call_count", limitWarn:null, limitMax:null },
+  { id:"twelvedata", name:"Twelve Data", badge:"12D", group:"Market Data",
+    desc:"Dividend enrichment · Splits · Earnings dates · 70+ exchanges · Real-time quotes · Technical indicators",
+    limit:"800 req/day (free)", docsUrl:"https://twelvedata.com/apikey",
+    sessionKey:"td_call_count", limitWarn:700, limitMax:800 },
+
   /* ── CRYPTO & ON-CHAIN ──────────────────────────────────────── */
   {
     id:         'defillama',
@@ -126,14 +140,44 @@ const KNOWN_PROVIDERS = [
     limitWarn:  null,
     limitMax:   null,
   },
+  /* ── FALLBACK PROVIDERS (apifallback.js) ─────────────────────── */
+  { id:"tiingo", name:"Tiingo", badge:"TNG", group:"Market Data",
+    desc:"News · Fundamentals (PE, PB, EPS, DivYield) · EOD prices · Fallback chain Tier 1",
+    limit:"500 req/day (free)", docsUrl:"https://www.tiingo.com/account/api/token",
+    sessionKey:"tiingo_call_count", limitWarn:450, limitMax:500 },
+  { id:"polygon", name:"Polygon.io", badge:"PLY", group:"Market Data",
+    desc:"Real-time trades · Aggregates (OHLCV) · High-quality price fallback · Tier 2",
+    limit:"5 req/min (free)", docsUrl:"https://polygon.io/dashboard/api-keys",
+    sessionKey:"polygon_call_count", limitWarn:4, limitMax:5 },
+  { id:"marketstack", name:"Marketstack", badge:"MSK", group:"Market Data",
+    desc:"EOD · Intraday · 70+ global exchanges · Global EOD fallback · Tier 2",
+    limit:"1,000 req/month (free)", docsUrl:"https://marketstack.com/dashboard",
+    sessionKey:"marketstack_call_count", limitWarn:900, limitMax:1000 },
+  { id:"stooq", name:"Stooq", badge:"STQ", group:"Market Data",
+    noKey: true,
+    desc:"EOD · Historical prices · No API key required · Lightweight price fallback · Tier 3",
+    limit:"Unlimited (unofficial · throttling possible)", docsUrl:"https://stooq.com/",
+    sessionKey:"stooq_call_count", limitWarn:null, limitMax:null },
+
 ];
 
-window._KEYS = {};
-const lsId   = id => `finterm_key_${id}`;
-const getKey = id => window._KEYS[id] || localStorage.getItem(lsId(id)) || "";
-const setKey = (id, v) => { localStorage.setItem(lsId(id), v); window._KEYS[id] = v; };
-const delKey = id => { localStorage.removeItem(lsId(id)); delete window._KEYS[id]; };
-const mask   = v  => v.length > 8 ? v.slice(0,4)+"••••••"+v.slice(-4) : "••••••••";
+// ── PROXY MODE — all keys live on the backend, never in the browser ────────────
+// getKey() returns a truthy sentinel so API modules proceed normally.
+// proxy-client.js intercepts every fetch to a known API domain, strips the key
+// param/header, and re-routes the call through the secure backend proxy.
+// Populate _KEYS with proxy sentinels for every provider.
+// Individual modules (finnhub.js, api.js, fred.js, fmp.js…) check window._KEYS["id"]
+// FIRST — if truthy, they skip the localStorage fallback. This ensures their local
+// getFinnhubKey() / getAvKey() / getFredKey() etc. return "proxy-managed" (truthy),
+// so all `if (!key) return` guards pass. The fetch interceptor then strips the sentinel
+// and re-routes the actual call through the secure backend proxy.
+window._KEYS = Object.fromEntries(
+  KNOWN_PROVIDERS.filter(p => !p.noKey).map(p => [p.id, 'proxy-managed'])
+);
+const getKey = () => "proxy-managed";          // always truthy — actual key is server-side
+const setKey = () => {};                        // no-op — keys are set on Vercel, not here
+const delKey = () => {};                        // no-op
+const mask   = () => "🔒 Backend";             // shown in any legacy badge renders
 
 function getAvKey()          { return getKey("av");           }
 function getFmpKey()         { return getKey("fmp");          }
@@ -157,14 +201,18 @@ function getOpenFigiKey()       { return getKey("openfigi");       }
 function getCompaniesHouseKey() { return getKey("companieshouse"); }
 /* Phase 4 — Reference Data */
 function getTwelvedataKey()     { return getKey("twelvedata");     }
+
+/* Fallback providers (apifallback.js) */
+function getTiingoKey()      { return getKey("tiingo");      }
+function getPolygonKey()     { return getKey("polygon");     }
+function getMarketstackKey() { return getKey("marketstack"); }
+
 /* Persistence */
 function getSbKey()             { return getKey("supabase");       }
 
 function loadAllKeys() {
-  allProviders().forEach(p => {
-    const v = localStorage.getItem(lsId(p.id));
-    if (v) window._KEYS[p.id] = v;
-  });
+  // Proxy mode: nothing to load from localStorage.
+  // All keys are on the backend. window._KEYS stays empty — getKey() handles it.
 }
 
 const LS_CUSTOM = "finterm_custom_providers";
@@ -212,23 +260,22 @@ function renderApiStatusSidebar() {
   Object.entries(groups).forEach(([groupName, items]) => {
     html += `<div class="aps-group-label">${cfgEsc(groupName)}</div>`;
     items.forEach(p => {
-      const key = getKey(p.id);
       const n   = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
-      const dot = !key ? "#484f58"
-        : p.limitMax && n >= p.limitMax   ? "#f85149"
-        : p.limitWarn && n >= p.limitWarn ? "#d29922" : "#3fb950";
-      const statusLabel = !key ? "NOT SET"
-        : p.limitMax && n >= p.limitMax ? "LIMIT" : p.limitWarn && n >= p.limitWarn ? "WARN" : "OK";
-      const barHtml = (key && p.limitMax)
+      // In proxy mode all providers are always active — colour by usage only
+      const dot = p.limitMax && n >= p.limitMax   ? "#f85149"
+                : p.limitWarn && n >= p.limitWarn ? "#d29922" : "#3fb950";
+      const statusLabel = p.limitMax && n >= p.limitMax ? "LIMIT"
+                        : p.limitWarn && n >= p.limitWarn ? "WARN" : "ACTIVE";
+      const barHtml = p.limitMax
         ? (() => {
             const pct = Math.min(100,(n/p.limitMax)*100);
             const bc  = pct>=100?"#f85149":pct>=80?"#d29922":"#3fb950";
             return `<div class="aps-bar-wrap"><div class="aps-bar-fill" style="width:${pct.toFixed(1)}%;background:${bc}"></div></div><span class="aps-count">${n}/${p.limitMax}</span>`;
           })()
-        : key ? `<span class="aps-unlimited">&#8734; no limit</span>` : `<span class="aps-nokey">no key set</span>`;
-      const resetBtn = (key&&p.sessionKey&&n>0)
+        : `<span class="aps-unlimited">&#8734; no limit</span>`;
+      const resetBtn = (p.sessionKey && n > 0)
         ? `<button class="aps-reset-btn" onclick="event.stopPropagation();resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')" title="Reset">&#8635;</button>` : "";
-      html += `<div class="aps-row" onclick="openApiConfig('${cfgEsc(p.id)}')" title="${cfgEsc(p.name)}">
+      html += `<div class="aps-row" title="${cfgEsc(p.name)}">
         <div class="aps-row-top">
           <span class="aps-dot" style="background:${dot}"></span>
           <span class="aps-badge">${cfgEsc(p.badge)}</span>
@@ -237,16 +284,15 @@ function renderApiStatusSidebar() {
           ${resetBtn}
         </div>
         <div class="aps-row-bottom">${barHtml}</div>
-        ${key&&p.limit?`<div class="aps-limit-note">${cfgEsc(p.limit)}</div>`:""}
+        ${p.limit?`<div class="aps-limit-note">${cfgEsc(p.limit)}</div>`:""}
       </div>`;
     });
   });
   box.innerHTML = html;
   const footer = document.getElementById("apiStatusFooter");
   if (footer) {
-    const configured = providers.filter(p=>!!getKey(p.id)).length;
     const cacheN = Object.keys(sessionStorage).filter(k=>providers.some(p=>k.startsWith(p.id+"_")||k.startsWith("av_")||k.startsWith("fmp_"))).length;
-    footer.innerHTML = `<span>${configured}/${providers.length} configured &middot; ${cacheN} cached</span><button class="aps-clear-btn" onclick="clearAllCache()">Clear cache</button>`;
+    footer.innerHTML = `<span>🔒 ${providers.length} providers active &middot; ${cacheN} cached</span><button class="aps-clear-btn" onclick="clearAllCache()">Clear cache</button>`;
   }
 }
 
@@ -259,7 +305,7 @@ function injectApiStatusSidebar() {
       <span class="aps-title">&#9889; API Status</span>
       <button class="aps-close-btn" onclick="closeApiStatus()" title="Close">&#10005;</button>
     </div>
-    <div class="aps-subhead">Click any row to configure &middot; Live call counters</div>
+    <div class="aps-subhead">🔒 All keys secured on backend &middot; Live call counters</div>
     <div class="aps-list" id="apiStatusList"></div>
     <div class="aps-footer" id="apiStatusFooter"></div>`;
   document.body.appendChild(el);
@@ -331,16 +377,14 @@ function renderProviderList() {
   Object.entries(groups).forEach(([groupName, items]) => {
     html += `<div class="api-group-heading">${cfgEsc(groupName)}</div>`;
     items.forEach(p => {
-      const val  = getKey(p.id);
       const n    = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
-      const bCls = p.noKey ? "badge-nokey"
-                 : !val   ? "badge-unset"
-                 : (p.limitMax && n >= p.limitMax) ? "badge-limit" : "badge-set";
-      const bLbl = p.noKey ? "NO KEY NEEDED"
-                 : !val   ? "NOT SET"
-                 : (p.limitMax && n >= p.limitMax) ? "LIMIT" : mask(val);
+      // In proxy mode: key status is always active, coloured by usage only
+      const isLimit = p.limitMax && n >= p.limitMax;
+      const isWarn  = p.limitWarn && n >= p.limitWarn;
+      const bCls = isLimit ? "badge-limit" : "badge-set";
+      const bLbl = isLimit ? "LIMIT" : isWarn ? "WARN" : "ACTIVE";
       html += `
-      <div class="api-key-block${_focusId===p.id?" api-key-block-focus":""}" id="pblock-${cfgEsc(p.id)}">
+      <div class="api-key-block" id="pblock-${cfgEsc(p.id)}">
         <div class="api-key-provider">
           <div class="api-key-provider-left">
             <span class="api-badge-pill">${cfgEsc(p.badge)}</span>
@@ -352,22 +396,13 @@ function renderProviderList() {
           <span class="api-key-badge ${bCls}">${cfgEsc(bLbl)}</span>
         </div>
         ${p.desc?`<div class="api-key-desc">${cfgEsc(p.desc)}${p.docsUrl?` &middot; <a href="${cfgEsc(p.docsUrl)}" target="_blank" rel="noopener">Docs &rarr;</a>`:""}  </div>`:""}
-        ${p.noKey ? `<div class="api-key-nokey-note">✓ This source requires no API key — it connects automatically.</div>` : `
-        <div class="api-key-input-row">
-          <input type="password" id="kinput-${cfgEsc(p.id)}" class="api-key-field"
-                 placeholder="Paste API key here…" value="${cfgEsc(val)}"
-                 autocomplete="off" spellcheck="false"
-                 oninput="livePreviewKey('${cfgEsc(p.id)}')" />
-          <button class="api-key-eye" title="Show/hide" onclick="toggleKeyVis('kinput-${cfgEsc(p.id)}',this)">&#128065;</button>
-          <button class="api-key-save"  onclick="saveKey('${cfgEsc(p.id)}')">Save</button>
-          <button class="api-key-clear" onclick="clearKey('${cfgEsc(p.id)}')">Clear</button>
+        <div class="api-key-nokey-note" style="color:#3fb950">
+          🔒 Key secured on backend — calls routed via proxy automatically.
         </div>
-        <div class="api-key-status" id="kstatus-${cfgEsc(p.id)}"></div>
-        ${val&&p.sessionKey?`<div class="api-key-usage">
+        ${p.sessionKey?`<div class="api-key-usage">
           Session calls: <strong>${n}</strong>${p.limitMax?" / "+p.limitMax:""}
           ${n>0?`<button class="api-reset-count-btn" onclick="resetCount('${cfgEsc(p.sessionKey)}','${cfgEsc(p.id)}')">Reset</button>`:""}
         </div>`:""}
-        `}
         ${p.custom?`<button class="api-custom-del-btn" style="margin-top:6px" onclick="removeCustom('${cfgEsc(p.id)}')">&#10005; Remove</button>`:""}
       </div>
       <div class="api-modal-divider"></div>`;
@@ -389,6 +424,17 @@ function saveKey(id) {
   setStatus(id, "&#10003; Saved &mdash; " + mask(val), "ok");
   renderProviderList();
   renderTopbarBadges();
+
+  /* Highlight the newly-configured provider in the API status sidebar */
+  setTimeout(() => {
+    openApiStatus();
+    const row = document.querySelector(`#apiStatusList .aps-row[onclick*="${CSS.escape(id)}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.classList.add("aps-row-flash");
+      setTimeout(() => row.classList.remove("aps-row-flash"), 1600);
+    }
+  }, 150);
 
   // Auto-reload live data immediately after saving a key
   const ticker = (typeof currentTicker !== "undefined") ? currentTicker.replace(/.*:/,"").toUpperCase() : null;
@@ -539,12 +585,11 @@ function renderSessionStats() {
   const cacheN = Object.keys(sessionStorage)
     .filter(k=>allProviders().some(p=>k.startsWith(p.id+"_")||k.startsWith("av_")||k.startsWith("fmp_"))).length;
   box.innerHTML = allProviders().map(p => {
-    const key = getKey(p.id);
     const n   = parseInt(sessionStorage.getItem(p.sessionKey||"")||"0");
-    const cls = !key?"stat-unset": n>(p.limitWarn||Infinity)?"stat-warn":"stat-ok";
+    const cls = n>(p.limitWarn||Infinity)?"stat-warn":"stat-ok";
     return `<div class="api-stat-row">
       <span><span class="api-badge-pill" style="font-size:8px;padding:1px 5px">${cfgEsc(p.badge)}</span> ${cfgEsc(p.name)}</span>
-      <span class="${cls}">${key?`${n}${p.limitMax?" / "+p.limitMax:""}` : "no key"}</span>
+      <span class="${cls}">${n}${p.limitMax?" / "+p.limitMax:""}</span>
     </div>`;
   }).join("")
   + `<div class="api-stat-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
@@ -603,15 +648,14 @@ function injectSidebarHTML() {
   sidebar.innerHTML = `
     <div class="api-sidebar-header">
       <div class="api-sidebar-title">
-        <span>&#9881;</span>
-        <span>API Keys</span>
+        <span>&#9889;</span>
+        <span>API Status</span>
       </div>
       <button class="api-sidebar-close" onclick="closeApiConfig()" title="Close">&#10005;</button>
     </div>
 
     <div class="api-tab-bar">
       <button class="api-tab active" data-tab="providers">Providers</button>
-      <button class="api-tab" data-tab="custom">+ Custom</button>
       <button class="api-tab" data-tab="session">Session</button>
       <button class="api-tab" data-tab="cache" onclick="if(typeof sbcRenderStats===\'function\')sbcRenderStats()">💾 Cache</button>
     </div>
@@ -619,40 +663,6 @@ function injectSidebarHTML() {
     <div class="api-sidebar-body">
       <div class="api-tab-pane active" id="apiTab-providers">
         <div id="apiProviderList"></div>
-      </div>
-
-      <div class="api-tab-pane" id="apiTab-custom">
-        <div class="api-custom-intro">
-          Register any API not listed above. The key is stored in <code>localStorage</code>
-          and accessible via <code>window._KEYS["id"]</code>.
-        </div>
-        <div class="api-custom-form">
-          <div class="api-custom-row">
-            <label>Provider Name <span class="api-custom-hint">(e.g. Polygon.io)</span></label>
-            <input type="text" id="customName" class="api-key-field" placeholder="My API Provider" />
-          </div>
-          <div class="api-custom-row">
-            <label>Short ID <span class="api-custom-hint">(max 6 chars, e.g. plg)</span></label>
-            <input type="text" id="customId" class="api-key-field" placeholder="plg" maxlength="6" />
-          </div>
-          <div class="api-custom-row">
-            <label>API Key <span class="api-custom-hint">(optional)</span></label>
-            <input type="password" id="customKey" class="api-key-field" placeholder="Paste key…" autocomplete="off" />
-          </div>
-          <div class="api-custom-row">
-            <label>Description <span class="api-custom-hint">(optional)</span></label>
-            <input type="text" id="customDesc" class="api-key-field" placeholder="What this API provides…" />
-          </div>
-          <div class="api-custom-row">
-            <label>Docs URL <span class="api-custom-hint">(optional)</span></label>
-            <input type="text" id="customUrl" class="api-key-field" placeholder="https://…" />
-          </div>
-          <button class="api-custom-add-btn" onclick="addCustomProvider()">+ Add Provider</button>
-          <div class="api-key-status" id="customStatus"></div>
-        </div>
-        <div class="api-modal-divider" style="margin:16px 0 10px"></div>
-        <div class="api-custom-saved-title">Saved Custom Providers</div>
-        <div id="customSavedList"></div>
       </div>
 
       <div class="api-tab-pane" id="apiTab-session">
@@ -673,9 +683,8 @@ function injectSidebarHTML() {
 
     <div class="api-sidebar-footer">
       <div class="api-modal-note-inline">
-        Keys saved to <code>localStorage</code> &mdash; persist across sessions.
+        🔒 All API keys secured on backend &mdash; never stored in browser.
       </div>
-      <button class="api-modal-apply" onclick="applyAndReload()">Apply &amp; Reload</button>
     </div>
   `;
 
@@ -699,13 +708,6 @@ function injectSidebarHTML() {
       if (e.key==="Escape") { closeApiConfig(); closeApiStatus(); }
     });
     renderApiStatusSidebar();
-
-    if (!allProviders().some(p=>!!getKey(p.id))) {
-      setTimeout(()=>{
-        if (typeof showApiToast==="function")
-          showApiToast("&#9881; No API keys — click &#9881; API Keys to configure.","info");
-      }, 1400);
-    }
   }
 
   if (document.readyState==="loading")
