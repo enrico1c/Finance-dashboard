@@ -24,6 +24,7 @@ function getFmpKey() {
 }
 
 const FMP_BASE    = "https://financialmodelingprep.com/api";
+const FMP_STABLE  = "https://financialmodelingprep.com/stable"; // v3 returns 403 on this key; /stable/ endpoints work
 const FMP_CACHE_TTL = 15 * 60 * 1000;  // 15 min
 const FMP_SESSION_KEY = "fmp_call_count";
 
@@ -183,7 +184,10 @@ async function fmpGetInstitutional(symbol) {
 
 /* ── Management / Executives ────────────────────────────────────── */
 async function fmpGetManagement(symbol) {
-  const data = await fmpFetch(`/v3/key-executives/${symbol}`, symbol);
+  const data = await fmpFetch(`/v3/key-executives/${symbol}`, symbol)
+    || await (async () => {
+      try { const r = await fetch(`${FMP_STABLE}/key-executives?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch { return null; }
+    })();
   if (!data || !data.length) return null;
   return data.slice(0, 10).map(e => ({
     name:  e.name  || "—",
@@ -211,7 +215,10 @@ async function fmpGetEarningsCalendar(symbol) {
 
 /* ── Financial Ratios (live P/E, EV/EBITDA, etc.) ──────────────── */
 async function fmpGetRatios(symbol) {
-  const data = await fmpFetch(`/v3/ratios-ttm/${symbol}`, symbol);
+  const data = await fmpFetch(`/v3/ratios-ttm/${symbol}`, symbol)
+    || await (async () => {
+      try { const r = await fetch(`${FMP_STABLE}/ratios-ttm?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch { return null; }
+    })();
   if (!data || !data.length) return null;
   const r = data[0];
   return {
@@ -243,8 +250,8 @@ async function fmpGetWACCInputs(symbol) {
     if (!key) return null;
 
     const [incData, balData] = await Promise.all([
-      fetch(`${FMP_BASE}/v3/income-statement/${symbol}?limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-      fetch(`${FMP_BASE}/v3/balance-sheet-statement/${symbol}?limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+      fetch(`${FMP_STABLE}/income-statement?symbol=${symbol}&limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+      fetch(`${FMP_STABLE}/balance-sheet-statement?symbol=${symbol}&limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
     ]);
 
     const inc = Array.isArray(incData) && incData.length ? incData[0] : null;
@@ -672,13 +679,17 @@ async function fmpLoadDividends(sym) {
   el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading dividends…</div>';
   try {
     fmpIncrement();
+    const stableDiv = await fetch(`${FMP_STABLE}/dividends?symbol=${encodeURIComponent(sym)}&limit=30&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null);
     const [divRes, splRes] = await Promise.allSettled([
-      fmpFetch(`/v3/historical-price-full/stock_dividend/${encodeURIComponent(sym)}`),
+      stableDiv ? Promise.resolve(stableDiv) : fmpFetch(`/v3/historical-price-full/stock_dividend/${encodeURIComponent(sym)}`),
       fmpFetch(`/v3/historical-price-full/stock_split/${encodeURIComponent(sym)}`),
     ]);
 
-    const divData  = divRes.status  === 'fulfilled' ? (divRes.value?.historical  || []) : [];
-    const splitData = splRes.status === 'fulfilled' ? (splRes.value?.historical  || []) : [];
+    // stable returns flat array; v3 returns {historical:[...]}
+    const divRaw   = divRes.status  === 'fulfilled' ? divRes.value  : null;
+    const divData  = Array.isArray(divRaw) ? divRaw : (divRaw?.historical || []);
+    const splitRaw = splRes.status  === 'fulfilled' ? splRes.value  : null;
+    const splitData = Array.isArray(splitRaw) ? splitRaw : (splitRaw?.historical || []);
 
     let html = '';
 
@@ -1142,8 +1153,8 @@ async function fmpLoadSegmentation(sym) {
   if (key) {
     try {
       const [prodRes, geoRes] = await Promise.all([
-        fetch(`https://financialmodelingprep.com/api/v3/revenue-product-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/revenue-geographic-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/revenue-product-segmentation?symbol=${sym}&period=annual&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch(`${FMP_STABLE}/revenue-geographic-segmentation?symbol=${sym}&period=annual&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null),
       ]);
       src = 'FMP';
       html += renderSegBlock("By Product / Segment", prodRes, src);
@@ -1661,9 +1672,9 @@ async function fmpLoadFATab(sym) {
   if (key) {
     try {
       const [inc, bal, cf] = await Promise.all([
-        fetch(`https://financialmodelingprep.com/api/v3/income-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/balance-sheet-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/cash-flow-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/income-statement?symbol=${sym}&limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/balance-sheet-statement?symbol=${sym}&limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/cash-flow-statement?symbol=${sym}&limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
       ]);
 
       if (Array.isArray(inc) && inc.length) {

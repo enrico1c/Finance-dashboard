@@ -618,9 +618,9 @@ window.yfLoadTrending = async function() {
   if (!mData) {
     try {
       const [act,gain,lose] = await Promise.all([
-        fetch(`https://financialmodelingprep.com/api/v3/actives?apikey=${_fmpKey()}`).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/gainers?apikey=${_fmpKey()}`).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/losers?apikey=${_fmpKey()}`).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/stable/most-actives?apikey=${_fmpKey()}`).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/stable/biggest-gainers?apikey=${_fmpKey()}`).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/stable/biggest-losers?apikey=${_fmpKey()}`).then(r=>r.json()),
       ]);
       const toArr = v => Array.isArray(v) ? v : (Array.isArray(v?.data) ? v.data : []);
       mData={actives:toArr(act),gainers:toArr(gain),losers:toArr(lose)};
