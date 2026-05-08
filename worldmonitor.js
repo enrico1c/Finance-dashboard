@@ -712,18 +712,17 @@ async function wmMacroCommodities() {
   };
 
   const results = await Promise.allSettled(COMMS.map(async s => {
-    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${s.sym}&i=d`)}`;
-    const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
-    const text  = await res.text();
-    const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
-    if (lines.length < 2) throw new Error('no data');
-    const last  = lines[lines.length-1].split(',');
-    const prev  = lines[lines.length-2].split(',');
-    const cur = +last[4], prv = +prev[4];
-    if (!cur || !prv) throw new Error('zero price');
-    const chgPct = ((cur - prv) / prv) * 100;
-    const chgAbs = cur - prv;
-    return { ...s, cur, prv, chgPct, chgAbs, date: last[0] };
+    // Stooq JSON quote endpoint — works without allorigins proxy
+    const url = `https://stooq.com/q/l/?s=${s.sym}&f=sd2t2ohlcvn&h&e=json`;
+    const res   = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const json  = await res.json();
+    const q     = json?.symbols?.[0];
+    if (!q || !q.close) throw new Error('no data');
+    const cur   = +q.close;
+    const ref   = +(q.open || q.close);  // intraday: open → close change
+    const chgPct = ref ? ((cur - ref) / ref) * 100 : 0;
+    const chgAbs = cur - ref;
+    return { ...s, cur, prv: ref, chgPct, chgAbs, date: q.date || '' };
   }));
 
   const groups = {};
@@ -2353,14 +2352,13 @@ async function wmMacroEtfFlows() {
   if (!items.length) {
     const STOOQ_LIST = ETF_LIST.slice(0, 20); // limit for free tier
     const results = await Promise.allSettled(STOOQ_LIST.map(async e => {
-      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${e.sym.toLowerCase()}.us&i=d`)}`;
-      const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
-      const text  = await res.text();
-      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
-      if (lines.length < 2) throw new Error('no data');
-      const last = lines[lines.length-1].split(','), prev = lines[lines.length-2].split(',');
-      const price = +last[4], prv = +prev[4];
-      return { ...e, price, chgPct: ((price-prv)/prv)*100, chgAbs: price-prv, volume: +last[5]||0 };
+      const url = `https://stooq.com/q/l/?s=${e.sym.toLowerCase()}.us&f=sd2t2ohlcvn&h&e=json`;
+      const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const json = await res.json();
+      const q    = json?.symbols?.[0];
+      if (!q || !q.close) throw new Error('no data');
+      const price = +q.close, prv = +(q.open || q.close);
+      return { ...e, price, chgPct: prv ? ((price-prv)/prv)*100 : 0, chgAbs: price-prv, volume: +q.volume||0 };
     }));
     items = results.filter(r => r.status==='fulfilled').map(r => r.value);
   }
@@ -2509,13 +2507,13 @@ async function wmMacroSectors() {
       {sym:'xlb.us', name:'Materials',              etf:'XLB'},
     ];
     const results = await Promise.allSettled(STOOQ_SECTS.map(async s => {
-      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://stooq.com/q/d/l/?s=${s.sym}&i=d`)}`;
-      const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
-      const text  = await res.text();
-      const lines = text.trim().split('\n').filter(l => l && !l.startsWith('Date'));
-      if (lines.length < 2) throw new Error('no data');
-      const last = lines[lines.length-1].split(','), prev = lines[lines.length-2].split(',');
-      return { ...s, change1d: ((+last[4] - +prev[4]) / +prev[4]) * 100 };
+      const url  = `https://stooq.com/q/l/?s=${s.sym}&f=sd2t2ohlcvn&h&e=json`;
+      const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const json = await res.json();
+      const q    = json?.symbols?.[0];
+      if (!q || !q.close) throw new Error('no data');
+      const prv  = +(q.open || q.close);
+      return { ...s, change1d: prv ? ((+q.close - prv) / prv) * 100 : 0 };
     }));
     sectors = results.filter(r => r.status==='fulfilled').map(r => r.value);
     source = 'Stooq (free)'; hasMulti = false;
