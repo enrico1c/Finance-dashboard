@@ -813,7 +813,7 @@
         <button class="tab-btn"        data-tab="risk"    onclick="switchTab('macro','risk');(function(){var el=document.getElementById('macro-risk');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmMacroRisk==='function')wmMacroRisk()}})()">RISK</button>
         <button class="tab-btn"        data-tab="pred"    onclick="switchTab('macro','pred');(function(){var el=document.getElementById('macro-pred');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof wmMacroPredictions==='function')wmMacroPredictions()}})()">PREDICTIONS</button>
         <button class="tab-btn"        data-tab="yield"   onclick="switchTab('macro','yield');if(typeof fredLazyYield==='function')fredLazyYield()">YIELD</button>
-        <button class="tab-btn"        data-tab="econ"    onclick="switchTab('macro','econ');(function(){if(typeof fredLazyEcon==='function')fredLazyEcon();if(document.getElementById('econ-cal-head'))return;if(typeof fhRenderEconCalendar==='function')fhRenderEconCalendar('macro-econ')})()">ECON</button>
+        <button class="tab-btn"        data-tab="econ"    onclick="switchTab('macro','econ');(function(){if(typeof fredLazyEcon==='function')fredLazyEcon();if(typeof ffCalendarLoad==='function')ffCalendarLoad('macro-econ');else if(!document.getElementById('econ-cal-head')&&typeof fhRenderEconCalendar==='function')fhRenderEconCalendar('macro-econ')})()">📅 ECON CAL</button>
         <button class="tab-btn"        data-tab="crypto"  onclick="switchTab('macro','crypto');if(typeof wmMacroCrypto==='function')wmMacroCrypto()">CRYPTO</button>
         <button class="tab-btn"        data-tab="flows"   onclick="switchTab('macro','flows');if(typeof wmMacroEtfFlows==='function')wmMacroEtfFlows()">FLOWS</button>
         <button class="tab-btn"        data-tab="sectors" onclick="switchTab('macro','sectors');if(typeof wmMacroSectors==='function')wmMacroSectors()">SECTORS</button>
@@ -1361,6 +1361,7 @@ document.addEventListener("DOMContentLoaded", () => {
   <script src="tradeflows.js"></script>
   <script src="positioning.js"></script>
   <script src="intel.js"></script>
+  <script src="ffcalendar.js"></script>
 
   <!-- Phase 1 — Identity Infrastructure (load after smartsearch.js) -->
   <script src="openfigi.js"></script>

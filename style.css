@@ -510,6 +510,9 @@ h1 {
 }
 .news-item:hover          { border-color: var(--border-bright); background: var(--bg-hover); }
 .news-item.ni-open        { border-color: var(--accent); }
+/* FF-style impact left border (feature: impact-colored news) */
+.news-item.ni-impact-high { border-left: 3px solid #d73027; }
+.news-item.ni-impact-med  { border-left: 3px solid #fc8d59; }
 
 /* ── Collapsed row (always visible) ──────────────────────────────── */
 .ni-row {

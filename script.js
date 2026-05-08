@@ -701,8 +701,19 @@ function niRelTime(ts) {
   return new Date(ms).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
 }
 
+/* FF-style impact classifier — keyword match on headline */
+const _NI_HIGH = /\b(fed|fomc|rate decision|nfp|non.?farm|payroll|cpi|inflation|gdp|recession|default|crisis|war|sanction|tariff|emergency|crash|collapse|bankruptcy)\b/i;
+const _NI_MED  = /\b(pmi|ism|retail sales|trade balance|earnings|jobless|pce|jolts|ecb|boe|boj|rba|rbnz|fed speak|powell|lagarde|unemp|growth|deficit|surplus|gdelt|ipo|merger|acquisition)\b/i;
+function niImpactCls(headline) {
+  if (!headline) return '';
+  if (_NI_HIGH.test(headline)) return 'ni-impact-high';
+  if (_NI_MED.test(headline))  return 'ni-impact-med';
+  return '';
+}
+
 /* Build a single news card HTML */
 function niCard(id, {headline, source, ts, sentiment, category, summary, url, image}) {
+  const impactCls = niImpactCls(headline);
   const timeStr = niRelTime(ts);
   const sentCls = sentiment === "Bullish" || sentiment === "Somewhat-Bullish" ? "ni-sent-bull"
                 : sentiment === "Bearish" || sentiment === "Somewhat-Bearish" ? "ni-sent-bear"
@@ -719,7 +730,7 @@ function niCard(id, {headline, source, ts, sentiment, category, summary, url, im
     ? `<span class="ni-sent ${sentCls}">${escapeHtml(sentLbl)}</span>`
     : "";
 
-  return `<div class="news-item" id="${id}" onclick="niToggle('${id}')">
+  return `<div class="news-item${impactCls?' '+impactCls:''}" id="${id}" onclick="niToggle('${id}')">
     <div class="ni-row${image ? ' has-thumb' : ''}">
       ${imgHtml}
       <div class="ni-left">

@@ -11,6 +11,43 @@
               ownership+comparables (but NOT fundamentals)
    ══════════════════════════════════════════════════════════════════ */
 
+/* ── Forex / commodity / index aliases ──────────────────────────── */
+const SS_ALIASES = {
+  /* Forex major pairs */
+  'CABLE':   'GBPUSD=X', 'POUND':   'GBPUSD=X',
+  'FIBER':   'EURUSD=X', 'EURO':    'EURUSD=X',
+  'YEN':     'USDJPY=X', 'GOPHER':  'USDJPY=X', 'UJ': 'USDJPY=X',
+  'LOONIE':  'USDCAD=X', 'CADDY':   'USDCAD=X',
+  'SWISSIE': 'USDCHF=X', 'SWISSY':  'USDCHF=X',
+  'AUSSIE':  'AUDUSD=X', 'AUD':     'AUDUSD=X',
+  'KIWI':    'NZDUSD=X',
+  'EURCAD':  'EURCAD=X', 'EURGBP':  'EURGBP=X',
+  'EURJPY':  'EURJPY=X', 'GBPJPY':  'GBPJPY=X',
+  /* Metals */
+  'GOLD':    'GC=F',  'XAU':  'GC=F',
+  'SILVER':  'SI=F',  'XAG':  'SI=F',
+  'COPPER':  'HG=F',
+  'PLATINUM':'PL=F',
+  /* Energy */
+  'OIL':    'CL=F',  'WTI':   'CL=F',  'CRUDE': 'CL=F',
+  'BRENT':  'BZ=F',
+  'NATGAS': 'NG=F',  'GAS':   'NG=F',
+  /* Indices */
+  'SPX':    '^GSPC', 'SP500':  '^GSPC', 'S&P':  '^GSPC',
+  'DOW':    '^DJI',  'DJIA':   '^DJI',
+  'NDX':    '^IXIC', 'NASDAQ': '^IXIC', 'NAS100': 'NQ=F',
+  'VIX':    '^VIX',
+  'DAX':    '^GDAXI','FTSE':   '^FTSE', 'NIKKEI': '^N225',
+  /* Crypto */
+  'BTC':    'BTC-USD', 'BITCOIN':  'BTC-USD',
+  'ETH':    'ETH-USD', 'ETHEREUM': 'ETH-USD',
+};
+
+function ssResolveAlias(raw) {
+  if (!raw) return raw;
+  return SS_ALIASES[raw.toUpperCase()] || raw;
+}
+
 /* ── State ──────────────────────────────────────────────────────── */
 let ss_currentType   = null;   // 'stock' | 'etf' | 'fund' | null
 let ss_currentSym    = null;
@@ -576,6 +613,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof changeTicker === 'function') {
     const _orig = changeTicker;
     window.changeTicker = function() {
+      const input = document.getElementById('tickerInput');
+      if (input) {
+        const resolved = ssResolveAlias(input.value.trim());
+        if (resolved !== input.value.trim()) input.value = resolved;
+      }
       _orig();
       const raw = document.getElementById('tickerInput')?.value.trim();
       if (raw) setTimeout(() => ssAnalyzeTicker(raw), 800);
