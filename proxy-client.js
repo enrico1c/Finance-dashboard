@@ -68,6 +68,11 @@
     'query1.finance.yahoo.com':                  { id: 'yahoo_direct',   keyParam: null },
     'query2.finance.yahoo.com':                  { id: 'yahoo_direct2',  keyParam: null },
     'api.open-meteo.com':                        { id: 'openmeteo',      keyParam: null },
+    'www.cftc.gov':                              { id: 'cftc',           keyParam: null },
+    'feeds.bloomberg.com':                       { id: 'bloomberg_rss',  keyParam: null },
+    'eonet.gsfc.nasa.gov':                       { id: 'eonet',          keyParam: null },
+    'stats.oecd.org':                            { id: 'oecd',           keyParam: null },
+    'sdmx.oecd.org':                             { id: 'oecd_sdmx',      keyParam: null },
   };
 
   // These query param names are always stripped (key param aliases across providers)

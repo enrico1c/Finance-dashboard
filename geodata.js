@@ -183,7 +183,7 @@ window.noaaLoadAlerts = async function() {
   const el = document.getElementById("alert-noaa");
   if (!el) return;
   const url  = "https://api.weather.gov/alerts/active?status=actual&message_type=alert,update&urgency=Immediate,Expected&severity=Extreme,Severe,Moderate";
-  const data = await gdFetch(url, "noaa_alerts", { headers: { "User-Agent": "FINTERM/1.0 (research@finterm.io)", "Accept": "application/geo+json" } });
+  const data = await gdFetch(url, "noaa_alerts", { signal: AbortSignal.timeout(18000), headers: { "User-Agent": "FINTERM/1.0 (research@finterm.io)", "Accept": "application/geo+json" } });
   if (!data?.features) { el.innerHTML = `<div class="no-data">// NOAA alerts unavailable.</div>`; return; }
 
   const features = data.features || [];
@@ -235,8 +235,7 @@ window.eonetLoadEvents = async function() {
   /* ── Fallback: GDACS RSS via proxy ── */
   if (!geojson || !geojson.features || !geojson.features.length) {
     try {
-      const rssProxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://www.gdacs.org/xml/rss.xml");
-      const rr = await fetch(rssProxy, { signal: AbortSignal.timeout(12000) });
+      const rr = await fetch("https://www.gdacs.org/xml/rss.xml", { signal: AbortSignal.timeout(12000) });
       if (rr.ok) {
         const text = await rr.text();
         const xml  = new DOMParser().parseFromString(text, "text/xml");
@@ -275,8 +274,7 @@ window.eonetLoadEvents = async function() {
   /* ── Last resort: NASA EONET (may be down) ── */
   if (!geojson || !geojson.features || !geojson.features.length) {
     try {
-      const eoproxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60");
-      const er = await fetch(eoproxy, { signal: AbortSignal.timeout(10000) });
+      const er = await fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60", { signal: AbortSignal.timeout(10000) });
       if (er.ok) {
         const eodata = await er.json();
         if (eodata && eodata.events && eodata.events.length) {

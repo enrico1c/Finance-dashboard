@@ -18,7 +18,7 @@ const _posFmtK = n => { if(!n&&n!==0) return '—'; const a=Math.abs(n); if(a>=1
    ══════════════════════════════════════════════════════════════════ */
 
 /* COT file URLs — CFTC publishes weekly */
-const CFTC_BASE = 'https://www.cftc.gov/files/dea/cotarchives/2025/futures';
+const CFTC_BASE = `https://www.cftc.gov/files/dea/cotarchives/${new Date().getFullYear()}/futures`;
 
 /* Market names to match in CFTC data — long form report */
 const COT_MARKETS = [
@@ -43,9 +43,8 @@ async function cftcGetLatestCOT() {
   try {
     /* CFTC provides annual CSV files with all futures positions */
     const year = new Date().getFullYear();
-    const url = `https://www.cftc.gov/sites/default/files/files/dea/cotarchives/${year}/futures/deafut${String(year).slice(-2)}c.txt`;
-    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxy, { signal: AbortSignal.timeout(20000) });
+    const url = `https://www.cftc.gov/files/dea/cotarchives/${year}/futures/deafut${String(year).slice(-2)}c.txt`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(`CFTC HTTP ${res.status}`);
     const text = await res.text();
     const parsed = _parseCOTcsv(text);
@@ -56,9 +55,8 @@ async function cftcGetLatestCOT() {
     /* Try previous year */
     try {
       const year = new Date().getFullYear() - 1;
-      const url = `https://www.cftc.gov/sites/default/files/files/dea/cotarchives/${year}/futures/deafut${String(year).slice(-2)}c.txt`;
-      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const res = await fetch(proxy, { signal: AbortSignal.timeout(15000) });
+      const url = `https://www.cftc.gov/files/dea/cotarchives/${year}/futures/deafut${String(year).slice(-2)}c.txt`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) return null;
       const text = await res.text();
       const parsed = _parseCOTcsv(text);

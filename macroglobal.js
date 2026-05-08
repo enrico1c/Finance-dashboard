@@ -152,7 +152,8 @@ function imfLatestAndForecast(imfData, countryCode) {
    https://stats.oecd.org/SDMX-JSON/data/MEI_CLI/...
    CLI amplitude-adjusted (AA) above 100 = expansion
    ══════════════════════════════════════════════════════════════════ */
-const OECD_CLI_BASE = 'https://stats.oecd.org/SDMX-JSON/data/MEI_CLI';
+// stats.oecd.org SDMX endpoint was retired in 2025 — now using sdmx.oecd.org
+const OECD_CLI_BASE = 'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.0';
 
 const OECD_COUNTRIES = ['USA','GBR','DEU','FRA','JPN','CHN','KOR','CAN','AUS','ITA','IND','BRA'];
 
@@ -161,8 +162,8 @@ async function oecdFetchCLI() {
   if (cached) return cached;
   try {
     const countries = OECD_COUNTRIES.join('+');
-    const url = `${OECD_CLI_BASE}/${countries}.LOLITOAA.M/all?startTime=${new Date().getFullYear()-1}&format=jsondata`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const url = `${OECD_CLI_BASE}/${countries}.LOLITOAA.M?startPeriod=${new Date().getFullYear()-1}-01&format=jsondata&dimensionAtObservation=TIME_PERIOD`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(15000) });
     const json = await res.json();
     _mgSet('oecd:cli', json);
     return json;
@@ -174,11 +175,13 @@ async function oecdFetchCLI() {
 
 // Parse OECD SDMX-JSON — extract latest value per country
 function oecdParseLatest(json) {
+  try {
   if (!json?.dataSets?.[0]?.series) return {};
   const series   = json.dataSets[0].series;
   const dims     = json.structure?.dimensions?.series || [];
   const timeDims = json.structure?.dimensions?.observation || [];
-  const countryDim = dims.find(d => d.id === 'LOCATION');
+  // New OECD API (sdmx.oecd.org) uses REF_AREA; old stats.oecd.org used LOCATION
+  const countryDim = dims.find(d => d.id === 'REF_AREA' || d.id === 'LOCATION');
 
   const result = {};
   Object.entries(series).forEach(([key, val]) => {
@@ -209,6 +212,10 @@ function oecdParseLatest(json) {
     };
   });
   return result;
+  } catch (e) {
+    console.warn('[MacroGlobal] OECD CLI parse error:', e.message);
+    return {};
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════

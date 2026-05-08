@@ -958,11 +958,9 @@ async function wmGeoIntel() {
       CD:'🇨🇩',DZ:'🇩🇿',IQ:'🇮🇶',YE:'🇾🇪',LB:'🇱🇧',CU:'🇨🇺',KP:'🇰🇵',
     };
     const COUNTRIES = 'US;CN;RU;DE;GB;FR;JP;IN;BR;ZA;NG;EG;TR;SA;IR;UA;IL;PK;VE;MM;LY;SY;AF;ET;AZ;BY;KZ;MX;SD;SO;CD;DZ;IQ;YE;LB;CU;KP';
-    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://feeds.bloomberg.com/markets/news.rss');
-
     const [wbRes, rssRes] = await Promise.allSettled([
       fetch(`https://api.worldbank.org/v2/country/${COUNTRIES}/indicator/PV.EST?format=json&mrv=1&per_page=60`, { signal: AbortSignal.timeout(12000) }),
-      fetch(proxy, { signal: AbortSignal.timeout(10000) }),
+      fetch('https://feeds.bloomberg.com/markets/news.rss', { signal: AbortSignal.timeout(10000) }),
     ]);
 
     let html = wmLiveBar('Theater Intel — World Bank Stability + Bloomberg', 'Live data');
@@ -1032,8 +1030,7 @@ async function wmGeoSignals() {
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching intelligence signals…');
   try {
-    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://feeds.bloomberg.com/markets/news.rss');
-    const res = await fetch(proxy, { signal: AbortSignal.timeout(12000) });
+    const res = await fetch('https://feeds.bloomberg.com/markets/news.rss', { signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error(`Bloomberg RSS ${res.status}`);
     const text = await res.text();
     const doc  = new DOMParser().parseFromString(text, 'text/xml');
