@@ -1194,19 +1194,9 @@ async function fmpLoadSegmentation(sym) {
       — Exhibits only, not full transcript
    ══════════════════════════════════════════════════════════════════ */
 
-/* Helper: fetch via API Ninjas */
+/* Helper: fetch via API Ninjas — endpoint removed as of 2025, returns 404 */
 async function _transcriptNinjas(sym, year, quarter) {
-  const key = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
-  if (!key) return null;
-  try {
-    const params = new URLSearchParams({ ticker: sym });
-    if (year)    params.set('year',    year);
-    if (quarter) params.set('quarter', quarter);
-    const res  = await fetch(`https://api.api-ninjas.com/v1/earningscalltranscript?${params}`, {
-      headers: { 'X-Api-Key': key },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!res.ok) return null;
+  return null; // API Ninjas /v1/earningscalltranscript endpoint has been removed (404)
     const json = await res.json();
     // API Ninjas returns array or object
     const items = Array.isArray(json) ? json : (json ? [json] : []);

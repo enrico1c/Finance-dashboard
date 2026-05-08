@@ -46,6 +46,7 @@
     'yahoo-finance15.p.rapidapi.com':            { id: 'yahoo',          keyParam: null },  // uses header
     'stooq.com':                                 { id: 'stooq',          keyParam: null },
     'api.apitube.io':                            { id: 'apitube',        keyParam: 'api_key' },
+    'api.massive.io':                            { id: 'massive',        keyParam: 'api_key' },
     'api.api-ninjas.com':                        { id: 'ninjas',         keyParam: null },  // uses header
     'api.stlouisfed.org':                        { id: 'fred',           keyParam: 'api_key' },
     'api.eia.gov':                               { id: 'eia',            keyParam: 'api_key' },
@@ -62,6 +63,11 @@
     'earthquake.usgs.gov':                       { id: 'usgs',           keyParam: null },
     'www.gdacs.org':                             { id: 'gdacs',          keyParam: null },
     'api.weather.gov':                           { id: 'noaa',           keyParam: null },
+    // No-key CORS isolation providers
+    'api.gdeltproject.org':                      { id: 'gdelt',          keyParam: null },
+    'query1.finance.yahoo.com':                  { id: 'yahoo_direct',   keyParam: null },
+    'query2.finance.yahoo.com':                  { id: 'yahoo_direct2',  keyParam: null },
+    'api.open-meteo.com':                        { id: 'openmeteo',      keyParam: null },
   };
 
   // These query param names are always stripped (key param aliases across providers)

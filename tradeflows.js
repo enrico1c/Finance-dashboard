@@ -52,22 +52,48 @@ const HS_META = {
   titanium:     { label:'Titanium unwrought',   icon:'✈' },
 };
 
+/* ISO numeric country code → name (free tier omits reporterDesc) */
+const CT_COUNTRY = {
+  4:'Afghanistan',8:'Albania',12:'Algeria',24:'Angola',32:'Argentina',36:'Australia',40:'Austria',
+  56:'Belgium',68:'Bolivia',76:'Brazil',100:'Bulgaria',124:'Canada',152:'Chile',156:'China',
+  170:'Colombia',203:'Czechia',208:'Denmark',218:'Ecuador',818:'Egypt',246:'Finland',250:'France',
+  266:'Gabon',276:'Germany',288:'Ghana',344:'Hong Kong SAR',348:'Hungary',356:'India',
+  360:'Indonesia',364:'Iran',372:'Ireland',376:'Israel',380:'Italy',392:'Japan',400:'Jordan',
+  404:'Kenya',408:'Korea DPR',410:'Korea Rep.',418:'Laos',458:'Malaysia',484:'Mexico',
+  504:'Morocco',508:'Mozambique',516:'Namibia',528:'Netherlands',540:'New Caledonia',
+  566:'Nigeria',578:'Norway',600:'Paraguay',604:'Peru',608:'Philippines',616:'Poland',
+  620:'Portugal',634:'Qatar',642:'Romania',643:'Russia',682:'Saudi Arabia',686:'Senegal',
+  710:'South Africa',724:'Spain',752:'Sweden',756:'Switzerland',762:'Tajikistan',
+  834:'Tanzania',764:'Thailand',788:'Tunisia',792:'Turkey',800:'Uganda',804:'Ukraine',
+  784:'UAE',826:'UK',840:'USA',842:'USA',858:'Uruguay',860:'Uzbekistan',862:'Venezuela',
+  704:'Viet Nam',887:'Yemen',894:'Zambia',716:'Zimbabwe',
+};
+
+function _ctName(code) {
+  return CT_COUNTRY[+code] || `Code ${code}`;
+}
+
 async function comtradeFetch(cmdCode, flowCode='M', year=2023, limit=20) {
   const key = getComtradeKey();
   const cacheKey = `ct_${cmdCode}_${flowCode}_${year}`;
   const cached = _tfGet(cacheKey, 12*60*60*1000);
   if (cached) return cached;
   try {
+    // Correct Comtrade v1 URL: all params as query string, no year/cmdCode in path
     const params = new URLSearchParams({
-      typeCode:'C', freqCode:'A', clCode:'HS',
-      period: year, cmdCode, flowCode,
-      reporterCode:'0', partnerCode:'0', partner2Code:'0',
-      includeDesc:'true', limit, format:'json',
+      reporterCode: '0',   // 0 = all countries
+      period: year,
+      cmdCode,
+      flowCode,
+      partnerCode: '0',
+      partner2Code: '0',
+      limit,
     });
+    // subscription-key is stripped by proxy-client and re-added by backend
+    // but set it anyway for non-proxy / local dev fallback
     if (key) params.set('subscription-key', key);
-    const url = `${COMTRADE_BASE}/C/A/HS/${year}/all/${cmdCode}?${params}`;
-    const headers = key ? { 'Ocp-Apim-Subscription-Key': key } : {};
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+    const url = `${COMTRADE_BASE}/C/A/HS?${params}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error(`Comtrade HTTP ${res.status}`);
     const data = await res.json();
     _tfSet(cacheKey, data);
@@ -224,7 +250,7 @@ async function tradeflowsRenderTrade() {
         const byReporter = {};
         let total = 0;
         for (const r of rows) {
-          const name = r.reporterDesc || r.reporterCode || 'Unknown';
+          const name = r.reporterDesc || _ctName(r.reporterCode) || 'Unknown';
           const val  = r.fobvalue || r.primaryValue || r.cifvalue || 0;
           byReporter[name] = (byReporter[name] || 0) + val;
           total += val;
