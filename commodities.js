@@ -263,7 +263,8 @@ window.commFetchIMFPCPS = async function() {
   // Replaced with Stooq commodity futures (free, no key, CORS via FINTERM proxy).
   const STOOQ_COMM = [
     { stooq:'cl.f',  name:'WTI Crude',    cat:'energy',  unit:'$/bbl'     },
-    { stooq:'bz.f',  name:'Brent Crude',  cat:'energy',  unit:'$/bbl'     },
+    // bz.f (Brent) returns empty from Stooq — skip here; EIA Brent added separately below
+    // { stooq:'bz.f', name:'Brent Crude', cat:'energy', unit:'$/bbl' },
     { stooq:'ng.f',  name:'Natural Gas',  cat:'energy',  unit:'$/MMBtu'   },
     { stooq:'gc.f',  name:'Gold',         cat:'metals',  unit:'$/troy oz' },
     { stooq:'si.f',  name:'Silver',       cat:'metals',  unit:'$/troy oz' },
@@ -305,6 +306,21 @@ window.commFetchIMFPCPS = async function() {
   const valid = results
     .filter(r => r.status === 'fulfilled' && r.value != null)
     .map(r => r.value);
+
+  // Add EIA Brent crude (Stooq bz.f returns empty)
+  try {
+    const eiaRes = await fetch('https://api.eia.gov/v2/petroleum/pri/spt/data/?frequency=weekly&data%5B0%5D=value&facets%5Bseries%5D%5B%5D=RBRTE&start=2024-01-01&length=2',
+      { signal: AbortSignal.timeout(10000) });
+    if (eiaRes.ok) {
+      const eiaJson = await eiaRes.json();
+      const data = (eiaJson?.response?.data || []).sort((a,b)=>b.period.localeCompare(a.period));
+      if (data[0]?.value != null) {
+        valid.push({ id:'brent_eia', name:'Brent Crude', cat:'energy', unit:'$/bbl',
+          latest: parseFloat(data[0].value), prev: data[1]?.value != null ? parseFloat(data[1].value) : null,
+          date: data[0].period, history:[] });
+      }
+    }
+  } catch {}
 
   if (valid.length) _cSet(cacheKey, valid);
   return valid;

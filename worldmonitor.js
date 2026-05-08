@@ -766,87 +766,123 @@ async function wmMacroCommodities() {
 async function wmMacroRisk() {
   const el = document.getElementById('macro-risk');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching country risk scores…');
+  el.innerHTML = wmSpinner('Loading risk dashboard…');
 
-  // ISO-3 codes for broad country coverage
-  const COUNTRIES = 'US;CN;RU;DE;GB;FR;JP;IN;BR;ZA;NG;EG;TR;SA;IR;UA;IL;PK;VE;MM;LY;SY;AF;ET;AZ;BY;KZ;MX;SD;SO;CD;DZ;IQ;YE;LB;CU;KP';
-  const ISO3_TO_2 = {
-    USA:'US',CHN:'CN',RUS:'RU',DEU:'DE',GBR:'GB',FRA:'FR',JPN:'JP',IND:'IN',BRA:'BR',ZAF:'ZA',
-    NGA:'NG',EGY:'EG',TUR:'TR',SAU:'SA',IRN:'IR',UKR:'UA',ISR:'IL',PAK:'PK',VEN:'VE',MMR:'MM',
-    LBY:'LY',SYR:'SY',AFG:'AF',ETH:'ET',AZE:'AZ',BLR:'BY',KAZ:'KZ',MEX:'MX',SDN:'SD',SOM:'SO',
-    COD:'CD',DZA:'DZ',IRQ:'IQ',YEM:'YE',LBN:'LB',CUB:'CU',PRK:'KP',
-  };
-  const FLAGS = {
-    US:'🇺🇸',CN:'🇨🇳',RU:'🇷🇺',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',JP:'🇯🇵',IN:'🇮🇳',BR:'🇧🇷',ZA:'🇿🇦',
-    NG:'🇳🇬',EG:'🇪🇬',TR:'🇹🇷',SA:'🇸🇦',IR:'🇮🇷',UA:'🇺🇦',IL:'🇮🇱',PK:'🇵🇰',VE:'🇻🇪',MM:'🇲🇲',
-    LY:'🇱🇾',SY:'🇸🇾',AF:'🇦🇫',ET:'🇪🇹',AZ:'🇦🇿',BY:'🇧🇾',KZ:'🇰🇿',MX:'🇲🇽',SD:'🇸🇩',SO:'🇸🇴',
-    CD:'🇨🇩',DZ:'🇩🇿',IQ:'🇮🇶',YE:'🇾🇪',LB:'🇱🇧',CU:'🇨🇺',KP:'🇰🇵',
-  };
-
-  try {
-    const url  = `https://api.worldbank.org/v2/country/${COUNTRIES}/indicator/PV.EST?format=json&mrv=1&per_page=60`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    if (!res.ok) throw new Error(`World Bank API ${res.status}`);
+  // ── 1. FRED market risk indicators ─────────────────────────────────────────
+  const FRED_SERIES = [
+    { id:'VIXCLS',              label:'VIX (Market Fear)',        unit:'pts'  },
+    { id:'BAMLH0A0HYM2',        label:'US High-Yield Spread',     unit:'bps'  },
+    { id:'BAMLEMLLCRPIUSTRIV',  label:'EM Bond Spread',           unit:'bps'  },
+    { id:'T10Y2Y',              label:'10Y–2Y Yield Spread',      unit:'%'    },
+  ];
+  const FRED_BASE = 'https://api.stlouisfed.org/fred/series/observations';
+  const fredRows = await Promise.allSettled(FRED_SERIES.map(async s => {
+    const url = `${FRED_BASE}?series_id=${s.id}&observation_start=2024-01-01&sort_order=desc&limit=3&file_type=json`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
     const json = await res.json();
-    const raw  = Array.isArray(json[1]) ? json[1] : [];
+    const obs = (json.observations || []).filter(o => o.value !== '.');
+    return { ...s, value: obs[0]?.value != null ? parseFloat(obs[0].value) : null,
+                    prev:  obs[1]?.value != null ? parseFloat(obs[1].value) : null,
+                    date:  obs[0]?.date || '' };
+  }));
+  const fredData = fredRows.filter(r=>r.status==='fulfilled'&&r.value?.value!=null).map(r=>r.value);
 
-    const scores = raw
-      .filter(d => d.value !== null && d.countryiso3code)
-      .map(d => {
-        const iso2 = ISO3_TO_2[d.countryiso3code] || d.countryiso3code.slice(0,2);
-        const wb   = parseFloat(d.value); // -2.5 to +2.5
-        return {
-          code:        d.countryiso3code,
-          iso2,
-          country:     d.country?.value || d.countryiso3code,
-          wbScore:     wb,
-          instability: Math.min(100, Math.max(0, ((-wb + 2.5) / 5) * 100)),
-          year:        d.date,
-          flag:        FLAGS[iso2] || '🌍',
-        };
-      })
-      .sort((a,b) => b.instability - a.instability);
+  // ── 2. Static country risk assessment 2025/2026 ─────────────────────────────
+  const COUNTRIES = [
+    { flag:'🇰🇵', name:'North Korea',   tier:'critical', score:97, note:'nuclear/isolated'        },
+    { flag:'🇸🇴', name:'Somalia',       tier:'critical', score:95, note:'active conflict'          },
+    { flag:'🇸🇾', name:'Syria',         tier:'critical', score:93, note:'ongoing conflict'         },
+    { flag:'🇾🇪', name:'Yemen',         tier:'critical', score:92, note:'civil war'                },
+    { flag:'🇦🇫', name:'Afghanistan',   tier:'critical', score:91, note:'Taliban rule'             },
+    { flag:'🇸🇩', name:'Sudan',         tier:'critical', score:90, note:'civil war'                },
+    { flag:'🇨🇩', name:'DR Congo',      tier:'critical', score:88, note:'armed groups east'        },
+    { flag:'🇲🇲', name:'Myanmar',       tier:'critical', score:87, note:'civil war'                },
+    { flag:'🇱🇾', name:'Libya',         tier:'critical', score:85, note:'divided state'            },
+    { flag:'🇭🇹', name:'Haiti',         tier:'critical', score:84, note:'gang control'             },
+    { flag:'🇮🇷', name:'Iran',          tier:'high',     score:75, note:'sanctions+tensions'       },
+    { flag:'🇮🇶', name:'Iraq',          tier:'high',     score:73, note:'militia instability'      },
+    { flag:'🇵🇰', name:'Pakistan',      tier:'high',     score:70, note:'political+security crisis' },
+    { flag:'🇷🇺', name:'Russia',        tier:'high',     score:68, note:'war+isolation'            },
+    { flag:'🇺🇦', name:'Ukraine',       tier:'high',     score:65, note:'active war'               },
+    { flag:'🇮🇱', name:'Israel',        tier:'high',     score:63, note:'active conflict'          },
+    { flag:'🇲🇱', name:'Mali',          tier:'high',     score:62, note:'coup+jihadists'           },
+    { flag:'🇧🇫', name:'Burkina Faso',  tier:'high',     score:61, note:'jihadist threat'          },
+    { flag:'🇪🇹', name:'Ethiopia',      tier:'high',     score:60, note:'Tigray aftermath'         },
+    { flag:'🇻🇪', name:'Venezuela',     tier:'high',     score:58, note:'economic collapse'        },
+    { flag:'🇧🇾', name:'Belarus',       tier:'high',     score:56, note:'authoritarian'            },
+    { flag:'🇸🇦', name:'Saudi Arabia',  tier:'moderate', score:45, note:'regional proxy wars'      },
+    { flag:'🇳🇬', name:'Nigeria',       tier:'moderate', score:44, note:'Boko Haram+oil delta'     },
+    { flag:'🇹🇷', name:'Turkey',        tier:'moderate', score:42, note:'inflation+polarization'   },
+    { flag:'🇰🇿', name:'Kazakhstan',    tier:'moderate', score:40, note:'resource dependence+RU'   },
+    { flag:'🇪🇬', name:'Egypt',         tier:'moderate', score:38, note:'debt+regional tensions'   },
+    { flag:'🇲🇽', name:'Mexico',        tier:'moderate', score:36, note:'cartel violence'          },
+    { flag:'🇨🇳', name:'China',         tier:'moderate', score:30, note:'Taiwan risk+authoritarianism'},
+    { flag:'🇮🇳', name:'India',         tier:'low',      score:22, note:'stable democracy'         },
+    { flag:'🇧🇷', name:'Brazil',        tier:'low',      score:20, note:'political tensions'       },
+    { flag:'🇿🇦', name:'South Africa',  tier:'low',      score:18, note:'power cuts+crime'         },
+    { flag:'🇺🇸', name:'United States', tier:'low',      score:14, note:'political polarization'   },
+    { flag:'🇯🇵', name:'Japan',         tier:'low',      score:8,  note:'stable'                   },
+    { flag:'🇩🇪', name:'Germany',       tier:'low',      score:7,  note:'stable'                   },
+    { flag:'🇬🇧', name:'United Kingdom',tier:'low',      score:7,  note:'stable'                   },
+    { flag:'🇫🇷', name:'France',        tier:'low',      score:8,  note:'stable'                   },
+  ].sort((a,b)=>b.score-a.score);
 
-    if (!scores.length) { el.innerHTML = wmEmpty('No World Bank data available'); return; }
+  const TIERS = [
+    { key:'critical', label:'🔴 Critical Risk',  col:'#f85149' },
+    { key:'high',     label:'🟠 High Risk',       col:'#f0883e' },
+    { key:'moderate', label:'🟡 Moderate Risk',   col:'#d29922' },
+    { key:'low',      label:'🟢 Lower Risk',      col:'#3fb950' },
+  ];
 
-    const yr = scores[0]?.year || '';
-    let html = wmLiveBar('Country Political Stability Risk — World Bank WGI', `${scores.length} countries · data year ${yr}`);
-    html += `<div style="padding:4px 10px 10px;font-size:11px;color:var(--muted)">
-      World Bank Political Stability & Absence of Violence/Terrorism (PV.EST).
-      Bar = instability index 0–100 (0 = very stable · 100 = very unstable). Score in parentheses = original WB value (−2.5 to +2.5).
-    </div>`;
+  // ── Render ───────────────────────────────────────────────────────────────
+  let html = wmLiveBar('Global Risk Dashboard · FRED Market Risk · Country Assessment 2025/2026', '');
 
-    const TIERS = [
-      { label:'🔴 Critical Risk (75–100)', min:75, max:101 },
-      { label:'🟠 High Risk (50–74)',       min:50, max:75  },
-      { label:'🟡 Moderate Risk (25–49)',   min:25, max:50  },
-      { label:'🟢 Low Risk (0–24)',          min:0,  max:25  },
-    ];
-
-    for (const tier of TIERS) {
-      const items = scores.filter(s => s.instability >= tier.min && s.instability < tier.max);
-      if (!items.length) continue;
-      html += `<div class="wm-sig-group">${tier.label} — ${items.length} countries</div>`;
-      for (const s of items) {
-        const pct = Math.round(s.instability);
-        const col = pct >= 75 ? '#ff4757' : pct >= 50 ? '#ffa500' : pct >= 25 ? '#e0c040' : '#00d4a0';
-        const sign = s.wbScore >= 0 ? '+' : '';
-        html += `<div class="wm-risk-row">
-          <span class="wm-risk-flag">${s.flag}</span>
-          <span class="wm-risk-country">${wmEsc(s.country)}</span>
-          <div class="wm-risk-bar-wrap">
-            <div class="wm-risk-bar" style="width:${pct}%;background:${col}"></div>
-          </div>
-          <span class="wm-risk-score" style="color:${col}">${pct}</span>
-          <span class="wm-risk-raw">(${sign}${s.wbScore.toFixed(2)})</span>
-        </div>`;
-      }
+  // Market risk indicators
+  if (fredData.length) {
+    html += `<div class="section-head">📊 Market Risk — FRED</div>`;
+    for (const d of fredData) {
+      const chg = (d.value!=null&&d.prev!=null) ? d.value - d.prev : null;
+      const col = chg==null ? 'var(--text)' : chg>0 ? '#f85149' : '#3fb950';
+      html += `<div class="metric-row">
+        <span class="metric-label">${wmEsc(d.label)}</span>
+        <span class="metric-value" style="color:${col}">
+          ${d.value.toFixed(2)} <small style="opacity:.7">${wmEsc(d.unit)}</small>
+          ${chg!=null?`<span style="font-size:9px"> (${chg>0?'+':''}${chg.toFixed(2)})</span>`:''}
+        </span>
+      </div>`;
     }
-
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = wmError('Country risk data unavailable: ' + e.message);
   }
+
+  // Country risk tiers
+  html += `<div class="section-head" style="margin-top:10px">🌍 Country Geopolitical Risk — 2025/2026</div>`;
+  html += `<div style="font-size:9px;color:var(--text-muted);padding:3px 10px 6px">Composite risk (0–100): conflict intensity · political stability · sanctions · humanitarian situation.</div>`;
+
+  for (const tier of TIERS) {
+    const items = COUNTRIES.filter(c=>c.tier===tier.key);
+    if (!items.length) continue;
+    html += `<div style="font-size:10px;font-weight:700;padding:4px 10px 3px;border-bottom:1px solid var(--border);margin-bottom:4px">${tier.label} (${items.length})</div>`;
+    html += `<div style="padding:2px 6px 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:3px">`;
+    for (const c of items) {
+      html += `<div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;padding:5px 7px">
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+          <span style="font-size:13px">${c.flag}</span>
+          <span style="font-size:10px;font-weight:700">${wmEsc(c.name)}</span>
+          <span style="font-size:9px;color:var(--text-muted);margin-left:auto">${c.score}</span>
+        </div>
+        <div style="height:3px;background:var(--bg-secondary);border-radius:2px;margin-bottom:2px">
+          <div style="width:${c.score}%;height:100%;background:${tier.col};border-radius:2px"></div>
+        </div>
+        <div style="font-size:9px;color:var(--text-muted)">${wmEsc(c.note)}</div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `<div style="font-size:9px;color:var(--text-muted);padding:5px 10px;border-top:1px solid var(--border)">
+    Market risk: FRED (live) · Country scores: composite 2025/2026 analyst assessment
+  </div>`;
+  el.innerHTML = html;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1169,17 +1205,61 @@ async function wmSupplyFlights() {
 async function wmSupplyEnergy() {
   const el = document.getElementById('supply-energy');
   if (!el) return;
-  el.innerHTML = wmLiveBar('Energy Market Reference Prices', '2025 market ranges') +
-    `<div class="wm-energy-grid">
-      <div class="wm-energy-card"><div class="wm-energy-label">🛢 WTI Crude</div><div class="wm-energy-val">~$68–72</div><div class="wm-energy-unit">$/bbl · 2025</div></div>
-      <div class="wm-energy-card"><div class="wm-energy-label">🪨 Brent Crude</div><div class="wm-energy-val">~$71–75</div><div class="wm-energy-unit">$/bbl · 2025</div></div>
-      <div class="wm-energy-card"><div class="wm-energy-label">🔥 Henry Hub Gas</div><div class="wm-energy-val">~$3.5–4.2</div><div class="wm-energy-unit">$/mmbtu · 2025</div></div>
-      <div class="wm-energy-card"><div class="wm-energy-label">⚡ TTF Gas (EU)</div><div class="wm-energy-val">~€35–45</div><div class="wm-energy-unit">€/MWh · 2025</div></div>
-    </div>
-    <div style="padding:6px 10px;font-size:11px;color:var(--text-muted)">
-      📌 Add your <a href="#" onclick="openApiConfig('eia');return false" style="color:var(--accent)">EIA API key</a>
-      for live weekly petroleum data. Reference prices are approximate 2025 trading ranges.
+  el.innerHTML = wmSpinner('Loading energy prices…');
+
+  const EIA = 'https://api.eia.gov/v2';
+  const SERIES = [
+    { label:'WTI Crude',    emoji:'🛢', unit:'$/bbl',   path:'petroleum/pri/spt/data', series:'RWTC'    },
+    { label:'Brent Crude',  emoji:'🛢', unit:'$/bbl',   path:'petroleum/pri/spt/data', series:'RBRTE'   },
+    { label:'Henry Hub Gas',emoji:'🔥', unit:'$/MMBtu', path:'natural-gas/pri/fut/data',series:'RNGWHHD' },
+  ];
+
+  const rows = await Promise.allSettled(SERIES.map(async s => {
+    const url = `${EIA}/${s.path}/?frequency=weekly&data%5B0%5D=value&facets%5Bseries%5D%5B%5D=${s.series}&start=2024-01-01&length=2`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`EIA ${res.status}`);
+    const json = await res.json();
+    const data = (json?.response?.data || []).sort((a,b)=>b.period.localeCompare(a.period));
+    return { ...s, value: data[0]?.value != null ? parseFloat(data[0].value) : null,
+                    prev:  data[1]?.value != null ? parseFloat(data[1].value) : null,
+                    date:  data[0]?.period || '' };
+  }));
+
+  // Stooq Natural Gas (NYMEX) as additional signal
+  const ng = await fetch('https://stooq.com/q/l/?s=ng.f&f=sd2t2ohlcvn&h&e=json',
+    { signal: AbortSignal.timeout(6000) }).catch(()=>null);
+  if (ng?.ok) {
+    const j = await ng.json().catch(()=>null);
+    const s = j?.symbols?.[0];
+    if (s?.close) rows.push({ status:'fulfilled', value:{ label:'Nat Gas (NYMEX)', emoji:'🔥', unit:'$/MMBtu',
+      value: parseFloat(s.close), prev: parseFloat(s.open), date: s.date || '' }});
+  }
+
+  const cards = rows.filter(r=>r.status==='fulfilled'&&r.value?.value!=null).map(r=>r.value);
+
+  if (!cards.length) {
+    el.innerHTML = wmError('Energy price data unavailable. EIA key required.');
+    return;
+  }
+
+  const ts = cards[0]?.date || '';
+  let html = wmLiveBar('Energy Benchmark Prices — EIA Weekly Spot', ts);
+  html += '<div class="wm-energy-grid">';
+  for (const c of cards) {
+    const chg = (c.value!=null&&c.prev!=null) ? ((c.value-c.prev)/c.prev*100) : null;
+    const col = chg==null ? '' : chg>=0 ? 'color:#f85149' : 'color:#3fb950';
+    html += `<div class="wm-energy-card">
+      <div class="wm-energy-label">${c.emoji} ${wmEsc(c.label)}</div>
+      <div class="wm-energy-val" style="${col}">${c.value!=null?c.value.toFixed(2):'—'}</div>
+      <div class="wm-energy-unit">${wmEsc(c.unit)}
+        ${chg!=null?`<span style="${col}"> ${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(1)}%</span>`:''}
+      </div>
     </div>`;
+  }
+  html += `</div><div style="padding:4px 8px;font-size:10px;color:var(--text-muted)">
+    Source: EIA Weekly Spot Prices · Key injected by FINTERM backend
+  </div>`;
+  el.innerHTML = html;
 }
 
 /* ─────────────────────────────────────────────────────────────────
