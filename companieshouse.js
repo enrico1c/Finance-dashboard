@@ -94,19 +94,19 @@ function _isUKTicker(ticker) {
    as Basic Auth (CH uses key as username, empty password).
    ══════════════════════════════════════════════════════════════════ */
 async function _chFetch(path) {
-  const key = _chGetKey();
-  if (!key) return null;
+  const key    = _chGetKey();
+  const isAuth = !!window._FINTERM_AUTHENTICATED;
+  // Allow fetch when: local key present OR FINTERM authenticated (backend proxy injects key)
+  if (!key && !isAuth) return null;
   const cacheKey = `ch_${path}`;
   const cached   = _chCacheGet(cacheKey);
   if (cached !== null) return cached;
 
-  const auth = btoa(key + ":");
+  const headers = { "Accept": "application/json" };
+  if (key) headers["Authorization"] = `Basic ${btoa(key + ":")}`;
   try {
     const res = await fetch(`${CH_BASE}${path}`, {
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Accept":        "application/json",
-      },
+      headers,
       signal: AbortSignal.timeout(8000),
     });
     if (res.status === 429) {
@@ -566,13 +566,13 @@ window.chLoadForTicker = async function chLoadForTicker(ticker) {
   const sym     = ticker.replace(/.*:/, "").toUpperCase();
   const isUK    = _isUKTicker(ticker);
   const hasKey  = !!_chGetKey();
+  const isAuth  = !!window._FINTERM_AUTHENTICATED;
 
   /* Only run if:
-       a) it's a UK ticker (certain) — always try CH
+       a) it's a UK ticker — always try CH
        b) GLEIF identified a UK entity — try CH
-       c) A CH key is set — can try to search for any entity
-     For non-UK entities without key, show informational setup banner. */
-  if (!isUK && !hasKey) {
+       c) A CH key is set or FINTERM authenticated (backend has the key) */
+  if (!isUK && !hasKey && !isAuth) {
     const pane = document.getElementById("own-psc");
     if (pane && !pane.innerHTML.trim()) {
       pane.innerHTML = `
@@ -767,7 +767,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     const t = typeof currentTicker !== "undefined" ? currentTicker : "AAPL";
     /* Only auto-run on initial load if UK ticker or key already set */
-    if (_isUKTicker(t) || _chGetKey()) chLoadForTicker(t);
+    if (_isUKTicker(t) || _chGetKey() || window._FINTERM_AUTHENTICATED) chLoadForTicker(t);
   }, 3500);
 });
 

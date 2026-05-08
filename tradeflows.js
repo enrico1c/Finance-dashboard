@@ -73,15 +73,18 @@ function _ctName(code) {
   return CT_COUNTRY[+code] || `Code ${code}`;
 }
 
-async function comtradeFetch(cmdCode, flowCode='M', year=2023, limit=20) {
+// Top critical-mineral exporting countries: China, Australia, DRC, Chile, Russia,
+// South Africa, USA, Brazil, Indonesia, Peru, Canada, Kazakhstan, Bolivia, Argentina
+const COMTRADE_REPORTERS = '156,36,180,152,643,710,842,76,360,604,124,398,68,32';
+
+async function comtradeFetch(cmdCode, flowCode='X', year=2022, limit=20) {
   const key = getComtradeKey();
   const cacheKey = `ct_${cmdCode}_${flowCode}_${year}`;
   const cached = _tfGet(cacheKey, 12*60*60*1000);
   if (cached) return cached;
   try {
-    // Correct Comtrade v1 URL: all params as query string, no year/cmdCode in path
     const params = new URLSearchParams({
-      reporterCode: '0',   // 0 = all countries
+      reporterCode: COMTRADE_REPORTERS,  // specific exporters (reporterCode=0 returns empty)
       period: year,
       cmdCode,
       flowCode,
@@ -90,10 +93,9 @@ async function comtradeFetch(cmdCode, flowCode='M', year=2023, limit=20) {
       limit,
     });
     // subscription-key is stripped by proxy-client and re-added by backend
-    // but set it anyway for non-proxy / local dev fallback
     if (key) params.set('subscription-key', key);
     const url = `${COMTRADE_BASE}/C/A/HS?${params}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`Comtrade HTTP ${res.status}`);
     const data = await res.json();
     _tfSet(cacheKey, data);
@@ -188,12 +190,13 @@ function tradeflowsInjectSection() {
 async function tradeflowsRenderTrade() {
   const el = document.getElementById('supply-minerals-trade');
   if (!el) return;
-  const key = getComtradeKey();
+  const key       = getComtradeKey();
+  const hasAccess = key || !!window._FINTERM_AUTHENTICATED; // backend has key when authenticated
 
-  let html = `<div class="av-live-badge">● Global Trade Flows · UN Comtrade+ · ${key?'Live (free key)':'Demo mode — add free Comtrade key for full data'}</div>`;
+  let html = `<div class="av-live-badge">● Global Trade Flows · UN Comtrade+ · ${hasAccess?'Live · 2022 annual data':'Demo mode — add free Comtrade key for full data'}</div>`;
   html += `<div class="av-note" style="margin-bottom:8px">
-    UN Comtrade+ provides bilateral trade flows by HS code. Free key: 500 calls/day. Data: annual reporting cycles with publication lags.
-    ${!key?`<br><a href="https://comtradeplus.un.org/" target="_blank" rel="noopener" style="color:var(--accent)">Register for free key at comtradeplus.un.org ↗</a> — then add via ⚙ API Settings → Comtrade.`:''}
+    UN Comtrade+ provides bilateral trade flows by HS code. Free key: 500 calls/day. Data: annual (2022).
+    ${!hasAccess?`<br><a href="https://comtradeplus.un.org/" target="_blank" rel="noopener" style="color:var(--accent)">Register for free key at comtradeplus.un.org ↗</a> — then add via ⚙ API Settings → Comtrade.`:''}
   </div>`;
 
   /* HS codes reference — configuration metadata, not financial data */
@@ -212,13 +215,12 @@ async function tradeflowsRenderTrade() {
   }
   html += `</tbody></table></div>`;
 
-  if (!key) {
+  if (!hasAccess) {
     html += `<div class="av-note" style="margin-top:8px">
       ⚠ Add a free UN Comtrade API key to load live top-exporter data and HHI scores.
       <a href="https://comtradeplus.un.org/" target="_blank" rel="noopener" style="color:var(--accent)">Register at comtradeplus.un.org ↗</a>
       — then add via ⚙ API Settings → Comtrade.
     </div>`;
-    /* Mark all cells as no-key */
     html = html.replace(/…loading/g, '— (no key)').replace(/…/g, '—');
   }
 
@@ -230,7 +232,7 @@ async function tradeflowsRenderTrade() {
   el.innerHTML = html;
 
   /* Live Comtrade fetch — populate top exporters + HHI per mineral */
-  if (key) {
+  if (hasAccess) {
     const minerals = Object.keys(HS_CODES);
     /* Fetch sequentially to respect rate limits (500 calls/day) */
     for (const id of minerals) {
@@ -239,7 +241,7 @@ async function tradeflowsRenderTrade() {
       const hhiCell = el.querySelector(`#tf-hhi-${id}`);
       if (!expCell) continue;
       try {
-        const data = await comtradeFetch(hs, 'X', 2023, 15);
+        const data = await comtradeFetch(hs, 'X', 2022, 15);
         const rows = data?.data || [];
         if (!rows.length) {
           expCell.textContent = '— (no data)';
