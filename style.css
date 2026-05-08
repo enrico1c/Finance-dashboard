@@ -5479,6 +5479,8 @@ body.panel-dragging iframe, body.panel-resizing iframe {
 .cg-coins-table th { padding:4px 6px; border-bottom:1px solid var(--border); font-size:8px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); background:var(--bg-panel); position:sticky; top:0; z-index:3; }
 .cg-coins-table td { padding:3px 6px; border-bottom:1px solid var(--border); font-family:var(--font-mono); }
 .cg-coins-table tr:hover td { background:rgba(255,255,255,.025); }
+/* override legacy list-grid rule that breaks <tr> layout in the coins table */
+.cg-coins-table .cg-coin-row { display:table-row; grid-template-columns:none; padding:0; gap:0; }
 .cg-td-name     { display:flex; align-items:center; gap:5px; min-width:130px; font-family:var(--font-sans,sans-serif); }
 .cg-coin-fullname{ color:var(--text-muted); font-size:9px; overflow:hidden; text-overflow:ellipsis; max-width:80px; }
 .cg-td-rank     { color:var(--text-muted); min-width:26px; }
