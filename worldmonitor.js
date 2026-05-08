@@ -1130,52 +1130,35 @@ async function wmGeoQuakes() {
 async function wmSupplyFlights() {
   const el = document.getElementById('supply-flights');
   if (!el) return;
-  el.innerHTML = wmSpinner('Fetching flight delay data…');
+  el.innerHTML = wmSpinner('Fetching military flight data…');
   try {
-    // OpenSky Network now requires authentication for /api/states/all
-    // Use the anonymous bounded-region endpoint (lower rate limit but no auth)
-    const res = await fetch('https://opensky-network.org/api/states/all?lamin=30&lamax=70&lomin=-130&lomax=40', {
+    const res = await fetch('https://opendata.adsb.fi/api/v2/mil', {
       signal: AbortSignal.timeout(15000)
     });
-    if (res.status === 401 || res.status === 403) {
-      el.innerHTML = `<div class="no-data">// OpenSky authentication required.<br>
-        Register a free account at <a href="https://opensky-network.org/index.php?option=com_users&view=registration" target="_blank" rel="noopener" style="color:var(--accent)">opensky-network.org ↗</a>
-        to access live flight data.</div>`;
-      return;
-    }
-    if (!res.ok) throw new Error(`OpenSky ${res.status}`);
+    if (!res.ok) throw new Error(`ADSB.fi ${res.status}`);
     const json = await res.json();
-    const states = json.states || [];
+    const ac = json.ac || [];
+    const airborne = ac.filter(a => a.lat != null && a.lon != null && typeof a.alt_baro === 'number' && a.alt_baro > 100);
 
     const REGIONS = [
-      { name: 'North Atlantic (EU→US)',   lat: [35,60],  lon: [-60, 10], emoji: '🌊' },
-      { name: 'Transpacific (Asia→US)',    lat: [15,55],  lon: [120,180], emoji: '🌏' },
-      { name: 'Middle East / Gulf',        lat: [15,32],  lon: [ 40, 60], emoji: '🕌' },
-      { name: 'Southeast Asia Hub',        lat: [-5,25],  lon: [ 95,140], emoji: '🏝' },
-      { name: 'Europe (Core)',             lat: [43,58],  lon: [ -5, 25], emoji: '🇪🇺' },
-      { name: 'North America (Domestic)', lat: [24,50],  lon: [-125,-70], emoji: '🗽' },
+      { name: 'Europe',            emoji: '🇪🇺', lat: [35,72],  lon: [-10,40]  },
+      { name: 'Middle East / Gulf',emoji: '🕌',  lat: [15,38],  lon: [30,65]   },
+      { name: 'North America',     emoji: '🗽',  lat: [24,72],  lon: [-170,-50] },
+      { name: 'Asia-Pacific',      emoji: '🌏',  lat: [-10,55], lon: [60,180]  },
+      { name: 'North Africa',      emoji: '🌍',  lat: [15,38],  lon: [-17,42]  },
     ];
+    const inR = (a, r) => a.lat >= r.lat[0] && a.lat <= r.lat[1] && a.lon >= r.lon[0] && a.lon <= r.lon[1];
+    const regionCounts = REGIONS.map(r => ({ ...r, count: airborne.filter(a => inR(a, r)).length }));
 
-    const regionCounts = REGIONS.map(r => ({
-      ...r,
-      count: states.filter(s => {
-        const lat = s[6], lon = s[5];
-        return lat != null && lon != null && !s[8] &&
-          lat >= r.lat[0] && lat <= r.lat[1] &&
-          lon >= r.lon[0] && lon <= r.lon[1];
-      }).length,
-    }));
-
-    const total = states.filter(s => !s[8]).length;
-    el.innerHTML = wmLiveBar('Air Traffic — OpenSky Network Live', `${total.toLocaleString()} aircraft airborne`) +
+    el.innerHTML = wmLiveBar('Military Air Activity — ADSB.fi Open Data', `${airborne.length} sorties airborne`) +
       `<div class="wm-flight-grid">` +
       regionCounts.map(r => `<div class="wm-flight-card">
         <div class="wm-flight-code">${r.emoji}</div>
         <div class="wm-flight-name">${wmEsc(r.name)}</div>
-        <div class="wm-flight-delay">${r.count.toLocaleString()} aircraft</div>
+        <div class="wm-flight-delay">${r.count} sorties</div>
       </div>`).join('') + `</div>` +
       `<div style="padding:4px 8px;font-size:10px;color:var(--text-muted)">
-        Live ADS-B data · ${new Date().toUTCString().slice(0,25)} UTC
+        Military ADS-B · ADSB.fi open data (dbFlags=1) · ${new Date().toUTCString().slice(0,25)} UTC
       </div>`;
   } catch(e) {
     el.innerHTML = wmError('Flight data unavailable: ' + e.message);
@@ -2196,70 +2179,65 @@ function wmGeoGpsJam() {
   el.innerHTML = html;
 }
 
-/* ── Military Operations  → Geo·Risk MILOPS tab (OpenSky live) ── */
+/* ── Military Operations  → Geo·Risk MILOPS tab (ADSB.fi open data) ── */
 async function wmGeoMilOps() {
   const el = document.getElementById('geo-milops');
   if (!el) return;
   el.innerHTML = wmSpinner('Loading military flight data…');
   try {
-    const res = await fetch('https://opensky-network.org/api/states/all?lamin=30&lamax=70&lomin=-130&lomax=40', {
+    const res = await fetch('https://opendata.adsb.fi/api/v2/mil', {
       signal: AbortSignal.timeout(15000)
     });
-    if (res.status === 401 || res.status === 403) {
-      el.innerHTML = `<div class="no-data">// OpenSky authentication required for military flight data.<br>
-        Register free at <a href="https://opensky-network.org/index.php?option=com_users&view=registration" target="_blank" rel="noopener" style="color:var(--accent)">opensky-network.org ↗</a></div>`;
-      return;
-    }
-    if (!res.ok) throw new Error(`OpenSky ${res.status}`);
+    if (!res.ok) throw new Error(`ADSB.fi ${res.status}`);
     const json = await res.json();
-    const states = json.states || [];
+    const ac = json.ac || [];
 
-    // Filter for known military callsign prefixes
-    const MIL_PREFIXES = ['RCH','REACH','DUKE','KNIFE','IRON','VAPOR','SPAR','JAKE','SAM','VENUS','GRIM','FURY','BOXER','HAVOC','VIPER','JEDI','CHAOS','DOOM','STORM','SHELL','MODAL'];
+    const airborne = ac
+      .filter(a => a.lat != null && a.lon != null && typeof a.alt_baro === 'number' && a.alt_baro > 100)
+      .sort((a, b) => (b.alt_baro || 0) - (a.alt_baro || 0))
+      .slice(0, 60);
 
-    const milFlights = states
-      .filter(s => {
-        const cs = (s[1] || '').trim().toUpperCase();
-        return cs.length > 3 && MIL_PREFIXES.some(p => cs.startsWith(p));
-      })
-      .slice(0, 40)
-      .map(s => ({
-        callsign: (s[1] || '').trim(),
-        country:  s[2] || 'Unknown',
-        altitude: s[7] ? Math.round(s[7] * 3.281) : null,
-        speed:    s[9] ? Math.round(s[9] * 1.944) : null,
-        onGround: s[8],
-      }))
-      .filter(f => !f.onGround);
-
-    if (!milFlights.length) {
-      el.innerHTML = wmLiveBar('Military Flight Activity — OpenSky Network') +
-        wmEmpty('No military callsigns detected in current ADS-B feed');
+    if (!airborne.length) {
+      el.innerHTML = wmLiveBar('Military Flight Activity — ADSB.fi') +
+        wmEmpty('No military aircraft tracked in current feed');
       return;
     }
+
+    // Group by broad aircraft type
+    const typeGroup = a => {
+      const t = (a.t || '').toUpperCase();
+      if (['B52','B2','B1','F16','F18','F35','F22','A10','SU27','SU35','MIG'].some(x=>t.startsWith(x))) return '✈ Fighter/Bomber';
+      if (['KC','C17','C130','C5','IL76'].some(x=>t.startsWith(x))) return '🛩 Transport/Tanker';
+      if (['E3','E8','RC','RQ','MQ','U2','P8'].some(x=>t.startsWith(x))) return '👁 ISR/Patrol';
+      if (['H60','H47','AS65','AW'].some(x=>t.startsWith(x))) return '🚁 Helicopter';
+      return '🎖 Military Other';
+    };
 
     const groups = {};
-    for (const f of milFlights) {
-      const prefix = MIL_PREFIXES.find(p => f.callsign.startsWith(p)) || 'Other';
-      if (!groups[prefix]) groups[prefix] = [];
-      groups[prefix].push(f);
+    for (const a of airborne) {
+      const g = typeGroup(a);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(a);
     }
 
-    let html = wmLiveBar('Military Flight Activity — OpenSky Network', `${milFlights.length} sorties detected`);
+    let html = wmLiveBar('Military Flight Activity — ADSB.fi Live', `${airborne.length} sorties tracked`);
     html += '<div class="wm-milops-list">';
     for (const [type, flights] of Object.entries(groups)) {
       html += `<div class="wm-milops-type-head">${wmEsc(type)} <span style="color:var(--text-muted);font-weight:400">(${flights.length})</span></div>`;
-      for (const f of flights) {
+      for (const a of flights.slice(0, 15)) {
+        const cs  = (a.flight || a.r || '—').trim();
+        const alt = typeof a.alt_baro === 'number' ? `${a.alt_baro.toLocaleString()}ft` : '';
+        const spd = a.gs ? `${Math.round(a.gs)}kts` : '';
         html += `<div class="wm-milops-row">
-          <span class="wm-milops-cs">${wmEsc(f.callsign)}</span>
-          <span class="wm-milops-region">${wmEsc(f.country)}${f.altitude ? ` · ${f.altitude.toLocaleString()}ft` : ''}</span>
-          ${f.speed ? `<span class="wm-milops-note">${f.speed}kts</span>` : ''}
+          <span class="wm-milops-cs">${wmEsc(cs)}</span>
+          <span class="wm-milops-region">${wmEsc(a.desc || a.t || 'Military')}${alt ? ' · '+alt : ''}</span>
+          ${spd ? `<span class="wm-milops-note">${wmEsc(spd)}</span>` : ''}
         </div>`;
       }
     }
     html += '</div>';
     html += `<div style="padding:4px 8px;font-size:10px;color:var(--text-muted)">
-      Source: OpenSky Network live ADS-B. Shows aircraft using known military callsign prefixes.
+      Source: ADSB.fi open ADS-B · military aircraft (dbFlags=1) · ${new Date().toUTCString().slice(0,25)} UTC
     </div>`;
     el.innerHTML = html;
   } catch(e) {

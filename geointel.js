@@ -313,28 +313,27 @@ window.geoLoadCyber = async function() {
    No key required. Proxy needed for CORS.
    ══════════════════════════════════════════════════════════════════ */
 
-const STATE_RSS = 'https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html/rss.xml';
-// AllOrigins is a free CORS proxy
-const ALLORIGINS = 'https://api.allorigins.win/get?url=';
+// UK FCDO travel advice atom feed — open data, no key, CORS via FINTERM proxy
+const FCDO_ATOM = 'https://www.gov.uk/foreign-travel-advice.atom';
 
 async function fetchTravelAdvisories() {
-  const cached = _giGet('travel:advisories', 2 * 3600 * 1000); // 2hr cache
+  const cached = _giGet('travel:advisories', 2 * 3600 * 1000);
   if (cached) return cached;
   try {
-    const res  = await fetch(`${ALLORIGINS}${encodeURIComponent(STATE_RSS)}`, { signal: AbortSignal.timeout(8000) });
-    const json = await res.json();
-    const xml  = json?.contents || '';
-    // Parse RSS XML
+    const res = await fetch(FCDO_ATOM, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`UK FCDO ${res.status}`);
+    const xml = await res.text();
     const parser = new DOMParser();
-    const doc    = parser.parseFromString(xml, 'text/xml');
-    const items  = [...doc.querySelectorAll('item')].map(item => ({
-      title:       item.querySelector('title')?.textContent || '',
-      description: item.querySelector('description')?.textContent || '',
-      link:        item.querySelector('link')?.textContent || '',
-      pubDate:     item.querySelector('pubDate')?.textContent || '',
+    const doc = parser.parseFromString(xml, 'text/xml');
+    // Atom feed uses <entry> (not <item>), link is an attribute
+    const entries = [...doc.querySelectorAll('entry')].map(e => ({
+      title:       e.querySelector('title')?.textContent || '',
+      description: e.querySelector('summary')?.textContent || '',
+      link:        e.querySelector('link')?.getAttribute('href') || '',
+      pubDate:     e.querySelector('updated')?.textContent || '',
     }));
-    _giSet('travel:advisories', items);
-    return items;
+    _giSet('travel:advisories', entries);
+    return entries;
   } catch (e) {
     console.warn('[GeoIntel] Travel advisory fetch failed:', e.message);
     return [];
@@ -596,29 +595,25 @@ window.geoLoadInstabilityScores = geoLoadInstabilityScores;
 
 const _GW_CACHE_MS = 15 * 60 * 1000;
 
-/* Active conflict zones from UCDP (Uppsala Conflict Data Program) */
+/* Active conflict news from GDELT (replaces UCDP which now requires auth) */
 async function _fetchUCDPActive() {
-  const cacheKey = 'georisk:ucdp:active';
+  const cacheKey = 'georisk:gdelt:conflicts';
   const cached = _giGet(cacheKey, _GW_CACHE_MS);
   if (cached) return cached;
   try {
-    // UCDP GED API — try direct, fallback to allorigins proxy (CORS)
-    const year = new Date().getFullYear();
-    const ucdpUrl = `https://ucdpapi.pcr.uu.se/api/gedevents/${year}?pagesize=100&page=1`;
-    let json = null;
-    try {
-      const res = await fetch(ucdpUrl, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) json = await res.json();
-    } catch {}
-    // CORS fallback via allorigins
-    if (!json?.Result) {
-      try {
-        const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(ucdpUrl)}`;
-        const res2  = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
-        if (res2.ok) json = await res2.json();
-      } catch {}
-    }
-    const data = json?.Result || [];
+    const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=armed+conflict+war+battle+airstrike+offensive+ceasefire&mode=artlist&maxrecords=20&format=json&timespan=7d';
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const articles = json.articles || [];
+    const data = articles.map(a => ({
+      country:               a.sourcecountry || '—',
+      date_start:            (a.seendate || '').replace(/(\d{4})(\d{2})(\d{2}).*/,'$1-$2-$3'),
+      type_of_violence_text: (a.title || '').slice(0, 90),
+      dyad_name:             a.domain || '',
+      deaths_civilians:      null,
+      _url:                  a.url || '',
+    }));
     if (data.length) _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
   } catch { return []; }
@@ -730,16 +725,17 @@ window.georiskLoadWars = async function() {
   }
 
   if (ucdp.length) {
-    html += `<div class="georisk-section-head">Recent UCDP Events (${new Date().getFullYear()})</div>`;
-    html += `<div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+    html += `<div class="georisk-section-head">Conflict News — GDELT (7 days)</div>`;
+    html += `<div style="overflow-x:auto;max-height:220px;overflow-y:auto">
       <table class="yf-fin-table" style="font-size:10px">
-        <thead><tr><th>Country</th><th>Date</th><th>Type</th><th>Fatalities</th></tr></thead>
+        <thead><tr><th>Country</th><th>Date</th><th>Headline</th></tr></thead>
         <tbody>
-          ${ucdp.slice(0,15).map(e=>`<tr>
+          ${ucdp.slice(0,18).map(e=>`<tr>
             <td>${_giEsc(e.country||'')}</td>
             <td>${(e.date_start||'').slice(0,10)}</td>
-            <td>${_giEsc(e.type_of_violence_text||e.dyad_name||'')}</td>
-            <td class="${(e.deaths_civilians||0)>10?'neg':''}">${e.deaths_civilians??0}</td>
+            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              ${e._url ? `<a href="${_giEsc(e._url)}" target="_blank" rel="noopener" style="color:var(--text)">${_giEsc(e.type_of_violence_text||'')}</a>` : _giEsc(e.type_of_violence_text||'')}
+            </td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -748,7 +744,7 @@ window.georiskLoadWars = async function() {
 
   html += `<div style="font-size:9px;color:var(--text-muted);padding:5px 10px;border-top:1px solid var(--border)">
     Sources: <a href="https://reliefweb.int" target="_blank" class="geo-wm-link">ReliefWeb/OCHA ↗</a> ·
-    <a href="https://ucdp.uu.se" target="_blank" class="geo-wm-link">UCDP Uppsala ↗</a> · No API key required
+    <a href="https://api.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT ↗</a> · No API key required
   </div>`;
 
   el.innerHTML = html;

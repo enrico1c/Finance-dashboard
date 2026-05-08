@@ -73,6 +73,8 @@
     'cdn.finra.org':                             { id: 'finra_cdn',      keyParam: null },
     'services.finra.org':                        { id: 'finra_services', keyParam: null },
     'www.nasdaqtrader.com':                      { id: 'nasdaqtrader',   keyParam: null },
+    'opendata.adsb.fi':                          { id: 'adsb_fi',        keyParam: null },
+    'www.gov.uk':                                { id: 'uk_gov',         keyParam: null },
     'feeds.bloomberg.com':                       { id: 'bloomberg_rss',  keyParam: null },
     'eonet.gsfc.nasa.gov':                       { id: 'eonet',          keyParam: null },
     'stats.oecd.org':                            { id: 'oecd',           keyParam: null },
