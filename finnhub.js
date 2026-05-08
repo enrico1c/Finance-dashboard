@@ -596,9 +596,21 @@ async function finnhubLoadAll(rawTicker) {
   // Render earnings (ERN tab) — Finnhub overwrites AV data with freshest available
   if (earnings?.length) fhRenderEarnings(sym, earnings);
 
-  // Render ownership
-  if (insiders || institutional) fhRenderOwnership(sym, insiders, institutional);
-  if (profile) fhRenderMgmt(sym, profile);
+  // Render ownership — clear spinner if no data returned
+  if (insiders || institutional) {
+    fhRenderOwnership(sym, insiders, institutional);
+  } else {
+    const hdsEl = document.getElementById('own-hds');
+    if (hdsEl && hdsEl.querySelector('.av-spinner,.av-loading'))
+      hdsEl.innerHTML = '<div class="no-data">// No ownership data — Finnhub or FMP key required.</div>';
+  }
+  if (profile) {
+    fhRenderMgmt(sym, profile);
+  } else {
+    const mgEl = document.getElementById('own-mgmt');
+    if (mgEl && mgEl.querySelector('.av-spinner,.av-loading'))
+      mgEl.innerHTML = '<div class="no-data">// No management data — Finnhub key required.</div>';
+  }
 
   // Render news
   if (news?.length) fhRenderNews(sym, news);

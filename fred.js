@@ -166,11 +166,13 @@ async function fredLoadYieldCurve() {
   const treasuryData = await fredLoadTreasuryDirect();
   if (treasuryData?.yields?.length) {
     _fredRenderYieldCurve(el, treasuryData.yields, treasuryData.date, treasuryData.src);
+  } else {
+    el.innerHTML = ''; // clear spinner — subsequent sections will fill the element
   }
 
   // ── 2. FRED credit spreads (BAMLC0A0CM, BAMLH0A0HYM2, T10YIE) ─
   if (!getFredKey()) {
-    if (!treasuryData?.yields?.length) el.innerHTML = fredNoKey();
+    el.innerHTML = fredNoKey('yield');
     return;
   }
 

@@ -627,6 +627,10 @@ window.yfLoadTrending = async function() {
       _yhCacheSet("fmp-movers", mData);
     } catch { el.innerHTML=`<div class="no-data">// Could not load market movers.</div>`; return; }
   }
+  if (!mData.actives.length && !mData.gainers.length && !mData.losers.length) {
+    el.innerHTML = `<div class="no-data">// Market movers unavailable — FMP free tier may not include actives/gainers/losers endpoints. Upgrade FMP plan or add Yahoo Finance key.</div>`;
+    return;
+  }
   const sec=(title,items,fixCls)=>`<div class="section-head" style="margin:10px 0 5px">${_yhEsc(title)}</div>`
     +(Array.isArray(items)?items:[]).slice(0,8).map(t=>{
       const chg=parseFloat(t.changesPercentage??t.change??0);

@@ -1388,8 +1388,8 @@ window.commRenderEnergy = async function() {
 };
 
 /* ── Renderer: #macro-comm — IMF PCPS 68-commodity grid ────────────── */
-window.commRenderIMFComm = async function() {
-  const el = document.getElementById('macro-comm');
+window.commRenderIMFComm = async function(targetId = 'macro-comm') {
+  const el = document.getElementById(targetId);
   if (!el) return;
   el.innerHTML = `<div class="wm-loading"><div class="wm-spin"></div>Loading IMF commodity indices…</div>`;
 
@@ -2460,9 +2460,11 @@ window.commFetchWITS        = window.commFetchWITS;
 // Backward-compat alias: macro COMMOD. tab calls commoditiesLoadAll()
 window.commoditiesLoadAll = async function() {
   const el = document.getElementById('macro-commodities');
-  if (el && !el.dataset.loaded) {
+  if (!el || el.dataset.loaded) return;
+  try {
+    await window.commRenderIMFComm('macro-commodities');
     el.dataset.loaded = '1';
-    if (typeof window.commRenderGeoResources === 'function') await window.commRenderGeoResources();
-    else if (typeof window.commRenderIMFComm === 'function') await window.commRenderIMFComm();
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// Commodities unavailable: ${e.message}</div>`;
   }
 };

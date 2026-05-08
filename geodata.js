@@ -35,7 +35,9 @@ async function gdFetch(url, cacheKey, opts = {}) {
 window.usgsLoadQuakes = async function(minMag = 4.5, limit = 60) {
   const el = document.getElementById("geo-quakes-usgs") || document.getElementById("geo-quakes");
   if (!el) return;
-  const url  = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=${minMag}&limit=${limit}&orderby=time`;
+  // GeoJSON Feed endpoint — public, no auth needed (FDSN /fdsnws/event/1/query now requires auth)
+  const feedMag = minMag >= 4.5 ? '4.5' : '2.5';
+  const url = `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/${feedMag}_week.geojson`;
   const data = await gdFetch(url, "quakes_usgs");
   if (!data) { el.innerHTML += `<div class="no-data">// USGS unavailable.</div>`; return; }
 

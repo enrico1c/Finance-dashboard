@@ -629,6 +629,10 @@ async function wmMacroSignals() {
     }
 
     const all  = Object.values(groups).flat();
+    if (!all.length) {
+      el.innerHTML = wmError('FRED API returned no indicators — key may be invalid or rate-limited. Add a valid FRED key in ⚙ API settings.');
+      return;
+    }
     const nBull = all.filter(s => s.signal.c === 'wm-up').length;
     const nBear = all.filter(s => s.signal.c === 'wm-dn').length;
     const nWarn = all.filter(s => s.signal.c === 'wm-warn').length;
@@ -1128,10 +1132,17 @@ async function wmSupplyFlights() {
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching flight delay data…');
   try {
-    // Fetch live aircraft counts from OpenSky Network
-    const res = await fetch('https://opensky-network.org/api/states/all', {
+    // OpenSky Network now requires authentication for /api/states/all
+    // Use the anonymous bounded-region endpoint (lower rate limit but no auth)
+    const res = await fetch('https://opensky-network.org/api/states/all?lamin=30&lamax=70&lomin=-130&lomax=40', {
       signal: AbortSignal.timeout(15000)
     });
+    if (res.status === 401 || res.status === 403) {
+      el.innerHTML = `<div class="no-data">// OpenSky authentication required.<br>
+        Register a free account at <a href="https://opensky-network.org/index.php?option=com_users&view=registration" target="_blank" rel="noopener" style="color:var(--accent)">opensky-network.org ↗</a>
+        to access live flight data.</div>`;
+      return;
+    }
     if (!res.ok) throw new Error(`OpenSky ${res.status}`);
     const json = await res.json();
     const states = json.states || [];
@@ -2097,9 +2108,14 @@ async function wmGeoMilOps() {
   if (!el) return;
   el.innerHTML = wmSpinner('Loading military flight data…');
   try {
-    const res = await fetch('https://opensky-network.org/api/states/all', {
+    const res = await fetch('https://opensky-network.org/api/states/all?lamin=30&lamax=70&lomin=-130&lomax=40', {
       signal: AbortSignal.timeout(15000)
     });
+    if (res.status === 401 || res.status === 403) {
+      el.innerHTML = `<div class="no-data">// OpenSky authentication required for military flight data.<br>
+        Register free at <a href="https://opensky-network.org/index.php?option=com_users&view=registration" target="_blank" rel="noopener" style="color:var(--accent)">opensky-network.org ↗</a></div>`;
+      return;
+    }
     if (!res.ok) throw new Error(`OpenSky ${res.status}`);
     const json = await res.json();
     const states = json.states || [];
