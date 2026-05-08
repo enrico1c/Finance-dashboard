@@ -177,7 +177,7 @@ window.geoLoadTerror = async function() {
    Free, no key, CC0 license, updates on weekdays
    ══════════════════════════════════════════════════════════════════ */
 
-const CISA_KEV_URL = 'https://raw.githubusercontent.com/cisagov/kev-data/main/kev.json';
+const CISA_KEV_URL = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json';
 
 async function fetchCISAKev() {
   const cached = _giGet('cisa:kev', 4 * 3600 * 1000); // 4hr cache

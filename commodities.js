@@ -255,115 +255,59 @@ const IMF_PCPS_SERIES = [
 ];
 
 window.commFetchIMFPCPS = async function() {
-  const cacheKey = 'imf:pcps:main';
-  const cached   = _cGet(cacheKey, _COMM_LONG);
+  const cacheKey = 'stooq:commodities:main';
+  const cached   = _cGet(cacheKey, 60 * 60 * 1000); // 1h
   if (cached) return cached;
 
-  // ── Strategy 1: IMF DataMapper API (simple JSON, no SDMX needed) ─────────
-  // IMF DataMapper provides commodity price series in a simple REST format
-  // API docs: https://www.imf.org/external/datamapper/api/v1
-  try {
-    const startYear = new Date().getFullYear() - 2;
-    // Request key commodity indices via DataMapper — these IDs are stable
-    const dmIndicators = [
-      'PALLFNFINDEXM', // Non-Fuel Primary Commodity Price Index
-      'PNFUELINDEXM',  // Non-Fuel Commodity Price Index
-      'PFUELINDEXM',   // Fuel (energy) Price Index
-      'PMETMINDEXM',   // Metal Price Index
-      'PFOODINDEXM',   // Food Price Index
-      'PRAWMINDEXM',   // Agricultural Raw Materials Price Index
-    ];
+  // IMF DataMapper (403) and IMF SDMX DataServices (DNS gone) are both dead.
+  // Replaced with Stooq commodity futures (free, no key, CORS via FINTERM proxy).
+  const STOOQ_COMM = [
+    { stooq:'cl.f',  name:'WTI Crude',    cat:'energy',  unit:'$/bbl'     },
+    { stooq:'bz.f',  name:'Brent Crude',  cat:'energy',  unit:'$/bbl'     },
+    { stooq:'ng.f',  name:'Natural Gas',  cat:'energy',  unit:'$/MMBtu'   },
+    { stooq:'gc.f',  name:'Gold',         cat:'metals',  unit:'$/troy oz' },
+    { stooq:'si.f',  name:'Silver',       cat:'metals',  unit:'$/troy oz' },
+    { stooq:'hg.f',  name:'Copper',       cat:'metals',  unit:'¢/lb'      },
+    { stooq:'pa.f',  name:'Palladium',    cat:'metals',  unit:'$/troy oz' },
+    { stooq:'pl.f',  name:'Platinum',     cat:'metals',  unit:'$/troy oz' },
+    { stooq:'zw.f',  name:'Wheat',        cat:'agri',    unit:'¢/bu'      },
+    { stooq:'zc.f',  name:'Corn',         cat:'agri',    unit:'¢/bu'      },
+    { stooq:'zs.f',  name:'Soybeans',     cat:'agri',    unit:'¢/bu'      },
+    { stooq:'kc.f',  name:'Coffee',       cat:'agri',    unit:'¢/lb'      },
+    { stooq:'cc.f',  name:'Cocoa',        cat:'agri',    unit:'$/MT'      },
+    { stooq:'sb.f',  name:'Sugar #11',    cat:'agri',    unit:'¢/lb'      },
+    { stooq:'ct.f',  name:'Cotton',       cat:'agri',    unit:'¢/lb'      },
+  ];
 
-    const dmUrl = `https://www.imf.org/external/datamapper/api/v1/${dmIndicators.join('+')}?periods=${startYear}:${new Date().getFullYear()}`;
-    const res   = await fetch(dmUrl, { signal: AbortSignal.timeout(12000) });
-    if (!res.ok) throw new Error(`IMF DataMapper HTTP ${res.status}`);
-    const json  = await res.json();
-
-    const dmData = [];
-    Object.entries(json?.values || {}).forEach(([indId, countryData]) => {
-      const worldData = countryData?.WLD || countryData?.W00 || null;
-      if (!worldData) return;
-      const periods = Object.entries(worldData)
-        .map(([p, v]) => ({ d: p, v: parseFloat(v) }))
-        .filter(x => !isNaN(x.v))
-        .sort((a, b) => b.d.localeCompare(a.d));
-
-      const labelMap = {
-        PALLFNFINDEXM: { name: 'Non-Fuel Commodities', cat: 'index', unit: '2016=100' },
-        PNFUELINDEXM:  { name: 'Non-Fuel Price Index', cat: 'index', unit: '2016=100' },
-        PFUELINDEXM:   { name: 'Fuel (Energy) Index',  cat: 'index', unit: '2016=100' },
-        PMETMINDEXM:   { name: 'Metals Index',          cat: 'index', unit: '2016=100' },
-        PFOODINDEXM:   { name: 'Food Price Index',       cat: 'index', unit: '2016=100' },
-        PRAWMINDEXM:   { name: 'Agri Raw Materials',    cat: 'index', unit: '2016=100' },
-      };
-      const def = labelMap[indId];
-      if (!def) return;
-      dmData.push({ id: indId, ...def, latest: periods[0]?.v, prev: periods[1]?.v,
-        date: periods[0]?.d, history: periods.slice(0, 12) });
-    });
-
-    if (dmData.length >= 3) {
-      // Merge with WB Pink Sheet data for individual commodity prices
-      // IMF DataMapper covers indices well; WB covers individual commodity prices
-      _cSet(cacheKey, dmData);
-      return dmData;
-    }
-  } catch (e) {
-    console.warn('[IMF DataMapper]', e.message);
-  }
-
-  // ── Strategy 2: IMF SDMX with CORRECT URL format ─────────────────────────
-  // Correct format: /CompactData/{db}/{freq}.{area}.{indicator}
-  // For PCPS world data: M.W00.{COMMODITY_CODE}
-  try {
-    const year = new Date().getFullYear();
-    // Fetch key commodity price series individually (world aggregate = W00)
-    const sdmxSeries = [
-      { code: 'POILAPSP',  name: 'Crude Oil (avg)',   cat: 'energy',  unit: '$/bbl' },
-      { code: 'PNGAS',     name: 'Nat. Gas (avg)',     cat: 'energy',  unit: '$/MMBtu' },
-      { code: 'PCOALAU',   name: 'Coal (Australia)',   cat: 'energy',  unit: '$/MT' },
-      { code: 'PGOLD',     name: 'Gold',               cat: 'metals',  unit: '$/troy oz' },
-      { code: 'PSILVER',   name: 'Silver',             cat: 'metals',  unit: '$/troy oz' },
-      { code: 'PCOPP',     name: 'Copper',             cat: 'metals',  unit: '$/MT' },
-      { code: 'PALUM',     name: 'Aluminum',           cat: 'metals',  unit: '$/MT' },
-      { code: 'PNICK',     name: 'Nickel',             cat: 'metals',  unit: '$/MT' },
-      { code: 'PSUNO',     name: 'Sunflower Oil',      cat: 'agri',    unit: '$/MT' },
-      { code: 'PWHEAMT',   name: 'Wheat',              cat: 'agri',    unit: '$/MT' },
-      { code: 'PUREA',     name: 'Urea',               cat: 'fertilizers', unit: '$/MT' },
-    ];
-
-    const results = await Promise.allSettled(sdmxSeries.map(async s => {
-      // Correct SDMX URL: M.W00.{CODE} = monthly, world aggregate
-      const url = `https://dataservices.imf.org/REST/SDMX_JSON.svc/CompactData/PCPS/M.W00.${s.code}?startPeriod=${year-2}-01`;
+  const results = await Promise.allSettled(
+    STOOQ_COMM.map(async c => {
       try {
+        const url = `https://stooq.com/q/l/?s=${c.stooq}&f=sd2t2ohlcvn&h&e=json`;
         const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) return null;
         const json = await res.json();
-        const obs  = json?.CompactData?.DataSet?.Series?.Obs;
-        const arr  = Array.isArray(obs) ? obs : (obs ? [obs] : []);
-        const sorted = arr
-          .map(o => ({ v: parseFloat(o['@OBS_VALUE']), d: o['@TIME_PERIOD'] }))
-          .filter(x => !isNaN(x.v))
-          .sort((a,b) => b.d.localeCompare(a.d));
-        return { ...s, latest: sorted[0]?.v ?? null, prev: sorted[1]?.v ?? null,
-          date: sorted[0]?.d ?? null, history: sorted.slice(0, 12) };
-      } catch { return { ...s, latest: null, prev: null, date: null, history: [] }; }
-    }));
+        const sym  = json?.symbols?.[0];
+        if (!sym || sym.close == null) return null;
+        return {
+          id:      c.stooq,
+          name:    c.name,
+          cat:     c.cat,
+          unit:    c.unit,
+          latest:  parseFloat(sym.close),
+          prev:    parseFloat(sym.open),
+          date:    sym.date || '',
+          history: [],
+        };
+      } catch { return null; }
+    })
+  );
 
-    const valid = results
-      .filter(r => r.status === 'fulfilled')
-      .map(r => r.value)
-      .filter(d => d.latest != null);
+  const valid = results
+    .filter(r => r.status === 'fulfilled' && r.value != null)
+    .map(r => r.value);
 
-    if (valid.length >= 3) {
-      _cSet(cacheKey, valid);
-      return valid;
-    }
-  } catch (e) {
-    console.warn('[IMF SDMX]', e.message);
-  }
-
-  return [];
+  if (valid.length) _cSet(cacheKey, valid);
+  return valid;
 };
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1393,7 +1337,7 @@ window.commRenderIMFComm = async function(targetId = 'macro-comm') {
     }
   });
 
-  let html = `<div class="av-live-badge">● IMF PCPS (68 commodities) + World Bank Pink Sheet · No API Key · Monthly</div>
+  let html = `<div class="av-live-badge">● Commodity Futures — Stooq Live · Energy · Metals · Agriculture · No API Key</div>
   <div style="overflow-y:auto;height:calc(100% - 30px);padding:6px">`;
 
   catOrder.forEach(cat => {
@@ -1419,9 +1363,7 @@ window.commRenderIMFComm = async function(targetId = 'macro-comm') {
   });
 
   html += `<div style="font-size:9px;color:var(--text-muted);margin-top:4px">
-    Sources: <a href="https://www.imf.org/en/research/commodity-prices" target="_blank" style="color:var(--accent)">IMF PCPS ↗</a> ·
-    <a href="https://www.worldbank.org/en/research/commodity-markets" target="_blank" style="color:var(--accent)">World Bank Pink Sheet ↗</a> ·
-    Both no API key · Monthly updates
+    Source: <a href="https://stooq.com" target="_blank" style="color:var(--accent)">Stooq commodity futures ↗</a> · No API key · Live/delayed quotes
   </div></div>`;
 
   el.innerHTML = html;

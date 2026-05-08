@@ -55,41 +55,48 @@ async function euAgriGetTradeOverview() {
    IMF SUNFLOWER OIL PRICE (PCPS — PSUNOUSDM series)
    ══════════════════════════════════════════════════════════════════ */
 async function imfGetSunflowerOil() {
-  const cached = _agGet('imf_sunflower', 6*60*60*1000);
+  // IMF DataMapper 403 — use Stooq soybean oil (ZL.F) as vegetable oil proxy
+  const cached = _agGet('stooq_sunflower', 60*60*1000);
   if (cached) return cached;
   try {
-    const url = 'https://www.imf.org/external/datamapper/api/v1/data/PSUNO/W00/?periods=12';
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`IMF HTTP ${res.status}`);
+    const res = await fetch('https://stooq.com/q/l/?s=zl.f&f=sd2t2ohlcvn&h&e=json', { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
     const json = await res.json();
-    const data = json?.values?.PSUNO?.W00 || {};
-    const series = Object.entries(data).sort().map(([p,v])=>({period:p, value:parseFloat(v)}));
-    _agSet('imf_sunflower', series);
+    const sym = json?.symbols?.[0];
+    if (!sym?.close) return null;
+    const series = [{ period: sym.date || '', value: parseFloat(sym.close) }];
+    _agSet('stooq_sunflower', series);
     return series;
-  } catch(e) { console.warn('[agriculture] IMF sunflower:', e.message); return null; }
+  } catch(e) { console.warn('[agriculture] oil price:', e.message); return null; }
 }
 
-/* IMF Food Price Index components (PMAIZMT, PWHEAT, PSOYB) */
+/* Food prices via Stooq agricultural futures (replaces IMF DataMapper which returns 403) */
 async function imfGetFoodPrices() {
-  const cached = _agGet('imf_food_prices', 6*60*60*1000);
+  const cached = _agGet('stooq_food_prices', 60*60*1000);
   if (cached) return cached;
-  try {
-    const indicators = ['PMAIZMT','PWHEAT','PSOYB','PRICENPQ','PCOFFOTM','PCOCOA','PSUGARUSA'];
-    const results = {};
-    await Promise.all(indicators.map(async ind => {
+  const STOOQ_MAP = {
+    PMAIZMT:   'zc.f',   // Corn/Maize
+    PWHEAT:    'zw.f',   // Wheat
+    PSOYB:     'zs.f',   // Soybeans
+    PCOFFOTM:  'kc.f',   // Coffee Arabica
+    PCOCOA:    'cc.f',   // Cocoa
+    PSUGARUSA: 'sb.f',   // Sugar #11
+  };
+  const results = {};
+  await Promise.allSettled(
+    Object.entries(STOOQ_MAP).map(async ([imfKey, stooqSym]) => {
       try {
-        const url = `https://www.imf.org/external/datamapper/api/v1/data/${ind}/W00/?periods=6`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const res = await fetch(`https://stooq.com/q/l/?s=${stooqSym}&f=sd2t2ohlcvn&h&e=json`, { signal: AbortSignal.timeout(8000) });
         if (!res.ok) return;
         const json = await res.json();
-        const data = json?.values?.[ind]?.W00 || {};
-        const sorted = Object.entries(data).sort().reverse();
-        if (sorted.length) results[ind] = { value: parseFloat(sorted[0][1]), period: sorted[0][0], prev: sorted[1] ? parseFloat(sorted[1][1]) : null };
+        const sym = json?.symbols?.[0];
+        if (!sym?.close) return;
+        results[imfKey] = { value: parseFloat(sym.close), period: sym.date || '', prev: sym.open ? parseFloat(sym.open) : null };
       } catch {}
-    }));
-    _agSet('imf_food_prices', results);
-    return results;
-  } catch(e) { console.warn('[agriculture] IMF food:', e.message); return null; }
+    })
+  );
+  if (Object.keys(results).length) _agSet('stooq_food_prices', results);
+  return Object.keys(results).length ? results : null;
 }
 
 /* Food price metadata */
@@ -110,7 +117,7 @@ async function faostatGetDatasetIndex() {
   const cached = _agGet('faostat_index', 24*60*60*1000);
   if (cached) return cached;
   try {
-    const url = 'https://fenixservices.fao.org/faostat/static/bulkdownloads/datasets_E.json';
+    const url = 'https://bulks-faostat.fao.org/production/datasets_E.json';
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!res.ok) throw new Error(`FAOSTAT HTTP ${res.status}`);
     const json = await res.json();
@@ -142,8 +149,8 @@ async function agricultureLoadAll() {
     euAgriGetOilseeds(), euAgriGetFertilizers(), imfGetSunflowerOil(), imfGetFoodPrices(), faostatGetDatasetIndex(),
   ]);
 
-  let html = `<div class="av-live-badge">● Agricultural Intelligence · EU Agri-food API · IMF PCPS · FAOSTAT</div>`;
-  html += `<div class="av-note" style="margin-bottom:8px">EU Agri-food Data Portal: weekly oilseed/fertilizer prices for EU markets. IMF PCPS: monthly global commodity benchmarks. FAOSTAT: annual production/trade. No API key required for any source.</div>`;
+  let html = `<div class="av-live-badge">● Agricultural Intelligence · Stooq Futures · FAOSTAT · EU Agri-food · No API Key</div>`;
+  html += `<div class="av-note" style="margin-bottom:8px">Stooq commodity futures: live/delayed food & grain prices. EU Agri-food: weekly EU market prices. FAOSTAT: annual production & trade datasets. No API key required.</div>`;
 
   /* ── Global Food Prices (IMF PCPS) ──────────────────────────────── */
   html += `<div class="section-head">🌍 Global Food & Agriculture Prices — IMF Primary Commodity Prices</div>`;
