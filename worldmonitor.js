@@ -1246,8 +1246,8 @@ document.addEventListener('DOMContentLoaded', wmInitAll);
 const WM_RESOURCE_TOPIC = {
   // Energy
   'oil':'oil', 'crude':'oil', 'wti':'oil', 'brent':'oil',
-  'lng':'lng', 'natural gas':'gas', 'gas':'gas',
-  'petroleum':'oil', 'energy':'energy', 'pipeline':'energy',
+  'lng':'gas', 'natural gas':'gas', 'gas':'gas', 'henry hub':'gas',
+  'petroleum':'oil', 'energy':'energy', 'pipeline':'energy', 'gasoline':'oil',
   // Metals & mining
   'gold':'gold', 'silver':'silver', 'copper':'copper', 'iron':'iron',
   'steel':'steel', 'aluminum':'aluminum', 'lithium':'lithium',
@@ -1372,36 +1372,98 @@ function wmDrawerTab(tab) {
   document.getElementById('wm-drawer-context-pane').classList.toggle('hidden', tab !== 'context');
 }
 
-/* NEWS pane: fetch from WM insights filtered by resource keyword */
+/* Static supply-chain knowledge — fallback when WM bootstrap unavailable */
+const WM_STATIC_CONTEXT = {
+  oil:       { icon:'🛢', chokepoints:['Strait of Hormuz (21% global oil)','Suez Canal','Turkish Straits'], producers:'Saudi Arabia · Russia · USA · Canada · Iran', note:'Hormuz closure would halt ~21M bbl/day. Iran tensions = key price driver.' },
+  gas:       { icon:'🔥', chokepoints:['Nord Stream routes','Strait of Hormuz'], producers:'Russia · USA · Iran · Qatar · Canada', note:'EU gas storage tracked weekly by GIE AGSI. Price sensitive to fill levels vs seasonal demand.' },
+  lng:       { icon:'⛽', chokepoints:['Strait of Malacca','Strait of Hormuz','Panama Canal'], producers:'Australia · Qatar · USA · Russia · Malaysia', note:'European LNG imports surged after Russia-Ukraine war. US now major swing supplier.' },
+  gold:      { icon:'🥇', chokepoints:['Suez Canal'], producers:'China · Australia · Russia · USA · Ghana', note:'Safe-haven demand spikes during geopolitical crises. Central bank purchases hit record 2022-2024.' },
+  silver:    { icon:'🥈', chokepoints:['Panama Canal'], producers:'Mexico · China · Peru · Russia · Chile', note:'65% industrial use (solar, electronics) — more correlated to growth than gold.' },
+  copper:    { icon:'🔴', chokepoints:['Panama Canal','Strait of Malacca'], producers:'Chile · Peru · DR Congo · China', note:'~50% from Chile/Peru. Mine strikes and Chinese demand are key price catalysts.' },
+  iron:      { icon:'🔩', chokepoints:['Strait of Malacca'], producers:'Australia · Brazil · China · India', note:'Australia exports ~53% of global seaborne iron ore. Steel demand = proxy for global construction.' },
+  steel:     { icon:'🏗', chokepoints:['Strait of Malacca','Suez Canal'], producers:'China · India · Japan · USA · Russia', note:'China produces ~55% of global steel. Trade tariffs create large regional price divergences.' },
+  aluminum:  { icon:'⬜', chokepoints:['Suez Canal'], producers:'China · Russia · Canada · India · UAE', note:'Energy-intensive: aluminium smelters shut across Europe in 2022 energy crisis.' },
+  lithium:   { icon:'🔋', chokepoints:['Strait of Malacca'], producers:'Australia · Chile · China · Argentina', note:'"Li Triangle" (Chile/Argentina/Bolivia) holds ~60% reserves. China dominates processing.' },
+  uranium:   { icon:'☢', chokepoints:['Suez Canal'], producers:'Kazakhstan · Canada · Australia · Namibia', note:'Kazakhstan produces ~43% of global uranium. Spot price sensitive to reactor policy.' },
+  shipping:  { icon:'🚢', chokepoints:['Suez Canal','Red Sea / Bab el-Mandeb','Strait of Hormuz','Panama Canal','Strait of Malacca'], producers:'Global', note:'Houthi Red Sea attacks (2024-) adding ~10 days via Cape rerouting. Rates up 200%+.' },
+  semiconductor: { icon:'🔬', chokepoints:['Taiwan Strait','Strait of Malacca'], producers:'Taiwan · South Korea · USA · Netherlands', note:'TSMC (Taiwan) produces ~60% of advanced chips. Taiwan Strait is single point of supply-chain failure.' },
+  agriculture: { icon:'🌾', chokepoints:['Black Sea','Suez Canal'], producers:'USA · Russia · Ukraine · China · Brazil', note:'Ukraine war disrupted ~12% of global wheat exports. Black Sea corridor agreement critical.' },
+  coal:      { icon:'⚫', chokepoints:['Strait of Malacca','Suez Canal'], producers:'China · India · Australia · Indonesia', note:'Indonesia is top exporter. China import policy sets Asian benchmark pricing.' },
+  defense:   { icon:'🛡', chokepoints:[], producers:'USA · Russia · China · France · UK', note:'Defense spending rising globally post-2022. NATO 2% GDP target driving European budgets.' },
+  tech:      { icon:'💻', chokepoints:['Taiwan Strait'], producers:'USA · China · Taiwan · South Korea', note:'AI hardware boom driving semiconductor demand. Export controls reshaping supply chains.' },
+  cyber:     { icon:'🔒', chokepoints:[], producers:'USA · Russia · China · Israel · Iran', note:'Nation-state attacks on critical infrastructure rising. Energy and finance sectors top targets.' },
+  finance:   { icon:'🏦', chokepoints:[], producers:'USA · EU · China', note:'Fed rate decisions drive global dollar funding costs. Dollar strength = EM stress indicator.' },
+};
+
+function _wmStaticCtx(kw) {
+  const lc = kw.toLowerCase();
+  for (const [k, v] of Object.entries(WM_STATIC_CONTEXT)) {
+    if (lc.includes(k) || k.includes(lc)) return v;
+  }
+  return null;
+}
+
+/* NEWS pane: GDELT primary, WM insights secondary */
 async function wmDrawerLoadNews(resourceLabel, topic) {
   const el = document.getElementById('wm-drawer-news-pane');
   if (!el) return;
   el.innerHTML = wmSpinner(`Fetching news for "${resourceLabel}"…`);
 
   try {
-    const d = await wmBootstrap(['insights']);
-    const all = d.insights?.insights || d.insights?.items || d.insights?.data || d.insights || [];
-    const kw  = resourceLabel.toLowerCase();
+    let articles = [];
+    let src = '';
 
-    // Filter insights relevant to this resource
-    const relevant = (Array.isArray(all) ? all : []).filter(a => {
-      const txt = `${a.title||''} ${a.body||''} ${a.description||''} ${(a.tags||[]).join(' ')}`.toLowerCase();
-      return txt.includes(kw) || txt.includes(topic.toLowerCase());
-    });
+    /* 1. Try WM insights (when WM backend is up) */
+    try {
+      const d = await wmBootstrap(['insights']);
+      const all = d.insights?.insights || d.insights?.items || d.insights?.data || d.insights || [];
+      if (Array.isArray(all) && all.length) {
+        const kw = resourceLabel.toLowerCase();
+        const rel = all.filter(a => {
+          const txt = `${a.title||''} ${a.body||''} ${a.description||''} ${(a.tags||[]).join(' ')}`.toLowerCase();
+          return txt.includes(kw) || txt.includes(topic.toLowerCase());
+        });
+        articles = rel.length ? rel : all.slice(0, 10);
+        src = 'WorldMonitor';
+      }
+    } catch(_) {}
 
-    // Show matched insights first, then all insights as fallback
-    const toShow = relevant.length ? relevant : (Array.isArray(all) ? all.slice(0, 10) : []);
+    /* 2. Fallback: GDELT DOC API (free, no key, 15-min updates) */
+    if (!articles.length) {
+      try {
+        const q = resourceLabel.length <= 5
+          ? `"${resourceLabel}" supply OR price OR market OR trade`
+          : resourceLabel;
+        const params = new URLSearchParams({ query:q, mode:'ArtList', maxrecords:'15',
+          format:'json', timespan:'72h', sort:'DateDesc' });
+        const res = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?${params}`,
+          { signal: AbortSignal.timeout(10000) });
+        if (res.ok) {
+          const json = await res.json();
+          articles = (json.articles || []).map(a => ({ _gdelt:true, title:a.title, url:a.url, source:a.domain, date:a.seendate }));
+          src = 'GDELT';
+        }
+      } catch(_) {}
+    }
 
-    if (!toShow.length) {
-      el.innerHTML = `<div class="wm-drawer-hint">
-        No matching intelligence signals. 
-        <a href="#" onclick="wmDrawerGoNews();return false;">Open news panel to search "${wmEsc(resourceLabel)}"</a>
-      </div>`;
+    if (!articles.length) {
+      el.innerHTML = `<div class="wm-drawer-hint">No recent news found for <strong>${wmEsc(resourceLabel)}</strong>.<br>
+        <a href="#" onclick="wmDrawerGoNews();return false;">Search full News panel →</a></div>`;
       return;
     }
 
-    el.innerHTML = `<div class="wm-drawer-news-head">${relevant.length ? `${relevant.length} signals matching` : 'Latest signals'} — <em>${wmEsc(resourceLabel)}</em></div>` +
-      toShow.slice(0, 12).map(s => {
+    el.innerHTML = `<div class="wm-drawer-news-head">${articles.length} articles · <em>${wmEsc(resourceLabel)}</em>
+        <span style="font-size:9px;color:var(--text-muted);margin-left:6px">${wmEsc(src)}</span></div>` +
+      articles.slice(0, 12).map(s => {
+        if (s._gdelt) {
+          return `<div class="wm-drawer-news-item" style="border-left:2px solid var(--border)">
+            <a href="${wmEsc(s.url||'#')}" target="_blank" rel="noopener"
+               style="color:var(--text);text-decoration:none;font-size:12px;font-weight:500">${wmEsc(s.title||'')}</a>
+            <div class="wm-drawer-news-meta" style="margin-top:3px">
+              ${s.date ? `<span style="color:var(--text-muted)">${wmEsc(s.date.slice(0,8))}</span>` : ''}
+              ${s.source ? `<span style="color:var(--text-muted);margin-left:6px">${wmEsc(s.source)}</span>` : ''}
+            </div></div>`;
+        }
         const sev = s.severity || s.importance || s.level || 'medium';
         const col = wmSeverityColor(sev);
         const ticker = s.ticker || s.symbol;
@@ -1413,7 +1475,7 @@ async function wmDrawerLoadNews(resourceLabel, topic) {
               onclick="wmResourceDrawerClose();setTimeout(()=>{ if(typeof loadTickerFromWatchlist==='function')loadTickerFromWatchlist('${wmEsc(ticker)}');},100)">${wmEsc(ticker)}</span>` : ''}
             ${wmBadge(sev.toUpperCase(), sev)}
           </div>
-          ${s.body || s.description ? `<div class="wm-drawer-news-body">${wmEsc((s.body||s.description).slice(0,160))}…</div>` : ''}
+          ${s.body||s.description ? `<div class="wm-drawer-news-body">${wmEsc((s.body||s.description).slice(0,160))}…</div>` : ''}
         </div>`;
       }).join('');
   } catch(e) {
@@ -1444,78 +1506,78 @@ async function wmDrawerLoadStocks(resourceLabel, topic) {
        </div>`);
 }
 
-/* CONTEXT pane: supply chain + risk data for this resource */
+/* CONTEXT pane: WM bootstrap first, static knowledge fallback */
 async function wmDrawerLoadContext(resourceLabel, topic) {
   const el = document.getElementById('wm-drawer-context-pane');
   if (!el) return;
   el.innerHTML = wmSpinner('Loading supply chain context…');
 
   try {
-    const d = await wmBootstrap(['chokepoints', 'minerals', 'riskScores', 'shippingRates']);
     const kw = resourceLabel.toLowerCase();
     let html = '';
 
-    // Related chokepoints
-    const chokes = d.chokepoints?.chokepoints || d.chokepoints?.data || d.chokepoints || [];
-    const relChokes = (Array.isArray(chokes) ? chokes : []).filter(c =>
-      (c.affectedCommodities||[]).some(x => x.toLowerCase().includes(kw)) ||
-      (c.name||'').toLowerCase().includes(kw) ||
-      (c.note||'').toLowerCase().includes(kw)
-    );
-    if (relChokes.length) {
-      html += `<div class="wm-ctx-section">🌊 Related Chokepoints</div>` +
-        relChokes.map(c => {
-          const col = wmSeverityColor(c.riskLevel || c.risk || 'medium');
-          return `<div class="wm-ctx-item" style="border-left:2px solid ${col.border}">
-            <span class="wm-ctx-name">${wmEsc(c.name||'')}</span>
-            ${wmBadge((c.riskLevel||c.risk||'').toUpperCase(), c.riskLevel||c.risk)}
-            ${c.note ? `<div class="wm-ctx-note">${wmEsc(c.note.slice(0,120))}</div>` : ''}
-          </div>`;
-        }).join('');
-    }
+    /* 1. Try WM bootstrap */
+    try {
+      const d = await wmBootstrap(['chokepoints', 'minerals', 'riskScores']);
+      const chokes = d.chokepoints?.chokepoints || d.chokepoints?.data || d.chokepoints || [];
+      const relChokes = (Array.isArray(chokes) ? chokes : []).filter(c =>
+        (c.affectedCommodities||[]).some(x => x.toLowerCase().includes(kw)) ||
+        (c.name||'').toLowerCase().includes(kw) || (c.note||'').toLowerCase().includes(kw)
+      );
+      if (relChokes.length) {
+        html += `<div class="wm-ctx-section">🌊 Related Chokepoints</div>` +
+          relChokes.map(c => {
+            const col = wmSeverityColor(c.riskLevel || c.risk || 'medium');
+            return `<div class="wm-ctx-item" style="border-left:2px solid ${col.border}">
+              <span class="wm-ctx-name">${wmEsc(c.name||'')}</span>
+              ${wmBadge((c.riskLevel||c.risk||'').toUpperCase(), c.riskLevel||c.risk)}
+              ${c.note ? `<div class="wm-ctx-note">${wmEsc(c.note.slice(0,120))}</div>` : ''}
+            </div>`;
+          }).join('');
+      }
+      const mins = d.minerals?.minerals || d.minerals?.data || d.minerals || [];
+      const relMins = (Array.isArray(mins) ? mins : []).filter(m =>
+        (m.name||m.mineral||'').toLowerCase().includes(kw) || (m.primaryUse||'').toLowerCase().includes(kw)
+      );
+      if (relMins.length) {
+        html += `<div class="wm-ctx-section">⛏️ Related Minerals</div>` +
+          relMins.map(m => {
+            const col = wmSeverityColor(m.supplyRisk || m.risk || 'medium');
+            return `<div class="wm-ctx-item" style="border-left:2px solid ${col.border}">
+              <span class="wm-ctx-name">${wmEsc(m.name || m.mineral || '')}</span>
+              ${wmBadge((m.supplyRisk||m.risk||'').toUpperCase(), m.supplyRisk||m.risk)}
+              ${m.conflictExposure ? `<div class="wm-ctx-note">⚠ ${wmEsc(m.conflictExposure)}</div>` : ''}
+            </div>`;
+          }).join('');
+      }
+    } catch(_) {}
 
-    // Related minerals
-    const mins = d.minerals?.minerals || d.minerals?.data || d.minerals || [];
-    const relMins = (Array.isArray(mins) ? mins : []).filter(m =>
-      (m.name||m.mineral||'').toLowerCase().includes(kw) ||
-      (m.primaryUse||'').toLowerCase().includes(kw)
-    );
-    if (relMins.length) {
-      html += `<div class="wm-ctx-section">⛏️ Related Minerals</div>` +
-        relMins.map(m => {
-          const col = wmSeverityColor(m.supplyRisk || m.risk || 'medium');
-          return `<div class="wm-ctx-item" style="border-left:2px solid ${col.border}">
-            <span class="wm-ctx-name">${wmEsc(m.name || m.mineral || '')}</span>
-            ${wmBadge((m.supplyRisk||m.risk||'').toUpperCase(), m.supplyRisk||m.risk)}
-            ${m.conflictExposure ? `<div class="wm-ctx-note">⚠ ${wmEsc(m.conflictExposure)}</div>` : ''}
+    /* 2. Static fallback — always shown if matched */
+    const staticCtx = _wmStaticCtx(kw) || _wmStaticCtx(topic);
+    if (staticCtx) {
+      if (staticCtx.note) {
+        html += `<div class="wm-ctx-section">📋 Supply Chain Overview</div>
+          <div class="wm-ctx-item" style="border-left:2px solid var(--accent)">
+            <span style="font-size:11px">${staticCtx.icon || '⚡'} <strong>${wmEsc(resourceLabel)}</strong></span>
+            <div class="wm-ctx-note" style="margin-top:4px">${wmEsc(staticCtx.note)}</div>
           </div>`;
-        }).join('');
-    }
-
-    // Risk scores for related countries
-    const riskRaw = d.riskScores?.scores || d.riskScores?.data || d.riskScores || {};
-    const riskArr = Array.isArray(riskRaw) ? riskRaw :
-      Object.entries(riskRaw).map(([k,v]) => typeof v==='object' ? {country:k,...v} : {country:k,score:v});
-    const relRisk = riskArr.filter(r =>
-      (r.country||r.code||'').toLowerCase().includes(kw) || kw.includes((r.country||r.code||'').toLowerCase())
-    ).slice(0, 5);
-    if (relRisk.length) {
-      html += `<div class="wm-ctx-section">🌡 Country Risk</div>` +
-        relRisk.map(r => {
-          const pct = Math.round(r.score ?? 0);
-          const sev = pct >= 75 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low';
-          const col = wmSeverityColor(sev);
-          return `<div class="wm-ctx-item wm-ctx-risk">
-            <span class="wm-ctx-name">${wmEsc(r.country||r.code||'')}</span>
-            <div class="wm-ctx-risk-bar"><div style="width:${pct}%;background:${col.text}"></div></div>
-            <span style="color:${col.text};font-weight:700;font-family:monospace">${pct}</span>
-          </div>`;
-        }).join('');
+      }
+      if (staticCtx.producers) {
+        html += `<div class="wm-ctx-section">🌍 Top Producers</div>
+          <div class="wm-ctx-item"><span class="wm-ctx-note">${wmEsc(staticCtx.producers)}</span></div>`;
+      }
+      if (staticCtx.chokepoints?.length) {
+        html += `<div class="wm-ctx-section">🌊 Key Chokepoints</div>` +
+          staticCtx.chokepoints.map(cp =>
+            `<div class="wm-ctx-item" style="border-left:2px solid rgba(255,165,0,.4)">
+              <span class="wm-ctx-name">🚢 ${wmEsc(cp)}</span></div>`
+          ).join('');
+      }
     }
 
     if (!html) {
-      html = `<div class="wm-drawer-hint">No specific supply chain data for "${wmEsc(resourceLabel)}".<br>
-        Try searching a broader term.</div>`;
+      html = `<div class="wm-drawer-hint">No supply chain context for "<strong>${wmEsc(resourceLabel)}</strong>".<br>
+        Try the News tab or search in the main panels.</div>`;
     }
     el.innerHTML = html;
   } catch(e) {
@@ -1580,9 +1642,10 @@ function wmResourceIcon(label) {
 
 /* ── Resource→tickers map (extends topicSeedTicker) ────────────── */
 const WM_TOPIC_TICKERS = {
-  oil:       ['XOM','CVX','COP','OXY','BP','SHEL'],
-  energy:    ['XOM','CVX','LNG','NEE','ENPH','SLB'],
-  gas:       ['LNG','CVX','XOM','RRC','EQT'],
+  oil:       ['XOM','CVX','COP','OXY','BP','SHEL','SLB','HAL'],
+  energy:    ['XOM','CVX','LNG','NEE','ENPH','SLB','COP'],
+  gas:       ['LNG','CVX','XOM','RRC','EQT','AR','SWN'],
+  lng:       ['LNG','CVX','XOM','TOT','QGS','RRC','EQT'],
   gold:      ['NEM','GOLD','AEM','AGI','WPM'],
   silver:    ['WPM','AG','HL','PAN'],
   copper:    ['FCX','SCCO','TECK','HBM'],
