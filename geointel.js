@@ -100,19 +100,29 @@ window.geoLoadTerror = async function() {
   el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Fetching terrorism &amp; conflict events from GDELT…</div>';
 
   try {
-    // Fetch terrorism + protest themes in parallel
-    const [terrorData, attackData, protestData, unrestData] = await Promise.all([
-      gdeltFetchTheme('TERROR', 20),
-      gdeltFetchTheme('TERROR_ATTACK', 15),
-      gdeltFetchTheme('PROTEST_RIOT', 15),
-      gdeltFetchTheme('ARMED_CONFLICT', 15),
-    ]);
+    // Sequential GDELT text queries (rate limit: 1/5s) — theme: codes are unreliable
+    const gdelt = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
+    gdelt.searchParams.set('mode', 'artlist');
+    gdelt.searchParams.set('format', 'json');
+    gdelt.searchParams.set('timespan', '3d');
+    gdelt.searchParams.set('sourcelang', 'english');
+    gdelt.searchParams.set('maxrecords', '30');
+
+    gdelt.searchParams.set('query', 'terrorism attack bomb explosion suicide-bomber');
+    const terrorRes = await fetch(gdelt.toString(), { signal: AbortSignal.timeout(10000) });
+    const terrorData = terrorRes.ok ? await terrorRes.json() : null;
+
+    // 6s gap to respect GDELT rate limit (1 req/5s)
+    await new Promise(r => setTimeout(r, 6000));
+
+    gdelt.searchParams.set('query', 'armed conflict war airstrike military offensive');
+    gdelt.searchParams.set('maxrecords', '20');
+    const conflictRes = await fetch(gdelt.toString(), { signal: AbortSignal.timeout(10000) });
+    const conflictData = conflictRes.ok ? await conflictRes.json() : null;
 
     const articles = [
-      ...((terrorData?.articles  || []).map(a => ({ ...a, cat: 'TERROR',  catColor: '#f85149' }))),
-      ...((attackData?.articles  || []).map(a => ({ ...a, cat: 'ATTACK',  catColor: '#f0883e' }))),
-      ...((protestData?.articles || []).map(a => ({ ...a, cat: 'PROTEST', catColor: '#d29922' }))),
-      ...((unrestData?.articles  || []).map(a => ({ ...a, cat: 'CONFLICT',catColor: '#58a6ff' }))),
+      ...((terrorData?.articles   || []).map(a => ({ ...a, cat: 'TERROR',  catColor: '#f85149' }))),
+      ...((conflictData?.articles || []).map(a => ({ ...a, cat: 'CONFLICT',catColor: '#58a6ff' }))),
     ];
 
     if (!articles.length) {

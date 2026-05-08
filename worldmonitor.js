@@ -981,61 +981,39 @@ async function wmGeoIntel() {
   if (!el) return;
   el.innerHTML = wmSpinner('Fetching intelligence data…');
   try {
-    const ISO3_TO_2 = {
-      USA:'US',CHN:'CN',RUS:'RU',DEU:'DE',GBR:'GB',FRA:'FR',JPN:'JP',IND:'IN',BRA:'BR',ZAF:'ZA',
-      NGA:'NG',EGY:'EG',TUR:'TR',SAU:'SA',IRN:'IR',UKR:'UA',ISR:'IL',PAK:'PK',VEN:'VE',MMR:'MM',
-      LBY:'LY',SYR:'SY',AFG:'AF',ETH:'ET',AZE:'AZ',BLR:'BY',KAZ:'KZ',MEX:'MX',SDN:'SD',SOM:'SO',
-      COD:'CD',DZA:'DZ',IRQ:'IQ',YEM:'YE',LBN:'LB',CUB:'CU',PRK:'KP',
-    };
-    const FLAGS = {
-      US:'🇺🇸',CN:'🇨🇳',RU:'🇷🇺',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',JP:'🇯🇵',IN:'🇮🇳',BR:'🇧🇷',ZA:'🇿🇦',
-      NG:'🇳🇬',EG:'🇪🇬',TR:'🇹🇷',SA:'🇸🇦',IR:'🇮🇷',UA:'🇺🇦',IL:'🇮🇱',PK:'🇵🇰',VE:'🇻🇪',MM:'🇲🇲',
-      LY:'🇱🇾',SY:'🇸🇾',AF:'🇦🇫',ET:'🇪🇹',AZ:'🇦🇿',BY:'🇧🇾',KZ:'🇰🇿',MX:'🇲🇽',SD:'🇸🇩',SO:'🇸🇴',
-      CD:'🇨🇩',DZ:'🇩🇿',IQ:'🇮🇶',YE:'🇾🇪',LB:'🇱🇧',CU:'🇨🇺',KP:'🇰🇵',
-    };
-    const COUNTRIES = 'US;CN;RU;DE;GB;FR;JP;IN;BR;ZA;NG;EG;TR;SA;IR;UA;IL;PK;VE;MM;LY;SY;AF;ET;AZ;BY;KZ;MX;SD;SO;CD;DZ;IQ;YE;LB;CU;KP';
-    const [wbRes, rssRes] = await Promise.allSettled([
-      fetch(`https://api.worldbank.org/v2/country/${COUNTRIES}/indicator/PV.EST?format=json&mrv=1&per_page=60`, { signal: AbortSignal.timeout(12000) }),
-      fetch('https://feeds.bloomberg.com/markets/news.rss', { signal: AbortSignal.timeout(10000) }),
-    ]);
+    // WB PV.EST permanently archived — use static risk heatmap + Bloomberg RSS
+    const HOTSPOTS = [
+      { flag:'🇰🇵', iso2:'KP', score:97 }, { flag:'🇸🇴', iso2:'SO', score:95 },
+      { flag:'🇸🇾', iso2:'SY', score:93 }, { flag:'🇾🇪', iso2:'YE', score:92 },
+      { flag:'🇦🇫', iso2:'AF', score:91 }, { flag:'🇸🇩', iso2:'SD', score:90 },
+      { flag:'🇨🇩', iso2:'CD', score:88 }, { flag:'🇲🇲', iso2:'MM', score:87 },
+      { flag:'🇱🇾', iso2:'LY', score:85 }, { flag:'🇭🇹', iso2:'HT', score:84 },
+      { flag:'🇮🇷', iso2:'IR', score:75 }, { flag:'🇮🇶', iso2:'IQ', score:73 },
+      { flag:'🇵🇰', iso2:'PK', score:70 }, { flag:'🇷🇺', iso2:'RU', score:68 },
+      { flag:'🇺🇦', iso2:'UA', score:65 }, { flag:'🇮🇱', iso2:'IL', score:63 },
+    ];
 
-    let html = wmLiveBar('Theater Intel — World Bank Stability + Bloomberg', 'Live data');
+    let html = wmLiveBar('Theater Intel — Geopolitical Hotspots + Bloomberg', '2025/2026');
 
-    // World Bank instability heatmap
-    if (wbRes.status === 'fulfilled' && wbRes.value.ok) {
-      const wbJson = await wbRes.value.json();
-      const raw = Array.isArray(wbJson[1]) ? wbJson[1] : [];
-      const scores = raw
-        .filter(d => d.value !== null && d.countryiso3code)
-        .map(d => {
-          const iso2 = ISO3_TO_2[d.countryiso3code] || d.countryiso3code.slice(0,2);
-          const wb = parseFloat(d.value);
-          return { iso2, country: d.country?.value || d.countryiso3code,
-            instability: Math.min(100, Math.max(0, ((-wb + 2.5) / 5) * 100)),
-            flag: FLAGS[iso2] || '🌍' };
-        })
-        .sort((a,b) => b.instability - a.instability)
-        .slice(0, 15);
+    // Instability heatmap from static data
+    html += `<div class="wm-section-head">🌡 Instability Index — Top Risk Countries (2025/2026)</div>`;
+    html += `<div class="wm-risk-heatmap">` +
+      HOTSPOTS.map(s => {
+        const level = s.score >= 75 ? 'critical' : s.score >= 50 ? 'high' : s.score >= 30 ? 'medium' : 'low';
+        const col = wmSeverityColor(level);
+        return `<div class="wm-heat-cell" style="background:${col.bg};border-color:${col.border}">
+          <span class="wm-heat-country">${s.flag} ${wmEsc(s.iso2)}</span>
+          <span class="wm-heat-score" style="color:${col.text}">${s.score}</span>
+        </div>`;
+      }).join('') + `</div>`;
 
-      if (scores.length) {
-        html += `<div class="wm-section-head">🌡 Instability Index — Top Risk Countries</div>`;
-        html += `<div class="wm-risk-heatmap">` +
-          scores.map(s => {
-            const pct = Math.round(s.instability);
-            const level = pct >= 75 ? 'critical' : pct >= 50 ? 'high' : pct >= 30 ? 'medium' : 'low';
-            const col = wmSeverityColor(level);
-            return `<div class="wm-heat-cell" style="background:${col.bg};border-color:${col.border}">
-              <span class="wm-heat-country">${s.flag} ${wmEsc(s.iso2)}</span>
-              <span class="wm-heat-score" style="color:${col.text}">${pct}</span>
-            </div>`;
-          }).join('') + `</div>`;
-      }
-    }
-
-    // Bloomberg headlines
-    if (rssRes.status === 'fulfilled' && rssRes.value.ok) {
-      const rssText = await rssRes.value.text();
-      const doc = new DOMParser().parseFromString(rssText, 'text/xml');
+    // Bloomberg market headlines
+    const rssRes = await fetch('https://feeds.bloomberg.com/markets/news.rss', { signal: AbortSignal.timeout(10000) });
+    if (rssRes.ok) {
+      let rssText = await rssRes.text();
+      // Backend proxy returns text as JSON string — unwrap if needed
+      if (rssText.startsWith('"')) { try { rssText = JSON.parse(rssText); } catch {} }
+      const doc   = new DOMParser().parseFromString(rssText, 'text/xml');
       const items = [...doc.querySelectorAll('item')].slice(0, 10);
       if (items.length) {
         html += `<div class="wm-section-head">📰 Bloomberg — Latest Intelligence</div>`;
@@ -1052,12 +1030,10 @@ async function wmGeoIntel() {
       }
     }
 
-    if (!html.includes('wm-section-head')) html += wmEmpty('No intelligence data available');
     el.innerHTML = html;
   } catch(e) {
     el.innerHTML = wmError(e.message);
   }
-
 }
 
 /* SIGNALS tab: Bloomberg RSS financial headlines */
@@ -1068,7 +1044,9 @@ async function wmGeoSignals() {
   try {
     const res = await fetch('https://feeds.bloomberg.com/markets/news.rss', { signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error(`Bloomberg RSS ${res.status}`);
-    const text = await res.text();
+    let text = await res.text();
+    // Backend proxy may return text as JSON string — unwrap if needed
+    if (text.startsWith('"')) { try { text = JSON.parse(text); } catch {} }
     const doc  = new DOMParser().parseFromString(text, 'text/xml');
     const items = [...doc.querySelectorAll('item')].slice(0, 25);
     if (!items.length) { el.innerHTML = wmError('No signal data available'); return; }
