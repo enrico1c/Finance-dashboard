@@ -15,41 +15,13 @@ const _agFmt = (n,d=2) => n==null||isNaN(n)?'—':Number(n).toFixed(d);
    EU AGRI-FOOD DATA PORTAL API  (no key, public JSON)
    https://agridata.ec.europa.eu/extensions/DataPortal/API_Documentation.html
    ══════════════════════════════════════════════════════════════════ */
-const EU_AGRI_BASE = 'https://agridata.ec.europa.eu/api';
-
-async function euAgriFetch(endpoint, params={}, cacheKey, ttlMs=4*60*60*1000) {
-  const cached = _agGet(cacheKey, ttlMs);
-  if (cached) return cached;
-  try {
-    const url = new URL(`${EU_AGRI_BASE}${endpoint}`);
-    Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) throw new Error(`EU Agri HTTP ${res.status}`);
-    const data = await res.json();
-    _agSet(cacheKey, data);
-    return data;
-  } catch(e) { console.warn('[agriculture] EU Agri:', cacheKey, e.message); return null; }
-}
-
-/* Oilseeds prices — weekly, crude sunflower oil, palm oil, etc. */
-async function euAgriGetOilseeds() {
-  return euAgriFetch('/v1/oilseeds', { limit:50, offset:0 }, 'eu_oilseeds', 4*60*60*1000);
-}
-
-/* Fertilizer prices — monthly N/P/K aggregates */
-async function euAgriGetFertilizers() {
-  return euAgriFetch('/v1/fertiliser', { limit:30, offset:0 }, 'eu_fertilizers', 6*60*60*1000);
-}
-
-/* Cereals market data */
-async function euAgriGetCereals() {
-  return euAgriFetch('/v1/cereals', { limit:30 }, 'eu_cereals', 4*60*60*1000);
-}
-
-/* Agricultural trade flows (EU Comext — note: 2-month typical lag) */
-async function euAgriGetTradeOverview() {
-  return euAgriFetch('/v1/trade', { limit:20 }, 'eu_agri_trade', 24*60*60*1000);
-}
+// EU Agri-food REST API (agridata.ec.europa.eu) permanently replaced by Qlik Sense BI —
+// all /api/ and /rest/1.0/ endpoints return 400 "Bad Request - Qlik Sense" with no data.
+// All EU Agri functions return null immediately to avoid wasted timeouts.
+async function euAgriGetOilseeds()      { return null; }
+async function euAgriGetFertilizers()   { return null; }
+async function euAgriGetCereals()       { return null; }
+async function euAgriGetTradeOverview() { return null; }
 
 /* ══════════════════════════════════════════════════════════════════
    IMF SUNFLOWER OIL PRICE (PCPS — PSUNOUSDM series)
