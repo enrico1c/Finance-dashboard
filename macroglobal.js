@@ -152,18 +152,18 @@ function imfLatestAndForecast(imfData, countryCode) {
    https://stats.oecd.org/SDMX-JSON/data/MEI_CLI/...
    CLI amplitude-adjusted (AA) above 100 = expansion
    ══════════════════════════════════════════════════════════════════ */
-// stats.oecd.org SDMX endpoint was retired in 2025 — now using sdmx.oecd.org
+// stats.oecd.org SDMX endpoint retired — sdmx.oecd.org requires all 9 key dimensions,
+// so we fetch /all and filter client-side for MEASURE=LI (CLI) + ADJUSTMENT=AA (amplitude-adjusted)
 const OECD_CLI_BASE = 'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.0';
 
-const OECD_COUNTRIES = ['USA','GBR','DEU','FRA','JPN','CHN','KOR','CAN','AUS','ITA','IND','BRA'];
+const OECD_COUNTRIES = new Set(['USA','GBR','DEU','FRA','JPN','CHN','KOR','CAN','AUS','ITA','IND','BRA']);
 
 async function oecdFetchCLI() {
   const cached = _mgGet('oecd:cli', 6*3600*1000);
   if (cached) return cached;
   try {
-    const countries = OECD_COUNTRIES.join('+');
-    const url = `${OECD_CLI_BASE}/${countries}.LOLITOAA.M?startPeriod=${new Date().getFullYear()-1}-01&format=jsondata&dimensionAtObservation=TIME_PERIOD`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const url = `${OECD_CLI_BASE}/all?lastNObservations=3&format=jsondata&dimensionAtObservation=TIME_PERIOD`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(20000) });
     const json = await res.json();
     _mgSet('oecd:cli', json);
     return json;
@@ -173,45 +173,56 @@ async function oecdFetchCLI() {
   }
 }
 
-// Parse OECD SDMX-JSON — extract latest value per country
+// Parse OECD SDMX-JSON v2 (sdmx.oecd.org) — filter for CLI amplitude-adjusted monthly
+// Dimensions: [0]=REF_AREA [1]=FREQ [2]=MEASURE [3]=UNIT_MEASURE [4]=ACTIVITY [5]=ADJUSTMENT ...
 function oecdParseLatest(json) {
   try {
-  if (!json?.dataSets?.[0]?.series) return {};
-  const series   = json.dataSets[0].series;
-  const dims     = json.structure?.dimensions?.series || [];
-  const timeDims = json.structure?.dimensions?.observation || [];
-  // New OECD API (sdmx.oecd.org) uses REF_AREA; old stats.oecd.org used LOCATION
-  const countryDim = dims.find(d => d.id === 'REF_AREA' || d.id === 'LOCATION');
+    const structs = json?.data?.structures;
+    const ds      = json?.data?.dataSets?.[0];
+    if (!structs || !ds) return {};
 
-  const result = {};
-  Object.entries(series).forEach(([key, val]) => {
-    // Key format: "0:0:0" for dimension indices
-    const parts      = key.split(':');
-    const countryIdx = parts[0];
-    const countryId  = countryDim?.values?.[parseInt(countryIdx)]?.id;
-    if (!countryId) return;
+    const dims    = structs[0]?.dimensions?.series || [];
+    const dimVals = dims.map(d => d.values || []);
+    const series  = ds.series || {};
 
-    // Get observations (sorted by time index)
-    const obs = val.observations;
-    if (!obs) return;
-    const timeKeys = Object.keys(obs).map(Number).sort((a,b)=>b-a);
-    if (!timeKeys.length) return;
-
-    const latestObs  = obs[timeKeys[0]]?.[0];
-    const prevObs    = obs[timeKeys[1]]?.[0];
-
-    // Get time period label
-    const timePeriods = timeDims[0]?.values || [];
-    const latestPeriod = timePeriods[timeKeys[0]]?.id || '';
-
-    result[countryId] = {
-      value:  latestObs,
-      prev:   prevObs,
-      period: latestPeriod,
-      trend:  (latestObs != null && prevObs != null) ? latestObs - prevObs : null,
+    // Find dimension indices for the filters we want
+    const findIdx = (dimId, valId) => {
+      const dim = dims.find(d => d.id === dimId);
+      if (!dim) return -1;
+      return (dim.values || []).findIndex(v => v.id === valId);
     };
-  });
-  return result;
+    const liIdx   = findIdx('MEASURE',    'LI');   // Composite Leading Indicator
+    const aaIdx   = findIdx('ADJUSTMENT', 'AA');   // Amplitude-Adjusted
+    const mIdx    = findIdx('FREQ',       'M');    // Monthly
+
+    const result = {};
+    for (const [key, val] of Object.entries(series)) {
+      const parts = key.split(':').map(Number);
+      // Filter: must be LI + AA + Monthly
+      if (parts[2] !== liIdx || parts[5] !== aaIdx || parts[1] !== mIdx) continue;
+
+      const country = dimVals[0]?.[parts[0]]?.id;
+      if (!country || !OECD_COUNTRIES.has(country)) continue;
+
+      const obs = val.observations || {};
+      const timeKeys = Object.keys(obs).map(Number).sort((a, b) => b - a);
+      if (!timeKeys.length) continue;
+
+      const latestObs = obs[timeKeys[0]]?.[0];
+      const prevObs   = obs[timeKeys[1]]?.[0];
+
+      // Time period from structure observation dimension
+      const timeDim   = structs[0]?.dimensions?.observation?.[0]?.values || [];
+      const latestPeriod = timeDim[timeKeys[0]]?.id || '';
+
+      result[country] = {
+        value:  latestObs,
+        prev:   prevObs,
+        period: latestPeriod,
+        trend:  (latestObs != null && prevObs != null) ? latestObs - prevObs : null,
+      };
+    }
+    return result;
   } catch (e) {
     console.warn('[MacroGlobal] OECD CLI parse error:', e.message);
     return {};

@@ -13,12 +13,12 @@ const _posFmt = (n,d=2) => n==null||isNaN(n)?'—':Number(n).toFixed(d);
 const _posFmtK = n => { if(!n&&n!==0) return '—'; const a=Math.abs(n); if(a>=1000) return (n/1000).toFixed(1)+'K'; return n.toString(); };
 
 /* ══════════════════════════════════════════════════════════════════
-   CFTC COMMITMENTS OF TRADERS  (no key, weekly CSV)
-   https://www.cftc.gov/MarketReports/CommitmentsofTraders
+   CFTC COMMITMENTS OF TRADERS  (no key, Socrata SoQL API)
+   https://publicreporting.cftc.gov
    ══════════════════════════════════════════════════════════════════ */
 
-/* COT file URLs — CFTC publishes weekly */
-const CFTC_BASE = `https://www.cftc.gov/files/dea/cotarchives/${new Date().getFullYear()}/futures`;
+/* Legacy Futures Only dataset on CFTC Socrata platform */
+const CFTC_SOCRATA = 'https://publicreporting.cftc.gov/resource/6dca-aqww.json';
 
 /* Market names to match in CFTC data — long form report */
 const COT_MARKETS = [
@@ -36,61 +36,41 @@ const COT_MARKETS = [
   { id:'treasury_10y',  cftcCode:'020601', name:'10-Yr T-Note (CBOT)', icon:'📋', group:'rates' },
 ];
 
-/* Fetch and parse CFTC COT long-form CSV via allorigins proxy */
+/* Fetch COT data via CFTC Socrata SoQL JSON API — no key, no ZIP parsing */
 async function cftcGetLatestCOT() {
   const cached = _posGet('cftc_cot', 24*60*60*1000);
   if (cached) return cached;
   try {
-    /* CFTC provides annual CSV files with all futures positions */
-    const year = new Date().getFullYear();
-    const url = `https://www.cftc.gov/files/dea/cotarchives/${year}/futures/deafut${String(year).slice(-2)}c.txt`;
+    const codes = COT_MARKETS.map(m => `'${m.cftcCode}'`).join(',');
+    const url = `${CFTC_SOCRATA}?$where=cftc_contract_market_code in(${codes})&$order=report_date_as_yyyy_mm_dd DESC&$limit=60`;
     const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
-    if (!res.ok) throw new Error(`CFTC HTTP ${res.status}`);
-    const text = await res.text();
-    const parsed = _parseCOTcsv(text);
+    if (!res.ok) throw new Error(`CFTC SoQL HTTP ${res.status}`);
+    const rows = await res.json();
+    const parsed = _parseCOTjson(rows);
     _posSet('cftc_cot', parsed);
     return parsed;
   } catch(e) {
     console.warn('[positioning] CFTC COT:', e.message);
-    /* Try previous year */
-    try {
-      const year = new Date().getFullYear() - 1;
-      const url = `https://www.cftc.gov/files/dea/cotarchives/${year}/futures/deafut${String(year).slice(-2)}c.txt`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      if (!res.ok) return null;
-      const text = await res.text();
-      const parsed = _parseCOTcsv(text);
-      _posSet('cftc_cot', parsed);
-      return parsed;
-    } catch { return null; }
+    return null;
   }
 }
 
-function _parseCOTcsv(text) {
-  if (!text||text.length<100) return {};
-  const lines = text.split('\n').filter(l=>l.trim());
-  if (lines.length < 2) return {};
-  const header = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+function _parseCOTjson(rows) {
+  if (!rows || !rows.length) return {};
   const records = {};
-  /* Parse only the last few weeks (most recent records first in CFTC format) */
-  const dataLines = lines.slice(1).slice(0, 500);
-  for (const line of dataLines) {
-    const vals = line.split(',').map(v=>v.trim().replace(/"/g,''));
-    if (vals.length < 10) continue;
-    const record = {};
-    header.forEach((h,i) => { record[h] = vals[i]; });
-    const cftcCode = (record['CFTC_Contract_Market_Code']||record['Market_and_Exchange_Names']||'').trim();
-    const name = (record['Market_and_Exchange_Names']||record['Market Name']||'').trim();
-    if (!records[cftcCode]) records[cftcCode] = [];
-    records[cftcCode].push({
-      date:         record['Report_Date_as_YYYY-MM-DD']||record['Date']||record['As_of_Date_In_Form_YYMMDD'],
-      name,
-      longAll:      parseInt(record['NonComm_Positions_Long_All']||record['Noncommercial Long']||0),
-      shortAll:     parseInt(record['NonComm_Positions_Short_All']||record['Noncommercial Short']||0),
-      spreadAll:    parseInt(record['NonComm_Positions_Spread_All']||0),
-      longComm:     parseInt(record['Comm_Positions_Long_All']||0),
-      shortComm:    parseInt(record['Comm_Positions_Short_All']||0),
-      openInterest: parseInt(record['Open_Interest_All']||record['Open Interest']||0),
+  for (const r of rows) {
+    const code = (r.cftc_contract_market_code || '').trim();
+    if (!code) continue;
+    if (!records[code]) records[code] = [];
+    records[code].push({
+      date:         (r.report_date_as_yyyy_mm_dd || '').slice(0, 10),
+      name:         r.market_and_exchange_names || '',
+      longAll:      parseInt(r.noncomm_positions_long_all  || 0),
+      shortAll:     parseInt(r.noncomm_positions_short_all || 0),
+      spreadAll:    parseInt(r.noncomm_postions_spread_all || 0),  // note: CFTC typo in column name
+      longComm:     parseInt(r.comm_positions_long_all     || 0),
+      shortComm:    parseInt(r.comm_positions_short_all    || 0),
+      openInterest: parseInt(r.open_interest_all           || 0),
     });
   }
   return records;

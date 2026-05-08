@@ -69,6 +69,7 @@
     'query2.finance.yahoo.com':                  { id: 'yahoo_direct2',  keyParam: null },
     'api.open-meteo.com':                        { id: 'openmeteo',      keyParam: null },
     'www.cftc.gov':                              { id: 'cftc',           keyParam: null },
+    'publicreporting.cftc.gov':                  { id: 'cftc_socrata',   keyParam: null },
     'feeds.bloomberg.com':                       { id: 'bloomberg_rss',  keyParam: null },
     'eonet.gsfc.nasa.gov':                       { id: 'eonet',          keyParam: null },
     'stats.oecd.org':                            { id: 'oecd',           keyParam: null },
