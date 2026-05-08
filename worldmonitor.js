@@ -1428,16 +1428,34 @@ async function wmDrawerLoadNews(resourceLabel, topic) {
       }
     } catch(_) {}
 
-    /* 2. Fallback: GDELT DOC API (free, no key, 15-min updates) */
+    /* 2. Fallback: commFetchGDELTNews (from commodities.js — cached, proven to work) */
+    if (!articles.length && typeof window.commFetchGDELTNews === 'function') {
+      try {
+        const lc = resourceLabel.toLowerCase();
+        const themeKey = (lc.includes('energy') || lc.includes('lng') || lc.includes('gas') || lc.includes('oil') || lc.includes('coal')) ? 'energy_crisis'
+          : (lc.includes('rare') || lc.includes('lithium') || lc.includes('cobalt') || lc.includes('mineral')) ? 'rare_earths'
+          : (lc.includes('metal') || lc.includes('copper') || lc.includes('gold') || lc.includes('silver') || lc.includes('iron') || lc.includes('aluminum')) ? 'mining_metals'
+          : (lc.includes('wheat') || lc.includes('grain') || lc.includes('corn') || lc.includes('agri') || lc.includes('food') || lc.includes('soy')) ? 'food_security'
+          : (lc.includes('sanction') || lc.includes('tariff') || lc.includes('trade') || lc.includes('ban') || lc.includes('export')) ? 'sanctions_trade'
+          : 'supply_disruption';
+        const gdeltArts = await window.commFetchGDELTNews(themeKey, 15);
+        if (gdeltArts?.length) {
+          articles = gdeltArts.map(a => ({ _gdelt:true, title:a.headline, url:a.url, source:a.source, date:a.date }));
+          src = 'GDELT · ' + themeKey.replace('_',' ');
+        }
+      } catch(_) {}
+    }
+
+    /* 3. Direct GDELT DOC API (longer timeout) */
     if (!articles.length) {
       try {
         const q = resourceLabel.length <= 5
-          ? `"${resourceLabel}" supply OR price OR market OR trade`
-          : resourceLabel;
+          ? `"${resourceLabel}" supply price market`
+          : `"${resourceLabel}"`;
         const params = new URLSearchParams({ query:q, mode:'ArtList', maxrecords:'15',
           format:'json', timespan:'72h', sort:'DateDesc' });
         const res = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?${params}`,
-          { signal: AbortSignal.timeout(10000) });
+          { signal: AbortSignal.timeout(18000) });
         if (res.ok) {
           const json = await res.json();
           articles = (json.articles || []).map(a => ({ _gdelt:true, title:a.title, url:a.url, source:a.domain, date:a.seendate }));
