@@ -54,7 +54,7 @@ function _esc(s) {
 }
 
 function _proxyFetch(url, timeoutMs = 15000) {
-  return fetch(PROXY + encodeURIComponent(url), {
+  return fetch(url, {
     signal: AbortSignal.timeout(timeoutMs),
   }).then(r => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);

@@ -861,49 +861,17 @@ window.commRenderCOT = async function() {
   if (!el) return;
   el.innerHTML = `<div class="wm-loading"><div class="wm-spin"></div>Loading CFTC Commitments of Traders…</div>`;
 
-  const cot = await commFetchCFTC();
-
-  if (!cot) {
-    el.innerHTML = `<div class="wm-empty">
-      ⚠ CFTC COT data unavailable.<br>
-      <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm"
-         target="_blank" style="color:var(--accent)">CFTC COT Weekly Reports ↗</a>
-    </div>`;
-    return;
+  // Reuse SoQL-based fetch from positioning.js (cftcGetLatestCOT defined there)
+  let cotData = null;
+  if (typeof cftcGetLatestCOT === 'function') {
+    cotData = await cftcGetLatestCOT();
   }
 
-  // COT sentiment for each contract
-  // Source: CFTC Legacy Futures-Only — Non-Commercial positions
-  // netNonComm > 0 = net long (bullish), < 0 = net short (bearish)
-  // For simplicity we show the contract list and link to CFTC
-  // Full CSV parse requires CORS-accessible endpoint (file is 3MB ZIP)
-
-  const contracts = cot.markets || [];
-  const reportDate = cot.reportDate || 'Latest';
-
-  let html = `<div class="av-live-badge">● CFTC Commitments of Traders · ${_cEsc(reportDate)} · No API Key</div>`;
-
-  // Header info
-  html += `<div style="padding:6px 10px;font-size:10px;color:var(--text-muted);border-bottom:1px solid var(--border)">
-    <strong>Source:</strong>
-    <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" style="color:var(--accent)">CFTC.gov ↗</a> ·
-    Weekly positioning report (Friday) · Legacy Futures-Only format ·
-    <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalCompressed/index.htm" target="_blank" style="color:var(--accent)">Historical CSV ↗</a>
-  </div>`;
-
-  // Contract grid with links to individual CFTC pages
-  html += `<div style="padding:8px">
-    <div style="font-size:10px;font-weight:700;margin-bottom:8px;color:var(--text)">
-      📊 Tracked Contracts — Net Non-Commercial Positioning
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">`;
-
-  // Contract → CFTC report code mapping (for deep links)
   const cotLinks = {
-    'Gold':           '088691', 'Silver':        '084691', 'Copper':          '085692',
-    'Crude Oil WTI':  '067651', 'Natural Gas':   '023651', 'Corn':            '002602',
-    'Wheat (CBOT)':   '001602', 'Soybeans':      '005602', 'Coffee':          '083731',
-    'Sugar #11':      '080732', 'Palladium':     '075651', 'Platinum':        '076651',
+    'Gold':          '088691', 'Silver':       '084691', 'Copper':       '085692',
+    'Crude Oil WTI': '067651', 'Natural Gas':  '023651', 'Corn':         '002602',
+    'Wheat (CBOT)':  '001602', 'Soybeans':     '005602', 'Coffee':       '083731',
+    'Sugar #11':     '080732', 'Palladium':    '075651', 'Platinum':     '076651',
   };
   const catIcons = {
     'Gold':'🥇','Silver':'⚪','Copper':'🟤','Crude Oil WTI':'🛢','Natural Gas':'🔥',
@@ -911,32 +879,43 @@ window.commRenderCOT = async function() {
     'Palladium':'💎','Platinum':'💎',
   };
 
+  let reportDate = 'Latest';
+  if (cotData) {
+    const first = Object.values(cotData)[0];
+    if (first?.[0]?.date) reportDate = first[0].date;
+  }
+
+  let html = `<div class="av-live-badge">● CFTC Commitments of Traders · ${_cEsc(reportDate)} · No API Key</div>`;
+  html += `<div style="padding:6px 10px;font-size:10px;color:var(--text-muted);border-bottom:1px solid var(--border)">
+    <strong>Source:</strong>
+    <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" style="color:var(--accent)">CFTC.gov ↗</a> ·
+    Weekly positioning (Friday) · Legacy Futures-Only · Socrata JSON API
+  </div>`;
+  html += `<div style="padding:8px"><div style="font-size:10px;font-weight:700;margin-bottom:8px;color:var(--text)">
+    📊 Tracked Contracts — Net Non-Commercial (Speculative) Positioning
+  </div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px">`;
+
   Object.entries(cotLinks).forEach(([name, code]) => {
     const icon = catIcons[name] || '📊';
+    const rows = cotData?.[code];
+    const latest = rows?.[0];
+    const net = latest ? latest.longAll - latest.shortAll : null;
+    const netCls = net > 0 ? 'color:#3fb950' : net < 0 ? 'color:#f85149' : 'color:var(--text-muted)';
+    const netStr = net != null ? (net > 0 ? '+' : '') + (Math.abs(net) >= 1000 ? (net/1000).toFixed(1)+'K' : net) : '—';
+    const sentiment = net != null ? (net > 0 ? '▲ Net Long' : '▼ Net Short') : 'No data';
     const cftcUrl = `https://www.cftc.gov/dea/futures/${code}.htm`;
     html += `<div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:8px">
       <div style="font-size:10px;font-weight:700">${icon} ${_cEsc(name)}</div>
-      <div style="font-size:9px;color:var(--text-muted);margin:3px 0">Contract: ${_cEsc(code)}</div>
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:6px">
-        Net positioning — updated weekly (Fri)
-      </div>
-      <a href="${_cEsc(cftcUrl)}" target="_blank" rel="noopener"
-         style="font-size:9px;color:var(--accent);text-decoration:none">
-        View CFTC report ↗
-      </a>
+      <div style="font-size:13px;font-weight:700;margin:4px 0;${netCls}">${_cEsc(netStr)} contracts</div>
+      <div style="font-size:9px;${netCls};margin-bottom:4px">${_cEsc(sentiment)}</div>
+      ${latest ? `<div style="font-size:9px;color:var(--text-muted)">OI: ${(latest.openInterest/1000).toFixed(0)}K</div>` : ''}
+      <a href="${_cEsc(cftcUrl)}" target="_blank" rel="noopener" style="font-size:9px;color:var(--accent);text-decoration:none">View CFTC ↗</a>
     </div>`;
   });
 
-  html += `</div></div>`;
-
-  // Methodology note
-  html += `<div style="padding:6px 10px;font-size:9px;color:var(--text-muted);border-top:1px solid var(--border)">
-    <strong>How to read COT:</strong>
-    Net Non-Commercial = Large Speculators net position.
-    Positive = net long (bullish sentiment) · Negative = net short (bearish sentiment) ·
-    Extreme readings historically mark turning points. ·
-    <a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalViewable/cotvariableslegacy.html"
-       target="_blank" style="color:var(--accent)">Variable definitions ↗</a>
+  html += `</div></div><div style="padding:6px 10px;font-size:9px;color:var(--text-muted);border-top:1px solid var(--border)">
+    Net Non-Commercial = large speculators. Positive = net long (bullish). Extreme readings = crowding risk. ·
+    <a href="https://publicreporting.cftc.gov/resource/6dca-aqww" target="_blank" style="color:var(--accent)">Socrata dataset ↗</a>
   </div>`;
 
   el.innerHTML = html;

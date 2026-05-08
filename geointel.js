@@ -912,10 +912,7 @@ async function _fetchShippingAlerts() {
   if (cached) return cached;
   try {
     // GDELT for shipping/maritime themes
-    const url = encodeURIComponent(
-      'https://api.gdeltproject.org/api/v2/doc/doc?query=shipping+chokepoint+disruption&mode=artlist&maxrecords=10&format=json&timespan=3d'
-    );
-    const res  = await fetch(`https://api.allorigins.win/raw?url=${url}`, { signal: AbortSignal.timeout(8000) });
+    const res  = await fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=shipping+chokepoint+disruption&mode=artlist&maxrecords=10&format=json&timespan=3d', { signal: AbortSignal.timeout(8000) });
     const json = await res.json();
     const articles = json?.articles || [];
     _giSet(cacheKey, articles, _GW_CACHE_MS);

@@ -119,10 +119,8 @@ async function _techFallbackStooq(sym) {
   for (const sfx of suffixes) {
     const ticker = sfx.startsWith('^') ? sfx : (base + sfx);
     try {
-      // Use AllOrigins proxy to avoid CORS
       const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(ticker.toLowerCase())}&i=d`;
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`;
-      const res      = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      const res      = await fetch(stooqUrl, { signal: AbortSignal.timeout(8000) });
       const text     = await res.text();
       if (!text || text.includes('No data') || text.trim().length < 50) continue;
 

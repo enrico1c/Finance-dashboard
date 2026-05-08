@@ -304,9 +304,8 @@ function _stooqSym(sym) {
 async function _stooqCsv(csvUrl) {
   if (!_RL.canCall("stooq")) return null;
   _RL.bump("stooq");
-  const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(csvUrl);
   try {
-    const r = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+    const r = await fetch(csvUrl, { signal: AbortSignal.timeout(10000) });
     if (!r.ok) return null;
     const text = await r.text();
     if (!text || text.startsWith("No data") || text.indexOf("<html") !== -1) return null;
