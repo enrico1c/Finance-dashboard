@@ -1403,101 +1403,114 @@ function _wmStaticCtx(kw) {
   return null;
 }
 
-/* NEWS pane: GDELT primary, WM insights secondary */
+/* NEWS pane: show static facts immediately, load GDELT in background */
 async function wmDrawerLoadNews(resourceLabel, topic) {
   const el = document.getElementById('wm-drawer-news-pane');
   if (!el) return;
-  el.innerHTML = wmSpinner(`Fetching news for "${resourceLabel}"…`);
+
+  const lc = resourceLabel.toLowerCase();
+  const staticCtx = _wmStaticCtx(lc) || _wmStaticCtx(topic);
+  const GDELT_THEME = (lc.includes('energy')||lc.includes('lng')||lc.includes('gas')||lc.includes('oil')||lc.includes('coal')) ? 'energy_crisis'
+    : (lc.includes('rare')||lc.includes('lithium')||lc.includes('cobalt')||lc.includes('mineral')) ? 'rare_earths'
+    : (lc.includes('metal')||lc.includes('copper')||lc.includes('gold')||lc.includes('silver')||lc.includes('iron')||lc.includes('aluminum')) ? 'mining_metals'
+    : (lc.includes('wheat')||lc.includes('grain')||lc.includes('corn')||lc.includes('agri')||lc.includes('food')||lc.includes('soy')) ? 'food_security'
+    : (lc.includes('sanction')||lc.includes('tariff')||lc.includes('trade')||lc.includes('ban')) ? 'sanctions_trade'
+    : 'supply_disruption';
+
+  /* Render static facts immediately so the user sees content at once */
+  const staticBlock = staticCtx ? `
+    <div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.2);border-radius:4px;padding:8px 10px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;margin-bottom:4px">${staticCtx.icon||'⚡'} ${wmEsc(resourceLabel)} — Supply Chain Context</div>
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.5">${wmEsc(staticCtx.note||'')}</div>
+      ${staticCtx.producers ? `<div style="font-size:10px;color:var(--text-muted);margin-top:5px">🌍 Producers: ${wmEsc(staticCtx.producers)}</div>` : ''}
+      ${staticCtx.chokepoints?.length ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">🚢 Chokepoints: ${wmEsc(staticCtx.chokepoints.join(' · '))}</div>` : ''}
+    </div>` : '';
+
+  el.innerHTML = staticBlock + `<div id="wm-news-live-area">${wmSpinner('Loading live news…')}</div>`;
+
+  /* Async: fetch live news, update the live area */
+  const liveEl = () => el.querySelector('#wm-news-live-area');
 
   try {
-    let articles = [];
-    let src = '';
+    let articles = [], src = '';
 
-    /* 1. Try WM insights (when WM backend is up) */
+    /* 1. WM insights */
     try {
       const d = await wmBootstrap(['insights']);
       const all = d.insights?.insights || d.insights?.items || d.insights?.data || d.insights || [];
       if (Array.isArray(all) && all.length) {
-        const kw = resourceLabel.toLowerCase();
         const rel = all.filter(a => {
           const txt = `${a.title||''} ${a.body||''} ${a.description||''} ${(a.tags||[]).join(' ')}`.toLowerCase();
-          return txt.includes(kw) || txt.includes(topic.toLowerCase());
+          return txt.includes(lc) || txt.includes(topic.toLowerCase());
         });
         articles = rel.length ? rel : all.slice(0, 10);
         src = 'WorldMonitor';
       }
     } catch(_) {}
 
-    /* 2. Fallback: commFetchGDELTNews (from commodities.js — cached, proven to work) */
+    /* 2. commFetchGDELTNews (cached, from commodities.js) */
     if (!articles.length && typeof window.commFetchGDELTNews === 'function') {
       try {
-        const lc = resourceLabel.toLowerCase();
-        const themeKey = (lc.includes('energy') || lc.includes('lng') || lc.includes('gas') || lc.includes('oil') || lc.includes('coal')) ? 'energy_crisis'
-          : (lc.includes('rare') || lc.includes('lithium') || lc.includes('cobalt') || lc.includes('mineral')) ? 'rare_earths'
-          : (lc.includes('metal') || lc.includes('copper') || lc.includes('gold') || lc.includes('silver') || lc.includes('iron') || lc.includes('aluminum')) ? 'mining_metals'
-          : (lc.includes('wheat') || lc.includes('grain') || lc.includes('corn') || lc.includes('agri') || lc.includes('food') || lc.includes('soy')) ? 'food_security'
-          : (lc.includes('sanction') || lc.includes('tariff') || lc.includes('trade') || lc.includes('ban') || lc.includes('export')) ? 'sanctions_trade'
-          : 'supply_disruption';
-        const gdeltArts = await window.commFetchGDELTNews(themeKey, 15);
+        const gdeltArts = await window.commFetchGDELTNews(GDELT_THEME, 15);
         if (gdeltArts?.length) {
           articles = gdeltArts.map(a => ({ _gdelt:true, title:a.headline, url:a.url, source:a.source, date:a.date }));
-          src = 'GDELT · ' + themeKey.replace('_',' ');
-        }
-      } catch(_) {}
-    }
-
-    /* 3. Direct GDELT DOC API (longer timeout) */
-    if (!articles.length) {
-      try {
-        const q = resourceLabel.length <= 5
-          ? `"${resourceLabel}" supply price market`
-          : `"${resourceLabel}"`;
-        const params = new URLSearchParams({ query:q, mode:'ArtList', maxrecords:'15',
-          format:'json', timespan:'72h', sort:'DateDesc' });
-        const res = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?${params}`,
-          { signal: AbortSignal.timeout(18000) });
-        if (res.ok) {
-          const json = await res.json();
-          articles = (json.articles || []).map(a => ({ _gdelt:true, title:a.title, url:a.url, source:a.domain, date:a.seendate }));
           src = 'GDELT';
         }
       } catch(_) {}
     }
 
+    /* 3. Direct GDELT (last resort) */
     if (!articles.length) {
-      el.innerHTML = `<div class="wm-drawer-hint">No recent news found for <strong>${wmEsc(resourceLabel)}</strong>.<br>
-        <a href="#" onclick="wmDrawerGoNews();return false;">Search full News panel →</a></div>`;
+      try {
+        const q = resourceLabel.length <= 5 ? `"${resourceLabel}" supply price` : `"${resourceLabel}"`;
+        const params = new URLSearchParams({ query:q, mode:'ArtList', maxrecords:'12', format:'json', timespan:'72h', sort:'DateDesc' });
+        const res = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?${params}`, { signal:AbortSignal.timeout(15000) });
+        if (res.ok) {
+          const json = await res.json();
+          articles = (json.articles||[]).map(a => ({ _gdelt:true, title:a.title, url:a.url, source:a.domain, date:a.seendate }));
+          src = 'GDELT';
+        }
+      } catch(_) {}
+    }
+
+    const live = liveEl();
+    if (!live) return; // drawer was closed
+
+    if (!articles.length) {
+      live.innerHTML = `<div style="font-size:11px;color:var(--text-muted);padding:6px 0">
+        No live news found. <a href="#" onclick="wmDrawerGoNews();return false;" style="color:var(--accent)">Search in News panel →</a></div>`;
       return;
     }
 
-    el.innerHTML = `<div class="wm-drawer-news-head">${articles.length} articles · <em>${wmEsc(resourceLabel)}</em>
+    const renderItem = s => {
+      if (s._gdelt) return `<div class="wm-drawer-news-item" style="border-left:2px solid var(--border)">
+        <a href="${wmEsc(s.url||'#')}" target="_blank" rel="noopener"
+           style="color:var(--text);text-decoration:none;font-size:12px;font-weight:500;display:block">${wmEsc(s.title||'')}</a>
+        <div class="wm-drawer-news-meta" style="margin-top:2px">
+          ${s.date ? `<span style="color:var(--text-muted)">${wmEsc(s.date.slice(0,8))}</span>` : ''}
+          ${s.source ? `<span style="color:var(--text-muted);margin-left:6px">${wmEsc(s.source)}</span>` : ''}
+        </div></div>`;
+      const sev = s.severity||s.importance||s.level||'medium';
+      const col = wmSeverityColor(sev);
+      const ticker = s.ticker||s.symbol;
+      return `<div class="wm-drawer-news-item" style="border-left:2px solid ${col.border}">
+        <div class="wm-drawer-news-title">${wmEsc(s.title||s.headline||'')}</div>
+        <div class="wm-drawer-news-meta">
+          ${wmRelTime(s.timestamp||s.date)||''}
+          ${ticker ? `<span class="wm-ic-ticker" style="margin-left:6px;cursor:pointer"
+            onclick="wmResourceDrawerClose();setTimeout(()=>{if(typeof loadTickerFromWatchlist==='function')loadTickerFromWatchlist('${wmEsc(ticker)}');},100)">${wmEsc(ticker)}</span>` : ''}
+          ${wmBadge(sev.toUpperCase(), sev)}
+        </div>
+        ${s.body||s.description ? `<div class="wm-drawer-news-body">${wmEsc((s.body||s.description).slice(0,160))}…</div>` : ''}
+      </div>`;
+    };
+
+    live.innerHTML = `<div class="wm-drawer-news-head">${articles.length} articles
         <span style="font-size:9px;color:var(--text-muted);margin-left:6px">${wmEsc(src)}</span></div>` +
-      articles.slice(0, 12).map(s => {
-        if (s._gdelt) {
-          return `<div class="wm-drawer-news-item" style="border-left:2px solid var(--border)">
-            <a href="${wmEsc(s.url||'#')}" target="_blank" rel="noopener"
-               style="color:var(--text);text-decoration:none;font-size:12px;font-weight:500">${wmEsc(s.title||'')}</a>
-            <div class="wm-drawer-news-meta" style="margin-top:3px">
-              ${s.date ? `<span style="color:var(--text-muted)">${wmEsc(s.date.slice(0,8))}</span>` : ''}
-              ${s.source ? `<span style="color:var(--text-muted);margin-left:6px">${wmEsc(s.source)}</span>` : ''}
-            </div></div>`;
-        }
-        const sev = s.severity || s.importance || s.level || 'medium';
-        const col = wmSeverityColor(sev);
-        const ticker = s.ticker || s.symbol;
-        return `<div class="wm-drawer-news-item" style="border-left:2px solid ${col.border}">
-          <div class="wm-drawer-news-title">${wmEsc(s.title || s.headline || '')}</div>
-          <div class="wm-drawer-news-meta">
-            ${wmRelTime(s.timestamp || s.date) || ''}
-            ${ticker ? `<span class="wm-ic-ticker" style="margin-left:6px;cursor:pointer"
-              onclick="wmResourceDrawerClose();setTimeout(()=>{ if(typeof loadTickerFromWatchlist==='function')loadTickerFromWatchlist('${wmEsc(ticker)}');},100)">${wmEsc(ticker)}</span>` : ''}
-            ${wmBadge(sev.toUpperCase(), sev)}
-          </div>
-          ${s.body||s.description ? `<div class="wm-drawer-news-body">${wmEsc((s.body||s.description).slice(0,160))}…</div>` : ''}
-        </div>`;
-      }).join('');
+      articles.slice(0,12).map(renderItem).join('');
   } catch(e) {
-    el.innerHTML = wmError(e.message);
+    const live = liveEl();
+    if (live) live.innerHTML = wmError(e.message);
   }
 }
 
