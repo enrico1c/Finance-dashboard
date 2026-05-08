@@ -1279,6 +1279,9 @@ async function fmpLoadTranscript(sym) {
   const ninjasKey = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
   const fmpKey    = (typeof getFmpKey==='function')    ? getFmpKey()    : '';
 
+  // Hide setup banner if key is available (proxy mode stores in window._KEYS, not localStorage)
+  if (ninjasKey) { const b = document.getElementById('trans-setup-banner'); if (b) b.style.display = 'none'; }
+
   // Show source badge
   const srcLabel = ninjasKey ? '● API Ninjas + FMP' : fmpKey ? '● FMP' : '● SEC EDGAR (limited)';
   const srcColor = ninjasKey ? '#3fb950' : fmpKey ? '#58a6ff' : '#d29922';

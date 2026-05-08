@@ -273,11 +273,14 @@
           <button class="api-qs-dismiss" onclick="this.closest('.api-quicksetup-banner').style.display='none'" title="Nascondi">✕</button>
         </div>
         <script>
-          (function() {
+          (function hideBanner() {
             try {
-              var k = localStorage.getItem('finterm_key_ninjas');
-              if (k) { var b = document.getElementById('trans-setup-banner'); if(b) b.style.display='none'; }
+              var k = (window._KEYS && window._KEYS['ninjas'])
+                   || localStorage.getItem('finterm_key_ninjas');
+              if (k) { var b = document.getElementById('trans-setup-banner'); if(b) b.style.display='none'; return; }
             } catch(e) {}
+            // Re-check after auth populates window._KEYS (proxy mode)
+            setTimeout(hideBanner, 1500);
           })();
         </script>
       </div>

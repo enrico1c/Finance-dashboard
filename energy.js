@@ -60,19 +60,25 @@ async function _enFetchJson(url, key, ttl = 15 * 60 * 1000) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   EIA PRICE SERIES  (XLS bulk download, no key)
+   EIA PRICE SERIES
+   Primary:  api.eia.gov/v2 JSON API (with key — reliable)
+   Fallback: eia.gov/dnav XLS bulk download via allorigins proxy
    ══════════════════════════════════════════════════════════════════ */
 const EIA_SERIES = [
   { id:'wti',      label:'WTI Crude Oil',    unit:'$/bbl',    icon:'🛢',  color:'#f0883e',
+    apiId:'PET.RWTC.D',
     url:'https://www.eia.gov/dnav/pet/hist_xls/RWTCd.xls',
     note:'Cushing, OK spot' },
   { id:'henryhub', label:'Henry Hub Gas',    unit:'$/MMBtu',  icon:'🔥',  color:'#3fb950',
+    apiId:'NG.RNGWHHD.D',
     url:'https://www.eia.gov/dnav/ng/hist_xls/RNGWHHDd.xls',
     note:'Louisiana spot' },
   { id:'heatoil',  label:'Heating Oil',      unit:'$/gal',    icon:'🏭',  color:'#d29922',
+    apiId:'PET.EER_EPD2F_PF4_Y35NY_DPG.D',
     url:'https://www.eia.gov/dnav/pet/hist_xls/EER_EPD2F_PF4_Y35NY_DPGd.xls',
     note:'NY Harbor No.2' },
   { id:'rbob',     label:'RBOB Gasoline',    unit:'$/gal',    icon:'⛽',  color:'#58a6ff',
+    apiId:'PET.EER_EPMRR_PF4_Y35NY_DPG.D',
     url:'https://www.eia.gov/dnav/pet/hist_xls/EER_EPMRR_PF4_Y35NY_DPGd.xls',
     note:'NY Harbor conventional' },
 ];
@@ -113,8 +119,42 @@ function _parseEiaXls(raw) {
   };
 }
 
+/* Parse EIA API v2 JSON response into the same shape as _parseEiaXls */
+function _parseEiaApiJson(json) {
+  const obs = json?.response?.data;
+  if (!obs?.length) return null;
+  const rows = obs
+    .filter(o => o.period && o.value != null && !isNaN(parseFloat(o.value)))
+    .map(o => ({ date: o.period, value: parseFloat(o.value) }))
+    .sort((a, b) => a.date > b.date ? 1 : -1);
+  if (!rows.length) return null;
+  const last = rows[rows.length - 1];
+  const prev  = rows.length >  1 ? rows[rows.length -  2] : null;
+  const week  = rows.length >  5 ? rows[rows.length -  6] : null;
+  const month = rows.length > 21 ? rows[rows.length - 22] : null;
+  const pct   = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null;
+  return {
+    current:  last.value,
+    date:     last.date,
+    chg1d:    prev  ? last.value - prev.value : null,
+    chg1dPct: pct(last.value, prev?.value),
+    chg1wPct: pct(last.value, week?.value),
+    chg1mPct: pct(last.value, month?.value),
+    history:  rows.slice(-30).map(r => r.value),
+  };
+}
+
 async function _eiaFetchSeries(s) {
-  const raw = await _enFetch(_EN_PROXY + encodeURIComponent(s.url), `eia_${s.id}`, 30 * 60 * 1000);
+  const key = (typeof getEiaKey === 'function') ? getEiaKey() : '';
+  if (key && s.apiId) {
+    // Primary: EIA JSON API (reliable, requires free key)
+    const apiUrl = `https://api.eia.gov/v2/seriesid/${s.apiId}?api_key=${key}&data[]=value&frequency=daily&sort[0][column]=period&sort[0][direction]=desc&length=30`;
+    const json = await _enFetchJson(apiUrl, `eia_api_${s.id}`, 30 * 60 * 1000);
+    const result = _parseEiaApiJson(json);
+    if (result) return result;
+  }
+  // Fallback: public XLS download via allorigins proxy (no key, less reliable)
+  const raw = await _enFetch(_EN_PROXY + encodeURIComponent(s.url), `eia_xls_${s.id}`, 30 * 60 * 1000);
   return _parseEiaXls(raw);
 }
 
@@ -316,7 +356,8 @@ async function energyRender() {
   let html = '';
 
   /* ── US Benchmark Prices ─────────────────────────────────────── */
-  html += _enLiveBar('US Energy Benchmarks', 'EIA · No API key · Daily updates');
+  const _eiaKey = (typeof getEiaKey === 'function') ? getEiaKey() : '';
+  html += _enLiveBar('US Energy Benchmarks', _eiaKey ? 'EIA API · Live JSON' : 'EIA · XLS fallback · Daily updates');
   html += `<div class="en-price-grid">`;
   for (const { s, d } of eiaCards) html += _renderPriceCard(s, d);
 
