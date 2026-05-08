@@ -26,9 +26,8 @@ async function _itFetchJSON(url, cacheKey, ttlMs=15*60*1000) {
 async function _itProxyFetch(url, cacheKey, ttlMs=15*60*1000) {
   const cached = _itGet(cacheKey, ttlMs);
   if (cached) return cached;
-  const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
   try {
-    const res = await fetch(proxy, { signal: AbortSignal.timeout(12000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     _itSet(cacheKey, text);
@@ -128,17 +127,29 @@ async function ofacGetRecentDesignations() {
    UK SANCTIONS LIST  (no key, CSV/XML)
    ══════════════════════════════════════════════════════════════════ */
 async function ukSanctionsGetList() {
-  const cached = _itGet('uk_sanctions', 12*60*60*1000);
+  const cached = _itGet('un_sanctions', 24*60*60*1000);
   if (cached) return cached;
   try {
-    /* UK FCDO consolidated sanctions list — CSV */
-    const url = 'https://assets.publishing.service.gov.uk/media/uk-sanctions-list.csv';
-    const text = await _itProxyFetch(url, 'uk_sanctions_raw', 12*60*60*1000);
-    if (!text) return null;
-    const lines = text.split('\n').slice(0,50); /* Preview first 50 */
-    _itSet('uk_sanctions', { count: text.split('\n').length - 1, preview: lines });
-    return _itGet('uk_sanctions', 24*60*60*1000);
-  } catch(e) { console.warn('[intel] UK Sanctions:', e.message); return null; }
+    /* UN Security Council Consolidated Sanctions List (XML, ~2MB) */
+    const xml  = await _itProxyFetch('https://scsanctions.un.org/resources/xml/en/consolidated.xml', 'un_sanctions_raw', 24*60*60*1000);
+    if (!xml) return null;
+    const doc  = new DOMParser().parseFromString(xml, 'text/xml');
+    const indivs   = [...doc.querySelectorAll('INDIVIDUAL')];
+    const entities = [...doc.querySelectorAll('ENTITY')];
+    /* Most recently listed — sort by LISTED_ON descending */
+    const recent = [...indivs, ...entities]
+      .map(el => ({
+        name:   [el.querySelector('FIRST_NAME')?.textContent, el.querySelector('SECOND_NAME')?.textContent].filter(Boolean).join(' '),
+        listed: el.querySelector('LISTED_ON')?.textContent || '',
+        type:   el.tagName === 'INDIVIDUAL' ? 'Individual' : 'Entity',
+      }))
+      .filter(e => e.name && e.listed)
+      .sort((a, b) => b.listed.localeCompare(a.listed))
+      .slice(0, 20);
+    const result = { individuals: indivs.length, entities: entities.length, total: indivs.length + entities.length, recent };
+    _itSet('un_sanctions', result);
+    return result;
+  } catch(e) { console.warn('[intel] UN Sanctions:', e.message); return null; }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -277,8 +288,9 @@ async function intelLoadAll() {
 
   el.innerHTML = html;
 
-  /* Kick off async live sanctions feed now that DOM is ready */
+  /* Kick off async live feeds now that DOM is ready */
   intelLoadSanctionsImpact();
+  intelLoadUNSanctions();
 }
 
 function intelRenderSanctionsHTML() {
@@ -294,17 +306,45 @@ function intelRenderSanctionsHTML() {
     <a href="https://ofac.treasury.gov/sanctions-list-service" target="_blank" rel="noopener" class="energy-entsog-link">↗ Download SDN List (CSV/XML)</a>
   </div>
 
-  <div class="section-head" style="margin-top:12px">🇬🇧 UK Sanctions List — FCDO</div>
-  <div class="metric-row"><span class="metric-label">Coverage</span><span class="metric-value">UK financial sanctions · 3,000+ entities across all regimes</span></div>
-  <div class="metric-row"><span class="metric-label">Format</span><span class="metric-value">CSV, XML, ODS, HTML</span></div>
-  <div class="metric-row"><span class="metric-label">Update Frequency</span><span class="metric-value" style="color:#3fb950">Updated on each designation</span></div>
+  <div class="section-head" style="margin-top:12px">🇺🇳 UN Security Council Consolidated Sanctions List</div>
+  <div id="un-sanctions-live"><div class="av-loading"><span class="av-spinner"></span>Loading UN SC sanctions…</div></div>
   <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
-    <a href="https://www.gov.uk/government/publications/the-uk-sanctions-list" target="_blank" rel="noopener" class="energy-entsog-link">↗ UK Sanctions List</a>
-    <a href="https://assets.publishing.service.gov.uk/media/uk-sanctions-list.csv" target="_blank" rel="noopener" class="energy-entsog-link">↗ Download CSV</a>
+    <a href="https://scsanctions.un.org/en/" target="_blank" rel="noopener" class="energy-entsog-link">↗ UN SC Sanctions Portal</a>
+    <a href="https://scsanctions.un.org/resources/xml/en/consolidated.xml" target="_blank" rel="noopener" class="energy-entsog-link">↗ Download XML</a>
   </div>
 
   <div class="section-head" style="margin-top:12px">📡 Live Sanctions & Export Control Notices — Federal Register</div>
   <div id="sanctions-live-impact"><div class="av-loading"><span class="av-spinner"></span>Loading live sanctions notices…</div></div>`;
+}
+
+async function intelLoadUNSanctions() {
+  const el = document.getElementById('un-sanctions-live');
+  if (!el) return;
+  try {
+    const data = await ukSanctionsGetList();
+    if (!data) {
+      el.innerHTML = `<div class="metric-row"><span class="metric-label">Status</span><span class="metric-value" style="color:var(--text-muted)">Loading… (2MB XML, cached 24h)</span></div>`;
+      return;
+    }
+    let html = `
+      <div class="metric-row"><span class="metric-label">Individuals</span><span class="metric-value">${data.individuals.toLocaleString()}</span></div>
+      <div class="metric-row"><span class="metric-label">Entities</span><span class="metric-value">${data.entities.toLocaleString()}</span></div>
+      <div class="metric-row"><span class="metric-label">Total listed</span><span class="metric-value" style="color:#f0883e">${data.total.toLocaleString()} designations</span></div>`;
+    if (data.recent?.length) {
+      html += `<div style="margin-top:8px;font-size:10px;color:var(--text-muted);font-weight:600">Recently listed:</div>
+        <div style="max-height:130px;overflow-y:auto">`;
+      for (const r of data.recent.slice(0, 10)) {
+        html += `<div class="metric-row" style="padding:2px 0">
+          <span class="metric-label">${_itEsc(r.listed?.slice(0,10) || '')}</span>
+          <span class="metric-value">${_itEsc(r.name)} <span style="opacity:.6;font-size:9px">${_itEsc(r.type)}</span></span>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// UN sanctions load error: ${_itEsc(e.message.slice(0,80))}</div>`;
+  }
 }
 
 async function intelLoadSanctionsImpact() {
