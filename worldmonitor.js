@@ -581,9 +581,11 @@ async function wmMacroSignals() {
               <div class="wm-sig-desc">${wmEsc(s.desc)}</div>
             </div>
             <div class="wm-sig-vals">
-              <div class="wm-macro-val">${wmEsc(fmtN(s.cur, s.unit))}</div>
-              ${s.chgPct !== 0 ? `<div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${pos?'+':''}${s.chgPct.toFixed(2)}%</div>` : ''}
-              ${s.date ? `<div class="wm-sig-chg" style="color:var(--text-muted)">${wmEsc(s.date)}</div>` : ''}
+              <div class="wm-sig-vals-text">
+                <div class="wm-macro-val">${wmEsc(fmtN(s.cur, s.unit))}</div>
+                ${s.chgPct !== 0 ? `<div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${pos?'+':''}${s.chgPct.toFixed(2)}%</div>` : ''}
+                ${s.date ? `<div class="wm-sig-chg" style="color:var(--text-muted)">${wmEsc(s.date)}</div>` : ''}
+              </div>
               <div class="wm-sig-spark">${spark(s.vals, pos)}</div>
             </div>
             <div class="wm-sig-badge ${s.sig.c}">${s.sig.t}</div>
@@ -655,8 +657,10 @@ async function wmMacroSignals() {
             <div class="wm-sig-desc">${wmEsc(s.desc)}</div>
           </div>
           <div class="wm-sig-vals">
-            <div class="wm-macro-val">${wmEsc(s.fmtCur)}</div>
-            <div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${wmEsc(s.fmtChg)}</div>
+            <div class="wm-sig-vals-text">
+              <div class="wm-macro-val">${wmEsc(s.fmtCur)}</div>
+              <div class="${pos?'wm-up':'wm-dn'} wm-sig-chg">${wmEsc(s.fmtChg)}</div>
+            </div>
             <div class="wm-sig-spark">${spark(s.vals, pos)}</div>
           </div>
           <div class="wm-sig-badge ${s.signal.c}">${s.signal.t}</div>
