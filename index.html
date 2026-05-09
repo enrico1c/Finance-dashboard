@@ -734,7 +734,7 @@
         <button class="tab-btn"        data-tab="weather"  onclick="switchTab('supply','weather');if(typeof meteoLoadSupplyWeather==='function')meteoLoadSupplyWeather()">WEATHER</button>
         <button class="tab-btn"        data-tab="agri"    onclick="switchTab('supply','agri');if(typeof commRenderAgri==='function'&&!document.getElementById('supply-agri')?.dataset?.loaded){document.getElementById('supply-agri').dataset.loaded='1';commRenderAgri()}">🌾 AGRI</button>
         <button class="tab-btn"        data-tab="cot"     onclick="switchTab('supply','cot');if(typeof commRenderCOT==='function'&&!document.getElementById('supply-cot')?.dataset?.loaded){document.getElementById('supply-cot').dataset.loaded='1';commRenderCOT()}">📊 COT</button>
-        <button class="tab-btn"        data-tab="trademap" onclick="switchTab('supply','trademap');(function(){var el=document.getElementById('supply-trademap');if(el&&!el.dataset.loaded){el.dataset.loaded='1';el.innerHTML='<iframe src=\'./trade-monitor/index.html\' style=\'width:100%;height:100%;border:none;\' allow=\'fullscreen\'></iframe>'}})()">🗺 TRADE MAP</button>
+        <button class="tab-btn"        data-tab="traderoutes" onclick="switchTab('supply','traderoutes');(function(){var el=document.getElementById('supply-traderoutes');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof tradeRoutesLoad==='function')tradeRoutesLoad()}})()">🚨 ROUTES</button>
       </div>
       <div class="tab-pane active panel-content" data-tab="choke"    id="supply-choke"></div>
       <div class="tab-pane        panel-content" data-tab="ship"     id="supply-ship"></div>
@@ -761,7 +761,7 @@
       <div class="tab-pane        panel-content" data-tab="weather"  id="supply-weather"></div>
       <div class="tab-pane        panel-content" data-tab="agri"     id="supply-agri"></div>
       <div class="tab-pane        panel-content" data-tab="cot"      id="supply-cot"></div>
-      <div class="tab-pane        panel-content" data-tab="trademap" id="supply-trademap" style="padding:0;overflow:hidden;"></div>
+      <div class="tab-pane        panel-content" data-tab="traderoutes" id="supply-traderoutes"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
@@ -1357,6 +1357,7 @@ document.addEventListener("DOMContentLoaded", () => {
   <script src="minerals.js"></script>
   <script src="agriculture.js"></script>
   <script src="tradeflows.js"></script>
+  <script src="tradedata.js"></script>
   <script src="positioning.js"></script>
   <script src="intel.js"></script>
   <script src="ffcalendar.js"></script>
