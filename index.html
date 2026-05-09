@@ -244,7 +244,6 @@
         <button class="tab-btn"        data-tab="div"     onclick="switchTab('fundamentals','div');if(typeof fmpLoadDividends==='function')fmpLoadDividends(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">DIV</button>
         <button class="tab-btn"        data-tab="filings" onclick="switchTab('fundamentals','filings');if(typeof fmpLoadSecFilings==='function')fmpLoadSecFilings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">FILINGS</button>
         <button class="tab-btn"        data-tab="yf-fin"  onclick="switchTab('fundamentals','yf-fin');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadFinancials==='function')yfLoadFinancials(s)})()">YF·FIN</button>
-        <button class="tab-btn"        data-tab="yf-opt"  onclick="switchTab('fundamentals','yf-opt');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('yf-options');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof OptionsChainUI!=='undefined'&&OptionsChainUI.render){var price=parseFloat(document.querySelector('.qh-price')?.textContent?.replace(/[^0-9.]/g,'')||0);OptionsChainUI.render('yf-options',s,price||100);}else if(typeof yfLoadOptions==='function'){yfLoadOptions(s);}}})()">OPTIONS</button>
         <button class="tab-btn"        data-tab="yf-hld"  onclick="switchTab('fundamentals','yf-hld');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHolders==='function')yfLoadHolders(s)})()">YF·HLD</button>
         <button class="tab-btn"        data-tab="yf-hist" onclick="switchTab('fundamentals','yf-hist');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHistory==='function')yfLoadHistory(s)})()">YF·HIST</button>
       </div>
@@ -288,7 +287,6 @@
       <div class="tab-pane        panel-content" data-tab="div"     id="fund-div"></div>
       <div class="tab-pane        panel-content" data-tab="filings" id="fund-filings"></div>
       <div class="tab-pane        panel-content" data-tab="yf-fin"  id="yf-financials"></div>
-      <div class="tab-pane        panel-content" data-tab="yf-opt"  id="yf-options"></div>
       <div class="tab-pane        panel-content" data-tab="yf-hld"  id="yf-holders"></div>
       <div class="tab-pane        panel-content" data-tab="yf-hist" id="yf-history"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
@@ -527,7 +525,7 @@
       <div class="tab-pane" data-tab="quakes" id="geo-quakes">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">USGS Seismic · M4.5+ global real-time</span>
-          <button class="geo-cross-btn" onclick="switchTab('alert','wm');showPanel('alert');if(typeof wmAlertLoad==='function')wmAlertLoad('quake')">⚡ Alert Feed</button>
+          <button class="geo-cross-btn" onclick="switchTab('alert','noaa');showPanel('alert');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">⚡ Alert Feed</button>
           <button class="geo-cross-btn" onclick="if(typeof usgsLoadQuakes==='function')usgsLoadQuakes()">↻ Refresh</button>
         </div>
         <div id="geo-quakes-usgs" class="panel-content"></div>
@@ -782,14 +780,10 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="wm" onclick="switchTab('alert','wm')">📰 @DeItaone</button>
-        <button class="tab-btn" data-tab="noaa" onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
+        <button class="tab-btn active" data-tab="noaa" onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
         <button class="tab-btn" data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
       </div>
-            <div class="tab-pane active panel-content" data-tab="wm" id="alert-feed" style="overflow-y:auto; padding:8px 10px; height: calc(100% - 80px);">
-        <div id="alert-feed-inner"></div>
-      </div>
-      <div class="tab-pane panel-content" data-tab="noaa" id="alert-noaa"></div>
+      <div class="tab-pane active panel-content" data-tab="noaa" id="alert-noaa"></div>
       <div class="tab-pane panel-content" data-tab="eonet" id="alert-eonet"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
@@ -1047,7 +1041,6 @@
 <script src="fmp.js"></script>
 <script src="finnhub.js"></script>
 <script src="eodhd.js"></script>
-<script src="apitube.js"></script>
 <script src="massive.js"></script>
 <script src="worldmonitor.js"></script>
 <script src="supabase.js"></script>

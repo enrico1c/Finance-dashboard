@@ -258,7 +258,8 @@ function wmAlertInit() {
   if (typeof initDrag   === 'function') initDrag(panel);
   if (typeof initResize === 'function') initResize(panel);
   if (typeof bringToFront === 'function') bringToFront(panel);
-  wmAlertLoad('all');
+  // Load NOAA as default (alert-feed/apitube removed — requires paid subscription)
+  if (typeof noaaLoadAlerts === 'function') noaaLoadAlerts();
 }
 
 /* ─── internal state ────────────────────────────────────────────── */
@@ -1262,7 +1263,7 @@ function wmInitAll() {
     WM_CACHE.clear(); // clear cache to force fresh data
     wmSupplyChokepoints();
     wmSupplyShipping();
-    wmAlertLoad(document.querySelector('#panel-alert .wm-filter-btn.active')?.dataset.filter || 'all');
+    if (typeof noaaLoadAlerts === 'function') noaaLoadAlerts();
     wmMacroSignals();
     wmMacroCommodities();
     wmMacroRisk();
