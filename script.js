@@ -1473,48 +1473,44 @@ function computeDefaultLayout(){
   const canvas = document.getElementById("dashboardCanvas");
   const W = canvas.clientWidth, H = canvas.clientHeight, G = 6;
 
-  /* ── Screenshot-faithful layout ──────────────────────────────
-     4 master columns (top row, no stacking):
+  /* ── Default layout ──────────────────────────────────────────
+     4 master columns (top row):
        Chart ≈28%  |  News ≈21%  |  Macro ≈34%  |  Geo ≈17%
      Row heights:
        Top row ≈56%  (chart | news | macro | geo)
-       Bot row ≈44%  (watchlist | analysts | comparables | ownership | alert | supply)
+       Bot row ≈44%  (watchlist | analysts | ownership | alert | supply)
      Bottom row aligns to top columns:
        col1→watchlist, col2→analysts,
-       col3 splits→comparables+ownership, col4 splits→alert+supply
+       col3→ownership (full width), col4 splits→alert+supply
   ──────────────────────────────────────────────────────────────── */
 
   const colA = Math.round(W * 0.28);   // Chart / Watchlist col
   const colB = Math.round(W * 0.21);   // News / Analysts col
-  const colC = Math.round(W * 0.34);   // Macro col (splits into comparables+ownership)
+  const colC = Math.round(W * 0.34);   // Macro / Ownership col (full, no split)
   const colD = W - colA - colB - colC - G*3; // Geo col (splits into alert+supply)
 
   const rowT = Math.round(H * 0.56);   // Top row height
   const rowB = H - rowT - G;           // Bottom row height
   const botY = rowT + G;
 
-  // ── TOP ROW (4 full-height columns, no stacking) ────────────
+  // ── TOP ROW (4 full-height columns) ─────────────────────────
   panelLayout.chart        = {x: 0,                          y: 0, w: colA, h: rowT};
   panelLayout.news         = {x: colA+G,                     y: 0, w: colB, h: rowT};
   panelLayout.macro        = {x: colA+colB+G*2,              y: 0, w: colC, h: rowT};
   panelLayout.geopolitical = {x: colA+colB+colC+G*3,         y: 0, w: colD, h: rowT};
 
-  // ── BOTTOM ROW (6 panels aligned to top columns) ────────────
-  const cC1 = Math.round((colC - G) / 2);   // left half of macro col
-  const cC2 = colC - cC1 - G;               // right half of macro col
+  // ── BOTTOM ROW (5 panels) ────────────────────────────────────
   const cD1 = Math.round((colD - G) / 2);   // left half of geo col
   const cD2 = colD - cD1 - G;               // right half of geo col
 
   const xB2 = colA + G;
   const xB3 = colA + colB + G*2;
-  const xB4 = xB3 + cC1 + G;
   const xB5 = colA + colB + colC + G*3;
   const xB6 = xB5 + cD1 + G;
 
   panelLayout.watchlist    = {x: 0,   y: botY, w: colA, h: rowB};
   panelLayout.analysts     = {x: xB2, y: botY, w: colB, h: rowB};
-  panelLayout.comparables  = {x: xB3, y: botY, w: cC1,  h: rowB};
-  panelLayout.ownership    = {x: xB4, y: botY, w: cC2,  h: rowB};
+  panelLayout.ownership    = {x: xB3, y: botY, w: colC, h: rowB};
   panelLayout.alert        = {x: xB5, y: botY, w: cD1,  h: rowB};
   panelLayout.supply       = {x: xB6, y: botY, w: cD2,  h: rowB};
 
@@ -1552,11 +1548,11 @@ function initLayout(){
   Object.keys(panelLayout).forEach(applyPanelPosition);
 
   // 2. Then set visibility:
-  //    Visible at startup: chart, news, macro, geopolitical (top row, 4 full-height cols)
-  //                        watchlist, analysts, comparables, ownership, alert, supply (bottom row)
+  //    Visible at startup: chart, news, macro, geopolitical (top row)
+  //                        watchlist, analysts, ownership, alert, supply (bottom row)
   //    Hidden by default: fundamentals, webhooks, intel, notes, portfolio, screener
   const startVisible = ["chart","news","macro","geopolitical",
-    "watchlist","analysts","comparables","ownership","alert","supply"];
+    "watchlist","analysts","ownership","alert","supply"];
   const startHidden  = ["fundamentals","webhooks","intel","notes","portfolio","screener"];
 
   startVisible.forEach(id => {
