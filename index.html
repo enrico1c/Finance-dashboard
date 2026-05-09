@@ -551,9 +551,11 @@
       <div class="tab-pane panel-content" data-tab="fema" id="geo-fema">
         <div class="geo-cross-bar">
           <span class="geo-cross-label">OpenFEMA · GDACS Global Disasters · No API key</span>
-          <button class="geo-cross-btn" onclick="if(typeof femaLoadDisasters==='function')femaLoadDisasters();if(typeof gdacsLoadEvents==='function')gdacsLoadEvents()">↻ Refresh</button>
-          <button class="geo-cross-btn" onclick="if(typeof gdacsLoadEvents==='function')gdacsLoadEvents()">🌍 GDACS</button>
+          <button class="geo-cross-btn" onclick="if(typeof femaLoadDisasters==='function'){document.getElementById('geo-fema-content').dataset.loaded='';femaLoadDisasters();}if(typeof gdacsLoadEvents==='function'){document.getElementById('geo-gdacs-content').dataset.loaded='';gdacsLoadEvents();}">↻ Refresh</button>
+          <button class="geo-cross-btn" onclick="if(typeof gdacsLoadEvents==='function'){document.getElementById('geo-gdacs-content').dataset.loaded='';gdacsLoadEvents();}">🌍 GDACS</button>
         </div>
+        <div id="geo-fema-content"></div>
+        <div id="geo-gdacs-content"></div>
       </div>
 
       <!-- AIR QUALITY TAB — OpenAQ v3 + WAQI fallback -->

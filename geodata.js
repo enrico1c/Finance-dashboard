@@ -369,7 +369,7 @@ window.eonetLoadEvents = async function() {
    5. OPENFEMA  — US disaster declarations
    ══════════════════════════════════════════════════════════════════ */
 window.femaLoadDisasters = async function() {
-  const el = document.getElementById("geo-fema");
+  const el = document.getElementById("geo-fema-content");
   if (!el) return;
   if (el.dataset.loaded === "1") return;
   const url  = "https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$orderby=declarationDate desc&$top=30&$format=json";
@@ -395,6 +395,88 @@ window.femaLoadDisasters = async function() {
   });
   html += `</tbody></table>
   <div class="av-note" style="margin-top:6px">// IH=Individuals & Households · IA=Individual Assistance · PA=Public Assistance · HM=Hazard Mitigation</div>`;
+  el.dataset.loaded = "1";
+  el.innerHTML = html;
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   GDACS — Global Disaster Alert & Coordination System (RSS)
+   Source: gdacs.org/xml/rss.xml (via backend proxy)
+   Target: geo-gdacs-content inside the FEMA tab
+   ══════════════════════════════════════════════════════════════════ */
+window.gdacsLoadEvents = async function() {
+  const el = document.getElementById("geo-gdacs-content");
+  if (!el) return;
+  if (el.dataset.loaded === "1") return;
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading GDACS global disasters…</div>`;
+
+  const rssText = await gdFetch("https://www.gdacs.org/xml/rss.xml", "gdacs_rss",
+    { signal: AbortSignal.timeout(14000) });
+
+  if (!rssText) {
+    el.innerHTML = `<div class="no-data">// GDACS feed unavailable.</div>`;
+    return;
+  }
+
+  let items = [];
+  try {
+    const xml = new DOMParser().parseFromString(rssText, "text/xml");
+    items = Array.from(xml.querySelectorAll("item"));
+  } catch(e) {
+    el.innerHTML = `<div class="no-data">// GDACS parse error.</div>`;
+    return;
+  }
+
+  if (!items.length) {
+    el.innerHTML = `<div class="no-data">// No GDACS events found.</div>`;
+    return;
+  }
+
+  const getNS = (item, tag) => {
+    const node = item.getElementsByTagNameNS("*", tag)[0] || item.querySelector(tag);
+    return node ? node.textContent.trim() : "";
+  };
+  const get = (item, tag) => {
+    const node = item.querySelector(tag);
+    return node ? node.textContent.trim() : "";
+  };
+
+  const alertColor = { Red:"#f85149", Orange:"#f0883e", Green:"#3fb950" };
+  const typeIcon   = { EQ:"🌍", TC:"🌀", FL:"🌊", VO:"🌋", WF:"🔥", DR:"☀️", LS:"⛰️" };
+
+  let html = `<div class="av-live-badge" style="margin-top:8px">● GDACS · Global Disasters · Live RSS</div>`;
+  html += `<div style="overflow-y:auto;max-height:220px">`;
+
+  items.slice(0, 20).forEach(item => {
+    const title   = get(item, "title") || "Event";
+    const link    = get(item, "link");
+    const pub     = get(item, "pubDate");
+    const alert   = getNS(item, "alertlevel") || "Green";
+    const evType  = (getNS(item, "eventtype") || "").toUpperCase();
+    const country = getNS(item, "country");
+    const severity= getNS(item, "severity");
+    const col     = alertColor[alert] || "#8b949e";
+    const icon    = typeIcon[evType] || "⚠";
+    const dateStr = pub ? new Date(pub).toLocaleDateString("en-GB",{day:"2-digit",month:"short"}) : "";
+
+    html += `<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:14px;flex-shrink:0">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${link ? `<a href="${link}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${title}</a>` : title}
+        </div>
+        <div style="font-size:9px;color:var(--text-muted);margin-top:1px">
+          ${country ? country + " · " : ""}${severity || ""}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <span style="font-size:9px;font-weight:700;color:${col};border:1px solid ${col}40;background:${col}15;padding:1px 5px;border-radius:3px">${alert}</span>
+        ${dateStr ? `<div style="font-size:8px;color:var(--text-muted);margin-top:2px">${dateStr}</div>` : ""}
+      </div>
+    </div>`;
+  });
+
+  html += `</div>`;
   el.dataset.loaded = "1";
   el.innerHTML = html;
 };
