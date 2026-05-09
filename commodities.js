@@ -1220,17 +1220,16 @@ window.commRenderEnergy = async function() {
   if (!el) return;
   el.innerHTML = `<div class="wm-loading"><div class="wm-spin"></div>Loading energy data…</div>`;
 
-  // Stooq (proxied, reliable) + EIA API v2 (backend key) + ENTSOG + GIE in parallel
+  // Stooq (proxied, needs auth) + EIA API v2 (backend key) + ENTSOG + GIE in parallel
   const stooqFetch = s => fetch(`https://stooq.com/q/l/?s=${s}&f=sd2t2ohlcvn&h&e=json`,
-    {signal:AbortSignal.timeout(8000)}).then(r=>r.json()).catch(()=>null);
+    {signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null);
   const eiaFetch = (path, series) => fetch(
     `https://api.eia.gov/v2/${path}/?frequency=weekly&data%5B0%5D=value&facets%5Bseries%5D%5B%5D=${series}&start=2024-01-01&length=2`,
-    {signal:AbortSignal.timeout(12000)}).then(r=>r.json()).catch(()=>null);
+    {signal:AbortSignal.timeout(12000)}).then(r=>r.ok?r.json():null).catch(()=>null);
 
-  const [sqWTI, sqNG, sqPalm, entsogRes, gieRes, eiaBrent, eiaWTI, eiaHH] = await Promise.allSettled([
+  const [sqWTI, sqNG, entsogRes, gieRes, eiaBrent, eiaWTI, eiaHH] = await Promise.allSettled([
     stooqFetch('cl.f'),   // WTI crude
     stooqFetch('ng.f'),   // Henry Hub gas
-    stooqFetch('pa.f'),   // Palladium (drop-in for generic)
     commFetchENTSOG(),
     commFetchGIEStorage(),
     eiaFetch('petroleum/pri/spt/data', 'RBRTE'),   // Brent via EIA API (backend key)
@@ -1288,8 +1287,13 @@ window.commRenderEnergy = async function() {
     });
     html += '</div>';
   } else {
+    // Retry once after 4s — authentication may not have completed on first load
+    setTimeout(async () => {
+      const fresh = document.getElementById('supply-energy');
+      if (fresh && window._FINTERM_AUTHENTICATED) commRenderEnergy();
+    }, 4000);
     html += `<div style="padding:12px;font-size:10px;color:var(--text-muted)">
-      Energy price data temporarily unavailable. EIA backend key may not be set in production.
+      Loading energy prices… (retrying)
     </div>`;
   }
 

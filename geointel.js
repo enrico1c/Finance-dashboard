@@ -100,30 +100,29 @@ window.geoLoadTerror = async function() {
   el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Fetching terrorism &amp; conflict events from GDELT…</div>';
 
   try {
-    // Sequential GDELT text queries (rate limit: 1/5s) — theme: codes are unreliable
-    const gdelt = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
-    gdelt.searchParams.set('mode', 'artlist');
-    gdelt.searchParams.set('format', 'json');
-    gdelt.searchParams.set('timespan', '3d');
-    gdelt.searchParams.set('sourcelang', 'english');
-    gdelt.searchParams.set('maxrecords', '30');
+    // Single GDELT query covering terrorism + conflict (avoids double rate-limit hit)
+    const gdeltUrl = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' +
+      encodeURIComponent('terrorism bomb attack explosion war conflict military airstrike') +
+      '&mode=artlist&maxrecords=30&format=json&timespan=7d&sourcelang=english';
 
-    gdelt.searchParams.set('query', 'terrorism attack bomb explosion suicide-bomber');
-    const terrorRes = await fetch(gdelt.toString(), { signal: AbortSignal.timeout(10000) });
-    const terrorData = terrorRes.ok ? await terrorRes.json() : null;
+    let gdeltRes = await fetch(gdeltUrl, { signal: AbortSignal.timeout(12000) });
 
-    // 6s gap to respect GDELT rate limit (1 req/5s)
-    await new Promise(r => setTimeout(r, 6000));
+    // Retry once if rate limited (backend may have just served another GDELT panel)
+    if (gdeltRes.status === 429) {
+      await new Promise(r => setTimeout(r, 5500));
+      gdeltRes = await fetch(gdeltUrl, { signal: AbortSignal.timeout(12000) });
+    }
 
-    gdelt.searchParams.set('query', 'armed conflict war airstrike military offensive');
-    gdelt.searchParams.set('maxrecords', '20');
-    const conflictRes = await fetch(gdelt.toString(), { signal: AbortSignal.timeout(10000) });
-    const conflictData = conflictRes.ok ? await conflictRes.json() : null;
+    const gdeltData = gdeltRes.ok ? await gdeltRes.json() : null;
+    const raw = gdeltData?.articles || [];
 
-    const articles = [
-      ...((terrorData?.articles   || []).map(a => ({ ...a, cat: 'TERROR',  catColor: '#f85149' }))),
-      ...((conflictData?.articles || []).map(a => ({ ...a, cat: 'CONFLICT',catColor: '#58a6ff' }))),
-    ];
+    // Classify articles by keyword
+    const articles = raw.map(a => {
+      const t = (a.title || '').toLowerCase();
+      const isTerror = /terror|bomb|explosion|attack|suicide.bomb/.test(t);
+      return { ...a, cat: isTerror ? 'TERROR' : 'CONFLICT',
+               catColor: isTerror ? '#f85149' : '#58a6ff' };
+    });
 
     if (!articles.length) {
       el.innerHTML = '<div class="no-data">// No terrorism/conflict events in last 3 days (GDELT).</div>';
