@@ -136,7 +136,6 @@
         <label><input type="checkbox" class="panel-toggle" data-panel="news"         checked> News</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="analysts"     checked> Analysts</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked> Ownership</label>
-        <label><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked> Comparables</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="notes"       > Notes</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="watchlist"    checked> Watchlist</label>
         <label><input type="checkbox" class="panel-toggle" data-panel="geopolitical" checked> Geo·Risk</label>
@@ -175,7 +174,6 @@
           <div class="modules-tray-section">Analysis</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="fundamentals" checked><span class="mti-icon">📊</span><span class="mti-label">Fundamentals</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="analysts"     checked><span class="mti-icon">🔬</span><span class="mti-label">Analysts</span></label>
-          <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="comparables"  checked><span class="mti-icon">⚖️</span><span class="mti-label">Comparables</span></label>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="ownership"    checked><span class="mti-icon">🏛</span><span class="mti-label">Ownership</span></label>
           <div class="modules-tray-section">News &amp; Notes</div>
           <label class="modules-tray-item"><input type="checkbox" class="panel-toggle" data-panel="news"         checked><span class="mti-icon">📰</span><span class="mti-label">News</span></label>
@@ -375,25 +373,6 @@
       <div class="size-tooltip" id="tooltip-analysts"></div>
     </section>
 
-    <!-- ▸ COMPARABLES ───────────────────────────────────────────── -->
-    <section class="panel hidden" id="panel-comparables" data-panel="comparables">
-      <div class="panel-head">
-        <div class="drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="panel-title-row">
-          <h3>▸ Comparables</h3>
-          <div class="mode-label" id="compLabel">Sector peers</div>
-        </div>
-        <div class="panel-actions">
-          <button class="icon-btn close" onclick="hidePanel('comparables')">✕</button>
-        </div>
-      </div>
-      <div id="comp-main" class="panel-content comp-main-content"></div>
-      <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
-      <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
-      <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
-      <div class="resize-handle" data-dir="sw"></div><div class="resize-handle" data-dir="se"></div>
-      <div class="size-tooltip" id="tooltip-comparables"></div>
-    </section>
 
     <!-- ▸ NOTES ────────────────────────────────────────────────── -->
     <section class="panel hidden" id="panel-notes" data-panel="notes">
