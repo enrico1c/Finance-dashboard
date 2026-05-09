@@ -103,59 +103,66 @@ async function _techFallbackAV(sym) {
 }
 
 
-/* ── Stooq.com fallback (no key, EOD CSV, global markets) ────────── */
+/* ── Yahoo Finance fallback (no key, unofficial chart API, global) ── */
 async function _techFallbackStooq(sym) {
-  /* Stooq provides free EOD OHLCV CSV for 5000+ global tickers.
-     URL: https://stooq.com/q/d/l/?s={sym}.US&i=d
-     Supports: US equities (.US), indices (^SPX), forex, etc.  */
-  const cacheKey = `tc_stooq:${sym}`;
+  // Stooq now requires API key — replaced with Yahoo Finance chart API
+  const cacheKey = `tc_yf:${sym}`;
   const cached   = _tcGet(cacheKey, 30*60*1000);
   if (cached) return cached;
 
-  // Try several Stooq suffix conventions
-  const suffixes = ['.US', '.UK', '', '^'+sym]; // US equities, UK, no suffix, index
-  const base = sym.replace(/^\^/,''); // strip ^ from indices
+  // Yahoo Finance unofficial chart endpoint (CORS-accessible, no key)
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=2y&includePrePost=false`;
+  try {
+    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`YF HTTP ${res.status}`);
+    const json = await res.json();
+    const result = json?.chart?.result?.[0];
+    if (!result?.timestamp?.length) throw new Error('No YF data');
 
-  for (const sfx of suffixes) {
-    const ticker = sfx.startsWith('^') ? sfx : (base + sfx);
-    try {
-      const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(ticker.toLowerCase())}&i=d`;
-      const res      = await fetch(stooqUrl, { signal: AbortSignal.timeout(8000) });
-      const text     = await res.text();
-      if (!text || text.includes('No data') || text.trim().length < 50) continue;
+    const ts   = result.timestamp;
+    const q    = result.indicators?.quote?.[0] || {};
+    const adj  = result.indicators?.adjclose?.[0]?.adjclose || q.close;
 
-      // Parse CSV: Date,Open,High,Low,Close,Volume
-      const lines   = text.trim().split('\n');
-      const header  = lines[0].toLowerCase();
-      if (!header.includes('close')) continue;
+    const candles = {
+      t: ts,
+      o: q.open  || [],
+      h: q.high  || [],
+      l: q.low   || [],
+      c: (adj    || q.close || []).map(v => v ?? null),
+      v: q.volume || [],
+      sym, resolution: 'D', _src: 'Yahoo Finance',
+    };
 
-      const rows = lines.slice(1)
-        .filter(l => l.trim())
-        .map(l => l.split(','))
-        .filter(r => r.length >= 5 && r[0].match(/^\d{4}-\d{2}-\d{2}$/))
-        .sort((a, b) => a[0] < b[0] ? -1 : 1)
-        .slice(-300);
+    const validC = candles.c.filter(v => v != null && !isNaN(v) && v > 0);
+    if (validC.length < 20) throw new Error('YF data too sparse');
 
-      if (rows.length < 30) continue;
-
-      const candles = {
-        t: rows.map(r => Math.floor(new Date(r[0]).getTime()/1000)),
-        o: rows.map(r => parseFloat(r[1])),
-        h: rows.map(r => parseFloat(r[2])),
-        l: rows.map(r => parseFloat(r[3])),
-        c: rows.map(r => parseFloat(r[4])),
-        v: rows.map(r => parseFloat(r[5] || 0)),
-        sym, resolution: 'D', _src: 'Stooq',
-      };
-
-      // Validate: reject if NaN-heavy
-      const validC = candles.c.filter(v => !isNaN(v) && v > 0);
-      if (validC.length < 20) continue;
-
-      _tcSet(cacheKey, candles);
-      return candles;
-    } catch { continue; }
+    _tcSet(cacheKey, candles);
+    return candles;
+  } catch (e) {
+    console.warn('[YF fallback]', e.message);
   }
+
+  // Last resort: Alpaca daily bars if keys are set
+  const { id, secret, ok } = _alpacaKeys?.() || {};
+  if (ok) {
+    try {
+      const url2 = new URL(`https://data.alpaca.markets/v2/stocks/${encodeURIComponent(sym)}/bars`);
+      url2.searchParams.set('timeframe', '1Day');
+      url2.searchParams.set('limit', '300');
+      url2.searchParams.set('sort', 'asc');
+      url2.searchParams.set('feed', 'iex');
+      const res2 = await fetch(url2.toString(), {
+        headers: { 'APCA-API-KEY-ID': id, 'APCA-API-SECRET-KEY': secret },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res2.ok) {
+        const j = await res2.json();
+        const result = _parseAlpacaBars ? _parseAlpacaBars(j.bars || [], sym, '1Day') : null;
+        if (result) { _tcSet(cacheKey, result); return result; }
+      }
+    } catch (e2) { console.warn('[Alpaca daily fallback]', e2.message); }
+  }
+
   return null;
 }
 
