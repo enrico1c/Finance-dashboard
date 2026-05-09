@@ -1522,10 +1522,11 @@ function computeDefaultLayout(){
   panelLayout.supply    = {x: bX5, y: botY, w: bW5, h: botH};
 
   // ── SECONDARY (hidden by default, floating when opened) ─────
-  panelLayout.fundamentals = {x: Math.round(W*0.1),  y: Math.round(H*0.1), w: colB, h: rowT};
-  panelLayout.webhooks     = {x: Math.round(W*0.35), y: Math.round(H*0.1), w: colB, h: rowT};
-  panelLayout.intel        = {x: Math.round(W*0.2),  y: botY, w: Math.round(W*0.35), h: rowB};
-  panelLayout.notes        = {x: Math.round(W*0.3),  y: Math.round(H*0.2), w: Math.round(W*0.28), h: Math.round(H*0.45)};
+  const floatW = Math.round(W * 0.30);
+  panelLayout.fundamentals = {x: Math.round(W*0.1),  y: Math.round(H*0.1),  w: floatW, h: topH};
+  panelLayout.webhooks     = {x: Math.round(W*0.35), y: Math.round(H*0.1),  w: floatW, h: topH};
+  panelLayout.intel        = {x: Math.round(W*0.2),  y: botY, w: Math.round(W*0.35), h: botH};
+  panelLayout.notes        = {x: Math.round(W*0.3),  y: Math.round(H*0.2),  w: Math.round(W*0.28), h: Math.round(H*0.45)};
   panelLayout.portfolio    = {x: Math.round(W*0.1),  y: Math.round(H*0.05), w: Math.round(W*0.80), h: Math.round(H*0.88)};
   panelLayout.screener     = {x: Math.round(W*0.05), y: Math.round(H*0.04), w: Math.round(W*0.90), h: Math.round(H*0.90)};
 
