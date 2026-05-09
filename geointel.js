@@ -97,6 +97,14 @@ window.geoLoadTerror = async function() {
   const wrapper = document.getElementById('geo-terror');
   if (!el) return;
 
+  // If not yet authenticated, wait for auth-ready event then re-run
+  if (!window._FINTERM_AUTHENTICATED) {
+    el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Waiting for session…</div>';
+    const _onAuth = () => { window.removeEventListener('finterm:auth-ready', _onAuth); window.geoLoadTerror(); };
+    window.addEventListener('finterm:auth-ready', _onAuth);
+    return;
+  }
+
   el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Fetching terrorism &amp; conflict events from GDELT…</div>';
 
   try {
@@ -107,7 +115,7 @@ window.geoLoadTerror = async function() {
 
     let gdeltRes = await fetch(gdeltUrl, { signal: AbortSignal.timeout(12000) });
 
-    // Retry once if rate limited (backend may have just served another GDELT panel)
+    // Retry once if rate limited
     if (gdeltRes.status === 429) {
       await new Promise(r => setTimeout(r, 5500));
       gdeltRes = await fetch(gdeltUrl, { signal: AbortSignal.timeout(12000) });

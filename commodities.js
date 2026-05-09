@@ -1287,13 +1287,11 @@ window.commRenderEnergy = async function() {
     });
     html += '</div>';
   } else {
-    // Retry once after 4s — authentication may not have completed on first load
-    setTimeout(async () => {
-      const fresh = document.getElementById('supply-energy');
-      if (fresh && window._FINTERM_AUTHENTICATED) commRenderEnergy();
-    }, 4000);
+    // Re-render when auth completes (panels load before session check finishes)
+    const _onAuth = () => { window.removeEventListener('finterm:auth-ready', _onAuth); commRenderEnergy(); };
+    window.addEventListener('finterm:auth-ready', _onAuth);
     html += `<div style="padding:12px;font-size:10px;color:var(--text-muted)">
-      Loading energy prices… (retrying)
+      Loading energy prices…
     </div>`;
   }
 

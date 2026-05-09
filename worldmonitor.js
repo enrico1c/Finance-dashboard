@@ -1275,6 +1275,17 @@ function wmInitAll() {
 
 document.addEventListener('DOMContentLoaded', wmInitAll);
 
+// Re-run proxied panels once authentication completes (they load empty before auth)
+window.addEventListener('finterm:auth-ready', () => {
+  wmGeoIntel();
+  wmGeoSignals();
+  wmGeoMilOps();
+  wmSupplyFlights();
+  wmMacroSignals();
+  wmMacroCrypto();
+  wmMacroPredictions();
+});
+
 /* ══════════════════════════════════════════════════════════════════
    INTEL FEED PANEL
    Breaking alerts: riskScores delta, insights, unrest, iran events,
