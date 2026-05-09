@@ -1474,48 +1474,52 @@ function computeDefaultLayout(){
   const W = canvas.clientWidth, H = canvas.clientHeight, G = 6;
 
   /* ── Default layout ──────────────────────────────────────────
-     TOP ROW (4 columns, independent of bottom):
-       Chart ≈28%  |  News ≈21%  |  Macro ≈34%  |  Geo ≈17%
-     BOTTOM ROW (5 columns, independent widths):
-       Watchlist ≈27%  |  Analysts ≈27%  |  Ownership ≈22%  |  Alert ≈12%  |  Supply ≈12%
-     Row heights: top ≈56%, bottom ≈44%
+     LEFT col (23%): Chart stacked above Analysts
+     CENTER col (47%): Macro-Intel — full top-section height
+     RIGHT col (30%): Geo-Risk — full top-section height
+     BOTTOM row (41% H): Watchlist | Ownership | Alert | News | Supply
   ──────────────────────────────────────────────────────────────── */
 
-  // ── TOP ROW columns ──────────────────────────────────────────
-  const colA = Math.round(W * 0.28);   // Chart
-  const colB = Math.round(W * 0.21);   // News
-  const colC = Math.round(W * 0.34);   // Macro
-  const colD = W - colA - colB - colC - G*3; // Geo
+  const colLeft   = Math.round(W * 0.23);
+  const colCenter = Math.round(W * 0.47);
+  const colRight  = W - colLeft - colCenter - G*2;
 
-  // ── BOTTOM ROW columns (independent widths) ──────────────────
-  const bW1 = Math.round(W * 0.27);   // Watchlist
-  const bW2 = Math.round(W * 0.27);   // Analysts
-  const bW3 = Math.round(W * 0.22);   // Ownership
-  const bW4 = Math.round(W * 0.12);   // Alert
-  const bW5 = W - bW1 - bW2 - bW3 - bW4 - G*4; // Supply (remainder)
+  const topH   = Math.round(H * 0.59);
+  const botY   = topH + G;
+  const botH   = H - topH - G;
 
-  const rowT = Math.round(H * 0.56);
-  const rowB = H - rowT - G;
-  const botY = rowT + G;
+  // ── LEFT COLUMN — Chart stacked over Analysts ────────────────
+  const chartH    = Math.round(topH * 0.51);
+  const analystsY = chartH + G;
+  const analystsH = topH - chartH - G;
 
-  // ── TOP ROW ──────────────────────────────────────────────────
-  panelLayout.chart        = {x: 0,                          y: 0, w: colA, h: rowT};
-  panelLayout.news         = {x: colA+G,                     y: 0, w: colB, h: rowT};
-  panelLayout.macro        = {x: colA+colB+G*2,              y: 0, w: colC, h: rowT};
-  panelLayout.geopolitical = {x: colA+colB+colC+G*3,         y: 0, w: colD, h: rowT};
+  panelLayout.chart     = {x: 0,            y: 0,        w: colLeft,   h: chartH};
+  panelLayout.analysts  = {x: 0,            y: analystsY, w: colLeft,   h: analystsH};
 
-  // ── BOTTOM ROW (free widths, not tied to top columns) ────────
+  // ── CENTER — Macro-Intel full top height ─────────────────────
+  panelLayout.macro     = {x: colLeft+G,    y: 0,  w: colCenter, h: topH};
+
+  // ── RIGHT — Geo-Risk full top height ─────────────────────────
+  panelLayout.geopolitical = {x: colLeft+colCenter+G*2, y: 0, w: colRight, h: topH};
+
+  // ── BOTTOM ROW (5 panels, independent widths) ────────────────
+  const bW1 = Math.round(W * 0.19);  // Watchlist
+  const bW2 = Math.round(W * 0.24);  // Ownership
+  const bW3 = Math.round(W * 0.14);  // Alert
+  const bW4 = Math.round(W * 0.18);  // News
+  const bW5 = W - bW1 - bW2 - bW3 - bW4 - G*4; // Supply
+
   const bX1 = 0;
   const bX2 = bX1 + bW1 + G;
   const bX3 = bX2 + bW2 + G;
   const bX4 = bX3 + bW3 + G;
   const bX5 = bX4 + bW4 + G;
 
-  panelLayout.watchlist    = {x: bX1, y: botY, w: bW1, h: rowB};
-  panelLayout.analysts     = {x: bX2, y: botY, w: bW2, h: rowB};
-  panelLayout.ownership    = {x: bX3, y: botY, w: bW3, h: rowB};
-  panelLayout.alert        = {x: bX4, y: botY, w: bW4, h: rowB};
-  panelLayout.supply       = {x: bX5, y: botY, w: bW5, h: rowB};
+  panelLayout.watchlist = {x: bX1, y: botY, w: bW1, h: botH};
+  panelLayout.ownership = {x: bX2, y: botY, w: bW2, h: botH};
+  panelLayout.alert     = {x: bX3, y: botY, w: bW3, h: botH};
+  panelLayout.news      = {x: bX4, y: botY, w: bW4, h: botH};
+  panelLayout.supply    = {x: bX5, y: botY, w: bW5, h: botH};
 
   // ── SECONDARY (hidden by default, floating when opened) ─────
   panelLayout.fundamentals = {x: Math.round(W*0.1),  y: Math.round(H*0.1), w: colB, h: rowT};
@@ -1551,11 +1555,14 @@ function initLayout(){
   Object.keys(panelLayout).forEach(applyPanelPosition);
 
   // 2. Then set visibility:
-  //    Visible at startup: chart, news, macro, geopolitical (top row)
-  //                        watchlist, analysts, ownership, alert, supply (bottom row)
-  //    Hidden by default: fundamentals, webhooks, intel, notes, portfolio, screener
-  const startVisible = ["chart","news","macro","geopolitical",
-    "watchlist","analysts","ownership","alert","supply"];
+  //    Visible at startup:
+  //      Left col:  chart (top) + analysts (bottom)
+  //      Center:    macro
+  //      Right:     geopolitical
+  //      Bottom row: watchlist | ownership | alert | news | supply
+  //    Hidden: fundamentals, webhooks, intel, notes, portfolio, screener
+  const startVisible = ["chart","analysts","macro","geopolitical",
+    "watchlist","ownership","alert","news","supply"];
   const startHidden  = ["fundamentals","webhooks","intel","notes","portfolio","screener"];
 
   startVisible.forEach(id => {
