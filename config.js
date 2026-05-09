@@ -202,6 +202,12 @@ function getCompaniesHouseKey() { return getKey("companieshouse"); }
 /* Phase 4 — Reference Data */
 function getTwelvedataKey()     { return getKey("twelvedata");     }
 
+/* LWC Chart — dedicated keys (NOT shared with proxy backend) */
+function getAlpacaId()     { return localStorage.getItem('finterm_alpaca_id')     || ''; }
+function getAlpacaSecret() { return localStorage.getItem('finterm_alpaca_secret') || ''; }
+function getRelayToken()   { return localStorage.getItem('finterm_relay_token')   || ''; }
+function getRelayUrl()     { return localStorage.getItem('finterm_relay_url')     || ''; }
+
 /* Fallback providers (apifallback.js) */
 function getTiingoKey()      { return getKey("tiingo");      }
 function getPolygonKey()     { return getKey("polygon");     }

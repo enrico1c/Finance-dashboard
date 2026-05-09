@@ -160,6 +160,137 @@ async function _techFallbackStooq(sym) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   PHASE 2 — INTRADAY WATERFALL
+   Alpaca Market Data API (new dedicated keys, no rate-limit overlap)
+   Endpoint: https://data.alpaca.markets/v2/stocks/{sym}/bars
+   Keys stored in localStorage: finterm_alpaca_id / finterm_alpaca_secret
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Resolution helpers */
+function _techResolutionMap(res) {
+  const map = {
+    '1m':  { isIntraday: true,  alpacaTf: '1Min',  fhRes: '1',   ttl: 60*1000    },
+    '5m':  { isIntraday: true,  alpacaTf: '5Min',  fhRes: '5',   ttl: 2*60*1000  },
+    '15m': { isIntraday: true,  alpacaTf: '15Min', fhRes: '15',  ttl: 5*60*1000  },
+    '1h':  { isIntraday: true,  alpacaTf: '1Hour', fhRes: '60',  ttl: 10*60*1000 },
+    '4h':  { isIntraday: true,  alpacaTf: '4Hour', fhRes: '240', ttl: 20*60*1000 },
+    '1D':  { isIntraday: false, alpacaTf: '1Day',  fhRes: 'D',   ttl: 15*60*1000 },
+    '1W':  { isIntraday: false, alpacaTf: '1Week', fhRes: 'W',   ttl: 60*60*1000 },
+    // Legacy Finnhub format passthrough
+    '1':   { isIntraday: true,  alpacaTf: '1Min',  fhRes: '1',   ttl: 60*1000    },
+    '5':   { isIntraday: true,  alpacaTf: '5Min',  fhRes: '5',   ttl: 2*60*1000  },
+    '15':  { isIntraday: true,  alpacaTf: '15Min', fhRes: '15',  ttl: 5*60*1000  },
+    '30':  { isIntraday: true,  alpacaTf: '30Min', fhRes: '30',  ttl: 5*60*1000  },
+    '60':  { isIntraday: true,  alpacaTf: '1Hour', fhRes: '60',  ttl: 10*60*1000 },
+    '240': { isIntraday: true,  alpacaTf: '4Hour', fhRes: '240', ttl: 20*60*1000 },
+    'D':   { isIntraday: false, alpacaTf: '1Day',  fhRes: 'D',   ttl: 15*60*1000 },
+    'W':   { isIntraday: false, alpacaTf: '1Week', fhRes: 'W',   ttl: 60*60*1000 },
+  };
+  return map[res] || map['D'];
+}
+
+function _alpacaKeys() {
+  const id     = localStorage.getItem('finterm_alpaca_id')     || '';
+  const secret = localStorage.getItem('finterm_alpaca_secret') || '';
+  return { id, secret, ok: !!(id && secret) };
+}
+
+/* Parse Alpaca bars response → internal { t[], o[], h[], l[], c[], v[] } */
+function _parseAlpacaBars(bars, sym, res) {
+  if (!Array.isArray(bars) || !bars.length) return null;
+  const sorted = [...bars].sort((a, b) => a.t < b.t ? -1 : 1);
+  return {
+    t: sorted.map(b => Math.floor(new Date(b.t).getTime() / 1000)),
+    o: sorted.map(b => b.o),
+    h: sorted.map(b => b.h),
+    l: sorted.map(b => b.l),
+    c: sorted.map(b => b.c),
+    v: sorted.map(b => b.v),
+    sym, resolution: res, _src: 'Alpaca',
+  };
+}
+
+/**
+ * Fetch intraday OHLCV from Alpaca Market Data API.
+ * Uses new dedicated keys (finterm_alpaca_id / finterm_alpaca_secret).
+ * Direct browser fetch — Alpaca data API supports CORS.
+ * @param {string} sym          — uppercase stock ticker, e.g. 'AAPL'
+ * @param {string} alpacaTf     — '1Min'|'5Min'|'15Min'|'1Hour'|'4Hour'|'1Day'|'1Week'
+ * @param {number} bars         — number of bars to fetch (max 10000)
+ * @returns {object|null}       — { t[], o[], h[], l[], c[], v[], sym, resolution } or null
+ */
+async function _techIntradayAlpaca(sym, alpacaTf = '5Min', bars = 300) {
+  const { id, secret, ok } = _alpacaKeys();
+  if (!ok) return null;
+
+  const cacheKey = `tc_alpaca:${sym}:${alpacaTf}`;
+  const ttl      = alpacaTf.includes('Min') ? 60*1000 : alpacaTf.includes('Hour') ? 5*60*1000 : 15*60*1000;
+  const cached   = _tcGet(cacheKey, ttl);
+  if (cached) return cached;
+
+  try {
+    const url = new URL(`https://data.alpaca.markets/v2/stocks/${encodeURIComponent(sym)}/bars`);
+    url.searchParams.set('timeframe', alpacaTf);
+    url.searchParams.set('limit',     String(Math.min(bars, 1000)));
+    url.searchParams.set('sort',      'asc');
+    url.searchParams.set('feed',      'iex'); // IEX = free; 'sip' = paid consolidated
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        'APCA-API-KEY-ID':     id,
+        'APCA-API-SECRET-KEY': secret,
+        'Accept':              'application/json',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) { console.warn('[Alpaca]', res.status, sym, alpacaTf); return null; }
+
+    const json   = await res.json();
+    const result = _parseAlpacaBars(json.bars || json.data?.bars || [], sym, alpacaTf);
+    if (result) _tcSet(cacheKey, result);
+    return result;
+  } catch (e) { console.warn('[Alpaca] fetch error:', e.message); return null; }
+}
+
+/**
+ * Fetch OHLCV from the local MT5 relay (http://localhost:8765).
+ * Gracefully returns null if the relay is not running.
+ * @param {string} sym     — MT5 symbol, e.g. 'EURUSD' or 'AAPL'
+ * @param {string} res     — LWC resolution string: '1m'|'5m'|'1h'|'1D' etc.
+ * @param {number} bars
+ */
+async function _techIntradayMT5(sym, res = '1D', bars = 300) {
+  const tfMap = {
+    '1m':'M1','5m':'M5','15m':'M15','30m':'M30',
+    '1h':'H1','4h':'H4','1D':'D1','1W':'W1',
+  };
+  const tf = tfMap[res] || 'D1';
+  try {
+    const url = `http://localhost:8765/ohlcv?sym=${encodeURIComponent(sym)}&tf=${tf}&bars=${bars}`;
+    const r   = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!Array.isArray(data) || !data.length) return null;
+    return {
+      t: data.map(b => b.time),
+      o: data.map(b => b.open),
+      h: data.map(b => b.high),
+      l: data.map(b => b.low),
+      c: data.map(b => b.close),
+      v: data.map(b => b.volume ?? 0),
+      sym, resolution: res, _src: 'MT5',
+    };
+  } catch { return null; }
+}
+
+/* Expose for lwchart.js Phase 2 bridge */
+window._techIntradayAlpaca = _techIntradayAlpaca;
+window._techIntradayMT5    = _techIntradayMT5;
+window._techResolutionMap  = _techResolutionMap;
+window._alpacaKeys         = _alpacaKeys;
+
+/* ══════════════════════════════════════════════════════════════════
    MATH — Pure JS indicator functions (no deps)
    ══════════════════════════════════════════════════════════════════ */
 function _sma(arr, n) {
