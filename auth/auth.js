@@ -95,6 +95,7 @@
   function unlockDashboard() {
     setAuthenticated(true);
     hideOverlay();
+    window._fintermAuthReady = true;
     window.dispatchEvent(new CustomEvent('finterm:auth-ready'));
   }
 

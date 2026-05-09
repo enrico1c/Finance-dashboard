@@ -1287,9 +1287,13 @@ window.commRenderEnergy = async function() {
     });
     html += '</div>';
   } else {
-    // Re-render when auth completes (panels load before session check finishes)
-    const _onAuth = () => { window.removeEventListener('finterm:auth-ready', _onAuth); commRenderEnergy(); };
-    window.addEventListener('finterm:auth-ready', _onAuth);
+    // Re-render when auth completes — guard against race where auth already fired
+    if (window._fintermAuthReady) {
+      setTimeout(window.commRenderEnergy, 400);
+    } else {
+      const _onAuth = () => { window.removeEventListener('finterm:auth-ready', _onAuth); window.commRenderEnergy(); };
+      window.addEventListener('finterm:auth-ready', _onAuth);
+    }
     html += `<div style="padding:12px;font-size:10px;color:var(--text-muted)">
       Loading energy prices…
     </div>`;

@@ -145,36 +145,25 @@ function _parseEiaApiJson(json) {
 }
 
 async function _eiaFetchSeries(s) {
-  const key = (typeof getEiaKey === 'function') ? getEiaKey() : '';
-  if (key && s.apiId) {
-    // Primary: EIA JSON API (reliable, requires free key)
-    const apiUrl = `https://api.eia.gov/v2/seriesid/${s.apiId}?api_key=${key}&data[]=value&frequency=daily&sort[0][column]=period&sort[0][direction]=desc&length=30`;
-    const json = await _enFetchJson(apiUrl, `eia_api_${s.id}`, 30 * 60 * 1000);
-    const result = _parseEiaApiJson(json);
-    if (result) return result;
-  }
-  // Fallback: public XLS download via allorigins proxy (no key, less reliable)
-  const raw = await _enFetch(_EN_PROXY + encodeURIComponent(s.url), `eia_xls_${s.id}`, 30 * 60 * 1000);
-  return _parseEiaXls(raw);
+  if (!s.apiId) return null;
+  // EIA API v2 — proxy-client intercepts and injects KEY_EIA automatically
+  const apiUrl = `https://api.eia.gov/v2/seriesid/${s.apiId}?data[]=value&frequency=daily&sort[0][column]=period&sort[0][direction]=desc&length=30`;
+  const json = await _enFetchJson(apiUrl, `eia_api_${s.id}`, 30 * 60 * 1000);
+  return _parseEiaApiJson(json);
 }
 
-/* EIA weekly natural gas storage */
+/* EIA weekly natural gas storage — EIA API v2 via backend proxy */
 async function _eiaGasStorage() {
-  const url = _EN_PROXY + encodeURIComponent(
-    'https://www.eia.gov/dnav/ng/hist_xls/NW2_EPG0_SWO_R48_BCFw.xls');
-  const raw = await _enFetch(url, 'eia_gas_storage', 60 * 60 * 1000);
-  if (!raw) return null;
+  const url = 'https://api.eia.gov/v2/natural-gas/stor/wkly/data/?frequency=weekly&data[0]=value&facets[series][]=NW2_EPG0_SWO_R48_BCF&sort[0][column]=period&sort[0][direction]=desc&length=60';
+  const json = await _enFetchJson(url, 'eia_gas_storage', 60 * 60 * 1000);
+  const obs = json?.response?.data;
+  if (!obs?.length) return null;
 
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  const rows  = [];
-  for (const line of lines) {
-    const parts = line.split('\t');
-    const date  = parts[0]?.trim();
-    const val   = parseFloat(parts[parts.length - 1]);
-    if (date && !isNaN(val) && val > 100) rows.push({ date, value: val });
-  }
+  const rows = obs
+    .filter(o => o.period && o.value != null && !isNaN(parseFloat(o.value)))
+    .map(o => ({ date: o.period, value: parseFloat(o.value) }))
+    .sort((a, b) => a.date > b.date ? 1 : -1);
   if (!rows.length) return null;
-  rows.sort((a, b) => a.date > b.date ? 1 : -1);
 
   const last = rows[rows.length - 1];
   const prev = rows.length >  1 ? rows[rows.length -  2] : null;
@@ -194,24 +183,15 @@ async function _eiaGasStorage() {
    OPEC BASKET  (HTML scrape via allorigins)
    ══════════════════════════════════════════════════════════════════ */
 async function _opecBasket() {
-  const html = await _enFetch(
-    _EN_PROXY + encodeURIComponent('https://www.opec.org/opec_web/en/data_graphs/40.htm'),
-    'opec_basket_html', 60 * 60 * 1000);
-  if (!html) return null;
-
-  /* The page contains a table with price rows like:
-     <td ...>72.45</td>  and date cells.
-     We collect all numeric tds and take the last plausible oil price. */
-  const prices = (html.match(/<td[^>]*>\s*([\d]{2,3}\.[\d]{1,3})\s*<\/td>/g) || [])
-    .map(td => parseFloat(td.replace(/<[^>]+>/g, '')))
-    .filter(v => !isNaN(v) && v > 20 && v < 300);
-
-  const dateMatch = html.match(
-    /(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
-  const date = dateMatch ? `${dateMatch[1]} ${dateMatch[2]} ${dateMatch[3]}` : 'Latest';
-
-  if (!prices.length) return null;
-  return { price: prices[prices.length - 1], date, unit: '$/bbl' };
+  // OPEC.org scraping is unreliable — use EIA Brent spot as proxy (OPEC basket ≈ Brent - $1-3)
+  // EIA API v2 via backend proxy (KEY_EIA injected automatically)
+  const url = 'https://api.eia.gov/v2/petroleum/pri/spt/data/?frequency=weekly&data[0]=value&facets[series][]=RBRTE&sort[0][column]=period&sort[0][direction]=desc&length=2';
+  const json = await _enFetchJson(url, 'opec_brent_proxy', 60 * 60 * 1000);
+  const rows = (json?.response?.data || []).filter(o => o.value != null);
+  if (!rows.length) return null;
+  const brent = parseFloat(rows[0].value);
+  if (isNaN(brent)) return null;
+  return { price: +(brent - 1.5).toFixed(2), date: rows[0].period, unit: '$/bbl', _proxy: true };
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -356,8 +336,7 @@ async function energyRender() {
   let html = '';
 
   /* ── US Benchmark Prices ─────────────────────────────────────── */
-  const _eiaKey = (typeof getEiaKey === 'function') ? getEiaKey() : '';
-  html += _enLiveBar('US Energy Benchmarks', _eiaKey ? 'EIA API · Live JSON' : 'EIA · XLS fallback · Daily updates');
+  html += _enLiveBar('US Energy Benchmarks', 'EIA API v2 · Daily JSON · Key via backend proxy');
   html += `<div class="en-price-grid">`;
   for (const { s, d } of eiaCards) html += _renderPriceCard(s, d);
 
@@ -367,9 +346,9 @@ async function energyRender() {
         <span class="en-pc-label">OPEC Basket</span>
         <span class="en-pc-unit">$/bbl</span></div>
       <div class="en-pc-val" style="color:#e05252">${_enFmt(opec.price)}</div>
-      <div class="en-pc-chg en-muted">13-country reference basket</div>
+      <div class="en-pc-chg en-muted">${opec._proxy ? 'Brent-based estimate' : '13-country reference basket'}</div>
       <div class="en-pc-meta"><span class="en-muted">${_enEsc(opec.date)}</span></div>
-      <div class="en-pc-note en-muted">OPEC official reference price</div>
+      <div class="en-pc-note en-muted">${opec._proxy ? 'EIA Brent proxy (OPEC ≈ Brent −$1.5)' : 'OPEC official reference price'}</div>
     </div>`;
   }
   html += `</div>`;
