@@ -1214,56 +1214,71 @@ async function _renderFertilizersTab(el, tabBar) {
   el.innerHTML = `<div class="av-live-badge">● Fertilizer Benchmarks · World Bank + EU Agri-food · No API Key</div>` + html;
 }
 
-/* ── Renderer: #supply-energy — EIA + OPEC + ENTSOG + GIE ─────────── */
+/* ── Renderer: #supply-energy — Stooq + EIA API + ENTSOG + GIE ────── */
 window.commRenderEnergy = async function() {
   const el = document.getElementById('supply-energy');
   if (!el) return;
   el.innerHTML = `<div class="wm-loading"><div class="wm-spin"></div>Loading energy data…</div>`;
 
-  const [wtiRes, gasRes, opecRes, entsogRes, gieRes, wbEnergyRes] = await Promise.allSettled([
-    commFetchEIA('wti'),
-    commFetchEIA('gas'),
-    commFetchOPEC(),
+  // Stooq (proxied, reliable) + EIA API v2 (backend key) + ENTSOG + GIE in parallel
+  const stooqFetch = s => fetch(`https://stooq.com/q/l/?s=${s}&f=sd2t2ohlcvn&h&e=json`,
+    {signal:AbortSignal.timeout(8000)}).then(r=>r.json()).catch(()=>null);
+  const eiaFetch = (path, series) => fetch(
+    `https://api.eia.gov/v2/${path}/?frequency=weekly&data%5B0%5D=value&facets%5Bseries%5D%5B%5D=${series}&start=2024-01-01&length=2`,
+    {signal:AbortSignal.timeout(12000)}).then(r=>r.json()).catch(()=>null);
+
+  const [sqWTI, sqNG, sqPalm, entsogRes, gieRes, eiaBrent, eiaWTI, eiaHH] = await Promise.allSettled([
+    stooqFetch('cl.f'),   // WTI crude
+    stooqFetch('ng.f'),   // Henry Hub gas
+    stooqFetch('pa.f'),   // Palladium (drop-in for generic)
     commFetchENTSOG(),
     commFetchGIEStorage(),
-    commFetchPinkSheet(['energy']),
+    eiaFetch('petroleum/pri/spt/data', 'RBRTE'),   // Brent via EIA API (backend key)
+    eiaFetch('petroleum/pri/spt/data', 'RWTC'),    // WTI via EIA API fallback
+    eiaFetch('natural-gas/pri/fut/data', 'RNGWHHD'), // HH gas via EIA API fallback
   ]);
 
-  const wti     = wtiRes.status     === 'fulfilled' ? wtiRes.value     : null;
-  const gas     = gasRes.status     === 'fulfilled' ? gasRes.value     : null;
-  const opec    = opecRes.status    === 'fulfilled' ? opecRes.value    : null;
-  const entsog  = entsogRes.status  === 'fulfilled' ? entsogRes.value  : null;
-  const gie     = gieRes.status     === 'fulfilled' ? gieRes.value     : null;
-  const wbEnergy= wbEnergyRes.status=== 'fulfilled' ? wbEnergyRes.value: [];
+  const entsog = entsogRes.status === 'fulfilled' ? entsogRes.value : null;
+  const gie    = gieRes.status    === 'fulfilled' ? gieRes.value    : null;
 
-  let html = `<div class="av-live-badge">● Energy Intelligence · EIA (no key) + OPEC + ENTSOG + World Bank</div>`;
+  // Helper: parse Stooq symbol response
+  const stooqPrice = res => {
+    const s = res.status==='fulfilled' ? res.value?.symbols?.[0] : null;
+    if (!s?.close) return null;
+    return { value:parseFloat(s.close), prev:parseFloat(s.open)||null, date:s.date||'' };
+  };
+  // Helper: parse EIA API v2 response
+  const eiaPrice = res => {
+    if (res.status!=='fulfilled') return null;
+    const rows = (res.value?.response?.data||[]).sort((a,b)=>b.period.localeCompare(a.period));
+    if (!rows.length||rows[0].value==null) return null;
+    return { value:parseFloat(rows[0].value), prev:rows[1]?.value!=null?parseFloat(rows[1].value):null, date:rows[0].period };
+  };
 
-  // ── Price cards ────────────────────────────────────────────────────
+  const wtiStooq   = stooqPrice(sqWTI);
+  const ngStooq    = stooqPrice(sqNG);
+  const brentAPI   = eiaPrice(eiaBrent);
+  const wtiAPI     = eiaPrice(eiaWTI);
+  const hhAPI      = eiaPrice(eiaHH);
+
+  // Build price cards — Stooq primary, EIA API secondary
   const priceCards = [];
-  if (wti?.value) {
-    const chg = wti.prev ? (wti.value - wti.prev) / wti.prev * 100 : 0;
-    priceCards.push({ name:'WTI Crude', icon:'🛢', val:`$${wti.value.toFixed(2)}`, unit:'/bbl', chg, src:'EIA Bulk', date:wti.date });
-  }
-  if (gas?.value) {
-    const chg = gas.prev ? (gas.value - gas.prev) / gas.prev * 100 : 0;
-    priceCards.push({ name:'Henry Hub', icon:'🔥', val:`$${gas.value.toFixed(2)}`, unit:'/MMBtu', chg, src:'EIA Bulk', date:gas.date });
-  }
-  if (opec?.value) {
-    priceCards.push({ name:'OPEC Basket', icon:'⛽', val:`$${opec.value.toFixed(2)}`, unit:'/bbl', chg:0, src:'OPEC.org', date:opec.date });
-  }
-  // Add World Bank energy benchmarks
-  wbEnergy.filter(c => !priceCards.find(p => p.name.toLowerCase().includes(c.name.toLowerCase().slice(0,4))))
-    .forEach(c => {
-      if (c.latest) {
-        const chg = (c.prev && c.latest) ? (c.latest - c.prev) / c.prev * 100 : 0;
-        priceCards.push({ name: c.name, icon: c.icon, val: c.latest.toFixed(2), unit: c.unit, chg, src: 'WB Pink Sheet', date: c.date });
-      }
-    });
+  const addCard = (name, icon, unit, src, data) => {
+    if (!data?.value) return false;
+    const chg = (data.value && data.prev) ? (data.value - data.prev) / data.prev * 100 : 0;
+    priceCards.push({ name, icon, val:`$${data.value.toFixed(2)}`, unit, chg, src, date:data.date });
+    return true;
+  };
+  addCard('WTI Crude',     '🛢', '/bbl',    'Stooq',   wtiStooq) || addCard('WTI Crude',  '🛢', '/bbl',    'EIA API', wtiAPI);
+  addCard('Henry Hub Gas', '🔥', '/MMBtu',  'Stooq',   ngStooq)  || addCard('Henry Hub',  '🔥', '/MMBtu',  'EIA API', hhAPI);
+  addCard('Brent Crude',   '🛢', '/bbl',    'EIA API', brentAPI);
+
+  let html = `<div class="av-live-badge">● Energy Intelligence · Stooq Futures · EIA API · ENTSOG · GIE</div>`;
 
   if (priceCards.length) {
     html += `<div class="comm-energy-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:8px;border-bottom:1px solid var(--border)">`;
     priceCards.forEach(c => {
-      const chgColor = c.chg >= 0 ? '#3fb950' : '#f85149';
+      const chgColor = c.chg >= 0 ? '#f85149' : '#3fb950'; // energy up = bad for consumers
       html += `<div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;padding:8px">
         <div style="font-size:9px;color:var(--text-muted)">${c.icon} ${_cEsc(c.name)}</div>
         <div style="font-size:14px;font-weight:700;font-family:var(--font-mono)">${_cEsc(c.val)}<small style="font-size:9px;color:var(--text-muted)">${_cEsc(c.unit)}</small></div>
@@ -1274,7 +1289,7 @@ window.commRenderEnergy = async function() {
     html += '</div>';
   } else {
     html += `<div style="padding:12px;font-size:10px;color:var(--text-muted)">
-      EIA bulk data temporarily unavailable. Sources: EIA (no key), OPEC (scraped), World Bank.
+      Energy price data temporarily unavailable. EIA backend key may not be set in production.
     </div>`;
   }
 
