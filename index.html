@@ -782,10 +782,12 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="noaa" onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
+        <button class="tab-btn active" data-tab="congress" onclick="switchTab('alert','congress');(function(){var el=document.getElementById('alert-congress');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof congressLoad==='function')congressLoad()}})()">🏛 CONGRESS</button>
+        <button class="tab-btn" data-tab="noaa" onclick="switchTab('alert','noaa');if(typeof noaaLoadAlerts==='function')noaaLoadAlerts()">🌩 NOAA</button>
         <button class="tab-btn" data-tab="eonet" onclick="switchTab('alert','eonet');if(typeof eonetLoadEvents==='function')eonetLoadEvents()">🛰 EONET</button>
       </div>
-      <div class="tab-pane active panel-content" data-tab="noaa" id="alert-noaa"></div>
+      <div class="tab-pane active panel-content" data-tab="congress" id="alert-congress"></div>
+      <div class="tab-pane panel-content" data-tab="noaa" id="alert-noaa"></div>
       <div class="tab-pane panel-content" data-tab="eonet" id="alert-eonet"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
@@ -1358,6 +1360,7 @@ document.addEventListener("DOMContentLoaded", () => {
   <script src="agriculture.js"></script>
   <script src="tradeflows.js"></script>
   <script src="tradedata.js"></script>
+  <script src="congress.js"></script>
   <script src="positioning.js"></script>
   <script src="intel.js"></script>
   <script src="ffcalendar.js"></script>
