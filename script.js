@@ -1702,58 +1702,33 @@ let zCounter=10;
 function bringToFront(panel){panel.style.zIndex=++zCounter;}
 
 /* ══════════════════════════════════════════════════════════════════
-   TRADINGVIEW
+   PRICE CHART — Lightweight Charts (replaces TradingView widget)
+   lwchart.js owns all chart state and rendering.
    ══════════════════════════════════════════════════════════════════ */
-let _tvWidget = null;
 
-/* Called whenever the TradingView chart changes its symbol (any source).
-   Exposed on window so uars-integration.js postMessage bridge can reach it. */
-window._onTvSymbolChange = function _onTvSymbolChange(newFull) {
-  if (!newFull) return;
-  const bare = newFull.replace(/.*:/, '').toUpperCase();
-  if (bare === (currentTicker || '').replace(/.*:/, '').toUpperCase()) return;
-  currentTicker = newFull;
-  const inp = document.getElementById('tickerInput');
-  if (inp) inp.value = newFull;
-  reloadAllPanels(newFull);
-  if (typeof avLoadAll      === 'function') avLoadAll(bare);
-  if (typeof finnhubLoadAll === 'function') finnhubLoadAll(bare);
-  /* Show + trigger UARS Analysts panel immediately */
-  showPanel('analysts');
-  if (typeof uarsSafeLoad   === 'function') uarsSafeLoad(newFull);
-};
-
-function loadChart(symbol){
-  const el=document.getElementById("priceChart"); if(!el) return;
-  el.innerHTML="";
-  _tvWidget = new TradingView.widget({autosize:true,symbol,interval:"D",timezone:"Europe/Rome",
-    theme:"dark",style:"1",locale:"it",toolbar_bg:"#0d1117",
-    enable_publishing:false,allow_symbol_change:true,save_image:false,container_id:"priceChart"});
-
-  /* Primary: use TradingView charting library API if available */
-  try {
-    if (typeof _tvWidget.onChartReady === 'function') {
-      _tvWidget.onChartReady(function() {
-        try {
-          const chart = typeof _tvWidget.activeChart === 'function'
-            ? _tvWidget.activeChart() : _tvWidget.chart();
-          chart.onSymbolChanged().subscribe(null, function() {
-            try { _onTvSymbolChange(chart.symbol()); } catch(_) {}
-          });
-        } catch(_) {}
-      });
-    }
-  } catch(_) {}
+function loadChart(symbol) {
+  const el = document.getElementById('priceChart');
+  if (!el || typeof lwcInit !== 'function') return;
+  const sym = (symbol || currentTicker || 'AAPL').replace(/.*:/, '').toUpperCase();
+  const res = window._lwcState?.main?.res || '1D';
+  lwcInit(el, sym, 'main');
+  lwcLoad(sym, res, 'main');
 }
-function loadForexChart(pair,interval){
-  pair=pair??currentForexPair; interval=interval??currentForexInterval;
-  currentForexPair=pair; currentForexInterval=interval;
-  const el=document.getElementById("forexChart"); if(!el) return;
-  el.innerHTML="";
-  new TradingView.widget({autosize:true,symbol:mapForexPairToSymbol(pair),interval,
-    timezone:"Europe/Rome",theme:"dark",style:"1",locale:"it",toolbar_bg:"#0d1117",
-    enable_publishing:false,allow_symbol_change:true,container_id:"forexChart"});
-  const lbl=document.getElementById("forexLabel");
+
+function loadForexChart(pair, interval) {
+  pair     = pair     ?? currentForexPair;
+  interval = interval ?? currentForexInterval;
+  currentForexPair     = pair;
+  currentForexInterval = interval;
+  const el = document.getElementById('forexChart');
+  if (el && typeof lwcInit === 'function') {
+    const sym = pair.replace(/[^A-Z]/g, '').toUpperCase();
+    const resMap = { '1':'1m','5':'5m','15':'15m','60':'1h','240':'4h','D':'1D','W':'1W' };
+    const res = resMap[String(interval)] || '1D';
+    lwcInit(el, sym, 'forex');
+    lwcLoad(sym, res, 'forex');
+  }
+  const lbl = document.getElementById('forexLabel');
   if(lbl) lbl.textContent=pair;
   document.querySelectorAll(".fx-tf-btn").forEach(b=>b.classList.toggle("active",b.textContent.trim()===formatInterval(interval)));
   // Update Frankfurter ECB rates + 90-day history for this pair
@@ -2018,33 +1993,25 @@ window.addEventListener("resize",()=>{
    TASK 2 — DUAL CHART
    ══════════════════════════════════════════════════════════════════ */
 let _chart2Active = false;
-let _chart2Widget = null;
 
 function toggleChart2() {
   const wrap = document.getElementById('chartSplit');
   const c2   = document.getElementById('priceChart2');
   const btn  = document.getElementById('chart2Btn');
-  if (!wrap || !c2) return;
+  if (!wrap || !c2 || typeof lwcInit !== 'function') return;
   _chart2Active = !_chart2Active;
   if (_chart2Active) {
     wrap.classList.replace('single','dual');
     c2.style.display = 'block';
-    btn.textContent = '⊗ 1 Chart';
-    // load second chart with same ticker
-    const sym = resolveSymbol(currentTicker);
-    _chart2Widget = new TradingView.widget({
-      autosize: true, symbol: sym, interval: '60', timezone: 'Etc/UTC',
-      theme: document.body.classList.contains('light') ? 'Light' : 'Dark',
-      style: '1', locale: 'en', toolbar_bg: '#0d1117',
-      hide_side_toolbar: true, allow_symbol_change: true,
-      enable_publishing: false, container_id: 'priceChart2'
-    });
+    btn.textContent  = '⊗ 1 Chart';
+    const sym = (currentTicker || 'AAPL').replace(/.*:/, '').toUpperCase();
+    lwcInit(c2, sym, 'second');
+    lwcLoad(sym, '1h', 'second');
   } else {
     wrap.classList.replace('dual','single');
     c2.style.display = 'none';
-    btn.textContent = '⊕ 2nd';
-    c2.innerHTML = '';
-    _chart2Widget = null;
+    btn.textContent  = '⊕ 2nd';
+    if (typeof lwcDestroy === 'function') lwcDestroy('second');
   }
 }
 
