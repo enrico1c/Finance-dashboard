@@ -2012,6 +2012,14 @@ window.addEventListener("load",()=>{
   }));
 });
 
+// Re-render chart after authentication completes (TV widget fails in hidden panel before login)
+window.addEventListener('finterm:auth-ready', () => {
+  const panel = document.getElementById('panel-chart');
+  if (panel && !panel.classList.contains('hidden')) {
+    setTimeout(() => loadChart(resolveSymbol(currentTicker)), 300);
+  }
+});
+
 window.addEventListener("resize",()=>{
   const canvas=document.getElementById("dashboardCanvas");
   const minY=getTopbarGuard();
