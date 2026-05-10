@@ -1820,11 +1820,10 @@ function changeTicker(){
   if(typeof avLoadAll       === "function") avLoadAll(sym);
   if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
   // Reset ALL Fundamentals tabs so they reload with the new ticker
-  ["fund-fa","fund-ern","fund-ee","fund-wacc",
-   "fund-div","fund-filings","fund-tech","fund-short","fund-seg","fund-trans","fund-form4",
-   "yf-financials","yf-options","yf-holders","yf-history"].forEach(id => {
+  ["fund-fa","fund-earn","fund-ern","fund-ee","fund-wacc",
+   "fund-div","fund-filings","fund-short","fund-seg","fund-trans","fund-form4"].forEach(id => {
     const el = document.getElementById(id);
-    if(el) { el.innerHTML = ""; el.dataset.loaded = ""; el.dataset.techSym = ""; }
+    if(el) { el.innerHTML = ""; el.dataset.loaded = ""; }
   });
   // Also reset desc so it refills with new ticker's profile
   const desEl = document.getElementById("fund-des");
@@ -1832,22 +1831,23 @@ function changeTicker(){
   // If a lazy tab is currently active, load it immediately for the new ticker
   const activeFundTab = document.querySelector("#panel-fundamentals .tab-btn.active");
   const at = activeFundTab?.dataset.tab;
-  if(at === "div"     && typeof fmpLoadDividends      === "function") fmpLoadDividends(sym);
-  if(at === "filings" && typeof fmpLoadSecFilings     === "function") fmpLoadSecFilings(sym);
-  if(at === "tech") {
-    if(typeof techLoadFull === "function") techLoadFull(sym);
-    else if(typeof avLoadTech === "function") avLoadTech(sym);
+  if(at === "div"      && typeof fmpLoadDividends    === "function") fmpLoadDividends(sym);
+  if(at === "filings"  && typeof fmpLoadSecFilings   === "function") fmpLoadSecFilings(sym);
+  if(at === "short"    && typeof fhLoadShortInterest === "function") fhLoadShortInterest(sym);
+  if(at === "seg"      && typeof fmpLoadSegmentation === "function") fmpLoadSegmentation(sym);
+  if(at === "trans"    && typeof fmpLoadTranscript   === "function") fmpLoadTranscript(sym);
+  if(at === "insiders" && typeof fmpLoadForm4        === "function") fmpLoadForm4(sym);
+  if(at === "earn") {
+    const earnEl = document.getElementById('fund-earn');
+    if(earnEl && !earnEl.dataset.loaded) {
+      earnEl.dataset.loaded = '1';
+      if(typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.earnings) {
+        if(typeof avRenderEarnings === 'function') avRenderEarnings(sym, avLiveCache[sym].earnings);
+      } else if(typeof fmpLoadAll === 'function') { fmpLoadAll(sym); }
+    }
   }
-  if(at === "short"   && typeof fhLoadShortInterest   === "function") fhLoadShortInterest(sym);
-  if(at === "seg"     && typeof fmpLoadSegmentation   === "function") fmpLoadSegmentation(sym);
-  if(at === "trans"   && typeof fmpLoadTranscript     === "function") fmpLoadTranscript(sym);
-  if(at === "form4"   && typeof fmpLoadForm4          === "function") fmpLoadForm4(sym);
-  if(at === "yf-fin"  && typeof yfLoadFinancials      === "function") yfLoadFinancials(sym);
-  if(at === "yf-opt"  && typeof yfLoadOptions         === "function") yfLoadOptions(sym);
-  if(at === "yf-hld"  && typeof yfLoadHolders         === "function") yfLoadHolders(sym);
-  if(at === "yf-hist" && typeof yfLoadHistory         === "function") yfLoadHistory(sym);
-  // DES / FA / ERN / EE / WACC — renderFundamentals handles them
-  if(at === "des" || at === "fa" || at === "ern" || at === "ee" || at === "wacc") {
+  // DES / FA / EARN / WACC — renderFundamentals handles them
+  if(at === "des" || at === "fa" || at === "earn" || at === "wacc") {
     renderFundamentals(sym);
   }
   // Always refresh Yahoo quote on ticker change if key is set
@@ -1856,13 +1856,7 @@ function changeTicker(){
   renderScorecard(sym);
   // Enrich watchlist rows with Yahoo live prices
   if(typeof yfEnrichWatchlist === "function") setTimeout(() => yfEnrichWatchlist(), 1500);
-  // Technical panel — load if visible, else mark stale
-  if(typeof techLoadFull === "function") {
-    const techEl = document.getElementById("fund-tech");
-    if (techEl) { techEl.dataset.techSym = sym; techEl.dataset.loaded = ""; }
-    const activeFund = document.querySelector("#panel-fundamentals .tab-btn.active");
-    if (activeFund?.dataset.tab === "tech") techLoadFull(sym);
-  }
+  // (TECH tab removed — duplicate of Chart panel's indicators)
   // Subscribe ticker to Finnhub WebSocket
   if(typeof fhWsSubscribe === "function") fhWsSubscribe(sym);
   // Update quote-qr price element for WS patches

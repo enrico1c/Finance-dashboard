@@ -231,28 +231,25 @@
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="des"     onclick="switchTab('fundamentals','des');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';renderFundamentals(s)})()">DES</button>
         <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-fa');if(el&&!el.dataset.loaded){if(typeof fmpLoadFATab==='function'){fmpLoadFATab(s);el.dataset.loaded='fmp';}else if(typeof avRenderFA!=='undefined'&&typeof avLiveCache!=='undefined'&&avLiveCache[s]?.income?.length){avRenderFA(s,avLiveCache[s].income,avLiveCache[s].balance,avLiveCache[s].cashflow);el.dataset.loaded='av';}else if(typeof faLoadEdgarXBRL==='function'){faLoadEdgarXBRL(s,el);el.dataset.loaded='xbrl';}}})()">FA</button>
-        <button class="tab-btn"        data-tab="ern"     onclick="switchTab('fundamentals','ern');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ern');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">ERN</button>
-        <button class="tab-btn"        data-tab="ee"      onclick="switchTab('fundamentals','ee');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-ee');if(el&&!el.dataset.loaded){if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);el.dataset.loaded='av';}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);el.dataset.loaded='fmp';}}})()">EE</button>
+        <button class="tab-btn"        data-tab="earn"    onclick="switchTab('fundamentals','earn');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-earn');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);}}})()">📈 EARN</button>
         <button class="tab-btn"        data-tab="wacc"    onclick="switchTab('fundamentals','wacc');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-wacc');if(el&&!el.dataset.loaded){renderFundamentals(s);}})()">WACC</button>
-        <button class="tab-btn"        data-tab="tech"    onclick="switchTab('fundamentals','tech');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-tech');if(el&&!el.dataset.techSym){if(typeof techLoadFull==='function')techLoadFull(s);else if(typeof avLoadTech==='function')avLoadTech(s);el.dataset.techSym=s;}})()">TECH</button>
         <button class="tab-btn"        data-tab="short"   onclick="switchTab('fundamentals','short');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fhLoadShortInterest==='function')fhLoadShortInterest(s)})()">SHORT</button>
         <button class="tab-btn"        data-tab="seg"     onclick="switchTab('fundamentals','seg');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadSegmentation==='function')fmpLoadSegmentation(s)})()">SEG</button>
         <button class="tab-btn"        data-tab="trans"   onclick="switchTab('fundamentals','trans');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadTranscript==='function')fmpLoadTranscript(s)})()">TRANS</button>
-        <button class="tab-btn"        data-tab="form4"   onclick="switchTab('fundamentals','form4');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadForm4==='function')fmpLoadForm4(s)})()">FORM 4</button>
+        <button class="tab-btn"        data-tab="insiders" onclick="switchTab('fundamentals','insiders');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadForm4==='function')fmpLoadForm4(s)})()">👤 INSIDERS</button>
         <button class="tab-btn"        data-tab="div"     onclick="switchTab('fundamentals','div');if(typeof fmpLoadDividends==='function')fmpLoadDividends(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">DIV</button>
         <button class="tab-btn"        data-tab="filings" onclick="switchTab('fundamentals','filings');if(typeof fmpLoadSecFilings==='function')fmpLoadSecFilings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">FILINGS</button>
-        <button class="tab-btn"        data-tab="yf-fin"  onclick="switchTab('fundamentals','yf-fin');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadFinancials==='function')yfLoadFinancials(s)})()">YF·FIN</button>
-        <button class="tab-btn"        data-tab="yf-hld"  onclick="switchTab('fundamentals','yf-hld');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHolders==='function')yfLoadHolders(s)})()">YF·HLD</button>
-        <button class="tab-btn"        data-tab="yf-hist" onclick="switchTab('fundamentals','yf-hist');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof yfLoadHistory==='function')yfLoadHistory(s)})()">YF·HIST</button>
       </div>
-      <div class="tab-pane active panel-content" data-tab="des"     id="fund-des"></div>
-      <div class="tab-pane        panel-content" data-tab="fa"      id="fund-fa"></div>
-      <div class="tab-pane        panel-content" data-tab="ern"     id="fund-ern"></div>
-      <div class="tab-pane        panel-content" data-tab="ee"      id="fund-ee"></div>
-      <div class="tab-pane        panel-content" data-tab="wacc"    id="fund-wacc"></div>
-      <div class="tab-pane        panel-content" data-tab="tech"    id="fund-tech"></div>
-      <div class="tab-pane        panel-content" data-tab="short"   id="fund-short"></div>
-      <div class="tab-pane        panel-content" data-tab="seg"     id="fund-seg"></div>
+      <div class="tab-pane active panel-content" data-tab="des"      id="fund-des"></div>
+      <div class="tab-pane        panel-content" data-tab="fa"       id="fund-fa"></div>
+      <div class="tab-pane        panel-content" data-tab="earn"     id="fund-earn">
+        <div id="fund-ern"></div>
+        <div style="border-top:1px solid var(--border);margin:6px 0 0"></div>
+        <div id="fund-ee"></div>
+      </div>
+      <div class="tab-pane        panel-content" data-tab="wacc"     id="fund-wacc"></div>
+      <div class="tab-pane        panel-content" data-tab="short"    id="fund-short"></div>
+      <div class="tab-pane        panel-content" data-tab="seg"      id="fund-seg"></div>
       <div class="tab-pane        panel-content" data-tab="trans"   id="fund-trans">
         <div class="api-quicksetup-banner" id="trans-setup-banner">
           <div class="api-qs-icon">🎙️</div>
@@ -281,12 +278,9 @@
           })();
         </script>
       </div>
-      <div class="tab-pane        panel-content" data-tab="form4"   id="fund-form4"></div>
+      <div class="tab-pane        panel-content" data-tab="insiders" id="fund-form4"></div>
       <div class="tab-pane        panel-content" data-tab="div"     id="fund-div"></div>
       <div class="tab-pane        panel-content" data-tab="filings" id="fund-filings"></div>
-      <div class="tab-pane        panel-content" data-tab="yf-fin"  id="yf-financials"></div>
-      <div class="tab-pane        panel-content" data-tab="yf-hld"  id="yf-holders"></div>
-      <div class="tab-pane        panel-content" data-tab="yf-hist" id="yf-history"></div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>

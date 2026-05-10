@@ -581,12 +581,36 @@ function fmpRenderCalendar(sym, calendar) {
 
 /* ── Ratios — update DES fundamentals section ───────────────────── */
 function fmpRenderRatios(sym, r) {
-  // Inject a live ratios block into the DES tab if overview already rendered
   const des = document.getElementById("fund-des");
   if (!des) return;
 
-  // Don't overwrite — append a ratios block at the top if AV already rendered
-  const existingRatios = des.querySelector(".fmp-ratios-block");
+  /* ── Horizontal quick-stats strip (always shown at top of DES) ── */
+  const colorVal = (v, good) => v == null ? 'var(--text-muted)' : (good ? (v > 0 ? '#3fb950' : '#f85149') : 'var(--text)');
+  const statCell = (label, val, colFn) => val == null ? '' :
+    `<div style="text-align:center;padding:5px 4px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px">
+      <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px">${label}</div>
+      <div style="font-size:12px;font-weight:700;color:${colFn}">${val}</div>
+    </div>`;
+  const strip = document.createElement("div");
+  strip.className = "fmp-ratios-block fmp-stats-strip";
+  strip.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:4px;padding:6px;border-bottom:1px solid var(--border)";
+  strip.innerHTML =
+    statCell("P/E",         r.pe       != null ? fmt(r.pe,1)       : null, 'var(--text)') +
+    statCell("EV/EBITDA",   r.evEbitda != null ? fmt(r.evEbitda,1) : null, 'var(--text)') +
+    statCell("P/S",         r.ps       != null ? fmt(r.ps,2)       : null, 'var(--text)') +
+    statCell("P/B",         r.pb       != null ? fmt(r.pb,2)       : null, 'var(--text)') +
+    statCell("ROE",         r.roe      != null ? fmt(r.roe,1)+'%'  : null, colorVal(r.roe, true)) +
+    statCell("Net Mgn",     r.netMgn   != null ? fmt(r.netMgn,1)+'%': null, colorVal(r.netMgn, true)) +
+    statCell("Gross Mgn",   r.grossMgn != null ? fmt(r.grossMgn,1)+'%': null, colorVal(r.grossMgn, true)) +
+    statCell("FCF Yield",   r.fcfYield != null ? fmt(r.fcfYield,2)+'%': null, colorVal(r.fcfYield, true)) +
+    statCell("Debt/Eq",     r.debtEq   != null ? fmt(r.debtEq,2)  : null, 'var(--text)') +
+    statCell("Div Yield",   r.divYield != null ? fmt(r.divYield,2)+'%': null, 'var(--text)');
+
+  const existing = des.querySelector(".fmp-stats-strip");
+  if (existing) existing.replaceWith(strip);
+  else des.insertAdjacentElement("afterbegin", strip);
+
+  /* ── Detailed vertical ratios block (below TV widget / profile) ── */
   const block = document.createElement("div");
   block.className = "fmp-ratios-block";
   block.innerHTML = `
@@ -606,13 +630,13 @@ function fmpRenderRatios(sym, r) {
     ${r.debtEq   != null ? mRow("Debt/Equity",  fmt(r.debtEq,2))      : ""}
     ${r.currentR != null ? mRow("Current Ratio",fmt(r.currentR,2))    : ""}`;
 
-  if (existingRatios) {
-    des.replaceChild(block, existingRatios);
+  const existingDetail = des.querySelector(".fmp-ratios-block:not(.fmp-stats-strip)");
+  if (existingDetail) {
+    existingDetail.replaceWith(block);
   } else {
-    // Prepend after live badge if present
     const badge = des.querySelector(".av-live-badge");
     if (badge) badge.insertAdjacentElement("afterend", block);
-    else des.insertAdjacentElement("afterbegin", block);
+    else des.appendChild(block);
   }
 
   // Also update valuation analyzer if the same ticker is loaded
