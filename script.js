@@ -1130,12 +1130,35 @@ async function loadWatchlist(topic) {
   if (typeof fmpRefreshWatchlistPrices === "function") fmpRefreshWatchlistPrices();
 }
 
+/* ── Watchlist peer scoring (0–10, computed from current list) ── */
+function _wlComputeScores(stocks) {
+  if (!stocks.length) return new Map();
+  const chgs = stocks.map(s => isFinite(+s.change) ? +s.change : 0);
+  const pes  = stocks.map(s => (+s.pe > 0 && +s.pe < 500) ? +s.pe : null);
+  const minC = Math.min(...chgs), maxC = Math.max(...chgs), rangeC = maxC - minC || 1;
+  const validPEs = pes.filter(p => p !== null);
+  const maxP = validPEs.length ? Math.max(...validPEs) : 1;
+  const minP = validPEs.length ? Math.min(...validPEs) : 0;
+  const rangeP = maxP - minP || 1;
+  const scores = new Map();
+  stocks.forEach((s, i) => {
+    const momScore = ((chgs[i] - minC) / rangeC) * 5;          // 0–5 momentum
+    const valScore = pes[i] !== null
+      ? ((maxP - pes[i]) / rangeP) * 3                          // 0–3 value (lower P/E = better)
+      : 1.5;                                                     // neutral if no P/E
+    const raw = momScore + valScore + 1.5;                       // +1.5 base so min isn't 0
+    scores.set(String(s.ticker), Math.round(Math.min(10, Math.max(1, raw)) * 10) / 10);
+  });
+  return scores;
+}
+
 function sortWatchlist(by) {
   currentWatchlistSort = by;
   document.querySelectorAll(".wl-sort-btn").forEach(b =>
     b.classList.toggle("active", b.textContent.toLowerCase() === by ||
       (by==="mktcap" && b.textContent==="Mkt Cap") ||
-      (by==="change" && b.textContent==="Chg%")));
+      (by==="change" && b.textContent==="Chg%") ||
+      (by==="score"  && b.textContent.includes("Score"))));
   renderWatchlistRows();
 }
 
@@ -1143,17 +1166,19 @@ function renderWatchlistRows() {
   const box = document.getElementById("watchlistBox");
   if (!box || !currentWatchlistStocks.length) return;
 
+  const scores = _wlComputeScores(currentWatchlistStocks);
+
   const sorted = [...currentWatchlistStocks].sort((a, b) => {
-    if (currentWatchlistSort === "name")    return a.name.localeCompare(b.name);
-    if (currentWatchlistSort === "price")   return b.price - a.price;
-    if (currentWatchlistSort === "change")  return b.change - a.change;
-    if (currentWatchlistSort === "mktcap")  return 0; // keep order
-    return 0;
+    if (currentWatchlistSort === "name")   return a.name.localeCompare(b.name);
+    if (currentWatchlistSort === "price")  return b.price - a.price;
+    if (currentWatchlistSort === "change") return b.change - a.change;
+    if (currentWatchlistSort === "score")  return (scores.get(String(b.ticker))||0) - (scores.get(String(a.ticker))||0);
+    return 0; // mktcap — keep server order
   });
 
   box.innerHTML = `
     <div class="wl-header-row">
-      <span>Stock</span><span>Price</span><span>Chg%</span><span>Mkt Cap</span><span>P/E</span><span>Chart</span>
+      <span>Stock</span><span>Price</span><span>Chg%</span><span>Mkt Cap</span><span>P/E</span><span>Score</span><span>Chart</span>
     </div>
     ${sorted.map(s => {
       const chg    = s.change != null ? Number(s.change) : 0;
@@ -1162,6 +1187,10 @@ function renderWatchlistRows() {
       const peStr  = s.pe != null ? Number(s.pe).toFixed(1) : "—";
       const priceStr = s.price != null ? "$"+fmt(Number(s.price)) : "—";
       const mcapStr = s.mktCap != null ? String(s.mktCap) : "—";
+      const sc = scores.get(String(s.ticker)) ?? "—";
+      const scCol = sc === "—" ? "var(--text-muted)"
+        : sc >= 7 ? "#3fb950" : sc >= 4.5 ? "#d29922" : "#f85149";
+      const scLabel = sc === "—" ? "—" : sc.toFixed(1);
       return `<div class="wl-row" onclick="openValuation('${escapeHtml(s.ticker)}')">
         <div class="wl-stock-info">
           <span class="wl-ticker">${escapeHtml(String(s.ticker||"").replace(/.*:/,""))}</span>
@@ -1172,6 +1201,7 @@ function renderWatchlistRows() {
         <span class="wl-chg ${chgCls}">${chgStr}</span>
         <span class="wl-mcap">${escapeHtml(mcapStr)}</span>
         <span class="wl-pe">${peStr}</span>
+        <span class="wl-score" style="font-weight:700;color:${scCol}" title="Peer score: momentum (50%) + valuation (30%) + base (20%)">${scLabel}</span>
         <button class="wl-chart-btn" title="Load in main chart" onclick="event.stopPropagation(); loadTickerFromWatchlist('${escapeHtml(s.ticker)}')">▶</button>
       </div>`;
     }).join("")}`;

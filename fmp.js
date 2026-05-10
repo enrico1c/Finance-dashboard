@@ -438,7 +438,38 @@ function fmpRenderOwnership(sym, insiders, institutional) {
   const hds = document.getElementById("own-hds");
   if (!hds) return;
 
-  let html = `<div class="av-live-badge">● LIVE — FMP</div>`;
+  /* ── Smart Money Score ──────────────────────────────────────── */
+  const instList = institutional || [];
+  const insiderList = insiders || [];
+  const netBuyers = instList.filter(h => {
+    const n = typeof h.change === "string" ? parseFloat(h.change.replace(/[^0-9.-]/g,"")) : Number(h.change);
+    return n > 0;
+  }).length;
+  const instScore = instList.length ? Math.round((netBuyers / instList.length) * 5) : 0;
+  const iBuys  = insiderList.filter(i => i.action === "Buy").length;
+  const iSells = insiderList.filter(i => i.action === "Sell").length;
+  const insiderScore = (iBuys + iSells) ? Math.round((iBuys / (iBuys + iSells)) * 5) : 2;
+  const totalScore = instScore + insiderScore; // 0–10
+  const scoreCol   = totalScore >= 7 ? "#3fb950" : totalScore >= 4 ? "#d29922" : "#f85149";
+  const scoreLabel = totalScore >= 7 ? "Bullish" : totalScore >= 4 ? "Neutral" : "Bearish";
+  const smsBadge   = `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;margin-bottom:6px">
+    <div style="text-align:center;min-width:40px">
+      <div style="font-size:22px;font-weight:800;color:${scoreCol}">${totalScore}</div>
+      <div style="font-size:8px;color:var(--text-muted)">/ 10</div>
+    </div>
+    <div style="flex:1">
+      <div style="font-size:11px;font-weight:700;color:${scoreCol}">Smart Money: ${scoreLabel}</div>
+      <div style="font-size:9px;color:var(--text-muted);margin-top:2px">
+        Institutional net-buyers: ${netBuyers}/${instList.length} &nbsp;·&nbsp;
+        Insider buy/sell: ${iBuys}B / ${iSells}S
+      </div>
+      <div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div style="height:100%;width:${totalScore*10}%;background:${scoreCol};border-radius:2px;transition:width .4s"></div>
+      </div>
+    </div>
+  </div>`;
+
+  let html = `<div class="av-live-badge">● LIVE — FMP</div>${smsBadge}`;
 
   if (institutional?.length) {
     const rows = institutional.map(h => {
