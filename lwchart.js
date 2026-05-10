@@ -50,52 +50,47 @@
       '.lwc-wrap{display:flex;flex-direction:column;height:100%;width:100%;background:#131722;',
       'color:#d1d4dc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden;position:relative;}',
       '.lwc-wrap *{box-sizing:border-box;}',
-      '.lwc-tb{background:#1e222d;display:flex;align-items:center;gap:5px;padding:4px 10px;flex-shrink:0;flex-wrap:wrap;}',
-      '.lwc-tb1{border-bottom:1px solid #2a2e39;}',
-      '.lwc-tb2{border-bottom:1px solid #2a2e39;font-size:11px;min-height:26px;}',
-      '.lwc-sep{width:1px;height:14px;background:#363a45;flex-shrink:0;}',
-      '.lwc-lbl{color:#4c5058;font-size:10px;letter-spacing:.5px;flex-shrink:0;}',
-      '.lwc-wrap input[type=text]{background:#2a2e39;border:1px solid #363a45;color:#d1d4dc;',
-      'padding:3px 8px;border-radius:4px;font-size:12px;width:110px;outline:none;text-transform:uppercase;}',
+      /* Single compact toolbar */
+      '.lwc-tb{background:#1e222d;border-bottom:1px solid #2a2e39;display:flex;align-items:center;',
+      'gap:3px;padding:2px 8px;flex-shrink:0;flex-wrap:wrap;min-height:0;}',
+      '.lwc-sep{width:1px;height:12px;background:#363a45;flex-shrink:0;margin:0 1px;}',
       '.lwc-wrap select{background:#2a2e39;border:1px solid #363a45;color:#d1d4dc;',
-      'padding:3px 6px;border-radius:4px;font-size:12px;outline:none;cursor:pointer;}',
-      '.lwc-btn{background:#2962ff;border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer;}',
-      '.lwc-btn:hover{background:#1e53e5;}',
-      '.lwc-bic{background:#2a2e39;border:1px solid #363a45;color:#787b86;padding:2px 7px;border-radius:3px;font-size:11px;cursor:pointer;}',
-      '.lwc-bic:hover{color:#d1d4dc;border-color:#4c5058;}',
-      '.lwc-tog{background:transparent;border:1px solid #2a2e39;color:#787b86;padding:1px 6px;border-radius:3px;font-size:10px;cursor:pointer;transition:all .1s;}',
+      'padding:2px 4px;border-radius:3px;font-size:11px;outline:none;cursor:pointer;}',
+      '.lwc-tog{background:transparent;border:1px solid #2a2e39;color:#787b86;padding:0px 4px;',
+      'border-radius:3px;font-size:10px;cursor:pointer;line-height:18px;transition:all .1s;}',
       '.lwc-tog:hover{color:#d1d4dc;}',
       '.lwc-tog.on{background:#1a2744;border-color:#2962ff;color:#7eadff;}',
       '.lwc-tog.tp{border-color:#2a2e39;color:#d1d4dc;}.lwc-tog.tp.on{border-color:#f9a825;color:#f9a825;}',
       '.lwc-tog.tl{border-color:#2a2e39;color:#d1d4dc;}.lwc-tog.tl.on{border-color:#26a69a;color:#26a69a;}',
-      '.lwc-pd{margin-left:4px;font-size:13px;font-weight:700;}.lwc-cd{font-size:11px;}',
+      '.lwc-sp{flex:1;}',  /* spacer to push price to right */
+      '.lwc-pd{font-size:12px;font-weight:700;white-space:nowrap;}.lwc-cd{font-size:10px;white-space:nowrap;}',
       '.lwc-up{color:#26a69a;}.lwc-dn{color:#ef5350;}',
       '.lwc-area{display:flex;flex-direction:column;flex:1;min-height:0;}',
       '.lwc-cp{position:relative;min-height:0;}',
       '.lwc-cp>div:first-child{width:100%;height:100%;}',
       '.lwc-cp+.lwc-cp{border-top:1px solid #2a2e39;}',
-      '.lwc-plbl{position:absolute;top:3px;left:8px;font-size:9px;color:#4c5058;pointer-events:none;z-index:10;display:flex;gap:5px;align-items:center;}',
-      '.lwc-pval{position:absolute;top:3px;left:8px;font-size:9px;pointer-events:none;z-index:10;padding-left:90px;}',
-      '.lwc-ohlc{position:absolute;top:5px;left:8px;font-size:11px;color:#d1d4dc;pointer-events:none;z-index:10;',
-      'background:rgba(19,23,34,.85);padding:2px 8px;border-radius:3px;display:none;white-space:nowrap;}',
+      '.lwc-plbl{position:absolute;top:3px;left:8px;font-size:9px;color:#4c5058;pointer-events:none;z-index:10;display:flex;gap:4px;align-items:center;}',
+      '.lwc-pval{position:absolute;top:3px;left:8px;font-size:9px;pointer-events:none;z-index:10;padding-left:80px;}',
+      '.lwc-ohlc{position:absolute;top:4px;left:8px;font-size:10px;color:#d1d4dc;pointer-events:none;z-index:10;',
+      'background:rgba(19,23,34,.85);padding:1px 6px;border-radius:3px;display:none;white-space:nowrap;}',
       '.lwc-ptog{background:#2a2e39;border:none;color:#787b86;font-size:9px;padding:1px 5px;border-radius:2px;cursor:pointer;}',
       '.lwc-ptog.on{color:#7b61ff;}',
-      '.lwc-stats{position:absolute;top:40px;right:10px;background:#1e222d;border:1px solid #2a2e39;',
-      'border-radius:6px;padding:10px 14px;font-size:11px;z-index:50;min-width:160px;display:none;color:#d1d4dc;}',
+      '.lwc-stats{position:absolute;top:28px;right:10px;background:#1e222d;border:1px solid #2a2e39;',
+      'border-radius:6px;padding:8px 12px;font-size:11px;z-index:50;min-width:150px;display:none;color:#d1d4dc;}',
       '.lwc-stats table{width:100%;border-collapse:collapse;}',
-      '.lwc-stats td{padding:2px 4px;}.lwc-stats td:first-child{color:#787b86;}',
-      '.lwc-svc{position:absolute;bottom:26px;right:10px;background:#1e222d;border:1px solid #363a45;',
-      'border-radius:6px;padding:12px 14px;font-size:11px;z-index:200;min-width:280px;display:none;}',
-      '.lwc-svc label{color:#787b86;display:block;margin-bottom:4px;}',
-      '.lwc-svc .sr{display:flex;align-items:center;gap:6px;margin-bottom:8px;}',
-      '.lwc-toast{position:absolute;top:10px;right:14px;background:#1e222d;border:1px solid #f9a825;',
-      'color:#f9a825;padding:7px 13px;border-radius:5px;font-size:11px;display:none;z-index:300;}',
-      '.lwc-hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);background:#1e222d;',
-      'border:1px solid #363a45;color:#d1d4dc;font-size:11px;padding:4px 12px;border-radius:4px;',
+      '.lwc-stats td{padding:2px 3px;}.lwc-stats td:first-child{color:#787b86;}',
+      '.lwc-svc{position:absolute;bottom:4px;right:10px;background:#1e222d;border:1px solid #363a45;',
+      'border-radius:6px;padding:10px 12px;font-size:11px;z-index:200;min-width:260px;display:none;}',
+      '.lwc-svc label{color:#787b86;display:block;margin-bottom:3px;}',
+      '.lwc-svc .sr{display:flex;align-items:center;gap:6px;margin-bottom:6px;}',
+      '.lwc-svc input[type=text]{background:#2a2e39;border:1px solid #363a45;color:#d1d4dc;',
+      'padding:2px 6px;border-radius:3px;font-size:11px;width:160px;outline:none;}',
+      '.lwc-svc .lwc-btn{background:#2962ff;border:none;color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;}',
+      '.lwc-toast{position:absolute;top:30px;right:10px;background:#1e222d;border:1px solid #f9a825;',
+      'color:#f9a825;padding:5px 10px;border-radius:4px;font-size:10px;display:none;z-index:300;}',
+      '.lwc-hint{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);background:#1e222d;',
+      'border:1px solid #363a45;color:#d1d4dc;font-size:10px;padding:3px 10px;border-radius:3px;',
       'z-index:100;display:none;pointer-events:none;}',
-      '.lwc-sbar{background:#1e222d;border-top:1px solid #2a2e39;padding:2px 10px;font-size:10px;',
-      'color:#787b86;display:flex;gap:12px;flex-shrink:0;align-items:center;}',
-      '.lwc-sbar .r{margin-left:auto;}',
       '.lwc-ok{color:#26a69a;}.lwc-err{color:#ef5350;}.lwc-warn{color:#f57c00;}.lwc-cache{color:#7c4dff;}'
     ].join('');
     document.head.appendChild(s);
@@ -113,55 +108,51 @@
     }
     return [
       '<div class="lwc-wrap" id="' + p + 'wrap">',
-      '<div class="lwc-tb lwc-tb1">',
-      '<input type="text" id="' + p + 'sym" value="AAPL" placeholder="AAPL / BTCUSDT" />',
+      /* Single compact toolbar — no symbol search (dashboard handles that) */
+      '<div class="lwc-tb">',
+      /* Interval */
       '<select id="' + p + 'iv">',
       '<option value="1m">1m</option><option value="5m">5m</option>',
       '<option value="15m">15m</option><option value="30m">30m</option>',
       '<option value="1h" selected>1h</option><option value="4h">4h</option>',
       '<option value="1d">1d</option><option value="1w">1w</option>',
       '</select>',
-      '<button class="lwc-btn" ' + t('load') + '>Load</button>',
       '<div class="lwc-sep"></div>',
-      '<button class="lwc-bic" ' + t('png') + ' title="Save PNG">📷</button>',
-      '<button class="lwc-bic" ' + t('csv') + ' title="Export CSV">💾</button>',
-      '<button class="lwc-bic" ' + t('stats') + ' title="Statistics">📊</button>',
-      '<div class="lwc-sep"></div>',
-      '<button class="lwc-tog tp" id="' + p + 'tLog" ' + t('log') + '>Log</button>',
-      '<button class="lwc-bic" ' + t('svc') + ' title="Services">⚙</button>',
-      '<div class="lwc-sep"></div>',
-      '<span class="lwc-pd" id="' + p + 'pd">&mdash;</span>',
-      '<span class="lwc-cd" id="' + p + 'cd"></span>',
-      '</div>',
-      '<div class="lwc-tb lwc-tb2">',
-      '<span class="lwc-lbl">IND</span>',
-      '<button class="lwc-tog on" id="' + p + 'tEma20" ' + t('ind', 'ema20') + '>EMA 20</button>',
-      '<button class="lwc-tog on" id="' + p + 'tEma50" ' + t('ind', 'ema50') + '>EMA 50</button>',
+      /* Indicators */
+      '<button class="lwc-tog on" id="' + p + 'tEma20" ' + t('ind', 'ema20') + '>E20</button>',
+      '<button class="lwc-tog on" id="' + p + 'tEma50" ' + t('ind', 'ema50') + '>E50</button>',
       '<button class="lwc-tog" id="' + p + 'tBb" ' + t('ind', 'bb') + '>BB</button>',
       '<button class="lwc-tog" id="' + p + 'tVwap" ' + t('ind', 'vwap') + '>VWAP</button>',
       '<button class="lwc-tog" id="' + p + 'tPsar" ' + t('ind', 'psar') + '>PSAR</button>',
-      '<button class="lwc-tog" id="' + p + 'tVolma" ' + t('ind', 'volma') + '>VolMA</button>',
-      '<button class="lwc-tog" id="' + p + 'tIchi" ' + t('ind', 'ichi') + '>Ichimoku</button>',
-      '<button class="lwc-tog" id="' + p + 'tPivots" ' + t('ind', 'pivots') + '>Pivots</button>',
+      '<button class="lwc-tog" id="' + p + 'tVolma" ' + t('ind', 'volma') + '>VMA</button>',
+      '<button class="lwc-tog" id="' + p + 'tIchi" ' + t('ind', 'ichi') + '>Ichi</button>',
+      '<button class="lwc-tog" id="' + p + 'tPivots" ' + t('ind', 'pivots') + '>Pvt</button>',
       '<div class="lwc-sep"></div>',
-      '<span class="lwc-lbl">TYPE</span>',
+      /* Chart type */
       '<button class="lwc-tog tp on" id="' + p + 'tCd" ' + t('type', 'candle') + '>Cd</button>',
       '<button class="lwc-tog tp" id="' + p + 'tHA" ' + t('type', 'ha') + '>HA</button>',
       '<button class="lwc-tog tp" id="' + p + 'tLn" ' + t('type', 'line') + '>Ln</button>',
       '<button class="lwc-tog tp" id="' + p + 'tAr" ' + t('type', 'area') + '>Ar</button>',
-      '<button class="lwc-tog tp" id="' + p + 'tBr" ' + t('type', 'bar') + '>Br</button>',
       '<div class="lwc-sep"></div>',
-      '<span class="lwc-lbl">PANEL</span>',
+      /* Panels */
       '<button class="lwc-tog on" id="' + p + 'tRsi" ' + t('ind', 'rsi') + '>RSI</button>',
       '<button class="lwc-tog on" id="' + p + 'tMacd" ' + t('ind', 'macd') + '>MACD</button>',
       '<div class="lwc-sep"></div>',
-      '<span class="lwc-lbl">DRAW</span>',
+      /* Drawing tools */
       '<button class="lwc-tog tl on" id="' + p + 'dCur" ' + t('tool', 'cursor') + '>✥</button>',
-      '<button class="lwc-tog tl" id="' + p + 'dHL" ' + t('tool', 'hline') + '>— H</button>',
-      '<button class="lwc-tog tl" id="' + p + 'dTr" ' + t('tool', 'trend') + '>↗ Trend</button>',
-      '<button class="lwc-tog tl" id="' + p + 'dFib" ' + t('tool', 'fib') + '>◈ Fib</button>',
+      '<button class="lwc-tog tl" id="' + p + 'dHL" ' + t('tool', 'hline') + '>—</button>',
+      '<button class="lwc-tog tl" id="' + p + 'dTr" ' + t('tool', 'trend') + '>↗</button>',
+      '<button class="lwc-tog tl" id="' + p + 'dFib" ' + t('tool', 'fib') + '>Fib</button>',
       '<button class="lwc-tog tl" id="' + p + 'dAlt" ' + t('tool', 'alert') + '>🔔</button>',
-      '<button class="lwc-tog tl" style="color:#ef5350" ' + t('clearAll') + '>✕ Clear</button>',
+      '<button class="lwc-tog tl" style="color:#ef5350;border-color:transparent" ' + t('clearAll') + '>✕</button>',
+      '<div class="lwc-sep"></div>',
+      /* Log scale + settings */
+      '<button class="lwc-tog tp" id="' + p + 'tLog" ' + t('log') + '>Log</button>',
+      '<button class="lwc-tog" ' + t('svc') + ' title="Relay settings" style="font-size:9px">⚙</button>',
+      /* Price pushed to right */
+      '<span class="lwc-sp"></span>',
+      '<span class="lwc-pd" id="' + p + 'pd">&mdash;</span>',
+      '<span class="lwc-cd" id="' + p + 'cd"></span>',
       '</div>',
       '<div class="lwc-area">',
       '<div class="lwc-cp" id="' + p + 'pMain" style="flex:55">',
@@ -186,23 +177,14 @@
       '</div>',
       '<div class="lwc-stats" id="' + p + 'stats"><table id="' + p + 'stbl"></table></div>',
       '<div class="lwc-svc" id="' + p + 'svc">',
-      '<label>Services</label>',
-      '<div style="display:flex;gap:12px;margin-bottom:8px;font-size:10px">',
-      '<span id="' + p + 'beDot">⬡ finterm-backend</span>',
-      '<span id="' + p + 'rlDot">⬡ ws-relay</span>',
-      '</div>',
       '<label>Relay token (RELAY_SECRET)</label>',
       '<div class="sr">',
-      '<input type="text" id="' + p + 'relTok" placeholder="paste RELAY_SECRET" style="text-transform:none" />',
-      '<button class="lwc-btn" style="font-size:11px;padding:3px 8px" ' + t('saveToken') + '>Save</button>',
+      '<input type="text" id="' + p + 'relTok" placeholder="paste RELAY_SECRET" />',
+      '<button class="lwc-btn" ' + t('saveToken') + '>Save</button>',
       '</div>',
-      '<div style="font-size:10px;color:#4c5058">Start ws-relay on :8080 for real-time stocks.</div>',
+      '<div style="font-size:10px;color:#4c5058;margin-top:4px">',
+      'Live: <span id="' + p + 'sLive" style="color:#787b86">&mdash;</span>',
       '</div>',
-      '<div class="lwc-sbar">',
-      '<span>Src1:<span id="' + p + 's1">&mdash;</span></span>',
-      '<span>Src2:<span id="' + p + 's2">&mdash;</span></span>',
-      '<span>Live:<span id="' + p + 'sLive">&mdash;</span></span>',
-      '<span class="r" id="' + p + 'sTime">&mdash;</span>',
       '</div>',
       '<div class="lwc-toast" id="' + p + 'toast"></div>',
       '<div class="lwc-hint" id="' + p + 'hint"></div>',
@@ -272,6 +254,7 @@
     var rCandle = null, rIvSec = 3600;
     var svc = { backend: false };
     var relayToken = localStorage.getItem('lwc_relayToken') || '';
+    var currentSym = 'AAPL'; /* tracks symbol since there is no input field in the toolbar */
 
     function g(id) { return document.getElementById(p + id); }
     function setS(id, h) { var el = g(id); if (el) el.innerHTML = h; }
@@ -341,8 +324,9 @@
       var cMainEl = g('cMain');
       cMainEl.addEventListener('click', onChartClick);
       cMainEl.addEventListener('contextmenu', function (e) { e.preventDefault(); undoLast(); });
-      var symEl = g('sym');
-      if (symEl) symEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') runLoad(); });
+      /* interval change triggers reload */
+      var ivEl2 = g('iv');
+      if (ivEl2) ivEl2.addEventListener('change', function () { runLoad(); });
     }
 
     function onChartClick(e) {
@@ -384,8 +368,8 @@
     function setTool(t) { activeTool = t; drawState.phase = 0; Object.keys(TOOL_BTNS).forEach(function (k) { var b = g(TOOL_BTNS[k]); if (b) b.classList.toggle('on', k === t); }); var cm = g('cMain'); if (cm) cm.style.cursor = t !== 'cursor' ? 'crosshair' : 'default'; hint(t === 'hline' ? 'Click for H-line' : t === 'trend' ? 'Click 1st trend point' : t === 'fib' ? 'Click Fib high/low' : t === 'alert' ? 'Click for price alert' : ''); }
     function setPMode(m) { panelMode = m; ['rsi', 'stoch', 'obv', 'atr'].forEach(function (x) { var b = g('pm_' + x); if (b) b.classList.toggle('on', x === m); }); RSIS.applyOptions({ visible: m === 'rsi' }); SKS.applyOptions({ visible: m === 'stoch' }); SDS.applyOptions({ visible: m === 'stoch' }); OBVS.applyOptions({ visible: m === 'obv' }); ATRS.applyOptions({ visible: m === 'atr' }); }
     function toggleLog() { logMode = !logMode; var b = g('tLog'); if (b) b.classList.toggle('on', logMode); MC.priceScale('right').applyOptions({ mode: logMode ? LightweightCharts.PriceScaleMode.Logarithmic : LightweightCharts.PriceScaleMode.Normal }); }
-    function exportPNG() { try { var cv = MC.takeScreenshot(), a = document.createElement('a'); a.download = (g('sym').value || 'chart') + '.png'; a.href = cv.toDataURL('image/png'); a.click(); } catch (e) { } }
-    function exportCSV() { if (!rawC.length) return; var rows = ['datetime,open,high,low,close,volume']; rawC.forEach(function (c) { rows.push(new Date(c.time * 1000).toISOString() + ',' + [c.open, c.high, c.low, c.close, c.volume].join(',')); }); var b = new Blob([rows.join('\n')], { type: 'text/csv' }), u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = (g('sym').value || 'data') + '.csv'; a.click(); URL.revokeObjectURL(u); }
+    function exportPNG() { try { var cv = MC.takeScreenshot(), a = document.createElement('a'); a.download = (currentSym || 'chart') + '.png'; a.href = cv.toDataURL('image/png'); a.click(); } catch (e) { } }
+    function exportCSV() { if (!rawC.length) return; var rows = ['datetime,open,high,low,close,volume']; rawC.forEach(function (c) { rows.push(new Date(c.time * 1000).toISOString() + ',' + [c.open, c.high, c.low, c.close, c.volume].join(',')); }); var b = new Blob([rows.join('\n')], { type: 'text/csv' }), u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = (currentSym || 'data') + '.csv'; a.click(); URL.revokeObjectURL(u); }
     function showStats() { var sp = g('stats'); if (!sp) return; if (sp.style.display === 'block') { sp.style.display = 'none'; return; } if (!rawC.length) return; var hi = Math.max.apply(null, rawC.map(function (c) { return c.high; })), lo = Math.min.apply(null, rawC.map(function (c) { return c.low; })), first = rawC[0], last = rawC[rawC.length - 1], chg = (last.close - first.open) / first.open * 100, vol = rawC.reduce(function (s, c) { return s + c.volume; }, 0); var rows = [['Bars', rawC.length], ['High', fmt(hi)], ['Low', fmt(lo)], ['Open', fmt(first.open)], ['Close', fmt(last.close)], ['Change', (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%'], ['Volume', vol.toLocaleString(undefined, { maximumFractionDigits: 0 })]]; var tbl = g('stbl'); if (tbl) tbl.innerHTML = rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td style="text-align:right;color:#d1d4dc">' + r[1] + '</td></tr>'; }).join(''); sp.style.display = 'block'; }
     function toggleSvc() { var sp = g('svc'); if (sp) { sp.style.display = sp.style.display === 'block' ? 'none' : 'block'; var ti = g('relTok'); if (ti) ti.value = relayToken; } }
     function saveToken() { var ti = g('relTok'); if (!ti) return; relayToken = ti.value.trim(); localStorage.setItem('lwc_relayToken', relayToken); toast('Relay token saved'); }
@@ -458,8 +442,8 @@
     async function detectSvc() { try { var r = await fetch(LOCAL_BACKEND + '/health', { signal: AbortSignal.timeout(1500) }); svc.backend = r.ok; } catch (e) { svc.backend = false; } var bd = g('beDot'); if (bd) bd.innerHTML = '<span class="' + (svc.backend ? 'lwc-ok' : '') + '">' + (svc.backend ? '✓ ' : '') + 'finterm-backend</span>'; }
 
     async function runLoad() {
-      var symEl = g('sym'), ivEl = g('iv'); if (!symEl || !ivEl) return;
-      var raw = symEl.value.trim().toUpperCase().replace(/.*:/, '');
+      var ivEl = g('iv'); if (!ivEl) return;
+      var raw = currentSym.trim().toUpperCase().replace(/.*:/, '');
       var iv = ivEl.value; if (!raw) return;
       rIvSec = (IVms[iv] || 3600e3) / 1000; stopLive();
       setS('s1', 'loading…'); setS('s2', 'loading…'); setS('sLive', '—');
@@ -468,7 +452,7 @@
       var nb = HIST[iv] || 500, now = Date.now(), cMs = now - LAG * 60 * 1000, cSec = Math.floor(cMs / 1000), sMs = cMs - nb * (IVms[iv] || 3600e3);
       var hist = [], gap = [];
       if (isCrypto(raw)) {
-        var sym = normBN(raw); symEl.value = sym;
+        var sym = normBN(raw); currentSym = sym;
         var cached = lc(sym, iv); if (cached) { renderCandles(cached); setS('s1', '<span class="lwc-cache">● cache (' + cached.length + ')</span>'); setS('s2', '<span class="lwc-cache">cache</span>'); connWS(sym, iv); return; }
         try { var r1 = await cH(sym, iv, sMs, cMs); hist = r1.data; setS('s1', '<span class="lwc-ok">' + r1.src + ' (' + hist.length + ')</span>'); } catch (e) { setS('s1', '<span class="lwc-err">' + e.message + '</span>'); }
         var r2 = await cG(sym, iv, cSec, now); gap = r2.data;
@@ -493,14 +477,11 @@
         });
       },
       load: function (sym, iv) {
-        var symEl = g('sym'), ivEl = g('iv'); if (!symEl) return;
-        /* Only update input if caller explicitly passes a symbol */
-        if (sym) symEl.value = sym.replace(/.*:/, '').toUpperCase();
-        if (iv) {
+        if (sym) currentSym = sym.replace(/.*:/, '').toUpperCase();
+        var ivEl = g('iv');
+        if (iv && ivEl) {
           var mapped = TV_IV[iv] || iv;
-          if (['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].includes(mapped)) {
-            if (ivEl) ivEl.value = mapped;
-          }
+          if (['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].includes(mapped)) ivEl.value = mapped;
         }
         runLoad();
       },
