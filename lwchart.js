@@ -97,19 +97,15 @@
   }
 
   /* ── HTML template ───────────────────────────────────────────────── */
-  function getHTML(p, slot) {
-    /* Generate onclick that calls the instance directly via global registry */
-    function t(fn, a) {
-      var call = a !== undefined
-        ? "window._lwcReg['" + slot + "']." + fn + "('" + a + "')"
-        : "window._lwcReg['" + slot + "']." + fn + "()";
-      return 'onclick="' + call + '"';
+  function getHTML(p) {
+    /* Use data-fn / data-arg — bound via addEventListener in bindButtons() */
+    function b(cls, id, fn, arg, label) {
+      var d = arg !== undefined ? ' data-fn="' + fn + '" data-arg="' + arg + '"' : ' data-fn="' + fn + '"';
+      return '<button class="' + cls + '" id="' + p + id + '"' + d + '>' + label + '</button>';
     }
     return [
       '<div class="lwc-wrap" id="' + p + 'wrap">',
-      /* Single compact toolbar — no symbol search (dashboard handles that) */
       '<div class="lwc-tb">',
-      /* Interval */
       '<select id="' + p + 'iv">',
       '<option value="1m">1m</option><option value="5m">5m</option>',
       '<option value="15m">15m</option><option value="30m">30m</option>',
@@ -117,38 +113,32 @@
       '<option value="1d">1d</option><option value="1w">1w</option>',
       '</select>',
       '<div class="lwc-sep"></div>',
-      /* Indicators */
-      '<button class="lwc-tog on" id="' + p + 'tEma20" ' + t('ind', 'ema20') + '>E20</button>',
-      '<button class="lwc-tog on" id="' + p + 'tEma50" ' + t('ind', 'ema50') + '>E50</button>',
-      '<button class="lwc-tog" id="' + p + 'tBb" ' + t('ind', 'bb') + '>BB</button>',
-      '<button class="lwc-tog" id="' + p + 'tVwap" ' + t('ind', 'vwap') + '>VWAP</button>',
-      '<button class="lwc-tog" id="' + p + 'tPsar" ' + t('ind', 'psar') + '>PSAR</button>',
-      '<button class="lwc-tog" id="' + p + 'tVolma" ' + t('ind', 'volma') + '>VMA</button>',
-      '<button class="lwc-tog" id="' + p + 'tIchi" ' + t('ind', 'ichi') + '>Ichi</button>',
-      '<button class="lwc-tog" id="' + p + 'tPivots" ' + t('ind', 'pivots') + '>Pvt</button>',
+      b('lwc-tog on','tEma20','ind','ema20','E20'),
+      b('lwc-tog on','tEma50','ind','ema50','E50'),
+      b('lwc-tog','tBb','ind','bb','BB'),
+      b('lwc-tog','tVwap','ind','vwap','VWAP'),
+      b('lwc-tog','tPsar','ind','psar','PSAR'),
+      b('lwc-tog','tVolma','ind','volma','VMA'),
+      b('lwc-tog','tIchi','ind','ichi','Ichi'),
+      b('lwc-tog','tPivots','ind','pivots','Pvt'),
       '<div class="lwc-sep"></div>',
-      /* Chart type */
-      '<button class="lwc-tog tp on" id="' + p + 'tCd" ' + t('type', 'candle') + '>Cd</button>',
-      '<button class="lwc-tog tp" id="' + p + 'tHA" ' + t('type', 'ha') + '>HA</button>',
-      '<button class="lwc-tog tp" id="' + p + 'tLn" ' + t('type', 'line') + '>Ln</button>',
-      '<button class="lwc-tog tp" id="' + p + 'tAr" ' + t('type', 'area') + '>Ar</button>',
+      b('lwc-tog tp on','tCd','type','candle','Cd'),
+      b('lwc-tog tp','tHA','type','ha','HA'),
+      b('lwc-tog tp','tLn','type','line','Ln'),
+      b('lwc-tog tp','tAr','type','area','Ar'),
       '<div class="lwc-sep"></div>',
-      /* Panels */
-      '<button class="lwc-tog on" id="' + p + 'tRsi" ' + t('ind', 'rsi') + '>RSI</button>',
-      '<button class="lwc-tog on" id="' + p + 'tMacd" ' + t('ind', 'macd') + '>MACD</button>',
+      b('lwc-tog on','tRsi','ind','rsi','RSI'),
+      b('lwc-tog on','tMacd','ind','macd','MACD'),
       '<div class="lwc-sep"></div>',
-      /* Drawing tools */
-      '<button class="lwc-tog tl on" id="' + p + 'dCur" ' + t('tool', 'cursor') + '>✥</button>',
-      '<button class="lwc-tog tl" id="' + p + 'dHL" ' + t('tool', 'hline') + '>—</button>',
-      '<button class="lwc-tog tl" id="' + p + 'dTr" ' + t('tool', 'trend') + '>↗</button>',
-      '<button class="lwc-tog tl" id="' + p + 'dFib" ' + t('tool', 'fib') + '>Fib</button>',
-      '<button class="lwc-tog tl" id="' + p + 'dAlt" ' + t('tool', 'alert') + '>🔔</button>',
-      '<button class="lwc-tog tl" style="color:#ef5350;border-color:transparent" ' + t('clearAll') + '>✕</button>',
+      b('lwc-tog tl on','dCur','tool','cursor','✥'),
+      b('lwc-tog tl','dHL','tool','hline','—'),
+      b('lwc-tog tl','dTr','tool','trend','↗'),
+      b('lwc-tog tl','dFib','tool','fib','Fib'),
+      b('lwc-tog tl','dAlt','tool','alert','🔔'),
+      '<button class="lwc-tog tl" data-fn="clearAll" style="color:#ef5350;border-color:transparent">✕</button>',
       '<div class="lwc-sep"></div>',
-      /* Log scale + settings */
-      '<button class="lwc-tog tp" id="' + p + 'tLog" ' + t('log') + '>Log</button>',
-      '<button class="lwc-tog" ' + t('svc') + ' title="Relay settings" style="font-size:9px">⚙</button>',
-      /* Price pushed to right */
+      b('lwc-tog tp','tLog','log',undefined,'Log'),
+      '<button class="lwc-tog" data-fn="svc" title="Relay settings" style="font-size:9px">⚙</button>',
       '<span class="lwc-sp"></span>',
       '<span class="lwc-pd" id="' + p + 'pd">&mdash;</span>',
       '<span class="lwc-cd" id="' + p + 'cd"></span>',
@@ -161,10 +151,10 @@
       '<div class="lwc-cp" id="' + p + 'pRsi" style="flex:20">',
       '<div id="' + p + 'cRsi"></div>',
       '<div class="lwc-plbl">',
-      '<button class="lwc-ptog on" id="' + p + 'pm_rsi" ' + t('pmode', 'rsi') + '>RSI 14</button>',
-      '<button class="lwc-ptog" id="' + p + 'pm_stoch" ' + t('pmode', 'stoch') + '>Stoch</button>',
-      '<button class="lwc-ptog" id="' + p + 'pm_obv" ' + t('pmode', 'obv') + '>OBV</button>',
-      '<button class="lwc-ptog" id="' + p + 'pm_atr" ' + t('pmode', 'atr') + '>ATR</button>',
+      b('lwc-ptog on','pm_rsi','pmode','rsi','RSI 14'),
+      b('lwc-ptog','pm_stoch','pmode','stoch','Stoch'),
+      b('lwc-ptog','pm_obv','pmode','obv','OBV'),
+      b('lwc-ptog','pm_atr','pmode','atr','ATR'),
       '</div>',
       '<div class="lwc-pval" id="' + p + 'rsiVal">&mdash;</div>',
       '</div>',
@@ -328,6 +318,26 @@
       if (ivEl2) ivEl2.addEventListener('change', function () { runLoad(); });
     }
 
+    function bindButtons() {
+      /* Attach all toolbar button listeners via data-fn / data-arg — no onclick attrs needed */
+      var dispatch = {
+        ind: togInd, type: setType, tool: setTool, pmode: setPMode,
+        log: toggleLog, svc: toggleSvc, saveToken: saveToken, clearAll: clearAll
+      };
+      var wrap = document.getElementById(p + 'wrap');
+      if (!wrap) return;
+      wrap.querySelectorAll('[data-fn]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          var fn = el.getAttribute('data-fn');
+          var arg = el.getAttribute('data-arg');
+          var handler = dispatch[fn];
+          if (typeof handler === 'function') {
+            try { handler(arg !== null ? arg : undefined); } catch (e) { console.warn('[LWC btn]', fn, e.message); }
+          }
+        });
+      });
+    }
+
     function onChartClick(e) {
       if (activeTool === 'cursor') return;
       var rect = g('cMain').getBoundingClientRect();
@@ -472,6 +482,7 @@
       init: function (onReady) {
         requestAnimationFrame(function () {
           initCharts();
+          bindButtons();
           detectSvc();
           if (onReady) onReady();
         });
@@ -504,7 +515,7 @@
     if (_reg[slot]) _reg[slot].destroy();
     injectCSS();
     var p = 'lwc' + (++_cnt) + '_';
-    container.innerHTML = getHTML(p, slot);
+    container.innerHTML = getHTML(p);
     container.style.overflow = 'hidden';
     var inst = createInstance(p);
     _reg[slot] = inst;
