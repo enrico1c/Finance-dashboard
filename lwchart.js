@@ -52,7 +52,7 @@
       '.lwc-wrap *{box-sizing:border-box;}',
       /* Single compact toolbar */
       '.lwc-tb{background:#1e222d;border-bottom:1px solid #2a2e39;display:flex;align-items:center;',
-      'gap:3px;padding:2px 8px;flex-shrink:0;flex-wrap:wrap;min-height:0;}',
+      'gap:3px;padding:2px 8px;flex-shrink:0;flex-wrap:nowrap;overflow-x:auto;height:26px;}',
       '.lwc-sep{width:1px;height:12px;background:#363a45;flex-shrink:0;margin:0 1px;}',
       '.lwc-wrap select{background:#2a2e39;border:1px solid #363a45;color:#d1d4dc;',
       'padding:2px 4px;border-radius:3px;font-size:11px;outline:none;cursor:pointer;}',
@@ -63,9 +63,10 @@
       '.lwc-tog.tp{border-color:#2a2e39;color:#d1d4dc;}.lwc-tog.tp.on{border-color:#f9a825;color:#f9a825;}',
       '.lwc-tog.tl{border-color:#2a2e39;color:#d1d4dc;}.lwc-tog.tl.on{border-color:#26a69a;color:#26a69a;}',
       '.lwc-sp{flex:1;}',  /* spacer to push price to right */
-      '.lwc-pd{font-size:12px;font-weight:700;white-space:nowrap;}.lwc-cd{font-size:10px;white-space:nowrap;}',
+      '.lwc-pd{font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;}.lwc-cd{font-size:10px;white-space:nowrap;flex-shrink:0;}',
       '.lwc-up{color:#26a69a;}.lwc-dn{color:#ef5350;}',
-      '.lwc-area{display:flex;flex-direction:column;flex:1;min-height:0;}',
+      '.lwc-tb::-webkit-scrollbar{height:2px;}.lwc-tb::-webkit-scrollbar-thumb{background:#363a45;}',
+      '.lwc-area{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}',
       '.lwc-cp{position:relative;min-height:0;}',
       '.lwc-cp>div:first-child{width:100%;height:100%;}',
       '.lwc-cp+.lwc-cp{border-top:1px solid #2a2e39;}',
