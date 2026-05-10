@@ -8,13 +8,12 @@
 const _cgEsc = s => String(s ?? '').replace(/[<>&"]/g, c =>
   ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
-const _cgAgo = d => {
-  const days = Math.floor((Date.now() - new Date(d)) / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return '1d ago';
-  if (days < 30)  return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days/30)}mo ago`;
-  return `${Math.floor(days/365)}y ago`;
+const _cgDate = d => {
+  const dt = new Date(d);
+  if (isNaN(dt)) return '';
+  const day = String(dt.getDate()).padStart(2, '0');
+  const mon = String(dt.getMonth() + 1).padStart(2, '0');
+  return `${day}/${mon}`;
 };
 
 const _cgParty = p => p === 'Democrat' ? '🔵' : p === 'Republican' ? '🔴' : '⚪';
@@ -106,7 +105,7 @@ function congressRender(el, dash, flags, members, view) {
           <span style="color:${tt.col};font-weight:700;font-size:12px">${tt.icon}</span>
           <strong style="font-size:11px;color:var(--text)">${_cgEsc(t.ticker)}</strong>
           <span style="font-size:10px;color:var(--text-muted)">${_cgEsc(t.companyName)}</span>
-          <span style="margin-left:auto;font-size:9px;color:var(--text-muted)">${_cgAgo(t.tradeDate)}</span>
+          <span style="margin-left:auto;font-size:9px;color:var(--text-muted)">${_cgDate(t.tradeDate)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--text-muted)">
           <span>${party} ${_cgEsc(t.memberName)}</span>
@@ -137,7 +136,7 @@ function congressRender(el, dash, flags, members, view) {
           <span style="font-size:10px;color:var(--text-muted)">${_cgEsc(f.companyName)}</span>
           <span style="margin-left:auto;font-size:9px;font-weight:700;color:${sev.col}">${sev.label}</span>
         </div>
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">${party} ${_cgEsc(f.memberName)} · ${_cgEsc(f.tradeType)} · ${_cgEsc(f.amount?.label||'')} · ${_cgAgo(f.tradeDate)}</div>
+        <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">${party} ${_cgEsc(f.memberName)} · ${_cgEsc(f.tradeType)} · ${_cgEsc(f.amount?.label||'')} · ${_cgDate(f.tradeDate)}</div>
         <div style="font-size:9px;color:var(--text-muted);font-style:italic">${_cgEsc(f.summary||'')}</div>
         ${f.matchedCommittees?.length ? `<div style="font-size:8px;color:#58a6ff;margin-top:2px">📋 ${f.matchedCommittees.join(' · ')}</div>` : ''}
       </div>`;
@@ -187,3 +186,11 @@ function congressRender(el, dash, flags, members, view) {
 
   el.innerHTML = html;
 }
+
+/* Auto-refresh every 30 minutes while the tab is visible */
+setInterval(() => {
+  const el = document.getElementById('alert-congress');
+  if (!el || el.offsetParent === null) return; // skip if panel hidden
+  _cgData = null; // clear cache so next load re-fetches
+  congressLoad();
+}, 30 * 60 * 1000);
