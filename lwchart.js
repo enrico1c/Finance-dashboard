@@ -100,10 +100,10 @@
   function getHTML(p) {
     function t(fn, a, b) {
       var args = b !== undefined
-        ? 'this,"' + fn + '","' + a + '","' + b + '"'
+        ? "this,'" + fn + "','" + a + "','" + b + "'"
         : a !== undefined
-          ? 'this,"' + fn + '","' + a + '"'
-          : 'this,"' + fn + '"';
+          ? "this,'" + fn + "','" + a + "'"
+          : "this,'" + fn + "'";
       return 'onclick="window._mcFn(' + args + ')"';
     }
     return [
