@@ -169,7 +169,7 @@
       '<label>Relay token (RELAY_SECRET)</label>',
       '<div class="sr">',
       '<input type="text" id="' + p + 'relTok" placeholder="paste RELAY_SECRET" />',
-      '<button class="lwc-btn" ' + t('saveToken') + '>Save</button>',
+      '<button class="lwc-btn" data-fn="saveToken">Save</button>',
       '</div>',
       '<div style="font-size:10px;color:#4c5058;margin-top:4px">',
       'Live: <span id="' + p + 'sLive" style="color:#787b86">&mdash;</span>',
