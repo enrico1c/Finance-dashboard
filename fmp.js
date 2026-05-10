@@ -438,21 +438,45 @@ function fmpRenderOwnership(sym, insiders, institutional) {
   const hds = document.getElementById("own-hds");
   if (!hds) return;
 
-  /* ── Smart Money Score ──────────────────────────────────────── */
-  const instList = institutional || [];
+  /* ── Smart Money Score (weighted by share magnitude) ────────── */
+  const instList   = institutional || [];
   const insiderList = insiders || [];
-  const netBuyers = instList.filter(h => {
-    const n = typeof h.change === "string" ? parseFloat(h.change.replace(/[^0-9.-]/g,"")) : Number(h.change);
-    return n > 0;
-  }).length;
-  const instScore = instList.length ? Math.round((netBuyers / instList.length) * 5) : 0;
-  const iBuys  = insiderList.filter(i => i.action === "Buy").length;
-  const iSells = insiderList.filter(i => i.action === "Sell").length;
-  const insiderScore = (iBuys + iSells) ? Math.round((iBuys / (iBuys + iSells)) * 5) : 2;
+  const parseChg = v => parseFloat(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
+
+  /* Institutional: net share flow (positive = net buying) */
+  let instBuy = 0, instSell = 0;
+  instList.forEach(h => {
+    const n = parseChg(h.change);
+    if (n > 0) instBuy += n; else instSell += Math.abs(n);
+  });
+  const instTotal = instBuy + instSell || 1;
+  const instScore = Math.round((instBuy / instTotal) * 5); // 0–5
+
+  /* Insider: $ value of buys vs sells (fall back to count if no value) */
+  const parseVal = v => {
+    const s = String(v ?? '').replace(/[$,\s]/g, '');
+    const n = parseFloat(s);
+    if (isNaN(n)) return 0;
+    if (/[Tt]/.test(s)) return n * 1e12;
+    if (/[Bb]/.test(s)) return n * 1e9;
+    if (/[Mm]/.test(s)) return n * 1e6;
+    if (/[Kk]/.test(s)) return n * 1e3;
+    return n;
+  };
+  let iBuyVal = 0, iSellVal = 0, iBuys = 0, iSells = 0;
+  insiderList.forEach(i => {
+    const v = parseVal(i.value);
+    if (i.action === 'Buy')  { iBuyVal  += v || 1; iBuys++;  }
+    if (i.action === 'Sell') { iSellVal += v || 1; iSells++; }
+  });
+  const iTotal = iBuyVal + iSellVal || 1;
+  const insiderScore = (iBuys + iSells) ? Math.round((iBuyVal / iTotal) * 5) : 2; // neutral if no data
+
   const totalScore = instScore + insiderScore; // 0–10
-  const scoreCol   = totalScore >= 7 ? "#3fb950" : totalScore >= 4 ? "#d29922" : "#f85149";
-  const scoreLabel = totalScore >= 7 ? "Bullish" : totalScore >= 4 ? "Neutral" : "Bearish";
-  const smsBadge   = `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;margin-bottom:6px">
+  const scoreCol   = totalScore >= 7 ? '#3fb950' : totalScore >= 4 ? '#d29922' : '#f85149';
+  const scoreLabel = totalScore >= 7 ? 'Bullish' : totalScore >= 4 ? 'Neutral' : 'Bearish';
+  const fmtFlow = n => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n.toFixed(0);
+  const smsBadge = `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;margin-bottom:6px">
     <div style="text-align:center;min-width:40px">
       <div style="font-size:22px;font-weight:800;color:${scoreCol}">${totalScore}</div>
       <div style="font-size:8px;color:var(--text-muted)">/ 10</div>
@@ -460,8 +484,8 @@ function fmpRenderOwnership(sym, insiders, institutional) {
     <div style="flex:1">
       <div style="font-size:11px;font-weight:700;color:${scoreCol}">Smart Money: ${scoreLabel}</div>
       <div style="font-size:9px;color:var(--text-muted);margin-top:2px">
-        Institutional net-buyers: ${netBuyers}/${instList.length} &nbsp;·&nbsp;
-        Insider buy/sell: ${iBuys}B / ${iSells}S
+        Inst flow: +${fmtFlow(instBuy)} / −${fmtFlow(instSell)} shares &nbsp;·&nbsp;
+        Insider: ${iBuys}B ($${fmtFlow(iBuyVal)}) / ${iSells}S ($${fmtFlow(iSellVal)})
       </div>
       <div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
         <div style="height:100%;width:${totalScore*10}%;background:${scoreCol};border-radius:2px;transition:width .4s"></div>
@@ -469,7 +493,7 @@ function fmpRenderOwnership(sym, insiders, institutional) {
     </div>
   </div>`;
 
-  let html = `<div class="av-live-badge">● LIVE — FMP</div>${smsBadge}`;
+  let html = `<div class="av-live-badge">● FMP · Institutional: 13F (quarterly) · Insiders: SEC Form 4</div>${smsBadge}`;
 
   if (institutional?.length) {
     const rows = institutional.map(h => {
@@ -513,7 +537,11 @@ function fmpRenderOwnership(sym, insiders, institutional) {
 /* ── MGMT — Executives ──────────────────────────────────────────── */
 function fmpRenderMgmt(sym, mgmt) {
   const box = document.getElementById("own-mgmt");
-  if (!box || !mgmt.length) return;
+  if (!box) return;
+  if (!mgmt || !mgmt.length) {
+    box.innerHTML = `<div class="no-data">// No management data available for ${escapeHtml(sym)}.</div>`;
+    return;
+  }
   box.innerHTML = `
     <div class="av-live-badge">● LIVE — FMP</div>
     ${mgmt.map(m => `
@@ -670,27 +698,31 @@ function fmpRenderRatios(sym, r) {
    ══════════════════════════════════════════════════════════════════ */
 async function fmpRefreshWatchlistPrices() {
   if (!currentWatchlistStocks || !currentWatchlistStocks.length) return;
-  const tickers = currentWatchlistStocks.map(s => s.ticker.replace(/.*:/,"")).join(",");
-  const quotes  = await fmpGetBatchQuote(tickers.split(","));
-  if (!quotes) return;
+  try {
+    const tickers = currentWatchlistStocks.map(s => s.ticker.replace(/.*:/,"")).join(",");
+    const quotes  = await fmpGetBatchQuote(tickers.split(","));
+    if (!quotes) return;
 
-  // Merge live prices into watchlist data
-  let updated = false;
-  currentWatchlistStocks.forEach(s => {
-    const sym = s.ticker.replace(/.*:/,"").toUpperCase();
-    const q   = quotes[sym];
-    if (q) {
-      if (q.price     != null) s.price  = q.price;
-      if (q.changePct != null) s.change = q.changePct;
-      if (q.mktCap    != null) s.mktCap = fmtB(q.mktCap);
-      if (q.pe        != null) s.pe     = q.pe;
-      updated = true;
+    let updated = false;
+    currentWatchlistStocks.forEach(s => {
+      const sym = s.ticker.replace(/.*:/,"").toUpperCase();
+      const q   = quotes[sym];
+      if (q) {
+        if (q.price     != null) s.price  = q.price;
+        if (q.changePct != null) s.change = q.changePct;
+        if (q.mktCap    != null) s.mktCap = fmtB(q.mktCap);
+        if (q.pe        != null) s.pe     = q.pe;
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      renderWatchlistRows();
+      showApiToast(`✓ Watchlist: prices refreshed`, "ok");
     }
-  });
-
-  if (updated) {
-    renderWatchlistRows();
-    showApiToast(`✓ Watchlist: live prices updated (FMP)`, "ok");
+  } catch(e) {
+    console.warn("[Watchlist] Price refresh failed:", e.message);
+    showApiToast("⚠ Watchlist: price refresh failed", "warn");
   }
 }
 

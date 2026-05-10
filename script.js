@@ -1101,6 +1101,7 @@ async function loadWatchlist(topic) {
         if (cnt) cnt.textContent = `${stocks.length} stocks`;
         renderWatchlistRows();
         if (typeof fmpRefreshWatchlistPrices === "function") fmpRefreshWatchlistPrices();
+        _wlStartAutoRefresh();
         return;
       }
     } catch(e) { console.warn("Finnhub sector search failed:", e); }
@@ -1128,6 +1129,18 @@ async function loadWatchlist(topic) {
   if (cnt) cnt.textContent = `${staticStocks.length} stocks`;
   renderWatchlistRows();
   if (typeof fmpRefreshWatchlistPrices === "function") fmpRefreshWatchlistPrices();
+  _wlStartAutoRefresh();
+}
+
+/* ── Auto-refresh watchlist prices every 60s while panel is open ── */
+let _wlRefreshTimer = null;
+function _wlStartAutoRefresh() {
+  if (_wlRefreshTimer) clearInterval(_wlRefreshTimer);
+  _wlRefreshTimer = setInterval(() => {
+    const panel = document.getElementById('panel-watchlist');
+    if (!panel || panel.classList.contains('hidden')) return;
+    if (typeof fmpRefreshWatchlistPrices === 'function') fmpRefreshWatchlistPrices();
+  }, 60000);
 }
 
 /* ── Watchlist peer scoring (0–10, computed from current list) ── */

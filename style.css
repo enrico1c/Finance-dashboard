@@ -1036,7 +1036,7 @@ textarea::placeholder { color:var(--text-muted); }
 
 .wl-header-row {
   display: grid;
-  grid-template-columns: 1fr 68px 56px 62px 36px 34px;
+  grid-template-columns: 1fr 68px 56px 62px 36px 34px 28px;
   padding: 5px 10px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
@@ -1051,7 +1051,7 @@ textarea::placeholder { color:var(--text-muted); }
 
 .wl-row {
   display: grid;
-  grid-template-columns: 1fr 68px 56px 62px 36px 34px;
+  grid-template-columns: 1fr 68px 56px 62px 36px 34px 28px;
   align-items: center;
   padding: 7px 10px;
   border-bottom: 1px solid var(--border);
