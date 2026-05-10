@@ -234,7 +234,13 @@
   /* ── Fetch helpers ───────────────────────────────────────────────── */
   function isCrypto(r) { var s = r.toUpperCase().replace(/[\s/\-_]/g, ''); if (/^(EURUSD|GBPUSD|USDJPY|AUDUSD|USDCHF|NZDUSD|USDCAD)/.test(s)) return false; return /^[A-Z0-9]+(USDT|USDC|BUSD|BTC|ETH|BNB)$/.test(s); }
   function normBN(r) { return r.toUpperCase().replace(/[\s/\-_]/g, ''); }
-  async function pFetch(u) { var last; for (var i = 0; i < CORS.length; i++) { try { var r = await fetch(CORS[i] + encodeURIComponent(u)); if (r.ok) return r; last = new Error(r.status); } catch (e) { last = e; } } throw last; }
+  async function pFetch(u) {
+    // Try direct fetch first — proxy-client.js will route through finterm-backend if configured
+    try { var d = await fetch(u, { signal: AbortSignal.timeout(8000) }); if (d.ok) return d; } catch (e) { }
+    var last;
+    for (var i = 0; i < CORS.length; i++) { try { var r = await fetch(CORS[i] + encodeURIComponent(u), { signal: AbortSignal.timeout(8000) }); if (r.ok) return r; last = new Error(r.status); } catch (e) { last = e; } }
+    throw last || new Error('pFetch failed');
+  }
   async function retry(fn, n) { var d = 400; for (var i = 0; i <= n; i++) { try { return await fn(); } catch (e) { if (i === n) throw e; await new Promise(function (r) { setTimeout(r, d); }); d = Math.min(d * 2, 8000); } } }
   function mkv(a) { var m = new Map(); a.forEach(function (c) { m.set(c.time, c); }); return Array.from(m.values()).sort(function (a, b) { return a.time - b.time; }); }
   async function bnB(s, iv, st, en) { var r = await fetch('https://api.binance.com/api/v3/klines?symbol=' + s + '&interval=' + iv + '&startTime=' + st + '&endTime=' + en + '&limit=1000'); if (!r.ok) throw new Error('BN' + r.status); return (await r.json()).map(function (k) { return { time: Math.floor(k[0] / 1000), open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5] }; }); }
@@ -274,8 +280,8 @@
 
     function initCharts() {
       LS = LightweightCharts.LineStyle;
-      var base = { layout: { background: { color: '#131722' }, textColor: '#d1d4dc' }, grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } }, crosshair: { mode: LightweightCharts.CrosshairMode.Normal }, rightPriceScale: { borderColor: '#2a2e39' }, timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false } };
-      function mkC(id, extra) { var el = g(id); var c = LightweightCharts.createChart(el, Object.assign({}, base, extra || {})); c.applyOptions({ width: el.clientWidth, height: el.clientHeight }); new ResizeObserver(function () { c.applyOptions({ width: el.clientWidth, height: el.clientHeight }); }).observe(el); return c; }
+      var base = { autoSize: true, layout: { background: { color: '#131722' }, textColor: '#d1d4dc' }, grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } }, crosshair: { mode: LightweightCharts.CrosshairMode.Normal }, rightPriceScale: { borderColor: '#2a2e39' }, timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false } };
+      function mkC(id, extra) { var el = g(id); var c = LightweightCharts.createChart(el, Object.assign({}, base, extra || {})); return c; }
       MC = mkC('cMain', { rightPriceScale: { scaleMargins: { top: .05, bottom: .25 } } });
       CS = MC.addCandlestickSeries({ upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350' });
       VS = MC.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' });
@@ -386,6 +392,7 @@
     function clearAll() { drawnObj.forEach(function (o) { if (o.type === 'hline') try { CS.removePriceLine(o.pl); } catch (e) { } if (o.type === 'series') try { MC.removeSeries(o.s); } catch (e) { } if (o.type === 'fib') o.lines.forEach(function (l) { try { CS.removePriceLine(l); } catch (e) { } }); }); drawnObj = []; alertList = []; drawState.phase = 0; if (drawState.tmpLine) { try { MC.removeSeries(drawState.tmpLine); } catch (x) { } drawState.tmpLine = null; } hint(''); }
 
     function renderCandles(candles) {
+      if (!candles || !candles.length) { setS('s1', '<span class="lwc-err">No data returned — check symbol or try again</span>'); return; }
       rawC = candles;
       var dsp = chartType === 'ha' ? toHA(candles) : candles;
       CS.applyOptions({ visible: true, upColor: '#26a69a', downColor: '#ef5350', borderVisible: chartType === 'bar', wickVisible: chartType !== 'line' && chartType !== 'area', wickUpColor: '#26a69a', wickDownColor: '#ef5350' });
@@ -466,13 +473,13 @@
         try { var r1 = await cH(sym, iv, sMs, cMs); hist = r1.data; setS('s1', '<span class="lwc-ok">' + r1.src + ' (' + hist.length + ')</span>'); } catch (e) { setS('s1', '<span class="lwc-err">' + e.message + '</span>'); }
         var r2 = await cG(sym, iv, cSec, now); gap = r2.data;
         setS('s2', '<span class="' + (r2.src.includes('failed') ? 'lwc-err' : 'lwc-ok') + '">' + r2.src + ' (' + gap.length + ')</span>');
-        var mg = merge(hist, gap); sc(sym, iv, mg); renderCandles(mg); connWS(sym, iv);
+        var mg = merge(hist, gap); if (mg.length) sc(sym, iv, mg); renderCandles(mg); connWS(sym, iv);
       } else {
         var cached2 = lc(raw, iv); if (cached2) { renderCandles(cached2); setS('s1', '<span class="lwc-cache">● cache (' + cached2.length + ')</span>'); setS('s2', '<span class="lwc-cache">cache</span>'); if (relayToken) connectRelay(raw); else startPoll(raw, iv); return; }
         if (svc.backend) { try { var loc = await fetchLocal(raw, iv, nb); hist = loc.data; setS('s1', '<span class="lwc-ok">' + loc.src + ' (' + hist.length + ' bars)</span>'); } catch (e) { setS('s1', '<span class="lwc-warn">backend err</span>'); } }
         if (!hist.length) { try { hist = await yH(raw, iv, cSec); setS('s1', '<span class="lwc-ok">Yahoo (' + hist.length + ')</span>'); } catch (e) { setS('s1', '<span class="lwc-err">Yahoo: ' + e.message + '</span>'); } }
         try { gap = await yR(raw, iv, cSec); setS('s2', '<span class="lwc-ok">Yahoo gap (' + gap.length + ')</span>'); } catch (e) { setS('s2', '<span class="lwc-err">gap: ' + e.message + '</span>'); }
-        var mg2 = merge(hist, gap); sc(raw, iv, mg2); renderCandles(mg2);
+        var mg2 = merge(hist, gap); if (mg2.length) sc(raw, iv, mg2); renderCandles(mg2);
         if (relayToken) connectRelay(raw); else startPoll(raw, iv);
       }
     }
@@ -487,15 +494,17 @@
       },
       load: function (sym, iv) {
         var symEl = g('sym'), ivEl = g('iv'); if (!symEl) return;
-        symEl.value = (sym || 'AAPL').replace(/.*:/, '').toUpperCase();
-        var mapped = TV_IV[iv] || iv || '1d';
-        if (!['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].includes(mapped)) mapped = '1d';
-        if (ivEl) ivEl.value = mapped;
+        /* Only update input if caller explicitly passes a symbol */
+        if (sym) symEl.value = sym.replace(/.*:/, '').toUpperCase();
+        if (iv) {
+          var mapped = TV_IV[iv] || iv;
+          if (['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].includes(mapped)) {
+            if (ivEl) ivEl.value = mapped;
+          }
+        }
         runLoad();
       },
       destroy: function () { stopLive(); },
-      /* button handlers */
-      load: runLoad,
       ind: togInd, type: setType, tool: setTool, pmode: setPMode,
       log: toggleLog, png: exportPNG, csv: exportCSV, stats: showStats,
       svc: toggleSvc, saveToken: saveToken, clearAll: clearAll
