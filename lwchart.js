@@ -97,14 +97,13 @@
   }
 
   /* ── HTML template ───────────────────────────────────────────────── */
-  function getHTML(p) {
-    function t(fn, a, b) {
-      var args = b !== undefined
-        ? "this,'" + fn + "','" + a + "','" + b + "'"
-        : a !== undefined
-          ? "this,'" + fn + "','" + a + "'"
-          : "this,'" + fn + "'";
-      return 'onclick="window._mcFn(' + args + ')"';
+  function getHTML(p, slot) {
+    /* Generate onclick that calls the instance directly via global registry */
+    function t(fn, a) {
+      var call = a !== undefined
+        ? "window._lwcReg['" + slot + "']." + fn + "('" + a + "')"
+        : "window._lwcReg['" + slot + "']." + fn + "()";
+      return 'onclick="' + call + '"';
     }
     return [
       '<div class="lwc-wrap" id="' + p + 'wrap">',
@@ -349,6 +348,7 @@
 
     var IND_BTNS = { ema20: 'tEma20', ema50: 'tEma50', bb: 'tBb', vwap: 'tVwap', psar: 'tPsar', volma: 'tVolma', ichi: 'tIchi', pivots: 'tPivots', rsi: 'tRsi', macd: 'tMacd' };
     function togInd(n) {
+      if (!MC) return; /* chart not yet initialised */
       indOn[n] = !indOn[n];
       var btn = g(IND_BTNS[n]); if (btn) btn.classList.toggle('on', indOn[n]);
       if (n === 'ema20') E20S.applyOptions({ visible: indOn.ema20 });
@@ -495,14 +495,7 @@
   /* ── Registry ────────────────────────────────────────────────────── */
   var _reg = {};
   var _cnt = 0;
-
-  window._mcFn = function (el, fn, arg) {
-    var node = el;
-    while (node && !node._lwcInst) node = node.parentElement;
-    if (!node || !node._lwcInst) return;
-    var inst = node._lwcInst;
-    if (typeof inst[fn] === 'function') inst[fn](arg);
-  };
+  window._lwcReg = _reg; /* exposed for direct onclick calls */
 
   window.mcInit = function (container, slot, onReady) {
     if (typeof container === 'string') container = document.querySelector(container);
@@ -511,12 +504,10 @@
     if (_reg[slot]) _reg[slot].destroy();
     injectCSS();
     var p = 'lwc' + (++_cnt) + '_';
-    container.innerHTML = getHTML(p);
+    container.innerHTML = getHTML(p, slot);
     container.style.overflow = 'hidden';
     var inst = createInstance(p);
     _reg[slot] = inst;
-    var wrap = document.getElementById(p + 'wrap');
-    if (wrap) wrap._lwcInst = inst;
     inst.init(onReady);
   };
 
