@@ -64,7 +64,7 @@ async function imfGetFoodPrices() {
         const sym = json?.symbols?.[0];
         if (!sym?.close) return;
         results[imfKey] = { value: parseFloat(sym.close), period: sym.date || '', prev: sym.open ? parseFloat(sym.open) : null };
-      } catch {}
+      } catch(e) {}
     })
   );
   if (Object.keys(results).length) _agSet('stooq_food_prices', results);

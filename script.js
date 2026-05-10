@@ -279,7 +279,7 @@ async function refreshDBPrices() {
       });
       console.info('[DB] Prices refreshed from FMP');
       return;
-    } catch {}
+    } catch(e) {}
   }
 
   // Fallback: Finnhub batch
@@ -296,7 +296,7 @@ async function refreshDBPrices() {
           DB[sym].open   = q.o;
           DB[sym].prevClose = q.pc;
         }
-      } catch {}
+      } catch(e) {}
     }));
     console.info('[DB] Prices refreshed from Finnhub');
   }
@@ -331,7 +331,7 @@ async function refreshSectorDBPrices() {
               }
             });
           }
-        } catch {}
+        } catch(e) {}
         // Brief pause every 10 tickers to stay within 60/min limit
         if (i > 0 && i % 10 === 0) await new Promise(r => setTimeout(r, 1000));
       }
@@ -366,7 +366,7 @@ async function refreshSectorDBPrices() {
       });
     }
     console.info('[sectorDB] Prices refreshed from FMP');
-  } catch {}
+  } catch(e) {}
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1320,7 +1320,7 @@ function renderValuation(ticker) {
               // Re-render valuation with fresh price
               if (typeof renderValuation === 'function') renderValuation(ticker);
             }
-          } catch {}
+          } catch(e) {}
         } else if (typeof fhGetLive === 'function') {
           const fhQ = fhGetLive(sym)?.quote;
           if (fhQ?.price) {
@@ -2258,7 +2258,7 @@ async function loadComparables(sym) {
       const res  = await fetch(`https://financialmodelingprep.com/api/v4/stock_peers?symbol=${sym}&apikey=${key}`);
       const json = await res.json();
       peers = json?.[0]?.peersList ?? [];
-    } catch {}
+    } catch(e) {}
   }
 
   // Also check Finnhub peers
@@ -2273,7 +2273,7 @@ async function loadComparables(sym) {
       const res = await fetch(`https://financialmodelingprep.com/api/v3/quote/${allSyms.join(',')}?apikey=${key}`);
       const arr = await res.json();
       (arr||[]).forEach(q => { if(q.symbol) quotes[q.symbol.toUpperCase()] = q; });
-    } catch {}
+    } catch(e) {}
   }
 
   el.innerHTML = `
@@ -2378,7 +2378,7 @@ async function compExpandPeer(sym) {
           · ${escapeHtml(p.exchangeShortName||'')} · ${escapeHtml(p.country||'')}
         </div>
       </div>`;
-  } catch {
+  } catch(e) {
     detailEl.innerHTML = '<div class="sc-nodata">// Could not load peer details.</div>';
   }
 }
@@ -2391,7 +2391,7 @@ let whLog    = [];
 let _whIntervalId = null;
 
 function whSaveAlerts() {
-  try { localStorage.setItem('finterm_wh_alerts', JSON.stringify(whAlerts)); } catch {}
+  try { localStorage.setItem('finterm_wh_alerts', JSON.stringify(whAlerts)); } catch(e) {}
 }
 
 function whRenderAlerts() {
@@ -2451,7 +2451,7 @@ function whSaveAlert() {
 
   // Validate payload JSON if provided
   if (payload) {
-    try { JSON.parse(payload); } catch { _whStatus('error', 'Payload is not valid JSON'); return; }
+    try { JSON.parse(payload); } catch(e) { _whStatus('error', 'Payload is not valid JSON'); return; }
   }
 
   const alert = { id: Date.now(), ticker, condition, value, interval, url, payload, note, active: true, triggered: false };

@@ -98,14 +98,14 @@ function _cGet(k, ttl = _COMM_TTL) {
         return parsed.d;
       }
     }
-  } catch {}
+  } catch(e) {}
   return null;
 }
 
 function _cSet(k, d) {
   const item = { d, ts: Date.now() };
   _COMM_CACHE[k] = item;
-  try { sessionStorage.setItem('finterm_comm_' + k, JSON.stringify(item)); } catch {}
+  try { sessionStorage.setItem('finterm_comm_' + k, JSON.stringify(item)); } catch(e) {}
 }
 
 const _cEsc = s => String(s ?? '').replace(/[<>&"]/g, c =>
@@ -177,13 +177,13 @@ async function commFetchWorldBank(indicatorId) {
       const r = await _cFetch(url);
       const d = await r.json();
       if (d?.[1]?.length) { data = d; break; }
-    } catch {}
+    } catch(e) {}
     // allorigins proxy fallback
     try {
       const r2 = await _cFetch(url, { proxy: true, timeout: 12000 });
       const d2 = await r2.json();
       if (d2?.[1]?.length) { data = d2; break; }
-    } catch {}
+    } catch(e) {}
   }
   const obs = data?.[1]?.filter(o => o.value != null) || [];
   return {
@@ -299,7 +299,7 @@ window.commFetchIMFPCPS = async function() {
           date:    sym.date || '',
           history: [],
         };
-      } catch { return null; }
+      } catch(e) { return null; }
     })
   );
 
@@ -320,7 +320,7 @@ window.commFetchIMFPCPS = async function() {
           date: data[0].period, history:[] });
       }
     }
-  } catch {}
+  } catch(e) {}
 
   if (valid.length) _cSet(cacheKey, valid);
   return valid;
@@ -457,7 +457,7 @@ window.commFetchOPEC = async function() {
           _cSet(cacheKey, result);
           return result;
         }
-      } catch {}
+      } catch(e) {}
       throw new Error('OPEC basket and proxy both unavailable');
     }
 
@@ -600,7 +600,7 @@ window.commGetUSGSData = async function(categories = null) {
           if (liveData.length > 10) break;
         }
       }
-    } catch {}
+    } catch(e) {}
   }
 
   // Merge live data with static definitions
@@ -636,7 +636,7 @@ function _parseUSGSCSV(csv) {
         worldProd: parseFloat(obj['world production'] || obj['world_production'] || 0),
       };
     }).filter(m => m.name);
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -720,7 +720,7 @@ window.commFetchFAOFPI = async function() {
 
     let indices = [];
     if (jsonMatch) {
-      try { indices = JSON.parse(jsonMatch[1]); } catch {}
+      try { indices = JSON.parse(jsonMatch[1]); } catch(e) {}
     }
 
     // Fallback: known FAO FPI values (February 2026 release reference)
@@ -1937,7 +1937,7 @@ window.commLoadGDELTTheme = async function(themeKey) {
           if (el && (el.querySelector('.wm-empty') || !el.innerHTML.trim())) {
             el.innerHTML = ourContent;
           }
-        } catch {
+        } catch(e) {
           // wmBootstrap failed — restore our content
           if (el && ourContent) el.innerHTML = ourContent;
         }
@@ -1947,7 +1947,7 @@ window.commLoadGDELTTheme = async function(themeKey) {
     // Patch wmSupplyMinerals to extend existing UI with new sub-tabs
     const origMinerals = window.wmSupplyMinerals;
     window.wmSupplyMinerals = async function() {
-      try { await origMinerals?.(); } catch {}
+      try { await origMinerals?.(); } catch(e) {}
       const el = document.getElementById('supply-minerals');
       if (el && (!el.innerHTML.trim() || el.querySelector('.wm-empty,.wm-loading'))) {
         await commRenderMinerals('critical');
@@ -1962,7 +1962,7 @@ window.commLoadGDELTTheme = async function(themeKey) {
     // Patch wmMacroCommodities to use IMF PCPS
     const origComm = window.wmMacroCommodities;
     window.wmMacroCommodities = async function() {
-      try { await origComm?.(); } catch {}
+      try { await origComm?.(); } catch(e) {}
       const el = document.getElementById('macro-comm');
       if (el && (!el.innerHTML.trim() || el.querySelector('.wm-empty,.wm-loading'))) {
         await commRenderIMFComm();
@@ -2099,7 +2099,7 @@ window.commFetchUSDA = async function(commodity = 'wheat') {
       const url = `https://apps.fas.usda.gov/psdonline/api/psd/commodity/${code}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
       if (res.ok) json = await res.json();
-    } catch {}
+    } catch(e) {}
 
     // Fallback: USDA FAS Bulk Download for world production/trade data
     if (!json || (Array.isArray(json) && !json.length)) {
@@ -2108,7 +2108,7 @@ window.commFetchUSDA = async function(commodity = 'wheat') {
         const quickUrl = `https://quickstats.nass.usda.gov/api/api_GET/?key=DEMO_KEY&commodity_desc=${encodeURIComponent(commodity.toUpperCase())}&statisticcat_desc=PRODUCTION&year_GE=${year-5}&format=JSON`;
         const res2 = await fetch(quickUrl, { signal: AbortSignal.timeout(10000) });
         if (res2.ok) json = (await res2.json())?.data;
-      } catch {}
+      } catch(e) {}
     }
 
     const result = {
@@ -2155,7 +2155,7 @@ window.commFetchOFAC = async function() {
         count = json?.count || json?.total || json?.numOfEntries;
         asOf  = json?.date || json?.publishDate || new Date().toISOString().split('T')[0];
       }
-    } catch {}
+    } catch(e) {}
 
     // Fallback: fetch only the first 2KB of the SDN CSV to get the header
     // and count only makes sense with partial read — skip and use known ref count

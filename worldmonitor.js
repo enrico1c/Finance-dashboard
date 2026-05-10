@@ -8,7 +8,7 @@
 
 const WM_BASE = 'https://worldmonitor.app';
 const WM_KEY  = (() => {
-  try { return localStorage.getItem('finterm_key_wm') || ''; } catch { return ''; }
+  try { return localStorage.getItem('finterm_key_wm') || ''; } catch(e) { return ''; }
 })();
 
 /* ── Bootstrap cache TTLs ────────────────────────────────────────── */
@@ -877,7 +877,7 @@ async function wmGeoIntel() {
     if (rssRes.ok) {
       let rssText = await rssRes.text();
       // Backend proxy returns text as JSON string — unwrap if needed
-      if (rssText.startsWith('"')) { try { rssText = JSON.parse(rssText); } catch {} }
+      if (rssText.startsWith('"')) { try { rssText = JSON.parse(rssText); } catch(e) {} }
       const doc   = new DOMParser().parseFromString(rssText, 'text/xml');
       const items = [...doc.querySelectorAll('item')].slice(0, 10);
       if (items.length) {
@@ -911,7 +911,7 @@ async function wmGeoSignals() {
     if (!res.ok) throw new Error(`Bloomberg RSS ${res.status}`);
     let text = await res.text();
     // Backend proxy may return text as JSON string — unwrap if needed
-    if (text.startsWith('"')) { try { text = JSON.parse(text); } catch {} }
+    if (text.startsWith('"')) { try { text = JSON.parse(text); } catch(e) {} }
     const doc  = new DOMParser().parseFromString(text, 'text/xml');
     const items = [...doc.querySelectorAll('item')].slice(0, 25);
     if (!items.length) { el.innerHTML = wmError('No signal data available'); return; }
@@ -2255,7 +2255,7 @@ async function wmMacroEtfFlows() {
           avgVol:  q.avgVolume,
           mktCap:  q.marketCap,
         }));
-    } catch {}
+    } catch(e) {}
   }
 
   // Free Stooq fallback
@@ -2382,7 +2382,7 @@ async function wmMacroSectors() {
         etf: SECTOR_ETF[k] || '',
       }));
       source = 'Alpha Vantage'; hasMulti = true;
-    } catch {}
+    } catch(e) {}
   }
 
   // ── FMP sectors-performance (1D only) ─────────────────────────
@@ -2398,7 +2398,7 @@ async function wmMacroSectors() {
         etf: SECTOR_ETF[s.sector] || '',
       }));
       source = 'FMP'; hasMulti = false;
-    } catch {}
+    } catch(e) {}
   }
 
   // ── Free Stooq fallback (sector ETF prices) ───────────────────
@@ -2541,7 +2541,7 @@ async function _fetchFearGreed() {
     const data = { current: json.data[0], history: json.data, _ts: Date.now() };
     _cgFearData = data;
     return data;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 function _renderFearGauge(val) {
@@ -2580,7 +2580,7 @@ async function _fetchDefiTVL() {
     };
     _defiCache = data;
     return data;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* ── C. BTC Network Stats ─────────────────────────────────────────── */
@@ -2593,7 +2593,7 @@ async function _fetchBTCStats() {
     data._ts   = Date.now();
     _btcStatsCache = data;
     return data;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* ── E. Binance WebSocket real-time (no key) ────────────────────── */
@@ -2654,7 +2654,7 @@ function _bnWsConnect(binanceSymbol) {
           }
         }
 
-      } catch {}
+      } catch(e) {}
     };
 
     ws.onclose = () => {
@@ -2663,7 +2663,7 @@ function _bnWsConnect(binanceSymbol) {
       setTimeout(() => _bnWsConnect(sym), 5000);
     };
     ws.onerror = () => ws.close();
-  } catch {}
+  } catch(e) {}
 }
 
 function _bnSymToCgId(binanceSymbol) {
@@ -2690,10 +2690,10 @@ function _bnLoadUserPairs() {
   try {
     const saved = localStorage.getItem('finterm_bn_pairs');
     return saved ? JSON.parse(saved) : null;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 function _bnSaveUserPairs(pairs) {
-  try { localStorage.setItem('finterm_bn_pairs', JSON.stringify(pairs)); } catch {}
+  try { localStorage.setItem('finterm_bn_pairs', JSON.stringify(pairs)); } catch(e) {}
 }
 function _bnGetActivePairs() {
   return _bnLoadUserPairs() || _BN_DEFAULT_PAIRS;
@@ -2715,7 +2715,7 @@ window.bnRemovePair = function(symbol) {
   const sym = symbol.toLowerCase();
   const pairs = _bnGetActivePairs().filter(p => p !== sym);
   _bnSaveUserPairs(pairs);
-  if (_bnWsMap[sym]) { try { _bnWsMap[sym].close(1000); } catch {} delete _bnWsMap[sym]; }
+  if (_bnWsMap[sym]) { try { _bnWsMap[sym].close(1000); } catch(e) {} delete _bnWsMap[sym]; }
   console.log('[Binance] Removed pair:', sym);
 };
 window.bnGetPairs = function() { return _bnGetActivePairs(); };
@@ -2725,7 +2725,7 @@ function _bnWsConnectAll(pairs) {
 }
 
 function _bnWsDisconnectAll() {
-  Object.values(_bnWsMap).forEach(ws => { try { ws.close(1000); } catch {} });
+  Object.values(_bnWsMap).forEach(ws => { try { ws.close(1000); } catch(e) {} });
   _bnWsMap = {};
 }
 
@@ -2757,7 +2757,7 @@ function _ccWsConnect(assetIds) {
     };
     _ccWs.onclose = () => setTimeout(() => _ccWsConnect(assetIds), 5000);
     _ccWs.onerror = () => _ccWs?.close();
-  } catch {}
+  } catch(e) {}
 }
 
 /* ── E. Binance OHLC for detail drawer ───────────────────────────── */
@@ -2769,7 +2769,7 @@ async function _fetchBinanceKlines(symbol='BTCUSDT', interval='1d', limit=60) {
     );
     const arr = await res.json();
     return arr.map(c => ({ t: c[0], o: +c[1], h: +c[2], l: +c[3], c: +c[4], v: +c[5] }));
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* ── MAIN RENDER ──────────────────────────────────────────────────── */

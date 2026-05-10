@@ -138,7 +138,7 @@ async function _fetchRelationships(lei) {
     }
 
     return { directParent: dp, ultimateParent: up };
-  } catch {
+  } catch(e) {
     return { directParent: null, ultimateParent: null };
   }
 }

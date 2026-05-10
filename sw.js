@@ -170,7 +170,7 @@ async function networkFirstWithCache(request, cacheName, maxAge) {
       return new Response(body, { status: res.status, headers: res.headers });
     }
     throw new Error(`HTTP ${res.status}`);
-  } catch {
+  } catch(e) {
     const cached = await caches.match(request);
     if (cached) {
       const age = Date.now() - parseInt(cached.headers.get('sw-cached-at') || '0');

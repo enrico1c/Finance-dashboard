@@ -400,7 +400,7 @@ async function secGetFundamentals(sym) {
     const entry = Object.values(tickers).find(function(c) { return c.ticker && c.ticker.toUpperCase() === sym.toUpperCase(); });
     if (!entry) return null;
     return { cik: String(entry.cik_str).padStart(10, "0"), name: entry.title, _source: "sec_edgar" };
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 
@@ -413,7 +413,7 @@ async function _fhBridge(fnName) {
   if (!_fbKey("finnhub")) return null;
   if (typeof window[fnName] !== "function") return null;
   _RL.bump("finnhub");
-  try { return await window[fnName].apply(null, args); } catch { return null; }
+  try { return await window[fnName].apply(null, args); } catch(e) { return null; }
 }
 
 

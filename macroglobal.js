@@ -573,7 +573,7 @@ window.macroLoadCentralBanks = async function() {
         fredFetch('IRSTCI01JPM156N'), // Bank of Japan policy rate proxy
         fredFetch('PBCFINSR'),        // PBoC 1-year LPR (loan prime rate)
       ]);
-    } catch {}
+    } catch(e) {}
   }
 
   // Try no-key fallback for ECB via ECB API (free, no auth)
@@ -589,7 +589,7 @@ window.macroLoadCentralBanks = async function() {
         const lastKey = Object.keys(obs).sort((a,b)=>+b-+a)[0];
         ecbRate = obs[lastKey]?.[0];
       }
-    } catch {}
+    } catch(e) {}
   }
 
   // Attempt to enrich meeting dates from FMP economic calendar (if FMP key available)
@@ -804,7 +804,7 @@ async function macroEnrichEconTab() {
       </div>`;
 
     el.appendChild(section);
-  } catch {}
+  } catch(e) {}
 }
 
 /* Auto-enrich ECON tab when it loads */

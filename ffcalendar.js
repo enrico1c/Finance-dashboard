@@ -158,11 +158,11 @@ const IMPACT_DOT = {
 
 function fmtTime(iso) {
   try { return new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
-  catch { return '—'; }
+  catch(e) { return '—'; }
 }
 function fmtDate(iso) {
   try { return new Date(iso).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }); }
-  catch { return '—'; }
+  catch(e) { return '—'; }
 }
 
 async function fetchCal(week) {

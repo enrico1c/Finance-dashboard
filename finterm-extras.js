@@ -66,7 +66,7 @@ async function fhLoadShortInterest(sym) {
         src = 'FINRA (no key)';
       }
     }
-  } catch {}
+  } catch(e) {}
 
   // ── 2. FMP /short-float (key) ───────────────────────────────────
   if (!shortData?.length) {
@@ -85,7 +85,7 @@ async function fhLoadShortInterest(sym) {
           }));
           src = 'FMP';
         }
-      } catch {}
+      } catch(e) {}
     }
   }
 
@@ -106,7 +106,7 @@ async function fhLoadShortInterest(sym) {
           }));
           src = 'Finnhub';
         }
-      } catch {}
+      } catch(e) {}
     }
   }
 
@@ -210,7 +210,7 @@ async function _loadFTDData(sym, container) {
         <a href="https://www.sec.gov/data/fails-deliver-data" target="_blank" class="geo-wm-link">SEC FTD Data Portal ↗</a>
       </div>`;
     container.appendChild(ftdSection);
-  } catch {}
+  } catch(e) {}
 }
 
 window.fhLoadShortInterest = fhLoadShortInterest;
@@ -270,7 +270,7 @@ async function _idbAll(store) {
       req.onsuccess=()=>res(req.result||[]);
       req.onerror=()=>rej(req.error);
     });
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 async function _idbPut(store, obj) {
@@ -282,7 +282,7 @@ async function _idbPut(store, obj) {
       req.onsuccess=()=>res(req.result);
       req.onerror=()=>rej(req.error);
     });
-  } catch {}
+  } catch(e) {}
 }
 
 async function _idbDel(store, id) {
@@ -293,13 +293,13 @@ async function _idbDel(store, id) {
       const req=tx.objectStore(store).delete(id);
       req.onsuccess=()=>res(); req.onerror=()=>rej(req.error);
     });
-  } catch {}
+  } catch(e) {}
 }
 
 /* ── localStorage fallback (positions only) ──────────────────────── */
 const PORT_KEY = 'finterm_portfolio_v2';
-function _lsLoad() { try{return JSON.parse(localStorage.getItem(PORT_KEY)||'[]');}catch{return[];} }
-function _lsSave(pos) { try{localStorage.setItem(PORT_KEY,JSON.stringify(pos));}catch{} }
+function _lsLoad() { try{return JSON.parse(localStorage.getItem(PORT_KEY)||'[]');}catch(e) {return[];} }
+function _lsSave(pos) { try{localStorage.setItem(PORT_KEY,JSON.stringify(pos));}catch(e) {} }
 
 /* ── Unified load/save (IDB primary, LS fallback) ─────────────────── */
 async function portLoadPositions() {
@@ -377,7 +377,7 @@ async function portFetchPrices(tickers) {
       const res = await fetch(`https://financialmodelingprep.com/api/v3/quote/${stocks.join(',')}?apikey=${fmpKey}`);
       const arr = await res.json();
       (arr||[]).forEach(q=>{ if(q.symbol&&q.price) map[q.symbol.toUpperCase()]=q.price; });
-    } catch {}
+    } catch(e) {}
   }
 
   // 2. Finnhub live cache fallback for stocks
@@ -394,7 +394,7 @@ async function portFetchPrices(tickers) {
       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
       const json = await res.json();
       Object.entries(json).forEach(([id,v])=>{ if(v.usd) map[id.toUpperCase()]=v.usd; });
-    } catch {}
+    } catch(e) {}
   }
 
   return map;
@@ -931,7 +931,7 @@ async function portImportCSV(file) {
         notes:`Imported from ${broker}`, executedAt:dateStr?new Date(dateStr).getTime()||Date.now():Date.now()
       });
       imported++;
-    } catch { errors++; }
+    } catch(e) { errors++; }
   }
 
   const statusEl = document.getElementById('port-form-status');
@@ -996,8 +996,8 @@ let _screenerSort    = { col:'mktcap', dir:-1 };
 let _screenerPreset  = 'custom';
 
 /* ── Saved custom presets ─────────────────────────────────────────── */
-function _scrLoadPresets(){ try{return JSON.parse(localStorage.getItem('scr_presets')||'{}');}catch{return{};} }
-function _scrSavePresets(p){ try{localStorage.setItem('scr_presets',JSON.stringify(p));}catch{} }
+function _scrLoadPresets(){ try{return JSON.parse(localStorage.getItem('scr_presets')||'{}');}catch(e) {return{};} }
+function _scrSavePresets(p){ try{localStorage.setItem('scr_presets',JSON.stringify(p));}catch(e) {} }
 
 /* ── FMP Screener (primary) ───────────────────────────────────────── */
 async function _screenerFMP(params) {
@@ -1020,7 +1020,7 @@ async function _screenerFMP(params) {
       roe: r.roe||null, roa: r.roa||null,
       debtEq: r.debtToEquity||null, netMargin: r.netProfitMargin||null,
     }));
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* ── Yahoo Screener fallback (no key) ────────────────────────────── */
@@ -1111,7 +1111,7 @@ async function _screenerYahoo(criteria={}) {
       country:'US', pe:q.trailingPE||null, pb:null, roe:null, roa:null,
       debtEq:null, netMargin:null, _src:'Yahoo',
     }));
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* ── EDGAR 13F Institutional holdings ────────────────────────────── */
@@ -1568,7 +1568,7 @@ async function bondsLoadSpreads() {
         const json = await res.json();
         const obs = (json.observations||[]).filter(o=>o.value!=='.');
         return { id, latest: obs[0], history: obs.slice(0,30).reverse() };
-      } catch { return { id, latest:null, history:[] }; }
+      } catch(e) { return { id, latest:null, history:[] }; }
     };
     const results = await Promise.allSettled(SERIES.map(s => fetchS(s.id)));
     results.forEach(r => { if (r.status==='fulfilled') map[r.value.id]=r.value; });

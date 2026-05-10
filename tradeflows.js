@@ -340,7 +340,7 @@ async function tradeflowsRenderTariffs() {
       } else {
         cell.textContent = '— (no data)';
       }
-    } catch {
+    } catch(e) {
       cell.textContent = '—';
     }
   }

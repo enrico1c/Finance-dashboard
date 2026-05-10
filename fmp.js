@@ -54,12 +54,12 @@ function fmpCacheGet(endpoint, symbol) {
     const { ts, data } = JSON.parse(raw);
     if (Date.now() - ts > FMP_CACHE_TTL) { sessionStorage.removeItem(fmpCacheKey(endpoint, symbol)); return null; }
     return data;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 function fmpCacheSet(endpoint, symbol, data) {
   try { sessionStorage.setItem(fmpCacheKey(endpoint, symbol), JSON.stringify({ ts: Date.now(), data })); }
-  catch { /* quota exceeded */ }
+  catch(e) { /* quota exceeded */ }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -186,7 +186,7 @@ async function fmpGetInstitutional(symbol) {
 async function fmpGetManagement(symbol) {
   const data = await fmpFetch(`/v3/key-executives/${symbol}`, symbol)
     || await (async () => {
-      try { const r = await fetch(`${FMP_STABLE}/key-executives?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch { return null; }
+      try { const r = await fetch(`${FMP_STABLE}/key-executives?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch(e) { return null; }
     })();
   if (!data || !data.length) return null;
   return data.slice(0, 10).map(e => ({
@@ -217,7 +217,7 @@ async function fmpGetEarningsCalendar(symbol) {
 async function fmpGetRatios(symbol) {
   const data = await fmpFetch(`/v3/ratios-ttm/${symbol}`, symbol)
     || await (async () => {
-      try { const r = await fetch(`${FMP_STABLE}/ratios-ttm?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch { return null; }
+      try { const r = await fetch(`${FMP_STABLE}/ratios-ttm?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch(e) { return null; }
     })();
   if (!data || !data.length) return null;
   const r = data[0];
@@ -978,7 +978,7 @@ async function fhLoadShortInterest(sym) {
         }], 'FMP');
         return;
       }
-    } catch {}
+    } catch(e) {}
   }
 
   // ── 2. Finnhub /stock/short-interest (key required) ─────────────────────
@@ -993,7 +993,7 @@ async function fhLoadShortInterest(sym) {
         _renderShortData(el, sym, recs, 'Finnhub');
         return;
       }
-    } catch {}
+    } catch(e) {}
   }
 
   // ── 3. FINRA REGSHO (no key, public) ────────────────────────────────────
@@ -1013,7 +1013,7 @@ async function fhLoadShortInterest(sym) {
       _renderShortData(el, sym, recs2, 'FINRA RegSHO');
       return;
     }
-  } catch {}
+  } catch(e) {}
 
   // ── 4. No data / no keys ─────────────────────────────────────────────────
   el.innerHTML = `<div class="no-data">
@@ -1063,7 +1063,7 @@ async function _fhShortLegacy(sym) {
     const res  = await fetch(`https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${key}`);
     const data = await res.json();
     return data.data || [];
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* ── LEGACY placeholder to prevent "not found" errors ─────────────────── */
@@ -1193,7 +1193,7 @@ async function _segEdgarXBRL(sym) {
     const segMap = {};
     segs.forEach(f=>{ segMap[f.segment?.value||f.segment?.dimension||'Other'] = f.val; });
     return { date: latestEnd, segs: segMap, src: 'SEC EDGAR XBRL' };
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 async function fmpLoadSegmentation(sym) {
@@ -1246,7 +1246,7 @@ async function fmpLoadSegmentation(sym) {
       src = 'FMP';
       html += renderSegBlock("By Product / Segment", prodRes, src);
       html += renderSegBlock("By Geography", geoRes, src);
-    } catch {}
+    } catch(e) {}
   }
 
   // ── 2. SEC EDGAR XBRL fallback ────────────────────────────────
@@ -1288,7 +1288,7 @@ async function _transcriptNinjas(sym, year, quarter) {
     // API Ninjas returns array or object
     const items = Array.isArray(json) ? json : (json ? [json] : []);
     return items.length ? items : null;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* Helper: fetch full text via FMP */
@@ -1302,7 +1302,7 @@ async function _transcriptFMP(sym, quarter, year) {
     );
     const data = await res.json();
     return Array.isArray(data) && data.length ? data : null;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* Helper: get list of available transcripts via FMP */
@@ -1316,7 +1316,7 @@ async function _transcriptListFMP(sym) {
     );
     const data = await res.json();
     return Array.isArray(data) ? data : [];
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Helper: EDGAR 8-K search fallback */
@@ -1331,7 +1331,7 @@ async function _transcriptEdgar(sym) {
     });
     const data  = await res.json();
     return data?.hits?.hits || [];
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Render speaker-labeled transcript from API Ninjas format */
@@ -1531,7 +1531,7 @@ async function fmpLoadIpoCalendar() {
     };
     ipos = [...parse(r1), ...parse(r2)];
     if (ipos.length) src = 'NASDAQ (no key)';
-  } catch {}
+  } catch(e) {}
 
   // ── 2. Finnhub fallback ───────────────────────────────────────
   if (!ipos.length) {
@@ -1551,7 +1551,7 @@ async function fmpLoadIpoCalendar() {
           _section: 'upcoming',
         }));
         if (ipos.length) src = 'Finnhub';
-      } catch {}
+      } catch(e) {}
     }
   }
 
@@ -1571,7 +1571,7 @@ async function fmpLoadIpoCalendar() {
           _section: 'upcoming',
         }));
         if (ipos.length) src = 'FMP';
-      } catch {}
+      } catch(e) {}
     }
   }
 
@@ -2119,7 +2119,7 @@ async function _xbrlGetRatios(sym) {
       const row = latestAnnual(r.concept)||latestAnnual(r.concept+'ExcludingAssessedTax');
       return { label:r.label, value:row?fmt3(row.val):'—', date:row?.end?.slice(0,7)||'' };
     });
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 window.faLoadEdgarXBRL  = faLoadEdgarXBRL;

@@ -557,7 +557,7 @@ window.openaqLoadCity = async function(lat, lon, cityName) {
         };
         src = 'WAQI';
       }
-    } catch {}
+    } catch(e) {}
   }
 
   // ── 3. Open-Meteo fallback ────────────────────────────────────
@@ -583,7 +583,7 @@ window.openaqLoadCity = async function(lat, lon, cityName) {
         };
         src = 'Open-Meteo';
       }
-    } catch {}
+    } catch(e) {}
   }
 
   if (!aqData) {
@@ -828,7 +828,7 @@ async function _openmeteoAirFetch(lat, lon) {
       },
       _src: 'Open-Meteo',
     };
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* ── Get HQ coordinates from company profile ─────────────────────── */
@@ -854,7 +854,7 @@ async function _getCompanyHQ(sym) {
           symbol:  sym,
         };
       }
-    } catch {}
+    } catch(e) {}
   }
 
   // Fallback: use ticker exchange to infer city

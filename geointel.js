@@ -87,7 +87,7 @@ async function gdeltCountryInstability(countryFIPS, days = 30) {
       .filter(r => !isNaN(r.value));
     _giSet(cacheKey, rows);
     return rows;
-  } catch {
+  } catch(e) {
     return [];
   }
 }
@@ -576,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(async () => {
     try {
       await fetchCISAKev();
-    } catch {}
+    } catch(e) {}
   }, 3000);
 
   // When INTEL tab is clicked, load instability scores
@@ -633,7 +633,7 @@ async function _fetchUCDPActive() {
     }));
     if (data.length) _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Humanitarian crises from ReliefWeb (no key, OCHA) */
@@ -658,7 +658,7 @@ async function _fetchReliefWeb() {
     const data = json?.data || [];
     _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* ACLED conflict event count by country (free, no key for summary) */
@@ -674,7 +674,7 @@ async function _fetchACLEDSummary() {
     const json = await res.json();
     _giSet(cacheKey, json?.data || [], _GW_CACHE_MS);
     return json?.data || [];
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Main Wars tab loader */
@@ -802,13 +802,13 @@ async function _fetchWorldBankCommodities() {
         try {
           const r = await fetch(wbUrl, { signal: AbortSignal.timeout(6000) });
           if (r.ok) wbRes = await r.json();
-        } catch {}
+        } catch(e) {}
         if (!wbRes?.[1]) {
           try {
             const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(wbUrl)}`;
             const r2 = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
             if (r2.ok) wbRes = await r2.json();
-          } catch {}
+          } catch(e) {}
         }
         const json = wbRes;
         const obs = json?.[1]?.filter(o => o.value != null) || [];
@@ -823,7 +823,7 @@ async function _fetchWorldBankCommodities() {
 
     _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 window.georiskLoadResources = async function() {
@@ -930,7 +930,7 @@ async function _fetchShippingAlerts() {
     const articles = json?.articles || [];
     _giSet(cacheKey, articles, _GW_CACHE_MS);
     return articles;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 window.georiskLoadRoutes = async function() {

@@ -222,7 +222,7 @@ function loadAllKeys() {
 }
 
 const LS_CUSTOM = "finterm_custom_providers";
-function getCustom() { try { return JSON.parse(localStorage.getItem(LS_CUSTOM)||"[]"); } catch { return []; } }
+function getCustom() { try { return JSON.parse(localStorage.getItem(LS_CUSTOM)||"[]"); } catch(e) { return []; } }
 function saveCustom(list) { localStorage.setItem(LS_CUSTOM, JSON.stringify(list)); }
 function allProviders() { return [...KNOWN_PROVIDERS, ...getCustom()]; }
 

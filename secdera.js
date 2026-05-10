@@ -141,7 +141,7 @@ async function _getCIK(sym) {
       _CIK_CACHE.set(bare, padded);
       return padded;
     }
-  } catch {}
+  } catch(e) {}
 
   return null;
 }

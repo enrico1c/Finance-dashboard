@@ -196,7 +196,7 @@ window.tradeRoutesLoad = async function() {
       const data = await res.json();
       liveEvents = data?.articles || [];
     }
-  } catch {}
+  } catch(e) {}
 
   const ongoing  = TD_DISRUPTIONS.filter(d => d.status === 'ongoing');
   const resolved = TD_DISRUPTIONS.filter(d => d.status === 'resolved');
@@ -235,7 +235,7 @@ window.tradeRoutesLoad = async function() {
   if (liveEvents.length) {
     html += `<div style="font-size:10px;font-weight:700;color:var(--text);padding:4px 0 4px;border-bottom:1px solid var(--border);margin-bottom:6px;margin-top:8px">📡 Live Shipping News — GDELT (14 days)</div>`;
     liveEvents.slice(0, 10).forEach(a => {
-      const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch { return ''; } })();
+      const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch(e) { return ''; } })();
       const date = a.seendate ? a.seendate.replace(/(\d{4})(\d{2})(\d{2}).*/,'$1-$2-$3') : '';
       html += `<div style="padding:5px 0;border-bottom:1px solid var(--border)">
         <a href="${_tdEsc(a.url||'#')}" target="_blank" rel="noopener" style="font-size:10px;color:var(--text);text-decoration:none">${_tdEsc(a.title||'')}</a>

@@ -50,12 +50,12 @@ function cacheGet(fn, symbol) {
     const { ts, data } = JSON.parse(raw);
     if (Date.now() - ts > CACHE_TTL) { sessionStorage.removeItem(cacheKey(fn, symbol)); return null; }
     return data;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 function cacheSet(fn, symbol, data) {
   try { sessionStorage.setItem(cacheKey(fn, symbol), JSON.stringify({ ts: Date.now(), data })); }
-  catch { /* storage full — ignore */ }
+  catch(e) { /* storage full — ignore */ }
 }
 
 /* ══════════════════════════════════════════════════════════════════

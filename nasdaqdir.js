@@ -219,7 +219,7 @@ async function _fetchRSS(feedName) {
       const res2    = await fetch(proxied, { signal: AbortSignal.timeout(12000) });
       if (!res2.ok) return [];
       return _parseRSS(await res2.text());
-    } catch {
+    } catch(e) {
       console.warn("[NasdaqDir] RSS feed unavailable:", feedName);
       return [];
     }
@@ -247,7 +247,7 @@ function _extractSym(title, description) {
 function _parseRSSDate(pubDate) {
   if (!pubDate) return null;
   try { return new Date(pubDate).toISOString().slice(0, 10); }
-  catch { return pubDate.slice(0, 10) || null; }
+  catch(e) { return pubDate.slice(0, 10) || null; }
 }
 
 async function _loadDailyList() {

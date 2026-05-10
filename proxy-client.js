@@ -113,7 +113,7 @@
     let parsed;
     try {
       parsed = new URL(urlString);
-    } catch {
+    } catch(e) {
       // Not a valid absolute URL — pass through (relative paths, blob:, etc.)
       return _originalFetch(input, init);
     }
@@ -206,7 +206,7 @@
     this._finterm_headers = {};
 
     let parsed;
-    try { parsed = new URL(url, window.location.href); } catch { parsed = null; }
+    try { parsed = new URL(url, window.location.href); } catch(e) { parsed = null; }
 
     if (parsed && PROVIDER_MAP[parsed.hostname]) {
       const provider = PROVIDER_MAP[parsed.hostname];

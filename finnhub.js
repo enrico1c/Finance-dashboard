@@ -817,7 +817,7 @@ function fhWsConnect() {
         if (msg.type === 'trade' && Array.isArray(msg.data)) {
           msg.data.forEach(trade => _fhWsHandleTrade(trade));
         }
-      } catch {}
+      } catch(e) {}
     };
 
     _fhWs.onclose = ev => {
@@ -873,7 +873,7 @@ function _fhWsUnsubscribe(sym) {
 
 function _fhWsSend(obj) {
   if (_fhWs?.readyState === WebSocket.OPEN) {
-    try { _fhWs.send(JSON.stringify(obj)); } catch {}
+    try { _fhWs.send(JSON.stringify(obj)); } catch(e) {}
   }
 }
 

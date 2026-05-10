@@ -9,7 +9,7 @@ const _IT = {};
 function _itGet(k,ms) { const e=_IT[k]; return (e&&Date.now()-e.ts<ms)?e.d:null; }
 function _itSet(k,d)  { _IT[k]={d,ts:Date.now()}; }
 const _itEsc = s => String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-const _itDate = iso => { try { return new Date(iso).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); } catch { return String(iso).slice(0,10); } };
+const _itDate = iso => { try { return new Date(iso).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); } catch(e) { return String(iso).slice(0,10); } };
 
 async function _itFetchJSON(url, cacheKey, ttlMs=15*60*1000) {
   const cached = _itGet(cacheKey, ttlMs);
@@ -230,7 +230,7 @@ async function intelLoadAll() {
   if (dispArticles.length) {
     html += `<div class="news-list">`;
     for (const a of dispArticles.slice(0,15)) {
-      const domain = a.domain || (a.url ? (() => { try { return new URL(a.url).hostname.replace('www.',''); } catch { return '—'; } })() : '—');
+      const domain = a.domain || (a.url ? (() => { try { return new URL(a.url).hostname.replace('www.',''); } catch(e) { return '—'; } })() : '—');
       html += `<div class="news-item">
         <a href="${_itEsc(a.url||'#')}" target="_blank" rel="noopener noreferrer">${_itEsc(a.title||'—')}</a>
         <div class="news-meta">${_itEsc(domain)} &nbsp;·&nbsp; ${_itDate(a.seendate||a.publishdate||'')}</div>
@@ -389,7 +389,7 @@ async function intelLoadSanctionsImpact() {
     if (gdeltArts.length) {
       html += `<div class="section-head" style="margin-top:10px">📰 Live Sanctions News — GDELT</div><div class="news-list">`;
       for (const a of gdeltArts.slice(0, 5)) {
-        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch { return '—'; } })();
+        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch(e) { return '—'; } })();
         html += `<div class="news-item">
           <a href="${_itEsc(a.url||'#')}" target="_blank" rel="noopener noreferrer">${_itEsc(a.title||'—')}</a>
           <div class="news-meta">${_itEsc(domain)} · ${_itDate(a.seendate||a.publishdate||'')}</div>
@@ -463,7 +463,7 @@ async function intelRenderConflictRisk() {
         </div>
         <div class="conflict-minerals">${minerals}</div>`;
       for (const a of arts.slice(0, 2)) {
-        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch { return '—'; } })();
+        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch(e) { return '—'; } })();
         html += `<div class="news-item" style="padding:3px 0;border-bottom:1px solid var(--border)">
           <a href="${_itEsc(a.url||'#')}" target="_blank" rel="noopener noreferrer" style="font-size:11px">${_itEsc(a.title||'—')}</a>
           <div class="news-meta">${_itEsc(domain)} · ${_itDate(a.seendate||a.publishdate||'')}</div>
@@ -477,7 +477,7 @@ async function intelRenderConflictRisk() {
     if (otherArts.length) {
       html += `<div class="section-head" style="margin-top:8px">📡 Additional Supply Chain Events</div><div class="news-list">`;
       for (const a of otherArts.slice(0, 4)) {
-        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch { return '—'; } })();
+        const domain = a.domain || (() => { try { return new URL(a.url||'').hostname.replace('www.',''); } catch(e) { return '—'; } })();
         html += `<div class="news-item">
           <a href="${_itEsc(a.url||'#')}" target="_blank" rel="noopener noreferrer">${_itEsc(a.title||'—')}</a>
           <div class="news-meta">${_itEsc(domain)} · ${_itDate(a.seendate||a.publishdate||'')}</div>

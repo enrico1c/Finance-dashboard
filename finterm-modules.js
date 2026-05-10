@@ -44,13 +44,13 @@ const _fmCache = {
         return null;
       }
       return item.v;
-    } catch { return null; }
+    } catch(e) { return null; }
   },
   set(key, value) {
     try {
       sessionStorage.setItem(this._prefix + key,
         JSON.stringify({ v: value, ts: Date.now() }));
-    } catch {
+    } catch(e) {
       // Storage full — purge old keys
       Object.keys(sessionStorage)
         .filter(k => k.startsWith(this._prefix))
@@ -141,7 +141,7 @@ const ProviderRegistry = {
               window._vixLive = fb;
               return fb;
             }
-          } catch {}
+          } catch(e) {}
         }
         return null;
       }
@@ -160,7 +160,7 @@ const ProviderRegistry = {
     async getSeries(seriesId, limit = 12) {
       if (typeof fredFetch !== 'function') return null;
       try { return await fredFetch(seriesId, { limit }); }
-      catch { return null; }
+      catch(e) { return null; }
     },
     async getTreasuryYield(maturity = '10') {
       const map = { '1':'DGS1','2':'DGS2','5':'DGS5','10':'DGS10','30':'DGS30' };
@@ -205,7 +205,7 @@ const ProviderRegistry = {
         };
         _fmCache.set(cacheKey, result);
         return result;
-      } catch { return null; }
+      } catch(e) { return null; }
     },
 
     async getHistory(symbol, interval = '1d', range = '1y') {
@@ -253,7 +253,7 @@ const ProviderRegistry = {
         }));
         _fmCache.set(cacheKey, result);
         return result;
-      } catch { return null; }
+      } catch(e) { return null; }
     },
 
     async getGlobal() {
@@ -280,7 +280,7 @@ const ProviderRegistry = {
         };
         _fmCache.set(cacheKey, result);
         return result;
-      } catch { return null; }
+      } catch(e) { return null; }
     },
 
     async getTrending() {
@@ -297,7 +297,7 @@ const ProviderRegistry = {
         }));
         _fmCache.set(cacheKey, result);
         return result;
-      } catch { return null; }
+      } catch(e) { return null; }
     }
   },
 
@@ -847,7 +847,7 @@ window.OptionsChainUI = {
       if (rows?.length) {
         return this._parseNasdaq(rows, ticker);
       }
-    } catch {}
+    } catch(e) {}
 
     // 2. Yahoo v7 keyless
     try {
@@ -860,7 +860,7 @@ window.OptionsChainUI = {
       if (result?.options?.[0]) {
         return this._parseYahooV7(result, ticker);
       }
-    } catch {}
+    } catch(e) {}
 
     return null;
   },
@@ -1341,11 +1341,11 @@ class RateLimiter {
 
   _getLog() {
     try { return JSON.parse(sessionStorage.getItem(this._key) || '[]'); }
-    catch { return []; }
+    catch(e) { return []; }
   }
   _saveLog(log) {
     try { sessionStorage.setItem(this._key, JSON.stringify(log)); }
-    catch {}
+    catch(e) {}
   }
 
   async acquire() {

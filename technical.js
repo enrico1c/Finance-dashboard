@@ -66,7 +66,7 @@ async function techFetchCandles(sym, resolution = 'D', bars = 300) {
     };
     _tcSet(cacheKey, candles);
     return candles;
-  } catch {
+  } catch(e) {
     // Try AV then Stooq
     const av = await _techFallbackAV(sym);
     if (av) return av;
@@ -99,7 +99,7 @@ async function _techFallbackAV(sym) {
     };
     _tcSet(cacheKey, candles);
     return candles;
-  } catch { return _techFallbackStooq(sym); }
+  } catch(e) { return _techFallbackStooq(sym); }
 }
 
 
@@ -288,7 +288,7 @@ async function _techIntradayMT5(sym, res = '1D', bars = 300) {
       v: data.map(b => b.volume ?? 0),
       sym, resolution: res, _src: 'MT5',
     };
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* Expose for lwchart.js Phase 2 bridge */

@@ -41,7 +41,7 @@
       if (!res.ok) return false;
       const data = await res.json();
       return data.authenticated === true;
-    } catch {
+    } catch(e) {
       return false;
     }
   }
@@ -63,7 +63,7 @@
         return { ok: true };
       }
       return { ok: false, error: data.error || 'Login failed.' };
-    } catch {
+    } catch(e) {
       return { ok: false, error: 'Cannot reach the backend. Check your connection.' };
     }
   }
@@ -78,7 +78,7 @@
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
-    } catch {
+    } catch(e) {
       // Even if the request fails, clear local auth state
     }
     setAuthenticated(false);
