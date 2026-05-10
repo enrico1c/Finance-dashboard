@@ -1709,51 +1709,22 @@ let zCounter=10;
 function bringToFront(panel){panel.style.zIndex=++zCounter;}
 
 /* ══════════════════════════════════════════════════════════════════
-   PRICE CHART — TradingView Widget
+   PRICE CHART — Lightweight Charts (market-chart engine)
    ══════════════════════════════════════════════════════════════════ */
-let _tvWidget = null;
-
-/* Called whenever TradingView changes its symbol internally.
-   Keeps currentTicker in sync and reloads all panels. */
-window._onTvSymbolChange = function _onTvSymbolChange(newFull) {
-  if (!newFull) return;
-  const bare = newFull.replace(/.*:/, '').toUpperCase();
-  if (bare === (currentTicker || '').replace(/.*:/, '').toUpperCase()) return;
-  currentTicker = newFull;
-  const inp = document.getElementById('tickerInput');
-  if (inp) inp.value = newFull;
-  reloadAllPanels(newFull);
-  if (typeof avLoadAll      === 'function') avLoadAll(bare);
-  if (typeof finnhubLoadAll === 'function') finnhubLoadAll(bare);
-  showPanel('analysts');
-  if (typeof uarsSafeLoad === 'function') uarsSafeLoad(newFull);
-};
+let _mcInited = false;
 
 function loadChart(symbol) {
   const el = document.getElementById('priceChart');
   if (!el) return;
-  el.innerHTML = '';
-  _tvWidget = new TradingView.widget({
-    autosize: true, symbol, interval: 'D', timezone: 'Europe/Rome',
-    theme: 'dark', style: '1', locale: 'en', toolbar_bg: '#0d1117',
-    enable_publishing: false, allow_symbol_change: true, save_image: false,
-    container_id: 'priceChart',
-  });
-  try {
-    if (typeof _tvWidget.onChartReady === 'function') {
-      _tvWidget.onChartReady(() => {
-        try {
-          const chart = typeof _tvWidget.activeChart === 'function'
-            ? _tvWidget.activeChart() : _tvWidget.chart();
-          chart.onSymbolChanged().subscribe(null, () => {
-            try { _onTvSymbolChange(chart.symbol()); } catch(_) {}
-          });
-        } catch(_) {}
-      });
-    }
-  } catch(_) {}
+  if (!_mcInited) {
+    _mcInited = true;
+    mcInit(el, 'main', () => mcLoad(symbol, 'D', 'main'));
+  } else {
+    mcLoad(symbol, 'D', 'main');
+  }
 }
 
+let _fxMcInited = false;
 function loadForexChart(pair, interval) {
   pair     = pair     ?? currentForexPair;
   interval = interval ?? currentForexInterval;
@@ -1761,13 +1732,14 @@ function loadForexChart(pair, interval) {
   currentForexInterval = interval;
   const el = document.getElementById('forexChart');
   if (el) {
-    el.innerHTML = '';
-    new TradingView.widget({
-      autosize: true, symbol: mapForexPairToSymbol(pair), interval,
-      timezone: 'Europe/Rome', theme: 'dark', style: '1', locale: 'en',
-      toolbar_bg: '#0d1117', enable_publishing: false,
-      allow_symbol_change: true, container_id: 'forexChart',
-    });
+    // Convert pair "EUR/USD" → "EURUSD" for the chart engine
+    const sym = pair.replace(/[^A-Z]/g, '');
+    if (!_fxMcInited) {
+      _fxMcInited = true;
+      mcInit(el, 'forex', () => mcLoad(sym, interval, 'forex'));
+    } else {
+      mcLoad(sym, interval, 'forex');
+    }
   }
   const lbl = document.getElementById('forexLabel');
   if(lbl) lbl.textContent=pair;
@@ -2019,12 +1991,9 @@ window.addEventListener("load",()=>{
   }));
 });
 
-// Re-render chart after authentication completes (TV widget fails in hidden panel before login)
+// Load chart after authentication (LWC initialises fine in hidden containers, no delay needed)
 window.addEventListener('finterm:auth-ready', () => {
-  const panel = document.getElementById('panel-chart');
-  if (panel && !panel.classList.contains('hidden')) {
-    setTimeout(() => loadChart(resolveSymbol(currentTicker)), 300);
-  }
+  if (!_mcInited) loadChart(resolveSymbol(currentTicker));
 });
 
 window.addEventListener("resize",()=>{
@@ -2038,11 +2007,9 @@ window.addEventListener("resize",()=>{
 });
 
 /* ══════════════════════════════════════════════════════════════════
-   TASK 1 — already fixed in CSS (wm-intel-tabs z-index)
-   TASK 2 — DUAL CHART
+   TASK 2 — DUAL CHART (second instance of market-chart engine)
    ══════════════════════════════════════════════════════════════════ */
 let _chart2Active = false;
-let _chart2Widget = null;
 
 function toggleChart2() {
   const wrap = document.getElementById('chartSplit');
@@ -2055,19 +2022,13 @@ function toggleChart2() {
     c2.style.display = 'block';
     btn.textContent  = '⊗ 1 Chart';
     const sym = resolveSymbol(currentTicker);
-    _chart2Widget = new TradingView.widget({
-      autosize: true, symbol: sym, interval: '60', timezone: 'Etc/UTC',
-      theme: document.body.classList.contains('light') ? 'Light' : 'Dark',
-      style: '1', locale: 'en', toolbar_bg: '#0d1117',
-      hide_side_toolbar: true, allow_symbol_change: true,
-      enable_publishing: false, container_id: 'priceChart2',
-    });
+    mcInit(c2, 'second', () => mcLoad(sym, '1h', 'second'));
   } else {
     wrap.classList.replace('dual','single');
     c2.style.display = 'none';
     btn.textContent  = '⊕ 2nd';
-    c2.innerHTML     = '';
-    _chart2Widget    = null;
+    mcDestroy('second');
+    c2.innerHTML = '';
   }
 }
 
