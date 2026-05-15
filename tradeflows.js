@@ -52,22 +52,50 @@ const HS_META = {
   titanium:     { label:'Titanium unwrought',   icon:'✈' },
 };
 
-async function comtradeFetch(cmdCode, flowCode='M', year=2023, limit=20) {
+/* ISO numeric country code → name (free tier omits reporterDesc) */
+const CT_COUNTRY = {
+  4:'Afghanistan',8:'Albania',12:'Algeria',24:'Angola',32:'Argentina',36:'Australia',40:'Austria',
+  56:'Belgium',68:'Bolivia',76:'Brazil',100:'Bulgaria',124:'Canada',152:'Chile',156:'China',
+  170:'Colombia',203:'Czechia',208:'Denmark',218:'Ecuador',818:'Egypt',246:'Finland',250:'France',
+  266:'Gabon',276:'Germany',288:'Ghana',344:'Hong Kong SAR',348:'Hungary',356:'India',
+  360:'Indonesia',364:'Iran',372:'Ireland',376:'Israel',380:'Italy',392:'Japan',400:'Jordan',
+  404:'Kenya',408:'Korea DPR',410:'Korea Rep.',418:'Laos',458:'Malaysia',484:'Mexico',
+  504:'Morocco',508:'Mozambique',516:'Namibia',528:'Netherlands',540:'New Caledonia',
+  566:'Nigeria',578:'Norway',600:'Paraguay',604:'Peru',608:'Philippines',616:'Poland',
+  620:'Portugal',634:'Qatar',642:'Romania',643:'Russia',682:'Saudi Arabia',686:'Senegal',
+  710:'South Africa',724:'Spain',752:'Sweden',756:'Switzerland',762:'Tajikistan',
+  834:'Tanzania',764:'Thailand',788:'Tunisia',792:'Turkey',800:'Uganda',804:'Ukraine',
+  784:'UAE',826:'UK',840:'USA',842:'USA',858:'Uruguay',860:'Uzbekistan',862:'Venezuela',
+  704:'Viet Nam',887:'Yemen',894:'Zambia',716:'Zimbabwe',
+};
+
+function _ctName(code) {
+  return CT_COUNTRY[+code] || `Code ${code}`;
+}
+
+// Top critical-mineral exporting countries: China, Australia, DRC, Chile, Russia,
+// South Africa, USA, Brazil, Indonesia, Peru, Canada, Kazakhstan, Bolivia, Argentina
+const COMTRADE_REPORTERS = '156,36,180,152,643,710,842,76,360,604,124,398,68,32';
+
+async function comtradeFetch(cmdCode, flowCode='X', year=2022, limit=20) {
   const key = getComtradeKey();
   const cacheKey = `ct_${cmdCode}_${flowCode}_${year}`;
   const cached = _tfGet(cacheKey, 12*60*60*1000);
   if (cached) return cached;
   try {
     const params = new URLSearchParams({
-      typeCode:'C', freqCode:'A', clCode:'HS',
-      period: year, cmdCode, flowCode,
-      reporterCode:'0', partnerCode:'0', partner2Code:'0',
-      includeDesc:'true', limit, format:'json',
+      reporterCode: COMTRADE_REPORTERS,  // specific exporters (reporterCode=0 returns empty)
+      period: year,
+      cmdCode,
+      flowCode,
+      partnerCode: '0',
+      partner2Code: '0',
+      limit,
     });
+    // subscription-key is stripped by proxy-client and re-added by backend
     if (key) params.set('subscription-key', key);
-    const url = `${COMTRADE_BASE}/C/A/HS/${year}/all/${cmdCode}?${params}`;
-    const headers = key ? { 'Ocp-Apim-Subscription-Key': key } : {};
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+    const url = `${COMTRADE_BASE}/C/A/HS?${params}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`Comtrade HTTP ${res.status}`);
     const data = await res.json();
     _tfSet(cacheKey, data);
@@ -98,7 +126,7 @@ async function eurostatFetch(dataset, params={}, cacheKey, ttlMs=12*60*60*1000) 
 /* EU extra-trade in critical minerals */
 async function eurostatGetMineralTrade() {
   /* DS-018995 = EU trade by commodity (SITC) */
-  return eurostatFetch('DS-018995', { sitc06:'27','2','28','5','68', geo:'EU27_2020', time:'2023', flow:'1' }, 'estat_minerals');
+  return eurostatFetch('DS-018995', { sitc06:'27+2+28+5+68', geo:'EU27_2020', time:'2023', flow:'1' }, 'estat_minerals');
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -162,109 +190,93 @@ function tradeflowsInjectSection() {
 async function tradeflowsRenderTrade() {
   const el = document.getElementById('supply-minerals-trade');
   if (!el) return;
-  const key = getComtradeKey();
+  const key       = getComtradeKey();
+  const hasAccess = key || !!window._FINTERM_AUTHENTICATED; // backend has key when authenticated
 
-  let html = `<div class="av-live-badge">● Global Trade Flows · UN Comtrade+ · ${key?'Live (free key)':'Demo mode — add free Comtrade key for full data'}</div>`;
+  let html = `<div class="av-live-badge">● Global Trade Flows · UN Comtrade+ · ${hasAccess?'Live · 2022 annual data':'Demo mode — add free Comtrade key for full data'}</div>`;
   html += `<div class="av-note" style="margin-bottom:8px">
-    UN Comtrade+ provides bilateral trade flows by HS code. Free key: 500 calls/day. Data: annual reporting cycles with publication lags.
-    ${!key?`<br><a href="https://comtradeplus.un.org/" target="_blank" rel="noopener" style="color:var(--accent)">Register for free key at comtradeplus.un.org ↗</a> — then add via ⚙ API Settings → Comtrade.`:''}
+    UN Comtrade+ provides bilateral trade flows by HS code. Free key: 500 calls/day. Data: annual (2022).
+    ${!hasAccess?`<br><a href="https://comtradeplus.un.org/" target="_blank" rel="noopener" style="color:var(--accent)">Register for free key at comtradeplus.un.org ↗</a> — then add via ⚙ API Settings → Comtrade.`:''}
   </div>`;
 
-  /* Show HS code reference table */
+  /* HS codes reference — configuration metadata, not financial data */
   html += `<div class="section-head">🏷 Critical Minerals HS Codes (UN Comtrade)</div>`;
   html += `<div class="fin-table-wrap"><table class="fin-table">
-    <thead><tr><th>Mineral</th><th>HS Code</th><th>Description</th><th>Key Exporters</th></tr></thead>
-    <tbody>`;
-
-  const TOP_EXPORTERS = {
-    rare_earths: 'China 70%, Myanmar 14%, Australia 7%',
-    lithium:     'Australia 46%, Chile 30%, China 15%',
-    cobalt:      'DRC 73%, Russia 4%, Australia 4%',
-    tungsten:    'China 84%, Vietnam 5%, Russia 2%',
-    gallium:     'China 98%, Russia 1%',
-    germanium:   'China 75%, Russia 7%, Canada 5%',
-    graphite:    'China 79%, Mozambique 7%, Ethiopia 3%',
-    nickel:      'Indonesia 48%, Philippines 11%, Russia 8%',
-    copper:      'Chile 27%, Peru 10%, DRC 10%',
-    phosphate:   'Morocco 40%, China 26%, Russia 13%',
-    neon:        'China 35%, Russia 5% (byproduct of steel ASUs)',
-    titanium:    'China 42%, Japan 17%, Russia 12%',
-  };
-
+    <thead><tr><th>Mineral</th><th>HS Code</th><th>Top Exporters (live)</th><th>HHI Concentration</th></tr></thead>
+    <tbody id="tf-hs-rows">`;
   for (const [id, hs] of Object.entries(HS_CODES)) {
     const meta = HS_META[id];
-    const exporters = TOP_EXPORTERS[id]||'—';
-    html += `<tr>
+    html += `<tr id="tf-row-${id}">
       <td><span style="margin-right:4px">${meta?.icon||'📦'}</span><strong>${_tfEsc(meta?.label||id)}</strong></td>
       <td><code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px">${hs}</code></td>
-      <td style="font-size:10px;color:var(--text-muted)">HS ${hs} classification</td>
-      <td style="font-size:10px">${_tfEsc(exporters)}</td>
+      <td id="tf-exp-${id}" style="font-size:10px;color:var(--text-muted)">…loading</td>
+      <td id="tf-hhi-${id}" style="font-size:10px;color:var(--text-muted)">…</td>
     </tr>`;
   }
   html += `</tbody></table></div>`;
 
-  /* Supply concentration context */
-  html += `<div class="section-head" style="margin-top:12px">⚠ Supply Concentration Risk</div>`;
-  html += `<div class="commodity-price-grid">`;
-
-  const concentrations = [
-    { label:'Gallium',    hhi: 9604, top:'China 98%',     color:'#f85149', risk:'Critical' },
-    { label:'Rare Earths',hhi: 4900, top:'China 70%',     color:'#f85149', risk:'Critical' },
-    { label:'Germanium',  hhi: 5625, top:'China 75%',     color:'#f85149', risk:'Critical' },
-    { label:'Graphite',   hhi: 6241, top:'China 79%',     color:'#f85149', risk:'Critical' },
-    { label:'Cobalt',     hhi: 5329, top:'DRC 73%',       color:'#f85149', risk:'Critical' },
-    { label:'Tungsten',   hhi: 7056, top:'China 84%',     color:'#f85149', risk:'Critical' },
-    { label:'Nickel',     hhi: 2304, top:'Indonesia 48%', color:'#d29922', risk:'Elevated' },
-    { label:'Lithium',    hhi: 2116, top:'Australia 46%', color:'#d29922', risk:'Elevated' },
-    { label:'Copper',     hhi:  729, top:'Chile 27%',     color:'#3fb950', risk:'Moderate' },
-  ];
-
-  for (const c of concentrations) {
-    html += `<div class="commodity-price-card">
-      <div class="commodity-price-label">${_tfEsc(c.label)}</div>
-      <div class="commodity-price-val" style="color:${c.color}">HHI: ${c.hhi}</div>
-      <div class="commodity-price-chg" style="color:${c.color}">Risk: ${_tfEsc(c.risk)}</div>
-      <div class="commodity-price-period">Top: ${_tfEsc(c.top)}</div>
+  if (!hasAccess) {
+    html += `<div class="av-note" style="margin-top:8px">
+      ⚠ Add a free UN Comtrade API key to load live top-exporter data and HHI scores.
+      <a href="https://comtradeplus.un.org/" target="_blank" rel="noopener" style="color:var(--accent)">Register at comtradeplus.un.org ↗</a>
+      — then add via ⚙ API Settings → Comtrade.
     </div>`;
-  }
-  html += `</div>`;
-  html += `<div class="av-note">HHI (Herfindahl-Hirschman Index) of export concentration. >2,500 = highly concentrated. Source: USGS MCS 2025/2026.</div>`;
-
-  if (key) {
-    html += `<div class="section-head" style="margin-top:12px">📊 Live Trade Data — UN Comtrade+ (2023 annual)</div>`;
-    html += `<div class="no-data">// Loading Comtrade data for selected minerals… (limited to prevent rate limit exhaustion)</div>`;
-    el.innerHTML = html;
-    /* Fetch one sample query for demonstration */
-    const sampleData = await comtradeFetch(HS_CODES.rare_earths, 'X', 2023, 10);
-    const sampleEl = el.querySelector('.no-data');
-    if (sampleEl && sampleData?.data?.length) {
-      const rows = sampleData.data.slice(0,10);
-      let tableHtml = `<div class="fin-table-wrap"><table class="fin-table">
-        <thead><tr><th>Reporter</th><th>Partner</th><th>Flow</th><th>Value (USD)</th><th>Period</th></tr></thead><tbody>`;
-      for (const row of rows) {
-        tableHtml += `<tr>
-          <td>${_tfEsc(row.reporterDesc||row.reporterCode||'—')}</td>
-          <td>${_tfEsc(row.partnerDesc||row.partnerCode||'—')}</td>
-          <td>${_tfEsc(row.flowDesc||row.flowCode||'—')}</td>
-          <td>${_tfFmtB(row.fobvalue||row.primaryValue||row.cifvalue)}</td>
-          <td>${_tfEsc(String(row.period||row.refYear||''))}</td>
-        </tr>`;
-      }
-      tableHtml += `</tbody></table></div>`;
-      tableHtml += `<div class="av-note">Sample: Rare earth compounds (HS 2846) trade flows. <a href="https://comtradeplus.un.org/" target="_blank" rel="noopener" style="color:var(--accent)">View full data at Comtrade+ ↗</a></div>`;
-      sampleEl.outerHTML = tableHtml;
-    } else if (sampleEl) {
-      sampleEl.textContent = '// Comtrade data requires free registration. Register at comtradeplus.un.org';
-    }
-    return;
+    html = html.replace(/…loading/g, '— (no key)').replace(/…/g, '—');
   }
 
-  html += `<div style="margin-top:8px">
-    <a href="https://comtradeplus.un.org/TradeFlow" target="_blank" rel="noopener" class="energy-entsog-link">↗ Explore UN Comtrade+ Trade Flows</a>
-    <a href="https://ec.europa.eu/eurostat/web/international-trade-in-goods/data/database" target="_blank" rel="noopener" class="energy-entsog-link" style="margin-left:8px">↗ Eurostat Trade Database</a>
+  html += `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+    <a href="https://comtradeplus.un.org/TradeFlow" target="_blank" rel="noopener" class="energy-entsog-link">↗ UN Comtrade+ Trade Flows</a>
+    <a href="https://ec.europa.eu/eurostat/web/international-trade-in-goods/data/database" target="_blank" rel="noopener" class="energy-entsog-link">↗ Eurostat Trade Database</a>
   </div>`;
 
   el.innerHTML = html;
+
+  /* Live Comtrade fetch — populate top exporters + HHI per mineral */
+  if (hasAccess) {
+    const minerals = Object.keys(HS_CODES);
+    /* Fetch sequentially to respect rate limits (500 calls/day) */
+    for (const id of minerals) {
+      const hs = HS_CODES[id];
+      const expCell = el.querySelector(`#tf-exp-${id}`);
+      const hhiCell = el.querySelector(`#tf-hhi-${id}`);
+      if (!expCell) continue;
+      try {
+        const data = await comtradeFetch(hs, 'X', 2022, 15);
+        const rows = data?.data || [];
+        if (!rows.length) {
+          expCell.textContent = '— (no data)';
+          if (hhiCell) hhiCell.textContent = '—';
+          continue;
+        }
+        /* Aggregate export value by reporter */
+        const byReporter = {};
+        let total = 0;
+        for (const r of rows) {
+          const name = r.reporterDesc || _ctName(r.reporterCode) || 'Unknown';
+          const val  = r.fobvalue || r.primaryValue || r.cifvalue || 0;
+          byReporter[name] = (byReporter[name] || 0) + val;
+          total += val;
+        }
+        /* Sort by value descending */
+        const sorted = Object.entries(byReporter).sort((a,b) => b[1]-a[1]);
+        const topStr = sorted.slice(0,3)
+          .map(([name, val]) => `${name} ${total ? (val/total*100).toFixed(0)+'%' : ''}`)
+          .join(', ');
+        expCell.textContent = topStr || '—';
+        expCell.style.color = '';
+        /* HHI */
+        const shares = sorted.map(([,v]) => v);
+        const hhi = _tfHHI(shares);
+        if (hhiCell && hhi) {
+          const risk = hhi >= 2500 ? 'Critical' : hhi >= 1500 ? 'Elevated' : 'Moderate';
+          const col  = hhi >= 2500 ? '#f85149'  : hhi >= 1500 ? '#d29922'  : '#3fb950';
+          hhiCell.innerHTML = `<span style="color:${col}">${hhi} — ${risk}</span>`;
+        }
+      } catch(e) {
+        if (expCell) expCell.textContent = '— (error)';
+      }
+    }
+  }
 }
 
 async function tradeflowsRenderTariffs() {
@@ -274,33 +286,67 @@ async function tradeflowsRenderTariffs() {
   let html = `<div class="av-live-badge">● Tariffs & Trade Policy — WITS (World Integrated Trade Solution)</div>`;
   html += `<div class="av-note" style="margin-bottom:8px">World Bank WITS provides MFN and preferential tariff data by HS code. No API key required. Data: annual (latest available WTO binding schedules).</div>`;
 
-  /* WITS tariff context for key minerals */
-  const tariffContext = [
-    { mineral:'Rare Earths (HS 2846)', reporter:'US', mfn:'4.0%', pref:'0% (KORUS)', notes:'Section 301 tariffs apply for Chinese origin' },
-    { mineral:'Cobalt (HS 810520)',    reporter:'US', mfn:'Free', pref:'Free',        notes:'Strategic material; no MFN tariff' },
-    { mineral:'Gallium (HS 811291)',   reporter:'EU', mfn:'Free', pref:'Free',        notes:'No MFN tariff; import licenses under review' },
-    { mineral:'Tungsten (HS 261019)',  reporter:'US', mfn:'Free', pref:'Free',        notes:'25% Section 232 tariff on Chinese origin' },
-    { mineral:'Graphite (HS 2504)',    reporter:'US', mfn:'Free', pref:'Free',        notes:'25% additional tariffs on Chinese natural graphite' },
-    { mineral:'Lithium (HS 280519)',   reporter:'EU', mfn:'2.7%', pref:'0% (EFTA)',   notes:'EV battery supply chain; CRMA strategic reserve under development' },
-    { mineral:'Neon (HS 280429)',      reporter:'US', mfn:'Free', pref:'Free',        notes:'Semiconductor supply chain; US-China tensions' },
-    { mineral:'Phosphate (HS 2510)',   reporter:'EU', mfn:'Free', pref:'Free',        notes:'Food security; Morocco FTA provides preferential access' },
+  /* Live WITS MFN tariff data for strategic minerals — US (842) and EU (918) reporters */
+  html += `<div class="section-head">📋 MFN Tariffs for Strategic Minerals — WITS Live</div>`;
+  html += `<div class="av-note" style="margin-bottom:6px">MFN (Most-Favoured-Nation) tariffs from World Bank WITS. Data: latest available WTO binding schedules. US reporter code: 842, EU: 918.</div>`;
+
+  /* HS6 codes to query — using 6-digit WITS codes */
+  const WITS_MINERALS = [
+    { label:'Rare Earth Compounds (HS 284610)', hs:'284610', reporter:'842', flag:'🇺🇸' },
+    { label:'Rare Earth Compounds (HS 284610)', hs:'284610', reporter:'918', flag:'🇪🇺' },
+    { label:'Lithium (HS 280519)',              hs:'280519', reporter:'842', flag:'🇺🇸' },
+    { label:'Lithium (HS 280519)',              hs:'280519', reporter:'918', flag:'🇪🇺' },
+    { label:'Cobalt Unwrought (HS 810520)',     hs:'810520', reporter:'842', flag:'🇺🇸' },
+    { label:'Gallium (HS 811291)',              hs:'811291', reporter:'918', flag:'🇪🇺' },
+    { label:'Natural Graphite (HS 250400)',     hs:'250400', reporter:'842', flag:'🇺🇸' },
+    { label:'Nickel Unwrought (HS 750210)',     hs:'750210', reporter:'842', flag:'🇺🇸' },
+    { label:'Copper Unwrought (HS 740311)',     hs:'740311', reporter:'842', flag:'🇺🇸' },
+    { label:'Phosphate Rock (HS 251010)',       hs:'251010', reporter:'918', flag:'🇪🇺' },
   ];
 
-  html += `<div class="section-head">📋 MFN Tariffs for Strategic Minerals</div>`;
   html += `<div class="fin-table-wrap"><table class="fin-table">
-    <thead><tr><th>Mineral / HS Code</th><th>Market</th><th>MFN Rate</th><th>Preferential</th><th>Notes</th></tr></thead>
-    <tbody>`;
-  for (const r of tariffContext) {
-    const mfnCls = r.mfn==='Free'?'pos':parseFloat(r.mfn)>5?'neg':'warn';
+    <thead><tr><th>Mineral / HS Code</th><th>Market</th><th>MFN Avg Rate</th><th>Source</th></tr></thead>
+    <tbody id="tf-tariff-rows">`;
+  for (const m of WITS_MINERALS) {
     html += `<tr>
-      <td><strong>${_tfEsc(r.mineral)}</strong></td>
-      <td>${_tfEsc(r.reporter)}</td>
-      <td class="${mfnCls}">${_tfEsc(r.mfn)}</td>
-      <td class="pos">${_tfEsc(r.pref)}</td>
-      <td style="font-size:10px;color:var(--text-muted)">${_tfEsc(r.notes)}</td>
+      <td><strong>${_tfEsc(m.label)}</strong></td>
+      <td>${m.flag}</td>
+      <td id="tf-tariff-${m.hs}-${m.reporter}" style="color:var(--text-muted)">Loading…</td>
+      <td style="font-size:9px;color:var(--text-muted)">WITS MFN-WTAVG</td>
     </tr>`;
   }
   html += `</tbody></table></div>`;
+  el.innerHTML = html + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+    <a href="https://wits.worldbank.org/witsapiintro.aspx" target="_blank" rel="noopener" class="energy-entsog-link">↗ WITS API Documentation</a>
+    <a href="https://wits.worldbank.org/tariff/trains/country/USA/indicator/MFN-WTAVG/partner/000/product/all" target="_blank" rel="noopener" class="energy-entsog-link">↗ US MFN Schedule</a>
+  </div>`;
+
+  /* Fetch live WITS tariff rates */
+  for (const m of WITS_MINERALS) {
+    const cell = el.querySelector(`#tf-tariff-${m.hs}-${m.reporter}`);
+    if (!cell) continue;
+    try {
+      const data = await witsGetTariff(m.hs, m.reporter, 2022);
+      /* WITS SDMX response: extract value from dataSets */
+      const obs = data?.dataSets?.[0]?.observations;
+      let rate = null;
+      if (obs) {
+        const lastKey = Object.keys(obs).sort().pop();
+        rate = obs[lastKey]?.[0];
+      }
+      if (rate != null) {
+        const cls  = rate === 0 ? 'pos' : rate > 5 ? 'neg' : 'warn';
+        cell.innerHTML = `<span class="${cls}">${rate === 0 ? 'Free (0%)' : rate.toFixed(2) + '%'}</span>`;
+      } else {
+        cell.textContent = '— (no data)';
+      }
+    } catch(e) {
+      cell.textContent = '—';
+    }
+  }
+  return; /* early return — HTML already set above */
+
+  /* (fallback links block kept below — unreachable after live fetch path) */
 
   html += `<div class="section-head" style="margin-top:12px">🔗 WITS & Eurostat Trade Resources</div>`;
   html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">

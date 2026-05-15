@@ -94,19 +94,19 @@ function _isUKTicker(ticker) {
    as Basic Auth (CH uses key as username, empty password).
    ══════════════════════════════════════════════════════════════════ */
 async function _chFetch(path) {
-  const key = _chGetKey();
-  if (!key) return null;
+  const key    = _chGetKey();
+  const isAuth = !!window._FINTERM_AUTHENTICATED;
+  // Allow fetch when: local key present OR FINTERM authenticated (backend proxy injects key)
+  if (!key && !isAuth) return null;
   const cacheKey = `ch_${path}`;
   const cached   = _chCacheGet(cacheKey);
   if (cached !== null) return cached;
 
-  const auth = btoa(key + ":");
+  const headers = { "Accept": "application/json" };
+  if (key) headers["Authorization"] = `Basic ${btoa(key + ":")}`;
   try {
     const res = await fetch(`${CH_BASE}${path}`, {
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Accept":        "application/json",
-      },
+      headers,
       signal: AbortSignal.timeout(8000),
     });
     if (res.status === 429) {
@@ -566,13 +566,43 @@ window.chLoadForTicker = async function chLoadForTicker(ticker) {
   const sym     = ticker.replace(/.*:/, "").toUpperCase();
   const isUK    = _isUKTicker(ticker);
   const hasKey  = !!_chGetKey();
+  const isAuth  = !!window._FINTERM_AUTHENTICATED;
 
   /* Only run if:
-       a) it's a UK ticker (certain) — always try CH
+       a) it's a UK ticker — always try CH
        b) GLEIF identified a UK entity — try CH
-       c) A CH key is set — can try to search for any entity
-     For non-UK entities without key, skip silently. */
-  if (!isUK && !hasKey) return;
+       c) A CH key is set or FINTERM authenticated (backend has the key) */
+  if (!isUK && !hasKey && !isAuth) {
+    const pane = document.getElementById("own-psc");
+    if (pane && !pane.innerHTML.trim()) {
+      pane.innerHTML = `
+        <div class="ch-setup-banner">
+          <div class="ch-setup-icon">🏛</div>
+          <div class="ch-setup-body">
+            <div class="ch-setup-title">PSC / Beneficial Ownership Data</div>
+            <div class="ch-setup-desc">
+              <strong>PSC (Persons with Significant Control)</strong> data is published by the
+              UK Companies House registry for UK-registered entities (LSE, AIM, AQSE tickers).<br><br>
+              <strong>For any company</strong>, add a free Companies House API key to search the
+              UK registry and cross-reference beneficial ownership via Open Ownership BODS.
+            </div>
+            <div class="ch-setup-actions">
+              <button class="ch-setup-btn" onclick="openApiConfig('companieshouse')">
+                ⚙ Configure Companies House Key
+              </button>
+              <a href="https://developer.company-information.service.gov.uk/"
+                 target="_blank" rel="noopener" class="ch-setup-link">
+                Get free key ↗
+              </a>
+            </div>
+            <div class="av-note" style="margin-top:10px">
+              For UK tickers (LSE:, AIM:), PSC data loads automatically with or without a key.
+            </div>
+          </div>
+        </div>`;
+    }
+    return;
+  }
 
   /* Small delay: let gleif.js run first so _currentLEI is populated */
   await new Promise(r => setTimeout(r, 2000));
@@ -737,7 +767,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     const t = typeof currentTicker !== "undefined" ? currentTicker : "AAPL";
     /* Only auto-run on initial load if UK ticker or key already set */
-    if (_isUKTicker(t) || _chGetKey()) chLoadForTicker(t);
+    if (_isUKTicker(t) || _chGetKey() || window._FINTERM_AUTHENTICATED) chLoadForTicker(t);
   }, 3500);
 });
 

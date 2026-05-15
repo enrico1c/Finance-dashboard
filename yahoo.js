@@ -87,7 +87,7 @@ async function _fmpFetch(path, cacheKey) {
     const json = await res.json();
     _yhCacheSet("fallback:"+cacheKey, json);
     return json;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 async function _fmpPeers(sym) {
   const d = await _fmpFetch(`/v4/stock_peers?symbol=${sym}`, `peers:${sym}`);
@@ -343,7 +343,7 @@ window.yfLoadHistory = async function(sym) {
             .sort((a,b)=>a.date.localeCompare(b.date))
             .slice(-52);
           _yhCacheSet(`avhist:${sym}`, avBars);
-        } catch {}
+        } catch(e) {}
       }
       if (avBars?.length) bars = avBars;
     }
@@ -406,7 +406,7 @@ window.yfLoadNews = async function(sym) {
       _yhCacheSet(`gnews:${sym}`, arts);
     }
     if (arts?.length && typeof renderNewsFeed==="function") renderNewsFeed(sym, arts, "gnews");
-  } catch {}
+  } catch(e) {}
 };
 
 /* ══════════════════════════════════════════════════════════════════
@@ -618,16 +618,21 @@ window.yfLoadTrending = async function() {
   if (!mData) {
     try {
       const [act,gain,lose] = await Promise.all([
-        fetch(`https://financialmodelingprep.com/api/v3/actives?apikey=${_fmpKey()}`).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/gainers?apikey=${_fmpKey()}`).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/losers?apikey=${_fmpKey()}`).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/stable/most-actives?apikey=${_fmpKey()}`).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/stable/biggest-gainers?apikey=${_fmpKey()}`).then(r=>r.json()),
+        fetch(`https://financialmodelingprep.com/stable/biggest-losers?apikey=${_fmpKey()}`).then(r=>r.json()),
       ]);
-      mData={actives:act||[],gainers:gain||[],losers:lose||[]};
+      const toArr = v => Array.isArray(v) ? v : (Array.isArray(v?.data) ? v.data : []);
+      mData={actives:toArr(act),gainers:toArr(gain),losers:toArr(lose)};
       _yhCacheSet("fmp-movers", mData);
-    } catch { el.innerHTML=`<div class="no-data">// Could not load market movers.</div>`; return; }
+    } catch(e) { el.innerHTML=`<div class="no-data">// Could not load market movers.</div>`; return; }
+  }
+  if (!mData.actives.length && !mData.gainers.length && !mData.losers.length) {
+    el.innerHTML = `<div class="no-data">// Market movers unavailable — FMP free tier may not include actives/gainers/losers endpoints. Upgrade FMP plan or add Yahoo Finance key.</div>`;
+    return;
   }
   const sec=(title,items,fixCls)=>`<div class="section-head" style="margin:10px 0 5px">${_yhEsc(title)}</div>`
-    +items.slice(0,8).map(t=>{
+    +(Array.isArray(items)?items:[]).slice(0,8).map(t=>{
       const chg=parseFloat(t.changesPercentage??t.change??0);
       const cls=fixCls||(chg>=0?"pos":"neg");
       return `<div class="yf-trend-row" onclick="if(typeof changeTicker==='function')changeTicker('${_yhEsc(t.ticker||t.symbol)}')">

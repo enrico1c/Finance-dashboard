@@ -254,22 +254,6 @@ function sbArticlesToEvents(articles, ticker) {
   }));
 }
 
-/* WM Intel alerts (from wmBuildIntelAlerts output) */
-function sbIntelToEvents(alerts) {
-  return (alerts || []).map(a => ({
-    type:    a.type || 'intel',
-    ticker:  a.ticker || null,
-    topic:   a.resource || null,
-    ts:      a.ts || 0,
-    sev:     a.severity || 'low',
-    title:   a.title || '',
-    body:    [a.subtitle, a.detail].filter(Boolean).join(' — '),
-    url:     null,
-    src:     'WorldMonitor',
-    country: null,
-  }));
-}
-
 /* WM bootstrap raw data — normalize all categories */
 function sbWmBootstrapToEvents(d) {
   const now = Math.floor(Date.now() / 1000);
@@ -371,17 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  /* 2. Intercept wmIntelLoad — save intel alerts when WM refreshes */
-  if (typeof wmIntelLoad === 'function') {
-    const _origWIL = wmIntelLoad;
-    window.wmIntelLoad = async function() {
-      await _origWIL();
-      if (wmIntelAlerts && wmIntelAlerts.length) {
-        sbSave(sbIntelToEvents(wmIntelAlerts)).catch(() => {});
-      }
-    };
-  }
-
   /* 3. Intercept wmBootstrap — save raw WM data after each fetch */
   const _origBootstrap = wmBootstrap;
   window.wmBootstrap = async function(keys) {
@@ -438,57 +411,6 @@ async function sbLoadNewsForTicker(ticker) {
   }
 }
 
-/* Load saved intel alerts (for Intel Feed panel on startup) */
-async function sbLoadIntelHistory(filter = 'all', limit = 40) {
-  const typeMap = {
-    insight:'intel', risk:'risk', iran:'iran',
-    unrest:'unrest', weather:'weather', cyber:'cyber',
-    quake:'quake', natural:'natural'
-  };
-  const type = (filter === 'all') ? null : (typeMap[filter] || filter);
-  const rows = await sbLoad({ type, limit });
-  return rows;
-}
-
-/* Inject saved intel into Intel Feed if it loads empty */
-async function sbInjectSavedIntel() {
-  const el = document.getElementById('intel-feed-list');
-  if (!el) return;
-  // Wait briefly to see if live data arrives first
-  await new Promise(r => setTimeout(r, 3000));
-  if (el.querySelector('.wm-spin') || el.innerHTML.trim() === '' || !wmIntelAlerts.length) {
-    const rows = await sbLoadIntelHistory('all', 50);
-    if (!rows.length) return;
-
-    const badge = document.getElementById('intel-feed-badge');
-    const critCount = rows.filter(r => ['critical','extreme'].includes(r.sev)).length;
-    if (badge) {
-      badge.textContent = critCount > 0 ? `${critCount} CRITICAL` : `${rows.length} CACHED`;
-      badge.style.background = critCount > 0 ? '#ff4757' : '#555';
-    }
-
-    el.innerHTML = `<div class="sb-cache-bar" style="margin:0">
-        <span>📦 ${rows.length} saved alerts — loading live data…</span>
-      </div>` +
-      rows.map(r => {
-        const col = wmSeverityColor(r.sev || 'medium');
-        const iconMap = { intel:'🧠', risk:'🌡', iran:'🇮🇷', unrest:'✊', weather:'🌪',
-                          cyber:'💻', quake:'🏔', natural:'🌿', news:'📰' };
-        return `<div class="wm-intel-card" style="border-left:3px solid ${col.border}">
-          <div class="wm-ic-header">
-            <span class="wm-ic-icon">${iconMap[r.type]||'⚡'}</span>
-            <div class="wm-ic-title">${escapeHtml(r.title||'')}</div>
-            <span class="wm-ic-badge" style="background:${col.bg};color:${col.text};border-color:${col.border}">${(r.sev||'').toUpperCase()}</span>
-          </div>
-          ${r.body ? `<div class="wm-ic-sub">${escapeHtml(r.body.slice(0,120))}</div>` : ''}
-          <div class="wm-ic-footer">
-            <span class="wm-ic-time">${sbRelTime(r.ts)} · ${escapeHtml(r.src||'')}</span>
-            <span class="sb-cache-tag">📦</span>
-          </div>
-        </div>`;
-      }).join('');
-  }
-}
 
 function sbRelTime(ts) {
   if (!ts) return '';
@@ -500,11 +422,8 @@ function sbRelTime(ts) {
   return `${Math.floor(d/86400)}d ago`;
 }
 
-/* ── Run saved intel injection on page load ─────────────────────── */
+/* ── Run saved news injection on page load ─────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
-  // Inject cached intel into feed on startup
-  sbInjectSavedIntel().catch(() => {});
-
   // Also intercept renderNews to load cached articles
   if (typeof renderNews === 'function') {
     const _origRN = renderNews;

@@ -8,6 +8,13 @@
 /* ── ⚙️  Keys are managed via the ⚙ API button in the UI ────────── */
 /* Use the modal to paste your FMP key — stored in localStorage.     */
 
+/* HTML escape helper — used throughout template literals */
+function fmpEsc(s) {
+  return typeof escapeHtml === 'function'
+    ? escapeHtml(String(s ?? ''))
+    : String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
 // Runtime key: config.js stores under finterm_key_fmp (via lsId = id => `finterm_key_${id}`)
 function getFmpKey() {
   return (window._KEYS && window._KEYS["fmp"])
@@ -17,6 +24,7 @@ function getFmpKey() {
 }
 
 const FMP_BASE    = "https://financialmodelingprep.com/api";
+const FMP_STABLE  = "https://financialmodelingprep.com/stable"; // v3 returns 403 on this key; /stable/ endpoints work
 const FMP_CACHE_TTL = 15 * 60 * 1000;  // 15 min
 const FMP_SESSION_KEY = "fmp_call_count";
 
@@ -46,12 +54,12 @@ function fmpCacheGet(endpoint, symbol) {
     const { ts, data } = JSON.parse(raw);
     if (Date.now() - ts > FMP_CACHE_TTL) { sessionStorage.removeItem(fmpCacheKey(endpoint, symbol)); return null; }
     return data;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 function fmpCacheSet(endpoint, symbol, data) {
   try { sessionStorage.setItem(fmpCacheKey(endpoint, symbol), JSON.stringify({ ts: Date.now(), data })); }
-  catch { /* quota exceeded */ }
+  catch(e) { /* quota exceeded */ }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -176,7 +184,10 @@ async function fmpGetInstitutional(symbol) {
 
 /* ── Management / Executives ────────────────────────────────────── */
 async function fmpGetManagement(symbol) {
-  const data = await fmpFetch(`/v3/key-executives/${symbol}`, symbol);
+  const data = await fmpFetch(`/v3/key-executives/${symbol}`, symbol)
+    || await (async () => {
+      try { const r = await fetch(`${FMP_STABLE}/key-executives?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch(e) { return null; }
+    })();
   if (!data || !data.length) return null;
   return data.slice(0, 10).map(e => ({
     name:  e.name  || "—",
@@ -204,7 +215,10 @@ async function fmpGetEarningsCalendar(symbol) {
 
 /* ── Financial Ratios (live P/E, EV/EBITDA, etc.) ──────────────── */
 async function fmpGetRatios(symbol) {
-  const data = await fmpFetch(`/v3/ratios-ttm/${symbol}`, symbol);
+  const data = await fmpFetch(`/v3/ratios-ttm/${symbol}`, symbol)
+    || await (async () => {
+      try { const r = await fetch(`${FMP_STABLE}/ratios-ttm?symbol=${symbol}&apikey=${getFmpKey()}`,{signal:AbortSignal.timeout(7000)}); return r.ok ? r.json() : null; } catch(e) { return null; }
+    })();
   if (!data || !data.length) return null;
   const r = data[0];
   return {
@@ -236,8 +250,8 @@ async function fmpGetWACCInputs(symbol) {
     if (!key) return null;
 
     const [incData, balData] = await Promise.all([
-      fetch(`${FMP_BASE}/v3/income-statement/${symbol}?limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-      fetch(`${FMP_BASE}/v3/balance-sheet-statement/${symbol}?limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+      fetch(`${FMP_STABLE}/income-statement?symbol=${symbol}&limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+      fetch(`${FMP_STABLE}/balance-sheet-statement?symbol=${symbol}&limit=1&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
     ]);
 
     const inc = Array.isArray(incData) && incData.length ? incData[0] : null;
@@ -424,7 +438,62 @@ function fmpRenderOwnership(sym, insiders, institutional) {
   const hds = document.getElementById("own-hds");
   if (!hds) return;
 
-  let html = `<div class="av-live-badge">● LIVE — FMP</div>`;
+  /* ── Smart Money Score (weighted by share magnitude) ────────── */
+  const instList   = institutional || [];
+  const insiderList = insiders || [];
+  const parseChg = v => parseFloat(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
+
+  /* Institutional: net share flow (positive = net buying) */
+  let instBuy = 0, instSell = 0;
+  instList.forEach(h => {
+    const n = parseChg(h.change);
+    if (n > 0) instBuy += n; else instSell += Math.abs(n);
+  });
+  const instTotal = instBuy + instSell || 1;
+  const instScore = Math.round((instBuy / instTotal) * 5); // 0–5
+
+  /* Insider: $ value of buys vs sells (fall back to count if no value) */
+  const parseVal = v => {
+    const s = String(v ?? '').replace(/[$,\s]/g, '');
+    const n = parseFloat(s);
+    if (isNaN(n)) return 0;
+    if (/[Tt]/.test(s)) return n * 1e12;
+    if (/[Bb]/.test(s)) return n * 1e9;
+    if (/[Mm]/.test(s)) return n * 1e6;
+    if (/[Kk]/.test(s)) return n * 1e3;
+    return n;
+  };
+  let iBuyVal = 0, iSellVal = 0, iBuys = 0, iSells = 0;
+  insiderList.forEach(i => {
+    const v = parseVal(i.value);
+    if (i.action === 'Buy')  { iBuyVal  += v || 1; iBuys++;  }
+    if (i.action === 'Sell') { iSellVal += v || 1; iSells++; }
+  });
+  const iTotal = iBuyVal + iSellVal || 1;
+  const insiderScore = (iBuys + iSells) ? Math.round((iBuyVal / iTotal) * 5) : 2; // neutral if no data
+
+  const totalScore = instScore + insiderScore; // 0–10
+  const scoreCol   = totalScore >= 7 ? '#3fb950' : totalScore >= 4 ? '#d29922' : '#f85149';
+  const scoreLabel = totalScore >= 7 ? 'Bullish' : totalScore >= 4 ? 'Neutral' : 'Bearish';
+  const fmtFlow = n => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n.toFixed(0);
+  const smsBadge = `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;margin-bottom:6px">
+    <div style="text-align:center;min-width:40px">
+      <div style="font-size:22px;font-weight:800;color:${scoreCol}">${totalScore}</div>
+      <div style="font-size:8px;color:var(--text-muted)">/ 10</div>
+    </div>
+    <div style="flex:1">
+      <div style="font-size:11px;font-weight:700;color:${scoreCol}">Smart Money: ${scoreLabel}</div>
+      <div style="font-size:9px;color:var(--text-muted);margin-top:2px">
+        Inst flow: +${fmtFlow(instBuy)} / −${fmtFlow(instSell)} shares &nbsp;·&nbsp;
+        Insider: ${iBuys}B ($${fmtFlow(iBuyVal)}) / ${iSells}S ($${fmtFlow(iSellVal)})
+      </div>
+      <div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div style="height:100%;width:${totalScore*10}%;background:${scoreCol};border-radius:2px;transition:width .4s"></div>
+      </div>
+    </div>
+  </div>`;
+
+  let html = `<div class="av-live-badge">● FMP · Institutional: 13F (quarterly) · Insiders: SEC Form 4</div>${smsBadge}`;
 
   if (institutional?.length) {
     const rows = institutional.map(h => {
@@ -468,7 +537,11 @@ function fmpRenderOwnership(sym, insiders, institutional) {
 /* ── MGMT — Executives ──────────────────────────────────────────── */
 function fmpRenderMgmt(sym, mgmt) {
   const box = document.getElementById("own-mgmt");
-  if (!box || !mgmt.length) return;
+  if (!box) return;
+  if (!mgmt || !mgmt.length) {
+    box.innerHTML = `<div class="no-data">// No management data available for ${escapeHtml(sym)}.</div>`;
+    return;
+  }
   box.innerHTML = `
     <div class="av-live-badge">● LIVE — FMP</div>
     ${mgmt.map(m => `
@@ -508,12 +581,36 @@ function fmpRenderCalendar(sym, calendar) {
 
 /* ── Ratios — update DES fundamentals section ───────────────────── */
 function fmpRenderRatios(sym, r) {
-  // Inject a live ratios block into the DES tab if overview already rendered
   const des = document.getElementById("fund-des");
   if (!des) return;
 
-  // Don't overwrite — append a ratios block at the top if AV already rendered
-  const existingRatios = des.querySelector(".fmp-ratios-block");
+  /* ── Horizontal quick-stats strip (always shown at top of DES) ── */
+  const colorVal = (v, good) => v == null ? 'var(--text-muted)' : (good ? (v > 0 ? '#3fb950' : '#f85149') : 'var(--text)');
+  const statCell = (label, val, colFn) => val == null ? '' :
+    `<div style="text-align:center;padding:5px 4px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px">
+      <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px">${label}</div>
+      <div style="font-size:12px;font-weight:700;color:${colFn}">${val}</div>
+    </div>`;
+  const strip = document.createElement("div");
+  strip.className = "fmp-ratios-block fmp-stats-strip";
+  strip.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:4px;padding:6px;border-bottom:1px solid var(--border)";
+  strip.innerHTML =
+    statCell("P/E",         r.pe       != null ? fmt(r.pe,1)       : null, 'var(--text)') +
+    statCell("EV/EBITDA",   r.evEbitda != null ? fmt(r.evEbitda,1) : null, 'var(--text)') +
+    statCell("P/S",         r.ps       != null ? fmt(r.ps,2)       : null, 'var(--text)') +
+    statCell("P/B",         r.pb       != null ? fmt(r.pb,2)       : null, 'var(--text)') +
+    statCell("ROE",         r.roe      != null ? fmt(r.roe,1)+'%'  : null, colorVal(r.roe, true)) +
+    statCell("Net Mgn",     r.netMgn   != null ? fmt(r.netMgn,1)+'%': null, colorVal(r.netMgn, true)) +
+    statCell("Gross Mgn",   r.grossMgn != null ? fmt(r.grossMgn,1)+'%': null, colorVal(r.grossMgn, true)) +
+    statCell("FCF Yield",   r.fcfYield != null ? fmt(r.fcfYield,2)+'%': null, colorVal(r.fcfYield, true)) +
+    statCell("Debt/Eq",     r.debtEq   != null ? fmt(r.debtEq,2)  : null, 'var(--text)') +
+    statCell("Div Yield",   r.divYield != null ? fmt(r.divYield,2)+'%': null, 'var(--text)');
+
+  const existing = des.querySelector(".fmp-stats-strip");
+  if (existing) existing.replaceWith(strip);
+  else des.insertAdjacentElement("afterbegin", strip);
+
+  /* ── Detailed vertical ratios block (below TV widget / profile) ── */
   const block = document.createElement("div");
   block.className = "fmp-ratios-block";
   block.innerHTML = `
@@ -533,13 +630,13 @@ function fmpRenderRatios(sym, r) {
     ${r.debtEq   != null ? mRow("Debt/Equity",  fmt(r.debtEq,2))      : ""}
     ${r.currentR != null ? mRow("Current Ratio",fmt(r.currentR,2))    : ""}`;
 
-  if (existingRatios) {
-    des.replaceChild(block, existingRatios);
+  const existingDetail = des.querySelector(".fmp-ratios-block:not(.fmp-stats-strip)");
+  if (existingDetail) {
+    existingDetail.replaceWith(block);
   } else {
-    // Prepend after live badge if present
     const badge = des.querySelector(".av-live-badge");
     if (badge) badge.insertAdjacentElement("afterend", block);
-    else des.insertAdjacentElement("afterbegin", block);
+    else des.appendChild(block);
   }
 
   // Also update valuation analyzer if the same ticker is loaded
@@ -586,13 +683,13 @@ function fmpRenderRatios(sym, r) {
     wc.innerHTML = `
       <div class="av-live-badge">● WACC · ${fmpEsc(sym)} · beta:${fmpEsc(betaSrcFmp)} · Kd:${fmpEsc(kdSrc)} · tax:${fmpEsc(taxSrc)}</div>
       <div class="section-head">WACC Inputs</div>
-      ${mRow("Beta (levered)",         beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+fmpEsc(betaSrcFmp)+')</span>')}
+      ${mRowHtml("Beta (levered)",         beta.toFixed(2) + ' <span style="font-size:9px;opacity:.6">('+fmpEsc(betaSrcFmp)+')</span>')}
       ${mRow("D/E Ratio",              debtEq.toFixed(2))}
       ${mRow("Risk-Free Rate (10Y)",   rf+"%")}
-      ${mRow("Equity Risk Premium",    erp+'% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
+      ${mRowHtml("Equity Risk Premium",    erp+'% <span style="font-size:9px;opacity:.6">(Damodaran Jan 2026)</span>')}
       ${mRow("Cost of Equity (Ke)",    ke+"%")}
-      ${mRow("Pre-Tax Cost of Debt",   kd.toFixed(2)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(kdSrc)+')</span>')}
-      ${mRow("Tax Rate",               tax.toFixed(1)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(taxSrc)+')</span>')}
+      ${mRowHtml("Pre-Tax Cost of Debt",   kd.toFixed(2)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(kdSrc)+')</span>')}
+      ${mRowHtml("Tax Rate",               tax.toFixed(1)+'% <span style="font-size:9px;opacity:.6">('+fmpEsc(taxSrc)+')</span>')}
       ${mRow("Equity Weight",          eqW+"%")}
       ${mRow("Debt Weight",            dW+"%")}
       <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
@@ -625,27 +722,31 @@ function fmpRenderRatios(sym, r) {
    ══════════════════════════════════════════════════════════════════ */
 async function fmpRefreshWatchlistPrices() {
   if (!currentWatchlistStocks || !currentWatchlistStocks.length) return;
-  const tickers = currentWatchlistStocks.map(s => s.ticker.replace(/.*:/,"")).join(",");
-  const quotes  = await fmpGetBatchQuote(tickers.split(","));
-  if (!quotes) return;
+  try {
+    const tickers = currentWatchlistStocks.map(s => s.ticker.replace(/.*:/,"")).join(",");
+    const quotes  = await fmpGetBatchQuote(tickers.split(","));
+    if (!quotes) return;
 
-  // Merge live prices into watchlist data
-  let updated = false;
-  currentWatchlistStocks.forEach(s => {
-    const sym = s.ticker.replace(/.*:/,"").toUpperCase();
-    const q   = quotes[sym];
-    if (q) {
-      if (q.price     != null) s.price  = q.price;
-      if (q.changePct != null) s.change = q.changePct;
-      if (q.mktCap    != null) s.mktCap = fmtB(q.mktCap);
-      if (q.pe        != null) s.pe     = q.pe;
-      updated = true;
+    let updated = false;
+    currentWatchlistStocks.forEach(s => {
+      const sym = s.ticker.replace(/.*:/,"").toUpperCase();
+      const q   = quotes[sym];
+      if (q) {
+        if (q.price     != null) s.price  = q.price;
+        if (q.changePct != null) s.change = q.changePct;
+        if (q.mktCap    != null) s.mktCap = fmtB(q.mktCap);
+        if (q.pe        != null) s.pe     = q.pe;
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      renderWatchlistRows();
+      showApiToast(`✓ Watchlist: prices refreshed`, "ok");
     }
-  });
-
-  if (updated) {
-    renderWatchlistRows();
-    showApiToast(`✓ Watchlist: live prices updated (FMP)`, "ok");
+  } catch(e) {
+    console.warn("[Watchlist] Price refresh failed:", e.message);
+    showApiToast("⚠ Watchlist: price refresh failed", "warn");
   }
 }
 
@@ -665,13 +766,17 @@ async function fmpLoadDividends(sym) {
   el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Loading dividends…</div>';
   try {
     fmpIncrement();
+    const stableDiv = await fetch(`${FMP_STABLE}/dividends?symbol=${encodeURIComponent(sym)}&limit=30&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null);
     const [divRes, splRes] = await Promise.allSettled([
-      fmpFetch(`/v3/historical-price-full/stock_dividend/${encodeURIComponent(sym)}`),
+      stableDiv ? Promise.resolve(stableDiv) : fmpFetch(`/v3/historical-price-full/stock_dividend/${encodeURIComponent(sym)}`),
       fmpFetch(`/v3/historical-price-full/stock_split/${encodeURIComponent(sym)}`),
     ]);
 
-    const divData  = divRes.status  === 'fulfilled' ? (divRes.value?.historical  || []) : [];
-    const splitData = splRes.status === 'fulfilled' ? (splRes.value?.historical  || []) : [];
+    // stable returns flat array; v3 returns {historical:[...]}
+    const divRaw   = divRes.status  === 'fulfilled' ? divRes.value  : null;
+    const divData  = Array.isArray(divRaw) ? divRaw : (divRaw?.historical || []);
+    const splitRaw = splRes.status  === 'fulfilled' ? splRes.value  : null;
+    const splitData = Array.isArray(splitRaw) ? splitRaw : (splitRaw?.historical || []);
 
     let html = '';
 
@@ -735,7 +840,42 @@ async function fmpLoadDividends(sym) {
 
     el.innerHTML = html;
   } catch(e) {
-    el.innerHTML = `<div class="no-data">// Dividend data error: ${e.message}</div>`;
+    // FMP failed — try Finnhub basic metrics for minimal dividend info
+    const fhKey4 = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+    if (fhKey4) {
+      try {
+        fmpIncrement();
+        const mD = await fetch(
+          `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(sym)}&metric=all&token=${fhKey4}`,
+          { signal: AbortSignal.timeout(8000) }
+        ).then(r => r.json());
+        const m4 = mD?.metric || {};
+        const dps  = m4.dividendPerShareAnnual;
+        const dyld = m4.dividendYieldIndicatedAnnual;
+        const dg5  = m4.dividendGrowthRate5Y;
+        if (dps != null || dyld != null) {
+          el.innerHTML = `<div class="av-live-badge">● Dividend Summary · Finnhub Metrics</div>
+            <div class="div-summary-bar">
+              <div class="div-sum-cell"><span class="div-sum-label">Annual DPS</span><span class="div-sum-val">${dps != null ? '$' + Number(dps).toFixed(4) : '—'}</span></div>
+              <div class="div-sum-cell"><span class="div-sum-label">Div Yield</span><span class="div-sum-val" style="color:var(--accent)">${dyld != null ? Number(dyld).toFixed(2) + '%' : '—'}</span></div>
+              <div class="div-sum-cell"><span class="div-sum-label">5Y Div Growth</span><span class="div-sum-val">${dg5 != null ? Number(dg5).toFixed(1) + '%' : '—'}</span></div>
+            </div>
+            <div class="no-data" style="margin-top:6px">// Full dividend history requires FMP key (API temporarily unreachable).<br>
+            <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+        } else if (dps === 0 || (m4.dividendPerShareTTM === 0)) {
+          el.innerHTML = `<div class="no-data">// ${fmpEsc(sym)} does not pay a dividend.</div>`;
+        } else {
+          el.innerHTML = `<div class="no-data">// Dividend data temporarily unavailable.<br>
+            <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+        }
+      } catch(_) {
+        el.innerHTML = `<div class="no-data">// Dividend data temporarily unavailable.<br>
+          <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+      }
+    } else {
+      el.innerHTML = `<div class="no-data">// Dividend data temporarily unavailable.<br>
+        <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+    }
   }
 }
 
@@ -855,19 +995,129 @@ async function fmpLoadSecFilings(sym) {
 async function fhLoadShortInterest(sym) {
   const el = document.getElementById("fund-short");
   if (!el) return;
-  const key = (typeof getKey === "function") ? getKey("finnhub") : localStorage.getItem("finterm_key_finnhub") || "";
+  el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest…</div>`;
+
+  // ── 1. FMP /stock_float (free, FMP key) ─────────────────────────────────
+  const fmpKey = (typeof getFmpKey === "function") ? getFmpKey() : "";
+  if (fmpKey) {
+    try {
+      const res  = await fetch(`https://financialmodelingprep.com/api/v3/stock_float/${encodeURIComponent(sym)}?apikey=${fmpKey}`, { signal: AbortSignal.timeout(7000) });
+      const data = await res.json();
+      const d    = Array.isArray(data) ? data[0] : data;
+      if (d?.floatShares || d?.shortFloat) {
+        _renderShortData(el, sym, [{
+          date: d.date || new Date().toISOString().slice(0,10),
+          shortInterest: d.shortInterest || d.shortOutstanding,
+          shortInterestRatio: d.shortFloat,
+          daysToCover: d.shortRatio,
+        }], 'FMP');
+        return;
+      }
+    } catch(e) {}
+  }
+
+  // ── 2. Finnhub /stock/short-interest (key required) ─────────────────────
+  const fhKey = (typeof getKey === "function") ? getKey("finnhub") : localStorage.getItem("finterm_key_finnhub") || "";
+  if (fhKey) {
+    try {
+      const url = `https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${fhKey}`;
+      const res  = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      const data = await res.json();
+      const recs = data.data || [];
+      if (recs.length) {
+        _renderShortData(el, sym, recs, 'Finnhub');
+        return;
+      }
+    } catch(e) {}
+  }
+
+  // ── 3. FINRA REGSHO (no key, public) ────────────────────────────────────
+  try {
+    const res  = await fetch(
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://services.finra.org/data/group/otcmarket/regSho/dailyShortSaleVolume?limit=10&q={"criteria":{"tickers":[{"value":"${sym}"}]}}&domainId=regShoSymbol`)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const json = await res.json();
+    const rows = json?.rows || [];
+    if (rows.length) {
+      const recs2 = rows.slice(0,10).map(r => ({
+        date: r.tradeReportDate || r[0],
+        shortInterest: parseInt(r.shortVolume || r[2]) || null,
+        shortInterestRatio: null, daysToCover: null,
+      }));
+      _renderShortData(el, sym, recs2, 'FINRA RegSHO');
+      return;
+    }
+  } catch(e) {}
+
+  // ── 4. No data / no keys ─────────────────────────────────────────────────
+  el.innerHTML = `<div class="no-data">
+    // Short interest data unavailable for <strong>${sym}</strong>.<br>
+    // Sources tried: FMP, Finnhub, FINRA RegSHO.<br>
+    // Add FMP or Finnhub key in ⚙ API for better coverage.
+  </div>`;
+}
+
+/* ── Shared renderer for short interest data from any source ─────────────── */
+function _renderShortData(el, sym, recs, srcLabel) {
+  const latest = recs[0] || {};
+  const prev   = recs[1] || null;
+  const chg    = (prev && latest.shortInterest && prev.shortInterest)
+                 ? ((latest.shortInterest - prev.shortInterest) / prev.shortInterest * 100).toFixed(1)
+                 : null;
+  const chgCls = chg ? (parseFloat(chg) > 0 ? "neg" : "pos") : "";
+  const fmt    = v => v ? Number(v).toLocaleString() : "—";
+  const fmtPct = v => v ? parseFloat(v).toFixed(2)+"%" : "—";
+
+  let html = `<div class="av-live-badge">● Short Interest · ${sym} · ${srcLabel}</div>`;
+  html += `<div class="short-summary">
+    <div class="short-kpi"><span class="short-kpi-lbl">Short Interest</span><span class="short-kpi-val">${fmt(latest.shortInterest)}</span></div>
+    <div class="short-kpi"><span class="short-kpi-lbl">% of Float</span><span class="short-kpi-val">${fmtPct(latest.shortInterestRatio)}</span></div>
+    <div class="short-kpi"><span class="short-kpi-lbl">Days to Cover</span><span class="short-kpi-val">${latest.daysToCover ? parseFloat(latest.daysToCover).toFixed(1) : "—"}</span></div>
+    <div class="short-kpi"><span class="short-kpi-lbl">Period Chg</span><span class="short-kpi-val ${chgCls}">${chg !== null ? (parseFloat(chg) > 0 ? "+" : "")+chg+"%" : "—"}</span></div>
+  </div>`;
+
+  if (recs.length > 1) {
+    html += `<table class="fmp-table" style="margin-top:10px">
+      <thead><tr><th>Date</th><th>Short Shares</th><th>% Float</th><th>Days Cover</th></tr></thead>
+      <tbody>`;
+    recs.slice(0, 12).forEach(r => {
+      html += `<tr><td>${r.date||"—"}</td><td>${fmt(r.shortInterest)}</td><td>${fmtPct(r.shortInterestRatio)}</td><td>${r.daysToCover ? parseFloat(r.daysToCover).toFixed(1) : "—"}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `<div class="av-note" style="margin-top:6px">// Source: ${srcLabel} · Bi-monthly FINRA settlement.</div>`;
+  el.innerHTML = html;
+}
+
+/* ── DUMMY REPLACED BLOCK (kept for structure integrity) ─────────────── */
+async function _fhShortLegacy(sym) {
+  const key = (typeof getKey === "function") ? getKey("finnhub") : "";
+  if (!key) return null;
+  try {
+    const res  = await fetch(`https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${key}`);
+    const data = await res.json();
+    return data.data || [];
+  } catch(e) { return null; }
+}
+
+/* ── LEGACY placeholder to prevent "not found" errors ─────────────────── */
+async function __shortPlaceholder() {
+  const el = document.getElementById("fund-short");
+  if (!el) return;
+  const key = "";
   if (!key) {
-    el.innerHTML = `<div class="no-data">// Finnhub key required for short interest data.</div>`;
+    el.innerHTML = `<div class="no-data">placeholder</div>`;
     return;
   }
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading short interest…</div>`;
   try {
-    const url = `https://finnhub.io/api/v1/stock/short-interest?symbol=${encodeURIComponent(sym)}&token=${key}`;
+    const url = `https://finnhub.io/api/v1/stock/short-interest?symbol=X&token=${key}`;
     const res  = await fetch(url);
     const data = await res.json();
     const recs = data.data || [];
     if (!recs.length) {
-      el.innerHTML = `<div class="no-data">// No short interest data available for ${sym}.</div>`;
+      el.innerHTML = `<div class="no-data">// No short interest data available.</div>`;
       return;
     }
     const latest = recs[0];
@@ -978,7 +1228,7 @@ async function _segEdgarXBRL(sym) {
     const segMap = {};
     segs.forEach(f=>{ segMap[f.segment?.value||f.segment?.dimension||'Other'] = f.val; });
     return { date: latestEnd, segs: segMap, src: 'SEC EDGAR XBRL' };
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 async function fmpLoadSegmentation(sym) {
@@ -1025,13 +1275,13 @@ async function fmpLoadSegmentation(sym) {
   if (key) {
     try {
       const [prodRes, geoRes] = await Promise.all([
-        fetch(`https://financialmodelingprep.com/api/v3/revenue-product-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/revenue-geographic-segmentation?symbol=${sym}&structure=flat&apikey=${key}`).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/revenue-product-segmentation?symbol=${sym}&period=annual&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch(`${FMP_STABLE}/revenue-geographic-segmentation?symbol=${sym}&period=annual&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null),
       ]);
       src = 'FMP';
       html += renderSegBlock("By Product / Segment", prodRes, src);
       html += renderSegBlock("By Geography", geoRes, src);
-    } catch {}
+    } catch(e) {}
   }
 
   // ── 2. SEC EDGAR XBRL fallback ────────────────────────────────
@@ -1066,24 +1316,9 @@ async function fmpLoadSegmentation(sym) {
       — Exhibits only, not full transcript
    ══════════════════════════════════════════════════════════════════ */
 
-/* Helper: fetch via API Ninjas */
+/* Helper: API Ninjas transcript — endpoint removed 2025 */
 async function _transcriptNinjas(sym, year, quarter) {
-  const key = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
-  if (!key) return null;
-  try {
-    const params = new URLSearchParams({ ticker: sym });
-    if (year)    params.set('year',    year);
-    if (quarter) params.set('quarter', quarter);
-    const res  = await fetch(`https://api.api-ninjas.com/v1/earningscalltranscript?${params}`, {
-      headers: { 'X-Api-Key': key },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    // API Ninjas returns array or object
-    const items = Array.isArray(json) ? json : (json ? [json] : []);
-    return items.length ? items : null;
-  } catch { return null; }
+  return null;
 }
 
 /* Helper: fetch full text via FMP */
@@ -1097,7 +1332,7 @@ async function _transcriptFMP(sym, quarter, year) {
     );
     const data = await res.json();
     return Array.isArray(data) && data.length ? data : null;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 /* Helper: get list of available transcripts via FMP */
@@ -1111,7 +1346,7 @@ async function _transcriptListFMP(sym) {
     );
     const data = await res.json();
     return Array.isArray(data) ? data : [];
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Helper: EDGAR 8-K search fallback */
@@ -1126,7 +1361,7 @@ async function _transcriptEdgar(sym) {
     });
     const data  = await res.json();
     return data?.hits?.hits || [];
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Render speaker-labeled transcript from API Ninjas format */
@@ -1159,38 +1394,21 @@ async function fmpLoadTranscript(sym) {
 
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading transcripts for ${fmpEsc(sym)}…</div>`;
 
-  const ninjasKey = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
-  const fmpKey    = (typeof getFmpKey==='function')    ? getFmpKey()    : '';
+  const fmpKey = (typeof getFmpKey==='function') ? getFmpKey() : '';
+  const srcLabel = fmpKey ? '● FMP' : '● SEC EDGAR';
+  const srcColor = fmpKey ? '#58a6ff' : '#d29922';
 
-  // Show source badge
-  const srcLabel = ninjasKey ? '● API Ninjas + FMP' : fmpKey ? '● FMP' : '● SEC EDGAR (limited)';
-  const srcColor = ninjasKey ? '#3fb950' : fmpKey ? '#58a6ff' : '#d29922';
-
-  // ── Get list of available transcripts ────────────────────────────
+  // ── Get list from FMP, fall back to SEC EDGAR 8-K ────────────────
   let transcriptList = [];
   if (fmpKey) transcriptList = await _transcriptListFMP(sym);
 
-  // Also add API Ninjas entry if available (always shows latest)
-  if (ninjasKey) {
-    const ninjasLatest = await _transcriptNinjas(sym);
-    if (ninjasLatest?.length) {
-      // Prepend Ninjas source as "latest" entry
-      transcriptList = [{ quarter: '?', year: 'Latest', _ninjas: true, _data: ninjasLatest }, ...transcriptList];
-    }
-  }
-
-  // EDGAR fallback if no keys
   if (!transcriptList.length) {
     const edgar = await _transcriptEdgar(sym);
     if (edgar.length) {
       el.innerHTML = `
-        <div class="av-live-badge" style="color:${srcColor}">${srcLabel}</div>
-        <div class="trans-no-key-note">
-          ⚠ No Ninjas or FMP key configured — showing SEC EDGAR 8-K filings only (partial content).
-          <br>Add an <a href="#" onclick="openApiConfig('ninjas');return false" style="color:var(--accent)">API Ninjas key</a> for full transcripts.
-        </div>
+        <div class="av-live-badge" style="color:${srcColor}">● SEC EDGAR 8-K · ${fmpEsc(sym)}</div>
         <div class="trans-list">
-          ${edgar.slice(0,8).map(h=>{
+          ${edgar.slice(0,8).map(h => {
             const d = h._source;
             return `<div class="trans-list-item">
               <span class="trans-label">${fmpEsc(d?.period_of_report||'8-K')}</span>
@@ -1201,10 +1419,7 @@ async function fmpLoadTranscript(sym) {
         </div>`;
       return;
     }
-    el.innerHTML = `<div class="no-data">
-      // No transcripts available without API keys.<br>
-      // <a href="#" onclick="openApiConfig('ninjas');return false" style="color:var(--accent)">Add API Ninjas key</a> (free, ~10K req/month) for full earnings call transcripts.
-    </div>`;
+    el.innerHTML = `<div class="no-data">// No transcripts available. Add <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP key</a> for full earnings call transcripts.</div>`;
     return;
   }
 
@@ -1323,7 +1538,7 @@ async function fmpLoadIpoCalendar() {
     };
     ipos = [...parse(r1), ...parse(r2)];
     if (ipos.length) src = 'NASDAQ (no key)';
-  } catch {}
+  } catch(e) {}
 
   // ── 2. Finnhub fallback ───────────────────────────────────────
   if (!ipos.length) {
@@ -1343,7 +1558,7 @@ async function fmpLoadIpoCalendar() {
           _section: 'upcoming',
         }));
         if (ipos.length) src = 'Finnhub';
-      } catch {}
+      } catch(e) {}
     }
   }
 
@@ -1363,7 +1578,7 @@ async function fmpLoadIpoCalendar() {
           _section: 'upcoming',
         }));
         if (ipos.length) src = 'FMP';
-      } catch {}
+      } catch(e) {}
     }
   }
 
@@ -1427,7 +1642,7 @@ async function fmpLoadForm4(sym) {
 
     if (!hits.length) {
       // Fallback: Finnhub insider transactions (if key set)
-      const fhKey = localStorage.getItem("finterm_key_finnhub") || "";
+      const fhKey = (window._KEYS && window._KEYS["finnhub"]) || localStorage.getItem("finterm_key_finnhub") || "";
       if (fhKey) {
         await fhLoadInsiderTransactions(sym);
         return;
@@ -1464,7 +1679,7 @@ async function fmpLoadForm4(sym) {
     el.dataset.loaded = "1";
   } catch(e) {
     // Fallback to Finnhub if EDGAR fails
-    const fhKey = localStorage.getItem("finterm_key_finnhub") || "";
+    const fhKey = (window._KEYS && window._KEYS["finnhub"]) || localStorage.getItem("finterm_key_finnhub") || "";
     if (fhKey) { await fhLoadInsiderTransactions(sym); return; }
     el.innerHTML = `<div class="no-data">// Form 4 error: ${e.message}</div>`;
   }
@@ -1473,7 +1688,7 @@ async function fmpLoadForm4(sym) {
 /* Finnhub fallback for insider transactions */
 async function fhLoadInsiderTransactions(sym) {
   const el  = document.getElementById("fund-form4");
-  const key = localStorage.getItem("finterm_key_finnhub") || "";
+  const key = (window._KEYS && window._KEYS["finnhub"]) || localStorage.getItem("finterm_key_finnhub") || "";
   if (!el || !key) return;
   try {
     const data = await fetch(`https://finnhub.io/api/v1/stock/insider-transactions?symbol=${sym}&token=${key}`).then(r=>r.json());
@@ -1541,9 +1756,9 @@ async function fmpLoadFATab(sym) {
   if (key) {
     try {
       const [inc, bal, cf] = await Promise.all([
-        fetch(`https://financialmodelingprep.com/api/v3/income-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/balance-sheet-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-        fetch(`https://financialmodelingprep.com/api/v3/cash-flow-statement/${sym}?limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/income-statement?symbol=${sym}&limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/balance-sheet-statement?symbol=${sym}&limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+        fetch(`${FMP_STABLE}/cash-flow-statement?symbol=${sym}&limit=5&apikey=${key}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
       ]);
 
       if (Array.isArray(inc) && inc.length) {
@@ -1673,11 +1888,51 @@ async function fmpLoadFATab(sym) {
     }
   }
 
+  // ── 3. Finnhub /stock/metric?metric=all fallback ─────────────────
+  if (!html) {
+    const fhKey3 = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+    if (fhKey3) {
+      try {
+        fmpIncrement();
+        const mData = await fetch(
+          `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(sym)}&metric=all&token=${fhKey3}`,
+          { signal: AbortSignal.timeout(8000) }
+        ).then(r => r.json());
+        const m = mData?.metric || {};
+        if (Object.keys(m).length > 5) {
+          src = 'Finnhub';
+          const fmtPct2 = v => v == null || isNaN(v) ? '—' : Number(v).toFixed(1) + '%';
+          const fmtV2   = (v, d=2) => v == null || isNaN(v) ? '—' : Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: d });
+          const pos2    = v => v == null ? '' : (v >= 0 ? 'wm-pos' : 'wm-neg');
+          html += sHead('📊 Key Financial Metrics · Finnhub');
+          html += `<div class="fa-table-wrap"><table class="fa-table">
+            <thead><tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Revenue/Share TTM</td><td>$${fmtV2(m.revenuePerShareTTM)}</td><td>EPS TTM</td><td>$${fmtV2(m.epsTTM || m.epsBasicExclExtraItemsTTM)}</td></tr>
+              <tr><td>Gross Margin TTM</td><td class="${pos2(m.grossMarginTTM)}">${fmtPct2(m.grossMarginTTM)}</td><td>Net Margin TTM</td><td class="${pos2(m.netProfitMarginTTM)}">${fmtPct2(m.netProfitMarginTTM)}</td></tr>
+              <tr><td>EBITDA/Share TTM</td><td>$${fmtV2(m.ebitdaPerShareTTM)}</td><td>FCF/Share TTM</td><td>$${fmtV2(m.freeCashFlowPerShareTTM)}</td></tr>
+              <tr><td>ROE TTM</td><td class="${pos2(m.roeTTM)}">${fmtPct2(m.roeTTM)}</td><td>ROA TTM</td><td class="${pos2(m.roaTTM)}">${fmtPct2(m.roaTTM)}</td></tr>
+              <tr><td>Book Value/Share</td><td>$${fmtV2(m.bookValuePerShareAnnual)}</td><td>Cash/Share</td><td>$${fmtV2(m.cashPerSharePerShareAnnual)}</td></tr>
+              <tr><td>Current Ratio</td><td>${fmtV2(m.currentRatioAnnual)}</td><td>Beta</td><td>${fmtV2(m.beta)}</td></tr>
+              <tr><td>Rev Growth 1Y</td><td class="${pos2(m.revenueGrowthTTMYoy)}">${fmtPct2(m.revenueGrowthTTMYoy)}</td><td>EPS Growth 1Y</td><td class="${pos2(m.epsGrowthTTMYoy)}">${fmtPct2(m.epsGrowthTTMYoy)}</td></tr>
+              <tr><td>Div/Share Annual</td><td>$${fmtV2(m.dividendPerShareAnnual)}</td><td>Div Yield</td><td>${fmtPct2(m.dividendYieldIndicatedAnnual)}</td></tr>
+              <tr><td>52W High</td><td>$${fmtV2(m['52WeekHigh'])}</td><td>52W Low</td><td>$${fmtV2(m['52WeekLow'])}</td></tr>
+            </tbody></table></div>
+          <div class="fa-source-note">Source: Finnhub Basic Financials · Full statements require FMP or Alpha Vantage key</div>`;
+        }
+      } catch(e) {
+        console.warn('[FA Finnhub metrics]', e.message);
+      }
+    }
+  }
+
   // ── No data ───────────────────────────────────────────────────────
   if (!html) {
+    const hasFmpKey = (typeof getFmpKey === 'function') && getFmpKey();
     html = `<div class="no-data" style="line-height:1.9">
-      // Financial statements not available for <strong>${fmpEsc(sym)}</strong>.<br>
-      // <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">Add FMP key</a> for full income/balance/cashflow statements.<br>
+      // Financial data temporarily unavailable for <strong>${fmpEsc(sym)}</strong>.<br>
+      ${hasFmpKey ? '// FMP API unreachable — try again later.' : '// <a href="#" onclick="openApiConfig(\'fmp\');return false" style="color:var(--accent)">Add FMP key</a> for full income/balance/cashflow statements.'}<br>
+      // <a href="#" onclick="document.getElementById('fund-fa').dataset.faSym='';fmpLoadFATab('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a> &nbsp;
       // <a href="https://www.sec.gov/cgi-bin/browse-edgar?company=${fmpEsc(sym)}&action=getcompany&type=10-K" target="_blank" class="geo-wm-link">SEC EDGAR 10-K ↗</a>
     </div>`;
   }
@@ -1911,7 +2166,7 @@ async function _xbrlGetRatios(sym) {
       const row = latestAnnual(r.concept)||latestAnnual(r.concept+'ExcludingAssessedTax');
       return { label:r.label, value:row?fmt3(row.val):'—', date:row?.end?.slice(0,7)||'' };
     });
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 window.faLoadEdgarXBRL  = faLoadEdgarXBRL;

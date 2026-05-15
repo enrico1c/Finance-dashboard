@@ -152,17 +152,18 @@ function imfLatestAndForecast(imfData, countryCode) {
    https://stats.oecd.org/SDMX-JSON/data/MEI_CLI/...
    CLI amplitude-adjusted (AA) above 100 = expansion
    ══════════════════════════════════════════════════════════════════ */
-const OECD_CLI_BASE = 'https://stats.oecd.org/SDMX-JSON/data/MEI_CLI';
+// stats.oecd.org SDMX endpoint retired — sdmx.oecd.org requires all 9 key dimensions,
+// so we fetch /all and filter client-side for MEASURE=LI (CLI) + ADJUSTMENT=AA (amplitude-adjusted)
+const OECD_CLI_BASE = 'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.0';
 
-const OECD_COUNTRIES = ['USA','GBR','DEU','FRA','JPN','CHN','KOR','CAN','AUS','ITA','IND','BRA'];
+const OECD_COUNTRIES = new Set(['USA','GBR','DEU','FRA','JPN','CHN','KOR','CAN','AUS','ITA','IND','BRA']);
 
 async function oecdFetchCLI() {
   const cached = _mgGet('oecd:cli', 6*3600*1000);
   if (cached) return cached;
   try {
-    const countries = OECD_COUNTRIES.join('+');
-    const url = `${OECD_CLI_BASE}/${countries}.LOLITOAA.M/all?startTime=${new Date().getFullYear()-1}&format=jsondata`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const url = `${OECD_CLI_BASE}/all?lastNObservations=3&format=jsondata&dimensionAtObservation=TIME_PERIOD`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(20000) });
     const json = await res.json();
     _mgSet('oecd:cli', json);
     return json;
@@ -172,43 +173,60 @@ async function oecdFetchCLI() {
   }
 }
 
-// Parse OECD SDMX-JSON — extract latest value per country
+// Parse OECD SDMX-JSON v2 (sdmx.oecd.org) — filter for CLI amplitude-adjusted monthly
+// Dimensions: [0]=REF_AREA [1]=FREQ [2]=MEASURE [3]=UNIT_MEASURE [4]=ACTIVITY [5]=ADJUSTMENT ...
 function oecdParseLatest(json) {
-  if (!json?.dataSets?.[0]?.series) return {};
-  const series   = json.dataSets[0].series;
-  const dims     = json.structure?.dimensions?.series || [];
-  const timeDims = json.structure?.dimensions?.observation || [];
-  const countryDim = dims.find(d => d.id === 'LOCATION');
+  try {
+    const structs = json?.data?.structures;
+    const ds      = json?.data?.dataSets?.[0];
+    if (!structs || !ds) return {};
 
-  const result = {};
-  Object.entries(series).forEach(([key, val]) => {
-    // Key format: "0:0:0" for dimension indices
-    const parts      = key.split(':');
-    const countryIdx = parts[0];
-    const countryId  = countryDim?.values?.[parseInt(countryIdx)]?.id;
-    if (!countryId) return;
+    const dims    = structs[0]?.dimensions?.series || [];
+    const dimVals = dims.map(d => d.values || []);
+    const series  = ds.series || {};
 
-    // Get observations (sorted by time index)
-    const obs = val.observations;
-    if (!obs) return;
-    const timeKeys = Object.keys(obs).map(Number).sort((a,b)=>b-a);
-    if (!timeKeys.length) return;
-
-    const latestObs  = obs[timeKeys[0]]?.[0];
-    const prevObs    = obs[timeKeys[1]]?.[0];
-
-    // Get time period label
-    const timePeriods = timeDims[0]?.values || [];
-    const latestPeriod = timePeriods[timeKeys[0]]?.id || '';
-
-    result[countryId] = {
-      value:  latestObs,
-      prev:   prevObs,
-      period: latestPeriod,
-      trend:  (latestObs != null && prevObs != null) ? latestObs - prevObs : null,
+    // Find dimension indices for the filters we want
+    const findIdx = (dimId, valId) => {
+      const dim = dims.find(d => d.id === dimId);
+      if (!dim) return -1;
+      return (dim.values || []).findIndex(v => v.id === valId);
     };
-  });
-  return result;
+    const liIdx   = findIdx('MEASURE',    'LI');   // Composite Leading Indicator
+    const aaIdx   = findIdx('ADJUSTMENT', 'AA');   // Amplitude-Adjusted
+    const mIdx    = findIdx('FREQ',       'M');    // Monthly
+
+    const result = {};
+    for (const [key, val] of Object.entries(series)) {
+      const parts = key.split(':').map(Number);
+      // Filter: must be LI + AA + Monthly
+      if (parts[2] !== liIdx || parts[5] !== aaIdx || parts[1] !== mIdx) continue;
+
+      const country = dimVals[0]?.[parts[0]]?.id;
+      if (!country || !OECD_COUNTRIES.has(country)) continue;
+
+      const obs = val.observations || {};
+      const timeKeys = Object.keys(obs).map(Number).sort((a, b) => b - a);
+      if (!timeKeys.length) continue;
+
+      const latestObs = obs[timeKeys[0]]?.[0];
+      const prevObs   = obs[timeKeys[1]]?.[0];
+
+      // Time period from structure observation dimension
+      const timeDim   = structs[0]?.dimensions?.observation?.[0]?.values || [];
+      const latestPeriod = timeDim[timeKeys[0]]?.id || '';
+
+      result[country] = {
+        value:  latestObs,
+        prev:   prevObs,
+        period: latestPeriod,
+        trend:  (latestObs != null && prevObs != null) ? latestObs - prevObs : null,
+      };
+    }
+    return result;
+  } catch (e) {
+    console.warn('[MacroGlobal] OECD CLI parse error:', e.message);
+    return {};
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -219,7 +237,7 @@ function oecdParseLatest(json) {
    ══════════════════════════════════════════════════════════════════ */
 const FOMC_URL   = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm';
 const ECB_URL    = 'https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html';
-const ALLORIGINS  = 'https://api.allorigins.win/get?url=';
+const _MG_ALLORIGINS = 'https://api.allorigins.win/get?url=';
 
 // Hardcoded 2025-2026 FOMC dates (publicly known, stable)
 const FOMC_DATES_2025_26 = [
@@ -555,7 +573,7 @@ window.macroLoadCentralBanks = async function() {
         fredFetch('IRSTCI01JPM156N'), // Bank of Japan policy rate proxy
         fredFetch('PBCFINSR'),        // PBoC 1-year LPR (loan prime rate)
       ]);
-    } catch {}
+    } catch(e) {}
   }
 
   // Try no-key fallback for ECB via ECB API (free, no auth)
@@ -571,7 +589,7 @@ window.macroLoadCentralBanks = async function() {
         const lastKey = Object.keys(obs).sort((a,b)=>+b-+a)[0];
         ecbRate = obs[lastKey]?.[0];
       }
-    } catch {}
+    } catch(e) {}
   }
 
   // Attempt to enrich meeting dates from FMP economic calendar (if FMP key available)
@@ -621,20 +639,50 @@ window.macroLoadCentralBanks = async function() {
     { bank:'PBoC',            country:'🇨🇳 China', rate: pbocRate ?? 3.10, currency:'CNY', nextMeeting: null,                             color:'#a371f7', live: pbocRate != null },
   ];
 
-  // Merge all calendar events, sort chronologically
-  const allEvents = [
-    ...FOMC_DATES_2025_26.map(e => ({ ...e, bank:'Fed', color:'#58a6ff', flag:'🇺🇸' })),
-    ...ECB_DATES_2025_26.map(e  => ({ ...e, bank:'ECB', color:'#3fb950', flag:'🇪🇺' })),
-    ...BOE_DATES_2025_26.map(e  => ({ ...e, bank:'BoE', color:'#d29922', flag:'🇬🇧' })),
-    ...BOJ_DATES_2025_26.map(e  => ({ ...e, bank:'BoJ', color:'#f0883e', flag:'🇯🇵' })),
-  ].sort((a,b) => a.date.localeCompare(b.date));
+  const today = new Date().toISOString().slice(0,10);
 
-  const today      = new Date().toISOString().slice(0,10);
-  const upcoming   = allEvents.filter(e => e.date >= today).slice(0, 20);
-  const past3m     = allEvents.filter(e => {
-    const d = new Date(e.date);
-    return d < new Date() && d >= new Date(Date.now() - 90*864e5);
-  }).slice(-8).reverse();
+  // Build upcoming meetings: prefer live FMP calendar events; fall back to official schedules
+  let upcoming, past3m, calendarSource;
+  const bankColor = b => b==='Fed'?'#58a6ff':b==='ECB'?'#3fb950':b==='BoE'?'#d29922':b==='BoJ'?'#f0883e':'#a371f7';
+  const bankFlag  = b => b==='Fed'?'🇺🇸':b==='ECB'?'🇪🇺':b==='BoE'?'🇬🇧':b==='BoJ'?'🇯🇵':'🏦';
+
+  if (fmpCalendarEvents.length) {
+    // Use live FMP data as primary source
+    calendarSource = 'FMP Live Calendar';
+    const liveEvents = fmpCalendarEvents
+      .filter(ev => ev.date >= today)
+      .sort((a,b) => a.date.localeCompare(b.date))
+      .slice(0, 20)
+      .map(ev => ({
+        date:     ev.date,
+        bank:     ev.bank,
+        decision: ev.event,
+        color:    bankColor(ev.bank),
+        flag:     bankFlag(ev.bank),
+        actual:   ev.actual,
+        estimate: ev.estimate,
+      }));
+    upcoming = liveEvents;
+    const pastLive = fmpCalendarEvents
+      .filter(ev => { const d = new Date(ev.date); return d < new Date() && d >= new Date(Date.now() - 90*864e5); })
+      .sort((a,b) => b.date.localeCompare(a.date)).slice(0, 8)
+      .map(ev => ({ date:ev.date, bank:ev.bank, decision:ev.event, color:bankColor(ev.bank), flag:bankFlag(ev.bank) }));
+    past3m = pastLive;
+  } else {
+    // Fall back to official published schedules
+    calendarSource = 'Official CB Schedules';
+    const allHardcoded = [
+      ...FOMC_DATES_2025_26.map(e => ({ ...e, bank:'Fed', color:'#58a6ff', flag:'🇺🇸' })),
+      ...ECB_DATES_2025_26.map(e  => ({ ...e, bank:'ECB', color:'#3fb950', flag:'🇪🇺' })),
+      ...BOE_DATES_2025_26.map(e  => ({ ...e, bank:'BoE', color:'#d29922', flag:'🇬🇧' })),
+      ...BOJ_DATES_2025_26.map(e  => ({ ...e, bank:'BoJ', color:'#f0883e', flag:'🇯🇵' })),
+    ].sort((a,b) => a.date.localeCompare(b.date));
+    upcoming = allHardcoded.filter(e => e.date >= today).slice(0, 20);
+    past3m   = allHardcoded.filter(e => {
+      const d = new Date(e.date);
+      return d < new Date() && d >= new Date(Date.now() - 90*864e5);
+    }).slice(-8).reverse();
+  }
 
   el.innerHTML = `
     <div class="av-live-badge">● Central Bank Rates &amp; Calendar · ${fredKey?'FRED live rates · ':'Approximate rates · '}Free</div>
@@ -708,29 +756,9 @@ window.macroLoadCentralBanks = async function() {
 
     <div class="mg-footer">
       Rates: ${fredKey?'FRED live':'Approximate (add FRED key for live rates)'}
-      · Calendars: Official central bank published schedules
-      ${fmpKey ? ' · Live calendar via FMP' : ' · <a href="#" onclick="openApiConfig(\'fmp\');return false" style="color:var(--accent,#58a6ff)">Add FMP key for live events ↗</a>'}
+      · Calendar: ${calendarSource}
+      ${!fmpKey ? ' · <a href="#" onclick="openApiConfig && openApiConfig(\'fmp\');return false" style="color:var(--accent,#58a6ff)">Add FMP key for live calendar ↗</a>' : ''}
     </div>
-    ${fmpCalendarEvents.length ? `
-    <div class="mg-section">
-      <div class="mg-section-title">📡 FMP Live Calendar — Next 120 Days</div>
-      <div class="cb-calendar">
-        ${fmpCalendarEvents.slice(0,15).map(ev => {
-          const d      = new Date(ev.date);
-          const daysTo = Math.round((d - new Date()) / 864e5);
-          const isNear = daysTo <= 14;
-          const bankColor = ev.bank==='Fed'?'#58a6ff':ev.bank==='ECB'?'#3fb950':ev.bank==='BoE'?'#d29922':ev.bank==='BoJ'?'#f0883e':'#a371f7';
-          return `<div class="cb-event-row ${isNear?'cb-event-near':''}">
-            <span class="cb-event-date">${_me(ev.date)}</span>
-            <span class="cb-event-bank" style="color:${bankColor}">${_me(ev.bank)}</span>
-            <span class="cb-event-type" style="flex:1">${_me(ev.event)}</span>
-            <span class="cb-event-days ${daysTo<=7?'neg':daysTo<=30?'pos':''}">${daysTo}d</span>
-            ${ev.actual   != null ? `<span style="font-size:9px;color:#3fb950;margin-left:4px">Act: ${ev.actual}%</span>` : ''}
-            ${ev.estimate != null && ev.actual == null ? `<span style="font-size:9px;color:#58a6ff;margin-left:4px">Est: ${ev.estimate}%</span>` : ''}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>` : ''}
   `;
 };
 
@@ -776,7 +804,7 @@ async function macroEnrichEconTab() {
       </div>`;
 
     el.appendChild(section);
-  } catch {}
+  } catch(e) {}
 }
 
 /* Auto-enrich ECON tab when it loads */

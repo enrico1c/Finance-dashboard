@@ -87,7 +87,7 @@ async function gdeltCountryInstability(countryFIPS, days = 30) {
       .filter(r => !isNaN(r.value));
     _giSet(cacheKey, rows);
     return rows;
-  } catch {
+  } catch(e) {
     return [];
   }
 }
@@ -97,23 +97,40 @@ window.geoLoadTerror = async function() {
   const wrapper = document.getElementById('geo-terror');
   if (!el) return;
 
+  // If not yet authenticated, wait for auth-ready event then re-run
+  if (!window._FINTERM_AUTHENTICATED) {
+    el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Waiting for session…</div>';
+    const _onAuth = () => { window.removeEventListener('finterm:auth-ready', _onAuth); window.geoLoadTerror(); };
+    window.addEventListener('finterm:auth-ready', _onAuth);
+    return;
+  }
+
   el.innerHTML = '<div class="av-loading"><span class="av-spinner"></span>Fetching terrorism &amp; conflict events from GDELT…</div>';
 
   try {
-    // Fetch terrorism + protest themes in parallel
-    const [terrorData, attackData, protestData, unrestData] = await Promise.all([
-      gdeltFetchTheme('TERROR', 20),
-      gdeltFetchTheme('TERROR_ATTACK', 15),
-      gdeltFetchTheme('PROTEST_RIOT', 15),
-      gdeltFetchTheme('ARMED_CONFLICT', 15),
-    ]);
+    // Single GDELT query covering terrorism + conflict (avoids double rate-limit hit)
+    const gdeltUrl = 'https://api.gdeltproject.org/api/v2/doc/doc?query=' +
+      encodeURIComponent('terrorism bomb attack explosion war conflict military airstrike') +
+      '&mode=artlist&maxrecords=30&format=json&timespan=7d&sourcelang=english';
 
-    const articles = [
-      ...((terrorData?.articles  || []).map(a => ({ ...a, cat: 'TERROR',  catColor: '#f85149' }))),
-      ...((attackData?.articles  || []).map(a => ({ ...a, cat: 'ATTACK',  catColor: '#f0883e' }))),
-      ...((protestData?.articles || []).map(a => ({ ...a, cat: 'PROTEST', catColor: '#d29922' }))),
-      ...((unrestData?.articles  || []).map(a => ({ ...a, cat: 'CONFLICT',catColor: '#58a6ff' }))),
-    ];
+    let gdeltRes = await fetch(gdeltUrl, { signal: AbortSignal.timeout(12000) });
+
+    // Retry once if rate limited
+    if (gdeltRes.status === 429) {
+      await new Promise(r => setTimeout(r, 5500));
+      gdeltRes = await fetch(gdeltUrl, { signal: AbortSignal.timeout(12000) });
+    }
+
+    const gdeltData = gdeltRes.ok ? await gdeltRes.json() : null;
+    const raw = gdeltData?.articles || [];
+
+    // Classify articles by keyword
+    const articles = raw.map(a => {
+      const t = (a.title || '').toLowerCase();
+      const isTerror = /terror|bomb|explosion|attack|suicide.bomb/.test(t);
+      return { ...a, cat: isTerror ? 'TERROR' : 'CONFLICT',
+               catColor: isTerror ? '#f85149' : '#58a6ff' };
+    });
 
     if (!articles.length) {
       el.innerHTML = '<div class="no-data">// No terrorism/conflict events in last 3 days (GDELT).</div>';
@@ -166,18 +183,6 @@ window.geoLoadTerror = async function() {
 
       <div class="gi-footer">Source: <a href="https://www.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT Project</a> · 100% free, no API key · Updates every 15 min</div>`;
 
-    // Auto-inject critical events into Intel Feed
-    _injectToIntelFeed(unique.slice(0,5).map(a => ({
-      type:     'terror',
-      icon:     '💥',
-      title:    a.title || '',
-      subtitle: a.sourcecountry || '',
-      severity: 'high',
-      ts:       a.seendate ? new Date(a.seendate).getTime()/1000 : Date.now()/1000,
-      resource: a.domain || 'GDELT',
-      url:      a.url,
-    })));
-
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading terrorism data: ${_giEsc(e.message)}</div>`;
   }
@@ -189,7 +194,7 @@ window.geoLoadTerror = async function() {
    Free, no key, CC0 license, updates on weekdays
    ══════════════════════════════════════════════════════════════════ */
 
-const CISA_KEV_URL = 'https://raw.githubusercontent.com/cisagov/kev-data/main/kev.json';
+const CISA_KEV_URL = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json';
 
 async function fetchCISAKev() {
   const cached = _giGet('cisa:kev', 4 * 3600 * 1000); // 4hr cache
@@ -314,17 +319,6 @@ window.geoLoadCyber = async function() {
         · No API key required
       </div>`;
 
-    // Inject critical CVEs into Intel Feed
-    _injectToIntelFeed(recent.slice(0,3).map(v => ({
-      type:     'cyber',
-      icon:     '🔒',
-      title:    `${v.cveID}: ${v.vulnerabilityName||''}`,
-      subtitle: `${v.vendorProject||''} · ${v.product||''}`,
-      severity: v.knownRansomwareCampaignUse === 'Known' ? 'critical' : 'high',
-      ts:       v.dateAdded ? new Date(v.dateAdded).getTime()/1000 : Date.now()/1000,
-      resource: 'CISA KEV',
-    })));
-
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading cyber data: ${_giEsc(e.message)}</div>`;
   }
@@ -336,28 +330,27 @@ window.geoLoadCyber = async function() {
    No key required. Proxy needed for CORS.
    ══════════════════════════════════════════════════════════════════ */
 
-const STATE_RSS = 'https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html/rss.xml';
-// AllOrigins is a free CORS proxy
-const ALLORIGINS = 'https://api.allorigins.win/get?url=';
+// UK FCDO travel advice atom feed — open data, no key, CORS via FINTERM proxy
+const FCDO_ATOM = 'https://www.gov.uk/foreign-travel-advice.atom';
 
 async function fetchTravelAdvisories() {
-  const cached = _giGet('travel:advisories', 2 * 3600 * 1000); // 2hr cache
+  const cached = _giGet('travel:advisories', 2 * 3600 * 1000);
   if (cached) return cached;
   try {
-    const res  = await fetch(`${ALLORIGINS}${encodeURIComponent(STATE_RSS)}`, { signal: AbortSignal.timeout(8000) });
-    const json = await res.json();
-    const xml  = json?.contents || '';
-    // Parse RSS XML
+    const res = await fetch(FCDO_ATOM, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`UK FCDO ${res.status}`);
+    const xml = await res.text();
     const parser = new DOMParser();
-    const doc    = parser.parseFromString(xml, 'text/xml');
-    const items  = [...doc.querySelectorAll('item')].map(item => ({
-      title:       item.querySelector('title')?.textContent || '',
-      description: item.querySelector('description')?.textContent || '',
-      link:        item.querySelector('link')?.textContent || '',
-      pubDate:     item.querySelector('pubDate')?.textContent || '',
+    const doc = parser.parseFromString(xml, 'text/xml');
+    // Atom feed uses <entry> (not <item>), link is an attribute
+    const entries = [...doc.querySelectorAll('entry')].map(e => ({
+      title:       e.querySelector('title')?.textContent || '',
+      description: e.querySelector('summary')?.textContent || '',
+      link:        e.querySelector('link')?.getAttribute('href') || '',
+      pubDate:     e.querySelector('updated')?.textContent || '',
     }));
-    _giSet('travel:advisories', items);
-    return items;
+    _giSet('travel:advisories', entries);
+    return entries;
   } catch (e) {
     console.warn('[GeoIntel] Travel advisory fetch failed:', e.message);
     return [];
@@ -466,17 +459,6 @@ window.geoLoadTravel = async function() {
         · Updated continuously · No API key required
       </div>`;
 
-    // Inject Level 4 countries into Intel Feed
-    _injectToIntelFeed(level4.slice(0,3).map(item => ({
-      type:     'risk',
-      icon:     '🚫',
-      title:    item.title,
-      subtitle: 'US State Dept: Do Not Travel',
-      severity: 'critical',
-      ts:       item.pubDate ? new Date(item.pubDate).getTime()/1000 : Date.now()/1000,
-      resource: 'State Dept',
-    })));
-
   } catch (e) {
     el.innerHTML = `<div class="no-data">// Error loading travel advisories: ${_giEsc(e.message)}</div>`;
   }
@@ -583,43 +565,7 @@ async function geoLoadInstabilityScores() {
   }
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   HELPER — Inject events into Intel Feed (wmIntelAlerts)
-   ══════════════════════════════════════════════════════════════════ */
-function _injectToIntelFeed(events) {
-  if (!Array.isArray(events) || !events.length) return;
-  if (typeof wmIntelAlerts === 'undefined' || !Array.isArray(wmIntelAlerts)) return;
 
-  events.forEach(evt => {
-    // Build id from title hash to avoid duplicates
-    const id = 'gi_' + Math.abs(
-      (evt.title||'').split('').reduce((h,c) => ((h<<5)-h+c.charCodeAt(0))|0, 0)
-    ).toString(36);
-
-    if (wmIntelAlerts.find(a => a.id === id)) return; // already present
-
-    wmIntelAlerts.unshift({
-      id, icon: evt.icon || '⚡',
-      type:     evt.type || 'intel',
-      title:    evt.title || '',
-      subtitle: evt.subtitle || '',
-      detail:   evt.detail || '',
-      severity: evt.severity || 'high',
-      ts:       evt.ts || Math.floor(Date.now()/1000),
-      resource: evt.resource || 'GeoIntel',
-      ticker:   evt.ticker || null,
-    });
-  });
-
-  // Re-render feed if visible
-  if (typeof wmRenderIntelFeed === 'function') wmRenderIntelFeed();
-  if (typeof sbSave === 'function') {
-    sbSave(events.map(e => ({
-      type: e.type||'intel', title: e.title||'', ts: e.ts,
-      sev: e.severity||'high', src: e.resource||'GeoIntel',
-    }))).catch(()=>{});
-  }
-}
 
 /* ══════════════════════════════════════════════════════════════════
    INIT — auto-load cyber on startup (quiet background fetch)
@@ -629,23 +575,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Background fetch CISA KEV 3s after load (quiet, no UI update)
   setTimeout(async () => {
     try {
-      const kev = await fetchCISAKev();
-      if (kev?.vulnerabilities) {
-        // Inject latest 3 critical CVEs into Intel Feed silently
-        const recent = kev.vulnerabilities
-          .sort((a,b) => (b.dateAdded||'').localeCompare(a.dateAdded||''))
-          .slice(0, 3);
-        _injectToIntelFeed(recent.map(v => ({
-          type:     'cyber',
-          icon:     '🔒',
-          title:    `${v.cveID}: ${v.vulnerabilityName||''}`,
-          subtitle: `${v.vendorProject||''} ${v.product||''} · Due ${v.dueDate||''}`,
-          severity: v.knownRansomwareCampaignUse==='Known' ? 'critical' : 'high',
-          ts:       v.dateAdded ? new Date(v.dateAdded).getTime()/1000 : Date.now()/1000,
-          resource: 'CISA KEV',
-        })));
-      }
-    } catch {}
+      await fetchCISAKev();
+    } catch(e) {}
   }, 3000);
 
   // When INTEL tab is clicked, load instability scores
@@ -681,21 +612,28 @@ window.geoLoadInstabilityScores = geoLoadInstabilityScores;
 
 const _GW_CACHE_MS = 15 * 60 * 1000;
 
-/* Active conflict zones from UCDP (Uppsala Conflict Data Program) */
+/* Active conflict news from GDELT (replaces UCDP which now requires auth) */
 async function _fetchUCDPActive() {
-  const cacheKey = 'georisk:ucdp:active';
+  const cacheKey = 'georisk:gdelt:conflicts';
   const cached = _giGet(cacheKey, _GW_CACHE_MS);
   if (cached) return cached;
   try {
-    // UCDP GED API — active dyads (conflict pairs) current year
-    const year = new Date().getFullYear();
-    const url  = `https://ucdpapi.pcr.uu.se/api/gedevents/${year}?pagesize=100&page=1`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=armed+conflict+war+battle+airstrike+offensive+ceasefire&mode=artlist&maxrecords=20&format=json&timespan=7d';
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return [];
     const json = await res.json();
-    const data = json?.Result || [];
-    _giSet(cacheKey, data, _GW_CACHE_MS);
+    const articles = json.articles || [];
+    const data = articles.map(a => ({
+      country:               a.sourcecountry || '—',
+      date_start:            (a.seendate || '').replace(/(\d{4})(\d{2})(\d{2}).*/,'$1-$2-$3'),
+      type_of_violence_text: (a.title || '').slice(0, 90),
+      dyad_name:             a.domain || '',
+      deaths_civilians:      null,
+      _url:                  a.url || '',
+    }));
+    if (data.length) _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Humanitarian crises from ReliefWeb (no key, OCHA) */
@@ -720,7 +658,7 @@ async function _fetchReliefWeb() {
     const data = json?.data || [];
     _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* ACLED conflict event count by country (free, no key for summary) */
@@ -736,7 +674,7 @@ async function _fetchACLEDSummary() {
     const json = await res.json();
     _giSet(cacheKey, json?.data || [], _GW_CACHE_MS);
     return json?.data || [];
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 /* Main Wars tab loader */
@@ -804,16 +742,17 @@ window.georiskLoadWars = async function() {
   }
 
   if (ucdp.length) {
-    html += `<div class="georisk-section-head">Recent UCDP Events (${new Date().getFullYear()})</div>`;
-    html += `<div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+    html += `<div class="georisk-section-head">Conflict News — GDELT (7 days)</div>`;
+    html += `<div style="overflow-x:auto;max-height:220px;overflow-y:auto">
       <table class="yf-fin-table" style="font-size:10px">
-        <thead><tr><th>Country</th><th>Date</th><th>Type</th><th>Fatalities</th></tr></thead>
+        <thead><tr><th>Country</th><th>Date</th><th>Headline</th></tr></thead>
         <tbody>
-          ${ucdp.slice(0,15).map(e=>`<tr>
+          ${ucdp.slice(0,18).map(e=>`<tr>
             <td>${_giEsc(e.country||'')}</td>
             <td>${(e.date_start||'').slice(0,10)}</td>
-            <td>${_giEsc(e.type_of_violence_text||e.dyad_name||'')}</td>
-            <td class="${(e.deaths_civilians||0)>10?'neg':''}">${e.deaths_civilians??0}</td>
+            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              ${e._url ? `<a href="${_giEsc(e._url)}" target="_blank" rel="noopener" style="color:var(--text)">${_giEsc(e.type_of_violence_text||'')}</a>` : _giEsc(e.type_of_violence_text||'')}
+            </td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -822,7 +761,7 @@ window.georiskLoadWars = async function() {
 
   html += `<div style="font-size:9px;color:var(--text-muted);padding:5px 10px;border-top:1px solid var(--border)">
     Sources: <a href="https://reliefweb.int" target="_blank" class="geo-wm-link">ReliefWeb/OCHA ↗</a> ·
-    <a href="https://ucdp.uu.se" target="_blank" class="geo-wm-link">UCDP Uppsala ↗</a> · No API key required
+    <a href="https://api.gdeltproject.org" target="_blank" class="geo-wm-link">GDELT ↗</a> · No API key required
   </div>`;
 
   el.innerHTML = html;
@@ -858,9 +797,20 @@ async function _fetchWorldBankCommodities() {
 
     const results = await Promise.allSettled(
       indicators.map(async ind => {
-        const url = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(ind.id)}?downloadformat=json&mrv=3&format=json`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-        const json = await res.json();
+        const wbUrl = `https://api.worldbank.org/v2/en/indicator/${encodeURIComponent(ind.id)}?downloadformat=json&mrv=3&format=json`;
+        let wbRes = null;
+        try {
+          const r = await fetch(wbUrl, { signal: AbortSignal.timeout(6000) });
+          if (r.ok) wbRes = await r.json();
+        } catch(e) {}
+        if (!wbRes?.[1]) {
+          try {
+            const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(wbUrl)}`;
+            const r2 = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+            if (r2.ok) wbRes = await r2.json();
+          } catch(e) {}
+        }
+        const json = wbRes;
         const obs = json?.[1]?.filter(o => o.value != null) || [];
         return { ...ind, latest: obs[0]?.value, prev: obs[1]?.value, date: obs[0]?.date };
       })
@@ -873,7 +823,7 @@ async function _fetchWorldBankCommodities() {
 
     _giSet(cacheKey, data, _GW_CACHE_MS);
     return data;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 window.georiskLoadResources = async function() {
@@ -975,15 +925,12 @@ async function _fetchShippingAlerts() {
   if (cached) return cached;
   try {
     // GDELT for shipping/maritime themes
-    const url = encodeURIComponent(
-      'https://api.gdeltproject.org/api/v2/doc/doc?query=shipping+chokepoint+disruption&mode=artlist&maxrecords=10&format=json&timespan=3d'
-    );
-    const res  = await fetch(`https://api.allorigins.win/raw?url=${url}`, { signal: AbortSignal.timeout(8000) });
+    const res  = await fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=shipping+chokepoint+disruption&mode=artlist&maxrecords=10&format=json&timespan=3d', { signal: AbortSignal.timeout(8000) });
     const json = await res.json();
     const articles = json?.articles || [];
     _giSet(cacheKey, articles, _GW_CACHE_MS);
     return articles;
-  } catch { return []; }
+  } catch(e) { return []; }
 }
 
 window.georiskLoadRoutes = async function() {

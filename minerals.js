@@ -112,6 +112,46 @@ const KP_STATS_2024 = [
 ];
 
 /* ══════════════════════════════════════════════════════════════════
+   WORLD BANK PINK SHEET — live mineral commodity prices
+   No API key required. Source 21 = Global Economic Monitor Commodities.
+   ══════════════════════════════════════════════════════════════════ */
+/* Mapping from mineral ID → World Bank commodity series ID */
+const WB_MINERAL_PRICE_SERIES = {
+  copper:    { series:'PCOPPER',  unit:'$/mt',  label:'Copper' },
+  nickel:    { series:'PNICK',    unit:'$/mt',  label:'Nickel' },
+  cobalt:    { series:'PCOBALT',  unit:'$/mt',  label:'Cobalt' },
+  phosphate: { series:'PPHOPHR',  unit:'$/dmt', label:'Phosphate Rock' },
+  lithium:   { series:'PLITHIUM', unit:'$/mt',  label:'Lithium' },
+};
+
+async function _mineralsGetLivePrices() {
+  const cached = _minGet('wb_mineral_prices', 6*60*60*1000);
+  if (cached) return cached;
+  const results = {};
+  await Promise.all(
+    Object.entries(WB_MINERAL_PRICE_SERIES).map(async ([id, meta]) => {
+      try {
+        const url = `https://api.worldbank.org/v2/en/indicator/${meta.series}?format=json&mrv=3&source=21`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) throw new Error(`WB HTTP ${res.status}`);
+        const json = await res.json();
+        const obs  = json?.[1];
+        if (!Array.isArray(obs)) return;
+        /* Find most recent non-null value */
+        for (const o of obs) {
+          if (o.value != null) {
+            results[id] = { value: parseFloat(o.value), date: o.date, unit: meta.unit, label: meta.label };
+            break;
+          }
+        }
+      } catch(e) { console.warn('[minerals] WB price', id, e.message); }
+    })
+  );
+  _minSet('wb_mineral_prices', results);
+  return results;
+}
+
+/* ══════════════════════════════════════════════════════════════════
    RENDER HELPERS
    ══════════════════════════════════════════════════════════════════ */
 function _minCriticalityBadges(flags) {
@@ -136,19 +176,20 @@ function _minImportBar(pct) {
 /* ══════════════════════════════════════════════════════════════════
    RENDER — supply-minerals enrichment
    ══════════════════════════════════════════════════════════════════ */
-function mineralsRenderAll() {
-  _mineralsRenderUSGS();
+async function mineralsRenderAll() {
+  await _mineralsRenderUSGS();
   _mineralsRenderExportRestrictions();
   _mineralsRenderGemstones();
 }
 
-function _mineralsRenderUSGS() {
+async function _mineralsRenderUSGS() {
   const el = document.getElementById('supply-minerals-usgs');
   if (!el) return;
 
-  let html = `<div class="av-live-badge">● USGS Mineral Commodity Summaries 2025/2026 · Annual · Public Domain</div>`;
+  let html = `<div class="av-live-badge">● USGS Mineral Commodity Summaries · Annual · World Bank Prices: Live</div>`;
   html += `<div class="av-note" style="margin:4px 0 8px">
-    EU criticality classification: <strong>EU CRM Act (CRMA) 2023/2024</strong> · Next review cycle: <strong>2027</strong> ·
+    Production &amp; reserves: USGS MCS annual publication (public domain). Spot prices: World Bank Pink Sheet (live).
+    EU criticality: <strong>EU CRM Act (CRMA) 2023/2024</strong> · Next review: <strong>2027</strong> ·
     <a href="https://ec.europa.eu/growth/tools-databases/rmis" target="_blank" rel="noopener" class="energy-entsog-link">RMIS JRC ↗</a>
   </div>`;
   html += `<div class="min-legend">
@@ -164,7 +205,6 @@ function _mineralsRenderUSGS() {
     const eu    = EU_CRITICALITY[min.id] || {};
     if (!stats) continue;
 
-    const importCls = stats.import_reliance>=80?'neg':stats.import_reliance>=50?'warn':'pos';
     html += `<div class="min-mineral-card">
       <div class="min-card-header">
         <div class="min-card-icon">${min.icon}</div>
@@ -179,7 +219,9 @@ function _mineralsRenderUSGS() {
           ${stats.prod_world!=null ? `<div class="min-stat"><span class="min-stat-label">World Production</span><span class="min-stat-val">${Number(stats.prod_world).toLocaleString()} t/yr</span></div>` : ''}
           ${stats.prod_us!=null ? `<div class="min-stat"><span class="min-stat-label">US Production</span><span class="min-stat-val">${Number(stats.prod_us).toLocaleString()} t/yr</span></div>` : ''}
           ${stats.reserves!=null ? `<div class="min-stat"><span class="min-stat-label">World Reserves</span><span class="min-stat-val">${Number(stats.reserves).toLocaleString()} t</span></div>` : ''}
-          ${stats.price_range ? `<div class="min-stat"><span class="min-stat-label">Price Range</span><span class="min-stat-val">${_minEsc(stats.price_range)} ${_minEsc(stats.price_unit||'')}</span></div>` : ''}
+          ${WB_MINERAL_PRICE_SERIES[min.id]
+            ? `<div class="min-stat"><span class="min-stat-label">Spot Price (WB)</span><span class="min-stat-val min-live-price" id="min-price-${_minEsc(min.id)}">Loading…</span></div>`
+            : ''}
         </div>
         ${stats.import_reliance!=null ? `<div class="min-import-row"><span class="min-stat-label">US Net Import Reliance</span>${_minImportBar(stats.import_reliance)}</div>` : ''}
         <div class="min-producers">
@@ -193,12 +235,28 @@ function _mineralsRenderUSGS() {
   }
 
   html += `<div class="av-note" style="margin-top:10px">
-    Source: <a href="https://pubs.usgs.gov/publication/mcs2026" target="_blank" rel="noopener" style="color:var(--accent)">USGS MCS 2026</a> ·
-    <a href="https://rmis.jrc.ec.europa.eu/critical-and-strategic-materials" target="_blank" rel="noopener" style="color:var(--accent)">EU RMIS Portal</a> ·
-    Annual statistics · Public domain · Some values approximate (annual survey)
+    Production/Reserves: <a href="https://pubs.usgs.gov/publication/mcs2026" target="_blank" rel="noopener" style="color:var(--accent)">USGS MCS 2026</a> (annual, public domain) ·
+    Prices: <a href="https://www.worldbank.org/en/research/commodity-markets" target="_blank" rel="noopener" style="color:var(--accent)">World Bank Pink Sheet</a> (live) ·
+    <a href="https://rmis.jrc.ec.europa.eu/critical-and-strategic-materials" target="_blank" rel="noopener" style="color:var(--accent)">EU RMIS Portal</a>
   </div>`;
 
   el.innerHTML = html;
+
+  /* Fetch live prices from World Bank and populate price cells */
+  const prices = await _mineralsGetLivePrices();
+  for (const [id, p] of Object.entries(prices)) {
+    const cell = el.querySelector(`#min-price-${id}`);
+    if (!cell) continue;
+    const formatted = p.value >= 1000
+      ? `$${(p.value/1000).toFixed(2)}K/${p.unit.replace('$/','')} (${p.date})`
+      : `$${p.value.toFixed(2)}/${p.unit.replace('$/','')} (${p.date})`;
+    cell.textContent = formatted;
+    cell.style.color = '#3fb950';
+  }
+  /* Mark cells with no WB data */
+  el.querySelectorAll('.min-live-price').forEach(c => {
+    if (c.textContent === 'Loading…') c.textContent = '— (no public live API)';
+  });
 }
 
 function _mineralsRenderExportRestrictions() {

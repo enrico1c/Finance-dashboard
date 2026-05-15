@@ -66,7 +66,7 @@ async function techFetchCandles(sym, resolution = 'D', bars = 300) {
     };
     _tcSet(cacheKey, candles);
     return candles;
-  } catch {
+  } catch(e) {
     // Try AV then Stooq
     const av = await _techFallbackAV(sym);
     if (av) return av;
@@ -99,67 +99,203 @@ async function _techFallbackAV(sym) {
     };
     _tcSet(cacheKey, candles);
     return candles;
-  } catch { return _techFallbackStooq(sym); }
+  } catch(e) { return _techFallbackStooq(sym); }
 }
 
 
-/* ── Stooq.com fallback (no key, EOD CSV, global markets) ────────── */
+/* ── Yahoo Finance fallback (no key, unofficial chart API, global) ── */
 async function _techFallbackStooq(sym) {
-  /* Stooq provides free EOD OHLCV CSV for 5000+ global tickers.
-     URL: https://stooq.com/q/d/l/?s={sym}.US&i=d
-     Supports: US equities (.US), indices (^SPX), forex, etc.  */
-  const cacheKey = `tc_stooq:${sym}`;
+  // Stooq now requires API key — replaced with Yahoo Finance chart API
+  const cacheKey = `tc_yf:${sym}`;
   const cached   = _tcGet(cacheKey, 30*60*1000);
   if (cached) return cached;
 
-  // Try several Stooq suffix conventions
-  const suffixes = ['.US', '.UK', '', '^'+sym]; // US equities, UK, no suffix, index
-  const base = sym.replace(/^\^/,''); // strip ^ from indices
+  // Yahoo Finance unofficial chart endpoint (CORS-accessible, no key)
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=2y&includePrePost=false`;
+  try {
+    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`YF HTTP ${res.status}`);
+    const json = await res.json();
+    const result = json?.chart?.result?.[0];
+    if (!result?.timestamp?.length) throw new Error('No YF data');
 
-  for (const sfx of suffixes) {
-    const ticker = sfx.startsWith('^') ? sfx : (base + sfx);
-    try {
-      // Use AllOrigins proxy to avoid CORS
-      const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(ticker.toLowerCase())}&i=d`;
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`;
-      const res      = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-      const text     = await res.text();
-      if (!text || text.includes('No data') || text.trim().length < 50) continue;
+    const ts   = result.timestamp;
+    const q    = result.indicators?.quote?.[0] || {};
+    const adj  = result.indicators?.adjclose?.[0]?.adjclose || q.close;
 
-      // Parse CSV: Date,Open,High,Low,Close,Volume
-      const lines   = text.trim().split('\n');
-      const header  = lines[0].toLowerCase();
-      if (!header.includes('close')) continue;
+    const candles = {
+      t: ts,
+      o: q.open  || [],
+      h: q.high  || [],
+      l: q.low   || [],
+      c: (adj    || q.close || []).map(v => v ?? null),
+      v: q.volume || [],
+      sym, resolution: 'D', _src: 'Yahoo Finance',
+    };
 
-      const rows = lines.slice(1)
-        .filter(l => l.trim())
-        .map(l => l.split(','))
-        .filter(r => r.length >= 5 && r[0].match(/^\d{4}-\d{2}-\d{2}$/))
-        .sort((a, b) => a[0] < b[0] ? -1 : 1)
-        .slice(-300);
+    const validC = candles.c.filter(v => v != null && !isNaN(v) && v > 0);
+    if (validC.length < 20) throw new Error('YF data too sparse');
 
-      if (rows.length < 30) continue;
-
-      const candles = {
-        t: rows.map(r => Math.floor(new Date(r[0]).getTime()/1000)),
-        o: rows.map(r => parseFloat(r[1])),
-        h: rows.map(r => parseFloat(r[2])),
-        l: rows.map(r => parseFloat(r[3])),
-        c: rows.map(r => parseFloat(r[4])),
-        v: rows.map(r => parseFloat(r[5] || 0)),
-        sym, resolution: 'D', _src: 'Stooq',
-      };
-
-      // Validate: reject if NaN-heavy
-      const validC = candles.c.filter(v => !isNaN(v) && v > 0);
-      if (validC.length < 20) continue;
-
-      _tcSet(cacheKey, candles);
-      return candles;
-    } catch { continue; }
+    _tcSet(cacheKey, candles);
+    return candles;
+  } catch (e) {
+    console.warn('[YF fallback]', e.message);
   }
+
+  // Last resort: Alpaca daily bars if keys are set
+  const { id, secret, ok } = _alpacaKeys?.() || {};
+  if (ok) {
+    try {
+      const url2 = new URL(`https://data.alpaca.markets/v2/stocks/${encodeURIComponent(sym)}/bars`);
+      url2.searchParams.set('timeframe', '1Day');
+      url2.searchParams.set('limit', '300');
+      url2.searchParams.set('sort', 'asc');
+      url2.searchParams.set('feed', 'iex');
+      const res2 = await fetch(url2.toString(), {
+        headers: { 'APCA-API-KEY-ID': id, 'APCA-API-SECRET-KEY': secret },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res2.ok) {
+        const j = await res2.json();
+        const result = _parseAlpacaBars ? _parseAlpacaBars(j.bars || [], sym, '1Day') : null;
+        if (result) { _tcSet(cacheKey, result); return result; }
+      }
+    } catch (e2) { console.warn('[Alpaca daily fallback]', e2.message); }
+  }
+
   return null;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   PHASE 2 — INTRADAY WATERFALL
+   Alpaca Market Data API (new dedicated keys, no rate-limit overlap)
+   Endpoint: https://data.alpaca.markets/v2/stocks/{sym}/bars
+   Keys stored in localStorage: finterm_alpaca_id / finterm_alpaca_secret
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Resolution helpers */
+function _techResolutionMap(res) {
+  const map = {
+    '1m':  { isIntraday: true,  alpacaTf: '1Min',  fhRes: '1',   ttl: 60*1000    },
+    '5m':  { isIntraday: true,  alpacaTf: '5Min',  fhRes: '5',   ttl: 2*60*1000  },
+    '15m': { isIntraday: true,  alpacaTf: '15Min', fhRes: '15',  ttl: 5*60*1000  },
+    '1h':  { isIntraday: true,  alpacaTf: '1Hour', fhRes: '60',  ttl: 10*60*1000 },
+    '4h':  { isIntraday: true,  alpacaTf: '4Hour', fhRes: '240', ttl: 20*60*1000 },
+    '1D':  { isIntraday: false, alpacaTf: '1Day',  fhRes: 'D',   ttl: 15*60*1000 },
+    '1W':  { isIntraday: false, alpacaTf: '1Week', fhRes: 'W',   ttl: 60*60*1000 },
+    // Legacy Finnhub format passthrough
+    '1':   { isIntraday: true,  alpacaTf: '1Min',  fhRes: '1',   ttl: 60*1000    },
+    '5':   { isIntraday: true,  alpacaTf: '5Min',  fhRes: '5',   ttl: 2*60*1000  },
+    '15':  { isIntraday: true,  alpacaTf: '15Min', fhRes: '15',  ttl: 5*60*1000  },
+    '30':  { isIntraday: true,  alpacaTf: '30Min', fhRes: '30',  ttl: 5*60*1000  },
+    '60':  { isIntraday: true,  alpacaTf: '1Hour', fhRes: '60',  ttl: 10*60*1000 },
+    '240': { isIntraday: true,  alpacaTf: '4Hour', fhRes: '240', ttl: 20*60*1000 },
+    'D':   { isIntraday: false, alpacaTf: '1Day',  fhRes: 'D',   ttl: 15*60*1000 },
+    'W':   { isIntraday: false, alpacaTf: '1Week', fhRes: 'W',   ttl: 60*60*1000 },
+  };
+  return map[res] || map['D'];
+}
+
+function _alpacaKeys() {
+  const id     = localStorage.getItem('finterm_alpaca_id')     || '';
+  const secret = localStorage.getItem('finterm_alpaca_secret') || '';
+  return { id, secret, ok: !!(id && secret) };
+}
+
+/* Parse Alpaca bars response → internal { t[], o[], h[], l[], c[], v[] } */
+function _parseAlpacaBars(bars, sym, res) {
+  if (!Array.isArray(bars) || !bars.length) return null;
+  const sorted = [...bars].sort((a, b) => a.t < b.t ? -1 : 1);
+  return {
+    t: sorted.map(b => Math.floor(new Date(b.t).getTime() / 1000)),
+    o: sorted.map(b => b.o),
+    h: sorted.map(b => b.h),
+    l: sorted.map(b => b.l),
+    c: sorted.map(b => b.c),
+    v: sorted.map(b => b.v),
+    sym, resolution: res, _src: 'Alpaca',
+  };
+}
+
+/**
+ * Fetch intraday OHLCV from Alpaca Market Data API.
+ * Uses new dedicated keys (finterm_alpaca_id / finterm_alpaca_secret).
+ * Direct browser fetch — Alpaca data API supports CORS.
+ * @param {string} sym          — uppercase stock ticker, e.g. 'AAPL'
+ * @param {string} alpacaTf     — '1Min'|'5Min'|'15Min'|'1Hour'|'4Hour'|'1Day'|'1Week'
+ * @param {number} bars         — number of bars to fetch (max 10000)
+ * @returns {object|null}       — { t[], o[], h[], l[], c[], v[], sym, resolution } or null
+ */
+async function _techIntradayAlpaca(sym, alpacaTf = '5Min', bars = 300) {
+  const { id, secret, ok } = _alpacaKeys();
+  if (!ok) return null;
+
+  const cacheKey = `tc_alpaca:${sym}:${alpacaTf}`;
+  const ttl      = alpacaTf.includes('Min') ? 60*1000 : alpacaTf.includes('Hour') ? 5*60*1000 : 15*60*1000;
+  const cached   = _tcGet(cacheKey, ttl);
+  if (cached) return cached;
+
+  try {
+    const url = new URL(`https://data.alpaca.markets/v2/stocks/${encodeURIComponent(sym)}/bars`);
+    url.searchParams.set('timeframe', alpacaTf);
+    url.searchParams.set('limit',     String(Math.min(bars, 1000)));
+    url.searchParams.set('sort',      'asc');
+    url.searchParams.set('feed',      'iex'); // IEX = free; 'sip' = paid consolidated
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        'APCA-API-KEY-ID':     id,
+        'APCA-API-SECRET-KEY': secret,
+        'Accept':              'application/json',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) { console.warn('[Alpaca]', res.status, sym, alpacaTf); return null; }
+
+    const json   = await res.json();
+    const result = _parseAlpacaBars(json.bars || json.data?.bars || [], sym, alpacaTf);
+    if (result) _tcSet(cacheKey, result);
+    return result;
+  } catch (e) { console.warn('[Alpaca] fetch error:', e.message); return null; }
+}
+
+/**
+ * Fetch OHLCV from the local MT5 relay (http://localhost:8765).
+ * Gracefully returns null if the relay is not running.
+ * @param {string} sym     — MT5 symbol, e.g. 'EURUSD' or 'AAPL'
+ * @param {string} res     — LWC resolution string: '1m'|'5m'|'1h'|'1D' etc.
+ * @param {number} bars
+ */
+async function _techIntradayMT5(sym, res = '1D', bars = 300) {
+  const tfMap = {
+    '1m':'M1','5m':'M5','15m':'M15','30m':'M30',
+    '1h':'H1','4h':'H4','1D':'D1','1W':'W1',
+  };
+  const tf = tfMap[res] || 'D1';
+  try {
+    const url = `http://localhost:8765/ohlcv?sym=${encodeURIComponent(sym)}&tf=${tf}&bars=${bars}`;
+    const r   = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!Array.isArray(data) || !data.length) return null;
+    return {
+      t: data.map(b => b.time),
+      o: data.map(b => b.open),
+      h: data.map(b => b.high),
+      l: data.map(b => b.low),
+      c: data.map(b => b.close),
+      v: data.map(b => b.volume ?? 0),
+      sym, resolution: res, _src: 'MT5',
+    };
+  } catch(e) { return null; }
+}
+
+/* Expose for lwchart.js Phase 2 bridge */
+window._techIntradayAlpaca = _techIntradayAlpaca;
+window._techIntradayMT5    = _techIntradayMT5;
+window._techResolutionMap  = _techResolutionMap;
+window._alpacaKeys         = _alpacaKeys;
 
 /* ══════════════════════════════════════════════════════════════════
    MATH — Pure JS indicator functions (no deps)
@@ -715,6 +851,12 @@ async function techLoadFull(sym, resolution) {
 <!-- ══ Main chart ══ -->
 <div id="techChartWrap" class="tech-chart-wrap"></div>
 
+<!-- ══ RSI sub-chart ══ -->
+<div id="techRsiWrap" class="tech-sub-chart-wrap" style="height:var(--sub-chart-h,80px);min-height:60px;border-top:1px solid var(--border)"></div>
+
+<!-- ══ MACD sub-chart ══ -->
+<div id="techMacdWrap" class="tech-sub-chart-wrap" style="height:var(--sub-chart-h,80px);min-height:60px;border-top:1px solid var(--border)"></div>
+
 <!-- ══ Aggregate signal ══ -->
 <div class="tech-signal-bar">
   <div class="tech-signal-verdict" style="color:${aggr.vColor}">${aggr.verdict}</div>
@@ -985,11 +1127,166 @@ ${patterns.length ? `
     };
     _renderCandleChart(wrap, candles, ov, _techPeriod);
     _techOverlays = { sma20, sma50, sma200, ema12, ema9, ema21, bbR, vwapArr, ichR };
+
+    // ── RSI sub-chart ───────────────────────────────────────────────────
+    const rsiWrap = document.getElementById('techRsiWrap');
+    if (rsiWrap) _renderSubRSI(rsiWrap, rsiArr, stochR, 14);
+
+    // ── MACD sub-chart ──────────────────────────────────────────────────
+    const macdWrap = document.getElementById('techMacdWrap');
+    if (macdWrap) _renderSubMACD(macdWrap, macdR);
   }, 60);
 }
 
 /* ── Redraw chart with current overlay checkboxes ──────────────── */
 let _techOverlays = {};
+/* ── RSI sub-chart canvas renderer ──────────────────────────────────── */
+function _renderSubRSI(el, rsiArr, stochR, period) {
+  el.innerHTML = '';
+  const W = el.clientWidth || 700, H = el.clientHeight || 70;
+  const canvas = document.createElement('canvas');
+  canvas.width  = W * 2; canvas.height = H * 2;
+  canvas.style.cssText = `width:${W}px;height:${H}px;display:block`;
+  el.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  const vals = rsiArr.filter(v => v != null);
+  const nonNull = rsiArr.map((v,i) => ({v,i})).filter(x => x.v != null);
+  if (!nonNull.length) return;
+  const N = rsiArr.length;
+  const PAD = { l:36, r:8, t:6, b:14 };
+  const cW = W - PAD.l - PAD.r, cH = H - PAD.t - PAD.b;
+
+  // Zones
+  ctx.fillStyle = 'rgba(248,81,73,.06)';
+  ctx.fillRect(PAD.l, PAD.t, cW, (1 - 70/100)*cH);
+  ctx.fillStyle = 'rgba(63,185,80,.06)';
+  ctx.fillRect(PAD.l, PAD.t + (1-30/100)*cH, cW, (30/100)*cH);
+
+  // Reference lines
+  [[70,'#f8514944'],[30,'#3fb95044'],[50,'#30363d55']].forEach(([v,col]) => {
+    ctx.strokeStyle = col; ctx.lineWidth=1; ctx.setLineDash([3,2]);
+    const y = PAD.t + (1-v/100)*cH;
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+cW,y); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // RSI line
+  ctx.beginPath(); ctx.strokeStyle='#3b82f6'; ctx.lineWidth=1.5;
+  nonNull.forEach(({v,i},idx) => {
+    const x = PAD.l + (i/(N-1))*cW;
+    const y = PAD.t + (1-v/100)*cH;
+    idx===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Stochastic %K
+  if (stochR?.k) {
+    ctx.beginPath(); ctx.strokeStyle='#f59e0b'; ctx.lineWidth=1;
+    const sk = stochR.k;
+    sk.forEach((v,i) => {
+      if (v==null) return;
+      const x = PAD.l+(i/(N-1))*cW;
+      const y = PAD.t+(1-v/100)*cH;
+      i===0||sk.slice(0,i).every(x=>x==null) ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  }
+
+  // Current RSI value label
+  const lastRSI = vals[vals.length-1];
+  const rsiColor = lastRSI>=70?'#f85149':lastRSI<=30?'#3fb950':'#58a6ff';
+  ctx.fillStyle=rsiColor; ctx.font='bold 10px ui-monospace,monospace';
+  ctx.fillText(`RSI ${lastRSI.toFixed(1)}`, PAD.l+2, PAD.t+10);
+
+  // Stoch label
+  if (stochR?.k) {
+    const lastK = stochR.k.filter(v=>v!=null).slice(-1)[0];
+    if (lastK!=null) {
+      ctx.fillStyle='#f59e0b'; ctx.font='9px ui-monospace,monospace';
+      ctx.fillText(`%K ${lastK.toFixed(1)}`, PAD.l+60, PAD.t+10);
+    }
+  }
+
+  // Y axis labels
+  ctx.fillStyle='#8b949e'; ctx.font='9px ui-monospace,monospace'; ctx.textAlign='right';
+  [70,50,30].forEach(v => {
+    const y = PAD.t+(1-v/100)*cH;
+    ctx.fillText(v, PAD.l-3, y+3);
+  });
+  ctx.textAlign='left';
+}
+
+/* ── MACD sub-chart canvas renderer ─────────────────────────────────── */
+function _renderSubMACD(el, macdR) {
+  el.innerHTML = '';
+  const W = el.clientWidth || 700, H = el.clientHeight || 70;
+  const canvas = document.createElement('canvas');
+  canvas.width  = W * 2; canvas.height = H * 2;
+  canvas.style.cssText = `width:${W}px;height:${H}px;display:block`;
+  el.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  const hist = macdR.hist, line = macdR.line, sig = macdR.sigLine;
+  if (!hist||!line) return;
+  const N = hist.length;
+  const PAD = { l:36, r:8, t:6, b:14 };
+  const cW = W - PAD.l - PAD.r, cH = H - PAD.t - PAD.b;
+
+  const allVals = [...hist,...line,...(sig||[])].filter(v=>v!=null);
+  const MX = Math.max(...allVals.map(Math.abs)) * 1.15 || 1;
+  const toY = v => PAD.t + (0.5 - (v??0)/(2*MX))*cH;
+
+  // Zero line
+  ctx.strokeStyle='#30363d'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PAD.l,toY(0)); ctx.lineTo(PAD.l+cW,toY(0)); ctx.stroke();
+
+  // Histogram
+  const barW = Math.max(1, cW/N - 0.5);
+  hist.forEach((v,i) => {
+    if (v==null) return;
+    const x = PAD.l + (i/(N-1))*cW;
+    const y0=toY(0), y1=toY(v);
+    ctx.fillStyle = v>=0 ? 'rgba(63,185,80,.55)' : 'rgba(248,81,73,.55)';
+    ctx.fillRect(x-barW/2, Math.min(y0,y1), barW, Math.abs(y1-y0));
+  });
+
+  // MACD line
+  const drawLine = (arr, color, lw=1.5) => {
+    ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=lw;
+    let first=true;
+    arr.forEach((v,i) => {
+      if(v==null) return;
+      const x=PAD.l+(i/(N-1))*cW, y=toY(v);
+      first?ctx.moveTo(x,y):ctx.lineTo(x,y); first=false;
+    });
+    ctx.stroke();
+  };
+  drawLine(line,'#3b82f6');
+  if (sig) drawLine(sig,'#f59e0b',1.2);
+
+  // Labels
+  const lastLine = line.filter(v=>v!=null).slice(-1)[0];
+  const lastHist = hist.filter(v=>v!=null).slice(-1)[0];
+  ctx.fillStyle='#3b82f6'; ctx.font='bold 10px ui-monospace,monospace';
+  ctx.fillText(`MACD ${lastLine!=null?lastLine.toFixed(3):''}`, PAD.l+2, PAD.t+10);
+  if (lastHist!=null) {
+    ctx.fillStyle=lastHist>=0?'#3fb950':'#f85149';
+    ctx.font='9px ui-monospace,monospace';
+    ctx.fillText(`H ${lastHist.toFixed(3)}`, PAD.l+90, PAD.t+10);
+  }
+
+  // Y axis
+  ctx.fillStyle='#8b949e'; ctx.font='9px ui-monospace,monospace'; ctx.textAlign='right';
+  [MX,0,-MX].forEach(v => {
+    const y = toY(v);
+    ctx.fillText(v===0?'0':v.toFixed(1), PAD.l-3, y+3);
+  });
+  ctx.textAlign='left';
+}
+
 function techRedraw() {
   const wrap = document.getElementById('techChartWrap');
   if (!wrap || !_techCandles) return;

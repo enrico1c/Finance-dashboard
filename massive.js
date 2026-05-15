@@ -282,20 +282,36 @@ const massiveLiveCache = {};
 async function massiveLoadAll(rawTicker) {
   if (!getMassiveKey()) return;
   const bare = rawTicker.replace(/.*:/,"").toUpperCase();
-  showApiToast(`↻ Massive: loading alternative data for ${bare}…`, "info");
 
-  const [macro, flow, sentiment, calendar] = await Promise.all([
-    massiveGetMacro("US"),
-    massiveGetFlow(bare),
-    massiveGetSentiment(bare),
-    massiveGetEconomicCalendar("US", 14),
-  ]);
+  // Check if Massive API is reachable before showing loading toast
+  const ee = document.getElementById("fund-ee");
 
-  massiveLiveCache[bare] = { macro, flow, sentiment, calendar };
+  try {
+    showApiToast(`↻ Massive: loading alternative data for ${bare}…`, "info");
+    const [macro, flow, sentiment, calendar] = await Promise.all([
+      massiveGetMacro("US"),
+      massiveGetFlow(bare),
+      massiveGetSentiment(bare),
+      massiveGetEconomicCalendar("US", 14),
+    ]);
 
-  massiveRenderEE(bare, macro, flow, sentiment, calendar);
-  if (sentiment || macro) massiveRenderMON(bare, sentiment, macro);
+    massiveLiveCache[bare] = { macro, flow, sentiment, calendar };
+    massiveRenderEE(bare, macro, flow, sentiment, calendar);
+    if (sentiment || macro) massiveRenderMON(bare, sentiment, macro);
 
-  const loaded = [macro, flow, sentiment, calendar].filter(Boolean).length;
-  showApiToast(`✓ Massive: ${bare} alt data (${loaded}/4)`, "ok");
+    const loaded = [macro, flow, sentiment, calendar].filter(Boolean).length;
+    if (loaded === 0) {
+      // Don't overwrite fund-ee if another source already filled it with real data
+      if (ee && !ee.querySelector('.av-live-badge,.fin-table,.fa-table')) {
+        ee.innerHTML = `<div class="no-data">// Massive API unavailable — service may be offline or key invalid.</div>`;
+      }
+    } else {
+      showApiToast(`✓ Massive: ${bare} alt data (${loaded}/4)`, "ok");
+    }
+  } catch(e) {
+    // Don't overwrite fund-ee if another source already filled it
+    if (ee && !ee.querySelector('.av-live-badge,.fin-table,.fa-table')) {
+      ee.innerHTML = `<div class="no-data">// Massive API unreachable: ${e.message.slice(0,80)}</div>`;
+    }
+  }
 }
