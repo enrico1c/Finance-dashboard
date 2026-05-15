@@ -526,18 +526,21 @@ function fundInitFinancials(sym) {
     </div>`;
   }
   const fa = document.getElementById('fund-fa');
-  if (fa && !fa.dataset.loaded) {
+  // Proceed if: not loaded, OR AV loaded but with no actual table (AV returned empty)
+  const faHasTable = fa?.querySelector('.fin-table,.fa-table,.fa-section-head,.section-head');
+  if (fa && (!fa.dataset.loaded || (fa.dataset.loaded === 'av' && !faHasTable))) {
     const avData = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
     if (avData?.income?.length) {
       if (typeof avRenderFA === 'function') avRenderFA(sym, avData.income, avData.balance, avData.cashflow);
     } else {
       fa.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading financials…</div>`;
+      fa.dataset.loaded = '';
       setTimeout(() => {
         if (fa.querySelector('.av-loading')) {
           if (typeof fmpLoadFATab === 'function') { fmpLoadFATab(sym); }
           else if (typeof faLoadEdgarXBRL === 'function') { faLoadEdgarXBRL(sym, fa); }
         }
-      }, 3500);
+      }, 1500);
     }
   }
   if (typeof fmpLoadDividends === 'function') fmpLoadDividends(sym);

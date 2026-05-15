@@ -500,7 +500,9 @@ function avRenderEarnings(sym, earn) {
 function avRenderFA(sym, income, balance, cashflow) {
   const fa = document.getElementById("fund-fa");
   if (!fa) return;
-  fa.dataset.loaded = "av"; // Mark as loaded by AV so EDGAR doesn't overwrite
+  // Only mark as loaded if there's actual data to show
+  const hasData = income?.length || balance?.length || cashflow?.length;
+  if (hasData) fa.dataset.loaded = "av";
 
   let html = `<div class="av-live-badge">● Financial Statements · Alpha Vantage</div>`;
 

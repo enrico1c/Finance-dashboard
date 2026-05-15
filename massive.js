@@ -300,12 +300,18 @@ async function massiveLoadAll(rawTicker) {
     if (sentiment || macro) massiveRenderMON(bare, sentiment, macro);
 
     const loaded = [macro, flow, sentiment, calendar].filter(Boolean).length;
-    if (loaded === 0 && ee) {
-      ee.innerHTML = `<div class="no-data">// Massive API unavailable — service may be offline or key invalid.</div>`;
+    if (loaded === 0) {
+      // Don't overwrite fund-ee if another source already filled it with real data
+      if (ee && !ee.querySelector('.av-live-badge,.fin-table,.fa-table')) {
+        ee.innerHTML = `<div class="no-data">// Massive API unavailable — service may be offline or key invalid.</div>`;
+      }
     } else {
       showApiToast(`✓ Massive: ${bare} alt data (${loaded}/4)`, "ok");
     }
   } catch(e) {
-    if (ee) ee.innerHTML = `<div class="no-data">// Massive API unreachable: ${e.message.slice(0,80)}</div>`;
+    // Don't overwrite fund-ee if another source already filled it
+    if (ee && !ee.querySelector('.av-live-badge,.fin-table,.fa-table')) {
+      ee.innerHTML = `<div class="no-data">// Massive API unreachable: ${e.message.slice(0,80)}</div>`;
+    }
   }
 }
