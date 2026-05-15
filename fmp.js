@@ -1281,14 +1281,9 @@ async function fmpLoadSegmentation(sym) {
       — Exhibits only, not full transcript
    ══════════════════════════════════════════════════════════════════ */
 
-/* Helper: fetch via API Ninjas — endpoint removed as of 2025, returns 404 */
+/* Helper: API Ninjas transcript — endpoint removed 2025 */
 async function _transcriptNinjas(sym, year, quarter) {
-  return null; // API Ninjas /v1/earningscalltranscript endpoint has been removed (404)
-    const json = await res.json();
-    // API Ninjas returns array or object
-    const items = Array.isArray(json) ? json : (json ? [json] : []);
-    return items.length ? items : null;
-  } catch(e) { return null; }
+  return null;
 }
 
 /* Helper: fetch full text via FMP */
