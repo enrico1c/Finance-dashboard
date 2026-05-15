@@ -840,7 +840,42 @@ async function fmpLoadDividends(sym) {
 
     el.innerHTML = html;
   } catch(e) {
-    el.innerHTML = `<div class="no-data">// Dividend data error: ${e.message}</div>`;
+    // FMP failed — try Finnhub basic metrics for minimal dividend info
+    const fhKey4 = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+    if (fhKey4) {
+      try {
+        fmpIncrement();
+        const mD = await fetch(
+          `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(sym)}&metric=all&token=${fhKey4}`,
+          { signal: AbortSignal.timeout(8000) }
+        ).then(r => r.json());
+        const m4 = mD?.metric || {};
+        const dps  = m4.dividendPerShareAnnual;
+        const dyld = m4.dividendYieldIndicatedAnnual;
+        const dg5  = m4.dividendGrowthRate5Y;
+        if (dps != null || dyld != null) {
+          el.innerHTML = `<div class="av-live-badge">● Dividend Summary · Finnhub Metrics</div>
+            <div class="div-summary-bar">
+              <div class="div-sum-cell"><span class="div-sum-label">Annual DPS</span><span class="div-sum-val">${dps != null ? '$' + Number(dps).toFixed(4) : '—'}</span></div>
+              <div class="div-sum-cell"><span class="div-sum-label">Div Yield</span><span class="div-sum-val" style="color:var(--accent)">${dyld != null ? Number(dyld).toFixed(2) + '%' : '—'}</span></div>
+              <div class="div-sum-cell"><span class="div-sum-label">5Y Div Growth</span><span class="div-sum-val">${dg5 != null ? Number(dg5).toFixed(1) + '%' : '—'}</span></div>
+            </div>
+            <div class="no-data" style="margin-top:6px">// Full dividend history requires FMP key (API temporarily unreachable).<br>
+            <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+        } else if (dps === 0 || (m4.dividendPerShareTTM === 0)) {
+          el.innerHTML = `<div class="no-data">// ${fmpEsc(sym)} does not pay a dividend.</div>`;
+        } else {
+          el.innerHTML = `<div class="no-data">// Dividend data temporarily unavailable.<br>
+            <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+        }
+      } catch(_) {
+        el.innerHTML = `<div class="no-data">// Dividend data temporarily unavailable.<br>
+          <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+      }
+    } else {
+      el.innerHTML = `<div class="no-data">// Dividend data temporarily unavailable.<br>
+        <a href="#" onclick="document.getElementById('fund-div').innerHTML='';fmpLoadDividends('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+    }
   }
 }
 
@@ -1853,11 +1888,51 @@ async function fmpLoadFATab(sym) {
     }
   }
 
+  // ── 3. Finnhub /stock/metric?metric=all fallback ─────────────────
+  if (!html) {
+    const fhKey3 = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+    if (fhKey3) {
+      try {
+        fmpIncrement();
+        const mData = await fetch(
+          `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(sym)}&metric=all&token=${fhKey3}`,
+          { signal: AbortSignal.timeout(8000) }
+        ).then(r => r.json());
+        const m = mData?.metric || {};
+        if (Object.keys(m).length > 5) {
+          src = 'Finnhub';
+          const fmtPct2 = v => v == null || isNaN(v) ? '—' : Number(v).toFixed(1) + '%';
+          const fmtV2   = (v, d=2) => v == null || isNaN(v) ? '—' : Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: d });
+          const pos2    = v => v == null ? '' : (v >= 0 ? 'wm-pos' : 'wm-neg');
+          html += sHead('📊 Key Financial Metrics · Finnhub');
+          html += `<div class="fa-table-wrap"><table class="fa-table">
+            <thead><tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Revenue/Share TTM</td><td>$${fmtV2(m.revenuePerShareTTM)}</td><td>EPS TTM</td><td>$${fmtV2(m.epsTTM || m.epsBasicExclExtraItemsTTM)}</td></tr>
+              <tr><td>Gross Margin TTM</td><td class="${pos2(m.grossMarginTTM)}">${fmtPct2(m.grossMarginTTM)}</td><td>Net Margin TTM</td><td class="${pos2(m.netProfitMarginTTM)}">${fmtPct2(m.netProfitMarginTTM)}</td></tr>
+              <tr><td>EBITDA/Share TTM</td><td>$${fmtV2(m.ebitdaPerShareTTM)}</td><td>FCF/Share TTM</td><td>$${fmtV2(m.freeCashFlowPerShareTTM)}</td></tr>
+              <tr><td>ROE TTM</td><td class="${pos2(m.roeTTM)}">${fmtPct2(m.roeTTM)}</td><td>ROA TTM</td><td class="${pos2(m.roaTTM)}">${fmtPct2(m.roaTTM)}</td></tr>
+              <tr><td>Book Value/Share</td><td>$${fmtV2(m.bookValuePerShareAnnual)}</td><td>Cash/Share</td><td>$${fmtV2(m.cashPerSharePerShareAnnual)}</td></tr>
+              <tr><td>Current Ratio</td><td>${fmtV2(m.currentRatioAnnual)}</td><td>Beta</td><td>${fmtV2(m.beta)}</td></tr>
+              <tr><td>Rev Growth 1Y</td><td class="${pos2(m.revenueGrowthTTMYoy)}">${fmtPct2(m.revenueGrowthTTMYoy)}</td><td>EPS Growth 1Y</td><td class="${pos2(m.epsGrowthTTMYoy)}">${fmtPct2(m.epsGrowthTTMYoy)}</td></tr>
+              <tr><td>Div/Share Annual</td><td>$${fmtV2(m.dividendPerShareAnnual)}</td><td>Div Yield</td><td>${fmtPct2(m.dividendYieldIndicatedAnnual)}</td></tr>
+              <tr><td>52W High</td><td>$${fmtV2(m['52WeekHigh'])}</td><td>52W Low</td><td>$${fmtV2(m['52WeekLow'])}</td></tr>
+            </tbody></table></div>
+          <div class="fa-source-note">Source: Finnhub Basic Financials · Full statements require FMP or Alpha Vantage key</div>`;
+        }
+      } catch(e) {
+        console.warn('[FA Finnhub metrics]', e.message);
+      }
+    }
+  }
+
   // ── No data ───────────────────────────────────────────────────────
   if (!html) {
+    const hasFmpKey = (typeof getFmpKey === 'function') && getFmpKey();
     html = `<div class="no-data" style="line-height:1.9">
-      // Financial statements not available for <strong>${fmpEsc(sym)}</strong>.<br>
-      // <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">Add FMP key</a> for full income/balance/cashflow statements.<br>
+      // Financial data temporarily unavailable for <strong>${fmpEsc(sym)}</strong>.<br>
+      ${hasFmpKey ? '// FMP API unreachable — try again later.' : '// <a href="#" onclick="openApiConfig(\'fmp\');return false" style="color:var(--accent)">Add FMP key</a> for full income/balance/cashflow statements.'}<br>
+      // <a href="#" onclick="document.getElementById('fund-fa').dataset.faSym='';fmpLoadFATab('${fmpEsc(sym)}');return false" style="color:var(--accent)">↻ Retry</a> &nbsp;
       // <a href="https://www.sec.gov/cgi-bin/browse-edgar?company=${fmpEsc(sym)}&action=getcompany&type=10-K" target="_blank" class="geo-wm-link">SEC EDGAR 10-K ↗</a>
     </div>`;
   }

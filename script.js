@@ -410,73 +410,108 @@ function fundInit(sym) {
 }
 
 /* ── OVERVIEW: self-rendered metrics grid + profile (no TradingView iframe) ── */
-function _fundRenderOverview(sym) {
+const _fhMetricsCache = {};
+async function _fundRenderOverview(sym) {
   const des = document.getElementById('fund-des');
   if (!des) return;
   des.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading overview for ${escapeHtml(sym)}…</div>`;
-  // Render as soon as profile + ratios data arrives (retry up to 6s)
+
+  // Wait up to 4s for Finnhub profile to arrive
   let tries = 0;
-  const _try = () => {
-    const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
-    const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
-    const avData  = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
-    const profile = fmpLive?.profile || fhLive?.profile || null;
-    const ratios  = fmpLive?.ratios  || null;
-    const quote   = fmpLive?.quote   || null;
-    if ((!profile && !ratios) && tries++ < 6) { setTimeout(_try, 1000); return; }
-    const p = profile || {};
-    const r = ratios  || {};
-    const q = quote   || {};
-    const av = avData?.overview || {};
-    const N  = (v, d=1) => v != null && isFinite(+v) ? (+v).toFixed(d) : '—';
-    const P  = (v, d=1) => v != null && isFinite(+v) ? N(+v*100, d)+'%' : '—';
-    const Pv = (v, d=1) => v != null && isFinite(+v) ? N(v, d)+'%' : '—';
-    const employees = p.employees || p.fullTimeEmployees || av['FullTimeEmployees'];
-    const desc = p.description || p.longBusinessSummary || av['Description'] || '';
-    const website = p.weburl || p.website || '';
-    const name = p.name || p.companyName || av['Name'] || sym;
-    const exchange = p.exchange || p.exchangeShortName || av['Exchange'] || '';
-    const sector = p.sector || p.finnhubIndustry || av['Sector'] || '';
-    const industry = p.industry || p.subIndustry || av['Industry'] || '';
-    const country = p.country || av['Country'] || '';
-    const mktCap = q.marketCap || p.mktCap || (av['MarketCapitalization'] ? +av['MarketCapitalization'] : null);
-    // Revenue/income from AV income statement
-    const avIncome = avData?.income;
-    const lastInc = avIncome?.[0];
-    const revTTM = lastInc?.revenue;
-    const niTTM  = lastInc?.netIncome;
-    const cell = (label, val) => `<div style="text-align:center;padding:5px 3px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;min-width:0">
-      <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
-      <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${val}</div></div>`;
-    const colGood  = v => v==null||!isFinite(+v)?'var(--text)':(+v>0?'#3fb950':'#f85149');
-    const cellC = (label, val, col) => `<div style="text-align:center;padding:5px 3px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;min-width:0">
-      <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
-      <div style="font-size:11px;font-weight:700;color:${col};white-space:nowrap">${val}</div></div>`;
-    des.innerHTML = `
-      <div class="av-live-badge">● ${escapeHtml(name)} · ${escapeHtml(exchange)} · ${escapeHtml(sector)}</div>
-      <div style="padding:4px 8px 2px;font-size:10px;color:var(--text-muted)">
-        ${country ? escapeHtml(country)+' · ' : ''}${industry ? escapeHtml(industry) : ''}
-        ${employees ? ' · ' + Number(employees).toLocaleString() + ' employees' : ''}
-        ${website ? ' · <a href="'+escapeHtml(website)+'" target="_blank" rel="noopener" class="geo-wm-link">'+escapeHtml(website)+'</a>' : ''}
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:3px;padding:6px 6px 4px">
-        ${cell('Mkt Cap',   mktCap ? fmtB(mktCap) : '—')}
-        ${cell('P/E (TTM)', N(r.pe,1)+'x')}
-        ${cell('EV/EBITDA', N(r.evEbitda,1)+'x')}
-        ${cell('P/S',       N(r.ps,2)+'x')}
-        ${cell('P/B',       N(r.pb,2)+'x')}
-        ${cell('Beta',      N(r.beta||fhLive?.profile?.beta,2))}
-        ${cellC('ROE',      Pv(r.roe,1), colGood(r.roe))}
-        ${cellC('Net Mgn',  Pv(r.netMgn,1), colGood(r.netMgn))}
-        ${cellC('Gr Mgn',   Pv(r.grossMgn,1), colGood(r.grossMgn))}
-        ${cellC('ROA',      Pv(r.roa,1), colGood(r.roa))}
-        ${cell('D/E',       N(r.debtEq,2))}
-        ${cell('Div Yield', r.divYield!=null ? Pv(r.divYield,2) : '—')}
-      </div>
-      ${(revTTM||niTTM) ? `<div style="padding:3px 8px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border)">Revenue ${fmtB(revTTM)} · Net Income ${fmtB(niTTM)}</div>` : ''}
-      ${desc ? `<div class="des-desc" style="padding:6px 8px;font-size:11px;color:var(--text);line-height:1.5;border-top:1px solid var(--border)">${escapeHtml(desc.slice(0,600))}${desc.length>600?'…':''}</div>` : ''}`;
-  };
-  setTimeout(_try, 600);
+  await new Promise(resolve => {
+    const _wait = () => {
+      const fhL  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+      const fmpL = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+      if (fhL?.profile || fmpL?.profile || fmpL?.ratios || tries++ >= 4) resolve();
+      else setTimeout(_wait, 900);
+    };
+    setTimeout(_wait, 500);
+  });
+
+  const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+  const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+  const avData  = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
+  const profile = fmpLive?.profile || fhLive?.profile || {};
+  const ratios  = fmpLive?.ratios  || {};
+  const quote   = fmpLive?.quote   || {};
+  const av      = avData?.overview || {};
+
+  // If FMP ratios are missing, fetch Finnhub /stock/metric?metric=all as fallback
+  let fhM = _fhMetricsCache[sym] || {};
+  if (!fmpLive?.ratios && !_fhMetricsCache[sym]) {
+    const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+    if (fhKey) {
+      try {
+        const md = await fetch(
+          `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(sym)}&metric=all&token=${fhKey}`,
+          { signal: AbortSignal.timeout(6000) }
+        ).then(r => r.json());
+        fhM = md?.metric || {};
+        _fhMetricsCache[sym] = fhM;
+      } catch(e) {}
+    }
+  }
+
+  const N  = (v, d=1) => v != null && isFinite(+v) ? (+v).toFixed(d) : '—';
+  const Pv = (v, d=1) => v != null && isFinite(+v) ? (+v).toFixed(d)+'%' : '—';
+  const employees = profile.employees || profile.fullTimeEmployees || av['FullTimeEmployees'];
+  const desc      = profile.description || profile.longBusinessSummary || av['Description'] || '';
+  const website   = profile.weburl || profile.website || '';
+  const name      = profile.name || profile.companyName || av['Name'] || sym;
+  const exchange  = profile.exchange || profile.exchangeShortName || av['Exchange'] || '';
+  const sector    = profile.sector || profile.finnhubIndustry || av['Sector'] || '';
+  const industry  = profile.industry || profile.subIndustry || av['Industry'] || '';
+  const country   = profile.country || av['Country'] || '';
+  const mktCap    = quote.marketCap || profile.mktCap || (av['MarketCapitalization'] ? +av['MarketCapitalization'] : null);
+  const revTTM    = avData?.income?.[0]?.revenue;
+  const niTTM     = avData?.income?.[0]?.netIncome;
+
+  // Merge FMP ratios (primary) with Finnhub metrics (fallback)
+  const pe        = ratios.pe       ?? fhM.peBasicExclExtraTTM     ?? fhM.peTTM        ?? null;
+  const evEbitda  = ratios.evEbitda ?? fhM.evEbitdaAnnual          ?? fhM.evEbitdaTTM  ?? null;
+  const ps        = ratios.ps       ?? fhM.psTTM                   ?? fhM.psAnnual     ?? null;
+  const pb        = ratios.pb       ?? fhM.pbQuarterly             ?? fhM.pbAnnual     ?? null;
+  const beta      = ratios.beta     ?? fhLive?.profile?.beta       ?? fhM.beta         ?? null;
+  const roe       = ratios.roe      ?? fhM.roeTTM                  ?? null;
+  const netMgn    = ratios.netMgn   ?? fhM.netProfitMarginTTM      ?? null;
+  const grossMgn  = ratios.grossMgn ?? fhM.grossMarginTTM         ?? null;
+  const roa       = ratios.roa      ?? fhM.roaTTM                  ?? null;
+  const debtEq    = ratios.debtEq   ?? null;
+  const divYield  = ratios.divYield ?? fhM.dividendYieldIndicatedAnnual ?? null;
+
+  const colGood = v => v == null || !isFinite(+v) ? 'var(--text)' : (+v > 0 ? '#3fb950' : '#f85149');
+  const cell = (label, val) => `<div style="text-align:center;padding:5px 3px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;min-width:0">
+    <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${val}</div></div>`;
+  const cellC = (label, val, col) => `<div style="text-align:center;padding:5px 3px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;min-width:0">
+    <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+    <div style="font-size:11px;font-weight:700;color:${col};white-space:nowrap">${val}</div></div>`;
+  const src = fmpLive?.ratios ? 'FMP' : (Object.keys(fhM).length ? 'Finnhub' : '');
+
+  if (des !== document.getElementById('fund-des')) return; // stale render
+  des.innerHTML = `
+    <div class="av-live-badge">● ${escapeHtml(name)} · ${escapeHtml(exchange)} · ${escapeHtml(sector)}${src ? ' · ' + src : ''}</div>
+    <div style="padding:4px 8px 2px;font-size:10px;color:var(--text-muted)">
+      ${country ? escapeHtml(country)+' · ' : ''}${industry ? escapeHtml(industry) : ''}
+      ${employees ? ' · ' + Number(employees).toLocaleString() + ' employees' : ''}
+      ${website ? ' · <a href="'+escapeHtml(website)+'" target="_blank" rel="noopener" class="geo-wm-link">'+escapeHtml(website)+'</a>' : ''}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:3px;padding:6px 6px 4px">
+      ${cell('Mkt Cap',   mktCap ? fmtB(mktCap) : '—')}
+      ${cell('P/E (TTM)', pe != null ? N(pe,1)+'x' : '—')}
+      ${cell('EV/EBITDA', evEbitda != null ? N(evEbitda,1)+'x' : '—')}
+      ${cell('P/S',       ps != null ? N(ps,2)+'x' : '—')}
+      ${cell('P/B',       pb != null ? N(pb,2)+'x' : '—')}
+      ${cell('Beta',      beta != null ? N(beta,2) : '—')}
+      ${cellC('ROE',      Pv(roe,1), colGood(roe))}
+      ${cellC('Net Mgn',  Pv(netMgn,1), colGood(netMgn))}
+      ${cellC('Gr Mgn',   Pv(grossMgn,1), colGood(grossMgn))}
+      ${cellC('ROA',      Pv(roa,1), colGood(roa))}
+      ${cell('D/E',       debtEq != null ? N(debtEq,2) : '—')}
+      ${cell('Div Yield', divYield != null ? Pv(divYield,2) : '—')}
+    </div>
+    ${(revTTM || niTTM) ? `<div style="padding:3px 8px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border)">Revenue ${fmtB(revTTM)} · Net Income ${fmtB(niTTM)}</div>` : ''}
+    ${desc ? `<div class="des-desc" style="padding:6px 8px;font-size:11px;color:var(--text);line-height:1.5;border-top:1px solid var(--border)">${escapeHtml(desc.slice(0,600))}${desc.length>600?'…':''}</div>` : ''}`;
 }
 
 /* ── fundInitFinancials: key ratios + FA + dividends with toggles ── */
@@ -523,15 +558,30 @@ function fundInitEarnings(sym) {
   const earnEl = document.getElementById('fund-earn');
   if (earnEl && !earnEl.dataset.loaded) {
     earnEl.dataset.loaded = '1';
-    const avData = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
+    const avData  = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
+    const fhLiveE = (typeof fhGetLive === 'function') ? fhGetLive(sym) : null;
+
     if (avData?.earnings?.quarterly?.length) {
       if (typeof avRenderEarnings === 'function') avRenderEarnings(sym, avData.earnings);
+    } else if (fhLiveE?.earnings?.length) {
+      // Finnhub already loaded earnings — render immediately, no network call
+      if (typeof fhRenderEarnings === 'function') fhRenderEarnings(sym, fhLiveE.earnings);
     } else {
       const ern = document.getElementById('fund-ern');
-      if (ern) ern.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading earnings…</div>`;
+      // Only set spinner if fund-ern doesn't already have live data
+      if (ern && !ern.querySelector('.av-live-badge,.fin-table')) {
+        ern.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading earnings…</div>`;
+      }
       setTimeout(() => {
         const el = document.getElementById('fund-ern');
-        if (!el || !el.querySelector('.av-loading')) return;
+        if (!el || !el.querySelector('.av-loading')) return; // data already filled
+
+        // Re-check Finnhub (may have loaded during the wait)
+        const fhL = typeof fhGetLive === 'function' ? fhGetLive(sym) : null;
+        if (fhL?.earnings?.length && typeof fhRenderEarnings === 'function') {
+          fhRenderEarnings(sym, fhL.earnings); return;
+        }
+
         const fmpKey = typeof getFmpKey === 'function' ? getFmpKey() : '';
         if (fmpKey) {
           fetch(`https://financialmodelingprep.com/api/v3/earnings-surprises/${sym}?apikey=${fmpKey}`,{signal:AbortSignal.timeout(8000)})
@@ -545,11 +595,19 @@ function fundInitEarnings(sym) {
               }).join('');
               el.innerHTML = `<div class="av-live-badge">● Earnings Surprises · FMP</div>${sHead('EPS Actual vs Estimate')}
                 <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Date</th><th>EPS Est</th><th>EPS Act</th><th>Surprise</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-            }).catch(() => { el.innerHTML = `<div class="no-data">// No earnings data — add FMP or Alpha Vantage key.</div>`; });
+            }).catch(() => {
+              const fhRetry = typeof fhGetLive === 'function' ? fhGetLive(sym) : null;
+              if (fhRetry?.earnings?.length && typeof fhRenderEarnings === 'function') {
+                fhRenderEarnings(sym, fhRetry.earnings);
+              } else {
+                el.innerHTML = `<div class="no-data">// Earnings data temporarily unavailable.<br><a href="#" onclick="fundInitEarnings('${escapeHtml(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+              }
+            });
         } else { el.innerHTML = `<div class="no-data">// Add <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> or <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> key for earnings data.</div>`; }
       }, 3000);
     }
-    // Forward estimates
+
+    // Forward estimates — FMP analyst-estimates + Finnhub price target / recs fallback
     const ee = document.getElementById('fund-ee');
     if (ee && !ee.dataset.loaded) {
       ee.dataset.loaded = '1';
@@ -562,7 +620,30 @@ function fundInitEarnings(sym) {
             const rows = data.slice(0,8).map(r=>`<tr><td>${escapeHtml(r.date?.slice(0,7)||'')}</td><td class="accent"><strong>$${fmt(r.estimatedEpsAvg)}</strong></td><td>$${fmt(r.estimatedEpsLow)}</td><td>$${fmt(r.estimatedEpsHigh)}</td><td>${fmtB(r.estimatedRevenueAvg)}</td><td>${r.numberAnalystEstimatedEps||'—'}</td></tr>`).join('');
             ee.innerHTML = `<div class="av-live-badge">● Forward Consensus · FMP</div>${sHead('Analyst EPS & Revenue Estimates')}
               <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Period</th><th>EPS Mean</th><th>EPS Low</th><th>EPS High</th><th>Rev Mean</th><th>Analysts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-          }).catch(() => { ee.innerHTML = `<div class="no-data">// No forward estimates available.</div>`; });
+          }).catch(() => {
+            // FMP failed — show Finnhub price target + recommendations as fallback
+            const fhEE = typeof fhGetLive === 'function' ? fhGetLive(sym) : null;
+            if (fhEE?.target || fhEE?.recs?.length) {
+              let fhHtml = '<div class="av-live-badge">● Analyst Data · Finnhub</div>';
+              if (fhEE.target) {
+                const t = fhEE.target;
+                fhHtml += `${sHead('Price Target')}<div style="padding:6px;font-size:11px">
+                  <span style="color:var(--text-muted)">Mean:</span> <strong>$${fmt(t.targetMean,2)}</strong> &nbsp;
+                  <span style="color:var(--text-muted)">High:</span> $${fmt(t.targetHigh,2)} &nbsp;
+                  <span style="color:var(--text-muted)">Low:</span> $${fmt(t.targetLow,2)} &nbsp;
+                  <span style="color:var(--text-muted)">Analysts:</span> ${t.targetNumberOfAnalysts||'—'}
+                </div>`;
+              }
+              if (fhEE.recs?.length) {
+                const recent = fhEE.recs.slice(0,4);
+                const rows2 = recent.map(r=>`<tr><td>${escapeHtml(r.period||'')}</td><td style="color:#3fb950">${r.strongBuy||0}</td><td style="color:#58a6ff">${r.buy||0}</td><td>${r.hold||0}</td><td style="color:#f85149">${r.sell||0}</td><td style="color:#ff7b72">${r.strongSell||0}</td></tr>`).join('');
+                fhHtml += `${sHead('Analyst Recommendations')}<div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Period</th><th>Strong Buy</th><th>Buy</th><th>Hold</th><th>Sell</th><th>Strong Sell</th></tr></thead><tbody>${rows2}</tbody></table></div>`;
+              }
+              ee.innerHTML = fhHtml;
+            } else {
+              ee.innerHTML = `<div class="no-data">// Forward estimates temporarily unavailable.<br><a href="#" onclick="document.getElementById('fund-ee').dataset.loaded='';fundInitEarnings('${escapeHtml(sym)}');return false" style="color:var(--accent)">↻ Retry</a></div>`;
+            }
+          });
       } else { ee.innerHTML = `<div class="no-data">// Add <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> key for analyst estimates.</div>`; }
     }
   }
@@ -1851,6 +1932,7 @@ function changeTicker(){
   if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
   // Reset Fundamentals cache + all sub-divs so they reload for the new ticker
   delete _fundCache[sym];
+  delete _fhMetricsCache[sym];
   ["fund-des","fund-fa","fund-fa-ctrl","fund-earn","fund-ern","fund-ee",
    "fund-wacc","fund-div","fund-filings","fund-filings-ctrl","fund-short",
    "fund-seg","fund-trans","fund-form4"].forEach(id => {
