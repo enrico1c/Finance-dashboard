@@ -544,7 +544,10 @@ function fundInitFinancials(sym) {
       }, 1500);
     }
   }
-  if (typeof fmpLoadDividends === 'function') fmpLoadDividends(sym);
+  // Only load dividends if fund-div doesn't already have real content (e.g. from Twelve Data)
+  const divEl = document.getElementById('fund-div');
+  const divHasData = divEl?.querySelector('.av-live-badge,.div-summary-bar,.div-table');
+  if (typeof fmpLoadDividends === 'function' && !divHasData) fmpLoadDividends(sym);
 }
 
 function fundToggleFA(section, btn, sym) {
@@ -627,7 +630,9 @@ function fundInitEarnings(sym) {
           }).catch(() => {
             // FMP failed — show Finnhub price target + recommendations as fallback
             const fhEE = typeof fhGetLive === 'function' ? fhGetLive(sym) : null;
-            if (fhEE?.target || fhEE?.recs?.length) {
+            // fhEE.recs is an object with a .history array (from fhGetRecommendations)
+            const fhRecsArr = fhEE?.recs?.history || (Array.isArray(fhEE?.recs) ? fhEE.recs : null);
+            if (fhEE?.target || fhRecsArr?.length) {
               let fhHtml = '<div class="av-live-badge">● Analyst Data · Finnhub</div>';
               if (fhEE.target) {
                 const t = fhEE.target;
@@ -638,8 +643,8 @@ function fundInitEarnings(sym) {
                   <span style="color:var(--text-muted)">Analysts:</span> ${t.targetNumberOfAnalysts||'—'}
                 </div>`;
               }
-              if (fhEE.recs?.length) {
-                const recent = fhEE.recs.slice(0,4);
+              if (fhRecsArr?.length) {
+                const recent = fhRecsArr.slice(0,4);
                 const rows2 = recent.map(r=>`<tr><td>${escapeHtml(r.period||'')}</td><td style="color:#3fb950">${r.strongBuy||0}</td><td style="color:#58a6ff">${r.buy||0}</td><td>${r.hold||0}</td><td style="color:#f85149">${r.sell||0}</td><td style="color:#ff7b72">${r.strongSell||0}</td></tr>`).join('');
                 fhHtml += `${sHead('Analyst Recommendations')}<div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Period</th><th>Strong Buy</th><th>Buy</th><th>Hold</th><th>Sell</th><th>Strong Sell</th></tr></thead><tbody>${rows2}</tbody></table></div>`;
               }
