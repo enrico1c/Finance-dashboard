@@ -436,9 +436,9 @@ async function _fundRenderOverview(sym) {
   const quote   = fmpLive?.quote   || {};
   const av      = avData?.overview || {};
 
-  // If FMP ratios are missing, fetch Finnhub /stock/metric?metric=all as fallback
+  // Always fetch Finnhub /stock/metric?metric=all to supplement FMP ratios (fills pe/roe/roa gaps)
   let fhM = _fhMetricsCache[sym] || {};
-  if (!fmpLive?.ratios && !_fhMetricsCache[sym]) {
+  if (!_fhMetricsCache[sym]) {
     const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
     if (fhKey) {
       try {
