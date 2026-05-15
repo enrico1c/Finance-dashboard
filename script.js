@@ -386,7 +386,7 @@ function switchTab(panelId, tabId){
 
 /* ── Shared renderers ─── */
 function mRow(label,value,cls=""){
-  return `<div class="metric ${cls}"><span>${escapeHtml(String(label))}</span><span>${escapeHtml(String(value))}</span></div>`;
+  return `<div class="metric ${cls}"><span>${escapeHtml(String(label))}</span><span>${String(value)}</span></div>`;
 }
 function sHead(t){ return `<div class="section-head">${escapeHtml(t)}</div>`; }
 function noData(t){ return `<div class="no-data">// No local data for <strong>${escapeHtml(t)}</strong>.<br>Connect an API to populate live data.</div>`; }
