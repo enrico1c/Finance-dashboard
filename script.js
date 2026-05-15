@@ -394,194 +394,224 @@ function noData(t){ return `<div class="no-data">// No local data for <strong>${
 /* ══════════════════════════════════════════════════════════════════
    RENDER: FUNDAMENTALS  (DES / FA / ERN / EE / WACC)
    ══════════════════════════════════════════════════════════════════ */
-function renderFundamentals(ticker) {
-  const sym    = ticker.replace(/.*:/, '').toUpperCase();
-  const tvSym  = resolveSymbol(ticker);
+/* ── Session cache for Fundamentals (30-min TTL, avoids repeat API calls) ── */
+const _fundCache = {};
+function _fundCacheGet(sym) { const c = _fundCache[sym]; return c && Date.now() - c.ts < 30*60*1000 ? c : null; }
+function _fundCacheSet(sym) { _fundCache[sym] = { ts: Date.now() }; }
 
-  /* ── DES — TradingView Fundamentals widget + live description ─── */
-  const des = document.getElementById('fund-des');
-  if (des) {
-    des.innerHTML = `
-      <div class="tv-fundamental-wrap" id="tv-fund-${escapeHtml(sym)}"></div>
-      <div class="tv-fundamental-fallback" id="tv-fund-fallback-${escapeHtml(sym)}">
-        <div class="av-loading"><span class="av-spinner"></span>Loading company profile…</div>
-      </div>`;
-    // Inject TradingView Financials widget
-    try {
-      const container = document.getElementById(`tv-fund-${sym}`);
-      if (container) {
-        const s = document.createElement('script');
-        s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-financials.js';
-        s.async = true;
-        s.innerHTML = JSON.stringify({
-          symbol: tvSym, colorTheme: 'dark', isTransparent: true,
-          largeChartUrl: '', displayMode: 'regular', width: '100%', height: 550, locale: 'en'
-        });
-        container.appendChild(s);
-        setTimeout(() => {
-          const fb = document.getElementById(`tv-fund-fallback-${sym}`);
-          if (fb && container.querySelector('iframe')) fb.style.display = 'none';
-        }, 3000);
-      }
-    } catch (e) { /* fallback stays visible */ }
-
-    // Also populate description from FMP / Finnhub profile
-    const _fillDesc = () => {
-      const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
-      const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
-      const profile = fhLive?.profile || fmpLive?.profile || null;
-      const fb = document.getElementById(`tv-fund-fallback-${sym}`);
-      if (!fb || !profile) return;
-      const p = profile;
-      fb.innerHTML = `
-        <div class="av-live-badge">● Company Profile · ${escapeHtml(p.name || sym)}</div>
-        ${mRow('Exchange',  escapeHtml(p.exchange  || p.exchangeShortName || '—'))}
-        ${mRow('Sector',    escapeHtml(p.sector    || p.finnhubIndustry   || '—'))}
-        ${mRow('Industry',  escapeHtml(p.industry  || p.subIndustry       || '—'))}
-        ${mRow('Country',   escapeHtml(p.country   || '—'))}
-        ${mRow('Currency',  escapeHtml(p.currency  || 'USD'))}
-        ${mRow('Employees', (p.employees || p.fullTimeEmployees) ? Number(p.employees || p.fullTimeEmployees).toLocaleString() : '—')}
-        ${mRow('Website',   p.weburl || p.website ? `<a href="${escapeHtml(p.weburl||p.website)}" target="_blank" class="geo-wm-link">${escapeHtml(p.weburl||p.website)}</a>` : '—')}
-        ${p.description || p.longBusinessSummary ? `<div class="des-desc">${escapeHtml((p.description||p.longBusinessSummary).slice(0,600))}${(p.description||p.longBusinessSummary).length>600?'…':''}</div>` : ''}`;
-    };
-    setTimeout(_fillDesc, 800); // Wait for FH/FMP to load
+/* ── fundInit: single entry point — fires fmpLoadAll once per ticker ── */
+function fundInit(sym) {
+  if (!sym) return;
+  if (!_fundCacheGet(sym)) {
+    _fundCacheSet(sym);
+    if (typeof fmpLoadAll === 'function') fmpLoadAll(sym);
   }
+  _fundRenderOverview(sym);
+}
 
-  /* ── FA — Financial Statements ──────────────────────────────────
-     Priority:
-       1. AV  avRenderFA()     (fires from avLoadAll automatically)
-       2. FMP fmpLoadAll()     (fires from avLoadAll when FMP key set)
-       3. SEC EDGAR XBRL      (fallback when no key, after 3.5s)       */
+/* ── OVERVIEW: self-rendered metrics grid + profile (no TradingView iframe) ── */
+function _fundRenderOverview(sym) {
+  const des = document.getElementById('fund-des');
+  if (!des) return;
+  des.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading overview for ${escapeHtml(sym)}…</div>`;
+  // Render as soon as profile + ratios data arrives (retry up to 6s)
+  let tries = 0;
+  const _try = () => {
+    const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+    const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+    const avData  = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
+    const profile = fmpLive?.profile || fhLive?.profile || null;
+    const ratios  = fmpLive?.ratios  || null;
+    const quote   = fmpLive?.quote   || null;
+    if ((!profile && !ratios) && tries++ < 6) { setTimeout(_try, 1000); return; }
+    const p = profile || {};
+    const r = ratios  || {};
+    const q = quote   || {};
+    const av = avData?.overview || {};
+    const N  = (v, d=1) => v != null && isFinite(+v) ? (+v).toFixed(d) : '—';
+    const P  = (v, d=1) => v != null && isFinite(+v) ? N(+v*100, d)+'%' : '—';
+    const Pv = (v, d=1) => v != null && isFinite(+v) ? N(v, d)+'%' : '—';
+    const employees = p.employees || p.fullTimeEmployees || av['FullTimeEmployees'];
+    const desc = p.description || p.longBusinessSummary || av['Description'] || '';
+    const website = p.weburl || p.website || '';
+    const name = p.name || p.companyName || av['Name'] || sym;
+    const exchange = p.exchange || p.exchangeShortName || av['Exchange'] || '';
+    const sector = p.sector || p.finnhubIndustry || av['Sector'] || '';
+    const industry = p.industry || p.subIndustry || av['Industry'] || '';
+    const country = p.country || av['Country'] || '';
+    const mktCap = q.marketCap || p.mktCap || (av['MarketCapitalization'] ? +av['MarketCapitalization'] : null);
+    // Revenue/income from AV income statement
+    const avIncome = avData?.income;
+    const lastInc = avIncome?.[0];
+    const revTTM = lastInc?.revenue;
+    const niTTM  = lastInc?.netIncome;
+    const cell = (label, val) => `<div style="text-align:center;padding:5px 3px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;min-width:0">
+      <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap">${val}</div></div>`;
+    const colGood  = v => v==null||!isFinite(+v)?'var(--text)':(+v>0?'#3fb950':'#f85149');
+    const cellC = (label, val, col) => `<div style="text-align:center;padding:5px 3px;background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;min-width:0">
+      <div style="font-size:8px;color:var(--text-muted);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+      <div style="font-size:11px;font-weight:700;color:${col};white-space:nowrap">${val}</div></div>`;
+    des.innerHTML = `
+      <div class="av-live-badge">● ${escapeHtml(name)} · ${escapeHtml(exchange)} · ${escapeHtml(sector)}</div>
+      <div style="padding:4px 8px 2px;font-size:10px;color:var(--text-muted)">
+        ${country ? escapeHtml(country)+' · ' : ''}${industry ? escapeHtml(industry) : ''}
+        ${employees ? ' · ' + Number(employees).toLocaleString() + ' employees' : ''}
+        ${website ? ' · <a href="'+escapeHtml(website)+'" target="_blank" rel="noopener" class="geo-wm-link">'+escapeHtml(website)+'</a>' : ''}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:3px;padding:6px 6px 4px">
+        ${cell('Mkt Cap',   mktCap ? fmtB(mktCap) : '—')}
+        ${cell('P/E (TTM)', N(r.pe,1)+'x')}
+        ${cell('EV/EBITDA', N(r.evEbitda,1)+'x')}
+        ${cell('P/S',       N(r.ps,2)+'x')}
+        ${cell('P/B',       N(r.pb,2)+'x')}
+        ${cell('Beta',      N(r.beta||fhLive?.profile?.beta,2))}
+        ${cellC('ROE',      Pv(r.roe,1), colGood(r.roe))}
+        ${cellC('Net Mgn',  Pv(r.netMgn,1), colGood(r.netMgn))}
+        ${cellC('Gr Mgn',   Pv(r.grossMgn,1), colGood(r.grossMgn))}
+        ${cellC('ROA',      Pv(r.roa,1), colGood(r.roa))}
+        ${cell('D/E',       N(r.debtEq,2))}
+        ${cell('Div Yield', r.divYield!=null ? Pv(r.divYield,2) : '—')}
+      </div>
+      ${(revTTM||niTTM) ? `<div style="padding:3px 8px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border)">Revenue ${fmtB(revTTM)} · Net Income ${fmtB(niTTM)}</div>` : ''}
+      ${desc ? `<div class="des-desc" style="padding:6px 8px;font-size:11px;color:var(--text);line-height:1.5;border-top:1px solid var(--border)">${escapeHtml(desc.slice(0,600))}${desc.length>600?'…':''}</div>` : ''}`;
+  };
+  setTimeout(_try, 600);
+}
+
+/* ── fundInitFinancials: key ratios + FA + dividends with toggles ── */
+function fundInitFinancials(sym) {
+  fundInit(sym);
+  const ctrl = document.getElementById('fund-fa-ctrl');
+  if (ctrl && !ctrl.dataset.built) {
+    ctrl.dataset.built = '1';
+    ctrl.innerHTML = `<div class="tab-bar" style="border-bottom:1px solid var(--border);margin-bottom:0;flex-shrink:0">
+      <button class="tab-btn active" data-fa="fa" onclick="fundToggleFA('fa',this,'${escapeHtml(sym)}')">Statements</button>
+      <button class="tab-btn" data-fa="div" onclick="fundToggleFA('div',this,'${escapeHtml(sym)}')">Dividends</button>
+    </div>`;
+  }
   const fa = document.getElementById('fund-fa');
-  if (fa) {
-    // Check if AV already populated it (avLoadAll fires async in parallel)
+  if (fa && !fa.dataset.loaded) {
     const avData = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
     if (avData?.income?.length) {
-      // AV data available — render immediately
       if (typeof avRenderFA === 'function') avRenderFA(sym, avData.income, avData.balance, avData.cashflow);
     } else {
-      // Show loading, start 3.5s EDGAR fallback
-      if (!fa.dataset.loaded) {
-        fa.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading financials for ${escapeHtml(sym)}…</div>`;
-      }
+      fa.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading financials…</div>`;
       setTimeout(() => {
-        const faEl = document.getElementById('fund-fa');
-        if (faEl && faEl.querySelector('.av-loading')) {
-          // AV/FMP hasn't populated it — fall through to EDGAR XBRL
-          if (typeof faLoadEdgarXBRL === 'function') faLoadEdgarXBRL(sym, faEl);
+        if (fa.querySelector('.av-loading')) {
+          if (typeof fmpLoadFATab === 'function') { fmpLoadFATab(sym); }
+          else if (typeof faLoadEdgarXBRL === 'function') { faLoadEdgarXBRL(sym, fa); }
         }
       }, 3500);
     }
   }
+  if (typeof fmpLoadDividends === 'function') fmpLoadDividends(sym);
+}
 
-  /* ── ERN — Earnings Surprises ───────────────────────────────────
-     Sources:
-       1. avLiveCache[sym].earnings  (populated by avLoadAll/avRenderEarnings)
-       2. FMP /earnings-surprises    (fallback after 3s)
-       3. "Add key" prompt           (no keys configured)              */
-  const ern = document.getElementById('fund-ern');
-  if (ern) {
-    const _avCache = (typeof avLiveCache !== 'undefined') ? avLiveCache : {};
-    if (_avCache[sym]?.earnings?.quarterly?.length) {
-      // AV data already loaded — render immediately
-      if (typeof avRenderEarnings === 'function') avRenderEarnings(sym, _avCache[sym].earnings);
-    } else if (!ern.dataset.loaded) {
-      ern.dataset.loaded = '1';
-      ern.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading earnings history for ${escapeHtml(sym)}…</div>`;
-      // FMP fallback after 3s if AV hasn't fired
-      setTimeout(() => {
-        const ernEl = document.getElementById('fund-ern');
-        if (!ernEl || !ernEl.querySelector('.av-loading')) return; // already populated
-        const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
-        if (fmpKey) {
-          fetch(`https://financialmodelingprep.com/api/v3/earnings-surprises/${sym}?apikey=${fmpKey}`,
-            {signal:AbortSignal.timeout(8000)})
-            .then(r=>r.json()).then(data => {
-              if (!Array.isArray(data) || !data.length) throw new Error('empty');
-              const rows = data.slice(0,12).map(q => {
-                const surp    = q.actualEarningResult - q.estimatedEarning;
-                const surpPct = q.estimatedEarning
-                  ? (surp/Math.abs(q.estimatedEarning)*100).toFixed(1)+'%' : '—';
-                const cls = surp >= 0 ? 'pos' : 'neg';
-                return `<tr>
-                  <td>${escapeHtml(q.date||'')}</td>
-                  <td>$${fmt(q.estimatedEarning)}</td>
-                  <td>$${fmt(q.actualEarningResult)}</td>
-                  <td class="${cls}">${surp>=0?'+':''}${surpPct}</td>
-                </tr>`;
-              }).join('');
-              ernEl.innerHTML = `<div class="av-live-badge">● Earnings Surprises · FMP · ${escapeHtml(sym)}</div>
-                ${sHead('EPS Actual vs Estimate')}
-                <div class="fin-table-wrap"><table class="fin-table">
-                  <thead><tr><th>Date</th><th>EPS Est</th><th>EPS Act</th><th>Surprise</th></tr></thead>
-                  <tbody>${rows}</tbody>
-                </table></div>`;
-            }).catch(() => {
-              ernEl.innerHTML = `<div class="no-data">// No earnings data available. Add
-                <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> or
-                <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> key.</div>`;
-            });
-        } else {
-          ernEl.innerHTML = `<div class="no-data">// Add
-            <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> or
-            <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a>
-            key to see earnings history for ${escapeHtml(sym)}.</div>`;
-        }
-      }, 3000);
-    }
-  }
+function fundToggleFA(section, btn, sym) {
+  ['fund-fa','fund-div'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (id === 'fund-'+section || (section==='fa' && id==='fund-fa')) ? '' : 'none';
+  });
+  const ctrl = document.getElementById('fund-fa-ctrl');
+  if (ctrl) ctrl.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.fa === section));
+}
 
-  /* ── EE — Analyst Estimates ─────────────────────────────────────
-     Sources:
-       1. avLiveCache[sym].earnings.annual  (from avRenderEarnings)
-       2. FMP /analyst-estimates            (forward consensus, fallback)
-       3. "Add key" prompt                                             */
-  const ee = document.getElementById('fund-ee');
-  if (ee) {
-    const _avCache = (typeof avLiveCache !== 'undefined') ? avLiveCache : {};
-    if (_avCache[sym]?.earnings?.annual?.length) {
-      // Reuse the AV earnings data already rendered into the EE tab
-      if (typeof avRenderEarnings === 'function') avRenderEarnings(sym, _avCache[sym].earnings);
-    } else if (!ee.dataset.loaded) {
-      ee.dataset.loaded = '1';
-      ee.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading analyst estimates for ${escapeHtml(sym)}…</div>`;
+/* ── fundInitEarnings: historical surprises + forward estimates ── */
+function fundInitEarnings(sym) {
+  fundInit(sym);
+  const earnEl = document.getElementById('fund-earn');
+  if (earnEl && !earnEl.dataset.loaded) {
+    earnEl.dataset.loaded = '1';
+    const avData = (typeof avLiveCache !== 'undefined') ? avLiveCache[sym] : null;
+    if (avData?.earnings?.quarterly?.length) {
+      if (typeof avRenderEarnings === 'function') avRenderEarnings(sym, avData.earnings);
+    } else {
+      const ern = document.getElementById('fund-ern');
+      if (ern) ern.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading earnings…</div>`;
       setTimeout(() => {
-        const eeEl = document.getElementById('fund-ee');
-        if (!eeEl || !eeEl.querySelector('.av-loading')) return;
-        const fmpKey = (typeof getFmpKey==='function') ? getFmpKey() : '';
+        const el = document.getElementById('fund-ern');
+        if (!el || !el.querySelector('.av-loading')) return;
+        const fmpKey = typeof getFmpKey === 'function' ? getFmpKey() : '';
         if (fmpKey) {
-          fetch(`https://financialmodelingprep.com/api/v3/analyst-estimates/${sym}?limit=8&apikey=${fmpKey}`,
-            {signal:AbortSignal.timeout(8000)})
+          fetch(`https://financialmodelingprep.com/api/v3/earnings-surprises/${sym}?apikey=${fmpKey}`,{signal:AbortSignal.timeout(8000)})
             .then(r=>r.json()).then(data => {
               if (!Array.isArray(data)||!data.length) throw new Error('empty');
-              const rows = data.slice(0,8).map(r=>`<tr>
-                <td>${escapeHtml(r.date?.slice(0,7)||'')}</td>
-                <td class="accent"><strong>$${fmt(r.estimatedEpsAvg)}</strong></td>
-                <td>$${fmt(r.estimatedEpsLow)}</td>
-                <td>$${fmt(r.estimatedEpsHigh)}</td>
-                <td>${fmtB(r.estimatedRevenueAvg)}</td>
-                <td>${r.numberAnalystEstimatedEps||'—'}</td>
-              </tr>`).join('');
-              eeEl.innerHTML = `<div class="av-live-badge">● Analyst Estimates · FMP · ${escapeHtml(sym)}</div>
-                ${sHead('Forward EPS & Revenue Consensus')}
-                <div class="fin-table-wrap"><table class="fin-table">
-                  <thead><tr><th>Period</th><th>EPS Mean</th><th>EPS Low</th><th>EPS High</th><th>Rev Mean</th><th>Analysts</th></tr></thead>
-                  <tbody>${rows}</tbody>
-                </table></div>`;
-            }).catch(()=>{
-              eeEl.innerHTML = `<div class="no-data">// No analyst estimates available. Add
-                <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> key.</div>`;
-            });
-        } else {
-          eeEl.innerHTML = `<div class="no-data">// Add
-            <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> or
-            <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a>
-            key for analyst estimates for ${escapeHtml(sym)}.</div>`;
-        }
+              const rows = data.slice(0,12).map(q => {
+                const surp = q.actualEarningResult - q.estimatedEarning;
+                const pct  = q.estimatedEarning ? (surp/Math.abs(q.estimatedEarning)*100).toFixed(1)+'%' : '—';
+                const cls  = surp >= 0 ? 'pos' : 'neg';
+                return `<tr><td>${escapeHtml(q.date||'')}</td><td>$${fmt(q.estimatedEarning)}</td><td>$${fmt(q.actualEarningResult)}</td><td class="${cls}">${surp>=0?'+':''}${pct}</td></tr>`;
+              }).join('');
+              el.innerHTML = `<div class="av-live-badge">● Earnings Surprises · FMP</div>${sHead('EPS Actual vs Estimate')}
+                <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Date</th><th>EPS Est</th><th>EPS Act</th><th>Surprise</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+            }).catch(() => { el.innerHTML = `<div class="no-data">// No earnings data — add FMP or Alpha Vantage key.</div>`; });
+        } else { el.innerHTML = `<div class="no-data">// Add <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> or <a href="#" onclick="openApiConfig('av');return false" style="color:var(--accent)">Alpha Vantage</a> key for earnings data.</div>`; }
       }, 3000);
     }
+    // Forward estimates
+    const ee = document.getElementById('fund-ee');
+    if (ee && !ee.dataset.loaded) {
+      ee.dataset.loaded = '1';
+      const fmpKey = typeof getFmpKey === 'function' ? getFmpKey() : '';
+      if (fmpKey) {
+        ee.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading estimates…</div>`;
+        fetch(`https://financialmodelingprep.com/api/v3/analyst-estimates/${sym}?limit=8&apikey=${fmpKey}`,{signal:AbortSignal.timeout(8000)})
+          .then(r=>r.json()).then(data => {
+            if (!Array.isArray(data)||!data.length) throw new Error('empty');
+            const rows = data.slice(0,8).map(r=>`<tr><td>${escapeHtml(r.date?.slice(0,7)||'')}</td><td class="accent"><strong>$${fmt(r.estimatedEpsAvg)}</strong></td><td>$${fmt(r.estimatedEpsLow)}</td><td>$${fmt(r.estimatedEpsHigh)}</td><td>${fmtB(r.estimatedRevenueAvg)}</td><td>${r.numberAnalystEstimatedEps||'—'}</td></tr>`).join('');
+            ee.innerHTML = `<div class="av-live-badge">● Forward Consensus · FMP</div>${sHead('Analyst EPS & Revenue Estimates')}
+              <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Period</th><th>EPS Mean</th><th>EPS Low</th><th>EPS High</th><th>Rev Mean</th><th>Analysts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+          }).catch(() => { ee.innerHTML = `<div class="no-data">// No forward estimates available.</div>`; });
+      } else { ee.innerHTML = `<div class="no-data">// Add <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP</a> key for analyst estimates.</div>`; }
+    }
   }
+}
 
+/* ── fundInitValuation: WACC + segments + short (lazy on tab open) ── */
+function fundInitValuation(sym) {
+  fundInit(sym);
+  const seg = document.getElementById('fund-seg');
+  if (seg && !seg.dataset.loaded && typeof fmpLoadSegmentation === 'function') fmpLoadSegmentation(sym);
+  if (typeof fhLoadShortInterest === 'function') fhLoadShortInterest(sym);
+  // WACC via existing renderFundamentals WACC block
+  _fundRenderWACC(sym);
+}
+
+/* ── fundInitFilings: filings / insiders / transcripts with toggles ── */
+function fundInitFilings(sym) {
+  const ctrl = document.getElementById('fund-filings-ctrl');
+  if (ctrl && !ctrl.dataset.built) {
+    ctrl.dataset.built = '1';
+    ctrl.innerHTML = `<div class="tab-bar" style="border-bottom:1px solid var(--border);margin-bottom:0;flex-shrink:0">
+      <button class="tab-btn active" data-fs="filings" onclick="fundShowFilingSection('filings','${escapeHtml(sym)}',this)">SEC Filings</button>
+      <button class="tab-btn" data-fs="form4" onclick="fundShowFilingSection('form4','${escapeHtml(sym)}',this)">Insider Trades</button>
+      <button class="tab-btn" data-fs="trans" onclick="fundShowFilingSection('trans','${escapeHtml(sym)}',this)">Transcripts</button>
+    </div>`;
+  }
+  fundShowFilingSection('filings', sym, null);
+}
+
+function fundShowFilingSection(section, sym, btn) {
+  ['fund-filings','fund-form4','fund-trans'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === 'fund-'+section ? '' : 'none';
+  });
+  const ctrl = document.getElementById('fund-filings-ctrl');
+  if (ctrl && btn) ctrl.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.fs === section));
+  if (section === 'filings' && typeof fmpLoadSecFilings === 'function') fmpLoadSecFilings(sym);
+  if (section === 'form4'   && typeof fmpLoadForm4      === 'function') fmpLoadForm4(sym);
+  if (section === 'trans'   && typeof fmpLoadTranscript === 'function') fmpLoadTranscript(sym);
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* renderFundamentals kept for WACC — called from fundInitValuation   */
+function renderFundamentals(ticker) {
+  const sym = ticker.replace(/.*:/, '').toUpperCase();
+  _fundRenderWACC(sym);
+}
+
+function _fundRenderWACC(sym) {
   /* ── WACC — Cost of Capital Calculator ─────────────────────────
      Sources:
        • Beta     : Finnhub profile2 → FMP ratios → fallback 1.0
@@ -662,7 +692,7 @@ function renderFundamentals(ticker) {
                 var s='${escapeHtml(sym)}';
                 sessionStorage.setItem('wacc_termg_'+s, el.value);
                 var wc2=document.getElementById('fund-wacc');
-                if(wc2){wc2.dataset.loaded='';renderFundamentals(s);}
+                if(wc2){wc2.dataset.loaded='';_fundRenderWACC(s);}
               })(this)" />
             <span style="font-size:10px;opacity:.6">%</span>
           </span>
@@ -1819,37 +1849,22 @@ function changeTicker(){
   // Fire all data providers — avLoadAll orchestrates AV + FMP + EODHD + APITube + Massive
   if(typeof avLoadAll       === "function") avLoadAll(sym);
   if(typeof finnhubLoadAll  === "function") finnhubLoadAll(sym);
-  // Reset ALL Fundamentals tabs so they reload with the new ticker
-  ["fund-fa","fund-earn","fund-ern","fund-ee","fund-wacc",
-   "fund-div","fund-filings","fund-short","fund-seg","fund-trans","fund-form4"].forEach(id => {
+  // Reset Fundamentals cache + all sub-divs so they reload for the new ticker
+  delete _fundCache[sym];
+  ["fund-des","fund-fa","fund-fa-ctrl","fund-earn","fund-ern","fund-ee",
+   "fund-wacc","fund-div","fund-filings","fund-filings-ctrl","fund-short",
+   "fund-seg","fund-trans","fund-form4"].forEach(id => {
     const el = document.getElementById(id);
-    if(el) { el.innerHTML = ""; el.dataset.loaded = ""; }
+    if(el) { el.innerHTML = ""; el.dataset.loaded = ""; el.dataset.built = ""; }
   });
-  // Also reset desc so it refills with new ticker's profile
-  const desEl = document.getElementById("fund-des");
-  if(desEl) { desEl.innerHTML = ""; }
-  // If a lazy tab is currently active, load it immediately for the new ticker
+  // If Fundamentals panel is open, reload the active tab immediately
   const activeFundTab = document.querySelector("#panel-fundamentals .tab-btn.active");
   const at = activeFundTab?.dataset.tab;
-  if(at === "div"      && typeof fmpLoadDividends    === "function") fmpLoadDividends(sym);
-  if(at === "filings"  && typeof fmpLoadSecFilings   === "function") fmpLoadSecFilings(sym);
-  if(at === "short"    && typeof fhLoadShortInterest === "function") fhLoadShortInterest(sym);
-  if(at === "seg"      && typeof fmpLoadSegmentation === "function") fmpLoadSegmentation(sym);
-  if(at === "trans"    && typeof fmpLoadTranscript   === "function") fmpLoadTranscript(sym);
-  if(at === "insiders" && typeof fmpLoadForm4        === "function") fmpLoadForm4(sym);
-  if(at === "earn") {
-    const earnEl = document.getElementById('fund-earn');
-    if(earnEl && !earnEl.dataset.loaded) {
-      earnEl.dataset.loaded = '1';
-      if(typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.earnings) {
-        if(typeof avRenderEarnings === 'function') avRenderEarnings(sym, avLiveCache[sym].earnings);
-      } else if(typeof fmpLoadAll === 'function') { fmpLoadAll(sym); }
-    }
-  }
-  // DES / FA / EARN / WACC — renderFundamentals handles them
-  if(at === "des" || at === "fa" || at === "earn" || at === "wacc") {
-    renderFundamentals(sym);
-  }
+  if(at === "overview")   fundInit(sym);
+  if(at === "financials") fundInitFinancials(sym);
+  if(at === "earnings")   fundInitEarnings(sym);
+  if(at === "valuation")  fundInitValuation(sym);
+  if(at === "filings")    fundInitFilings(sym);
   // Always refresh Yahoo quote on ticker change if key is set
   if(typeof yfLoadAll === "function") yfLoadAll(sym);
   loadComparables(sym);

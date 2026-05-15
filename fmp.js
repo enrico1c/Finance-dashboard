@@ -1364,41 +1364,21 @@ async function fmpLoadTranscript(sym) {
 
   el.innerHTML = `<div class="av-loading"><span class="av-spinner"></span>Loading transcripts for ${fmpEsc(sym)}…</div>`;
 
-  const ninjasKey = (typeof getNinjasKey==='function') ? getNinjasKey() : '';
-  const fmpKey    = (typeof getFmpKey==='function')    ? getFmpKey()    : '';
+  const fmpKey = (typeof getFmpKey==='function') ? getFmpKey() : '';
+  const srcLabel = fmpKey ? '● FMP' : '● SEC EDGAR';
+  const srcColor = fmpKey ? '#58a6ff' : '#d29922';
 
-  // Hide setup banner if key is available (proxy mode stores in window._KEYS, not localStorage)
-  if (ninjasKey) { const b = document.getElementById('trans-setup-banner'); if (b) b.style.display = 'none'; }
-
-  // Show source badge
-  const srcLabel = ninjasKey ? '● API Ninjas + FMP' : fmpKey ? '● FMP' : '● SEC EDGAR (limited)';
-  const srcColor = ninjasKey ? '#3fb950' : fmpKey ? '#58a6ff' : '#d29922';
-
-  // ── Get list of available transcripts ────────────────────────────
+  // ── Get list from FMP, fall back to SEC EDGAR 8-K ────────────────
   let transcriptList = [];
   if (fmpKey) transcriptList = await _transcriptListFMP(sym);
 
-  // Also add API Ninjas entry if available (always shows latest)
-  if (ninjasKey) {
-    const ninjasLatest = await _transcriptNinjas(sym);
-    if (ninjasLatest?.length) {
-      // Prepend Ninjas source as "latest" entry
-      transcriptList = [{ quarter: '?', year: 'Latest', _ninjas: true, _data: ninjasLatest }, ...transcriptList];
-    }
-  }
-
-  // EDGAR fallback if no keys
   if (!transcriptList.length) {
     const edgar = await _transcriptEdgar(sym);
     if (edgar.length) {
       el.innerHTML = `
-        <div class="av-live-badge" style="color:${srcColor}">${srcLabel}</div>
-        <div class="trans-no-key-note">
-          ⚠ No Ninjas or FMP key configured — showing SEC EDGAR 8-K filings only (partial content).
-          <br>Add an <a href="#" onclick="openApiConfig('ninjas');return false" style="color:var(--accent)">API Ninjas key</a> for full transcripts.
-        </div>
+        <div class="av-live-badge" style="color:${srcColor}">● SEC EDGAR 8-K · ${fmpEsc(sym)}</div>
         <div class="trans-list">
-          ${edgar.slice(0,8).map(h=>{
+          ${edgar.slice(0,8).map(h => {
             const d = h._source;
             return `<div class="trans-list-item">
               <span class="trans-label">${fmpEsc(d?.period_of_report||'8-K')}</span>
@@ -1409,10 +1389,7 @@ async function fmpLoadTranscript(sym) {
         </div>`;
       return;
     }
-    el.innerHTML = `<div class="no-data">
-      // No transcripts available without API keys.<br>
-      // <a href="#" onclick="openApiConfig('ninjas');return false" style="color:var(--accent)">Add API Ninjas key</a> (free, ~10K req/month) for full earnings call transcripts.
-    </div>`;
+    el.innerHTML = `<div class="no-data">// No transcripts available. Add <a href="#" onclick="openApiConfig('fmp');return false" style="color:var(--accent)">FMP key</a> for full earnings call transcripts.</div>`;
     return;
   }
 

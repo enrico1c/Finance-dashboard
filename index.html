@@ -229,58 +229,43 @@
         </div>
       </div>
       <div class="tab-bar">
-        <button class="tab-btn active" data-tab="des"     onclick="switchTab('fundamentals','des');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';renderFundamentals(s)})()">DES</button>
-        <button class="tab-btn"        data-tab="fa"      onclick="switchTab('fundamentals','fa');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-fa');if(el&&!el.dataset.loaded){if(typeof fmpLoadFATab==='function'){fmpLoadFATab(s);el.dataset.loaded='fmp';}else if(typeof avRenderFA!=='undefined'&&typeof avLiveCache!=='undefined'&&avLiveCache[s]?.income?.length){avRenderFA(s,avLiveCache[s].income,avLiveCache[s].balance,avLiveCache[s].cashflow);el.dataset.loaded='av';}else if(typeof faLoadEdgarXBRL==='function'){faLoadEdgarXBRL(s,el);el.dataset.loaded='xbrl';}}})()">FA</button>
-        <button class="tab-btn"        data-tab="earn"    onclick="switchTab('fundamentals','earn');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-earn');if(el&&!el.dataset.loaded){el.dataset.loaded='1';if(typeof avLiveCache!=='undefined'&&avLiveCache[s]?.earnings){avRenderEarnings(s,avLiveCache[s].earnings);}else if(typeof fmpLoadAll==='function'){fmpLoadAll(s);}}})()">📈 EARN</button>
-        <button class="tab-btn"        data-tab="wacc"    onclick="switchTab('fundamentals','wacc');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';var el=document.getElementById('fund-wacc');if(el&&!el.dataset.loaded){renderFundamentals(s);}})()">WACC</button>
-        <button class="tab-btn"        data-tab="short"   onclick="switchTab('fundamentals','short');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fhLoadShortInterest==='function')fhLoadShortInterest(s)})()">SHORT</button>
-        <button class="tab-btn"        data-tab="seg"     onclick="switchTab('fundamentals','seg');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadSegmentation==='function')fmpLoadSegmentation(s)})()">SEG</button>
-        <button class="tab-btn"        data-tab="trans"   onclick="switchTab('fundamentals','trans');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadTranscript==='function')fmpLoadTranscript(s)})()">TRANS</button>
-        <button class="tab-btn"        data-tab="insiders" onclick="switchTab('fundamentals','insiders');(function(){var s=currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL';if(typeof fmpLoadForm4==='function')fmpLoadForm4(s)})()">👤 INSIDERS</button>
-        <button class="tab-btn"        data-tab="div"     onclick="switchTab('fundamentals','div');if(typeof fmpLoadDividends==='function')fmpLoadDividends(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">DIV</button>
-        <button class="tab-btn"        data-tab="filings" onclick="switchTab('fundamentals','filings');if(typeof fmpLoadSecFilings==='function')fmpLoadSecFilings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">FILINGS</button>
+        <button class="tab-btn active" data-tab="overview"   onclick="switchTab('fundamentals','overview');fundInit(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">📊 OVERVIEW</button>
+        <button class="tab-btn"        data-tab="financials" onclick="switchTab('fundamentals','financials');fundInitFinancials(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">📈 FINANCIALS</button>
+        <button class="tab-btn"        data-tab="earnings"   onclick="switchTab('fundamentals','earnings');fundInitEarnings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">🎯 EARNINGS</button>
+        <button class="tab-btn"        data-tab="valuation"  onclick="switchTab('fundamentals','valuation');fundInitValuation(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">🔍 VALUATION</button>
+        <button class="tab-btn"        data-tab="filings"    onclick="switchTab('fundamentals','filings');fundInitFilings(currentTicker?.replace(/.*:/,'')?.toUpperCase()||'AAPL')">📋 FILINGS</button>
       </div>
-      <div class="tab-pane active panel-content" data-tab="des"      id="fund-des"></div>
-      <div class="tab-pane        panel-content" data-tab="fa"       id="fund-fa"></div>
-      <div class="tab-pane        panel-content" data-tab="earn"     id="fund-earn">
-        <div id="fund-ern"></div>
-        <div style="border-top:1px solid var(--border);margin:6px 0 0"></div>
-        <div id="fund-ee"></div>
+      <!-- OVERVIEW: company profile + metrics grid -->
+      <div class="tab-pane active panel-content" data-tab="overview" id="fund-overview">
+        <div id="fund-des"></div>
       </div>
-      <div class="tab-pane        panel-content" data-tab="wacc"     id="fund-wacc"></div>
-      <div class="tab-pane        panel-content" data-tab="short"    id="fund-short"></div>
-      <div class="tab-pane        panel-content" data-tab="seg"      id="fund-seg"></div>
-      <div class="tab-pane        panel-content" data-tab="trans"   id="fund-trans">
-        <div class="api-quicksetup-banner" id="trans-setup-banner">
-          <div class="api-qs-icon">🎙️</div>
-          <div class="api-qs-body">
-            <div class="api-qs-title">Earnings Call Transcripts — API Ninjas</div>
-            <div class="api-qs-desc">
-              Testo integrale con speaker labels (CEO, CFO, Analyst) · ~10K req/mese free.<br>
-              <span style="color:var(--text-muted);font-size:9px">Senza key: fallback automatico a SEC EDGAR 8-K (solo metadati)</span>
-            </div>
-            <div class="api-qs-actions">
-              <button class="api-qs-btn-primary" onclick="openApiConfig('ninjas')">⚙ Configura API Ninjas</button>
-              <a href="https://api-ninjas.com/register" target="_blank" class="api-qs-btn-link">Ottieni key gratuita ↗</a>
-            </div>
-          </div>
-          <button class="api-qs-dismiss" onclick="this.closest('.api-quicksetup-banner').style.display='none'" title="Nascondi">✕</button>
+      <!-- FINANCIALS: key ratios + Income/Balance/Cash/Dividends toggles -->
+      <div class="tab-pane panel-content" data-tab="financials" id="fund-financials">
+        <div id="fund-fa-ctrl"></div>
+        <div id="fund-fa"></div>
+        <div id="fund-div" style="display:none"></div>
+      </div>
+      <!-- EARNINGS: historical surprises + forward consensus -->
+      <div class="tab-pane panel-content" data-tab="earnings" id="fund-earnings-pane">
+        <div id="fund-earn">
+          <div id="fund-ern"></div>
+          <div style="border-top:1px solid var(--border);margin:8px 0 0"></div>
+          <div id="fund-ee"></div>
         </div>
-        <script>
-          (function hideBanner() {
-            try {
-              var k = (window._KEYS && window._KEYS['ninjas'])
-                   || localStorage.getItem('finterm_key_ninjas');
-              if (k) { var b = document.getElementById('trans-setup-banner'); if(b) b.style.display='none'; return; }
-            } catch(e) {}
-            // Re-check after auth populates window._KEYS (proxy mode)
-            setTimeout(hideBanner, 1500);
-          })();
-        </script>
       </div>
-      <div class="tab-pane        panel-content" data-tab="insiders" id="fund-form4"></div>
-      <div class="tab-pane        panel-content" data-tab="div"     id="fund-div"></div>
-      <div class="tab-pane        panel-content" data-tab="filings" id="fund-filings"></div>
+      <!-- VALUATION: WACC + revenue segments + short interest -->
+      <div class="tab-pane panel-content" data-tab="valuation" id="fund-valuation">
+        <div id="fund-wacc"></div>
+        <div id="fund-seg"></div>
+        <div id="fund-short"></div>
+      </div>
+      <!-- FILINGS: SEC filings / Insider trades / Transcripts toggles -->
+      <div class="tab-pane panel-content" data-tab="filings" id="fund-filings-pane">
+        <div id="fund-filings-ctrl"></div>
+        <div id="fund-filings"></div>
+        <div id="fund-form4" style="display:none"></div>
+        <div id="fund-trans" style="display:none"></div>
+      </div>
       <div class="resize-handle" data-dir="n"></div><div class="resize-handle" data-dir="s"></div>
       <div class="resize-handle" data-dir="w"></div><div class="resize-handle" data-dir="e"></div>
       <div class="resize-handle" data-dir="nw"></div><div class="resize-handle" data-dir="ne"></div>
