@@ -512,6 +512,7 @@ async function _fundRenderOverview(sym) {
     </div>
     ${(revTTM || niTTM) ? `<div style="padding:3px 8px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border)">Revenue ${fmtB(revTTM)} · Net Income ${fmtB(niTTM)}</div>` : ''}
     ${desc ? `<div class="des-desc" style="padding:6px 8px;font-size:11px;color:var(--text);line-height:1.5;border-top:1px solid var(--border)">${escapeHtml(desc.slice(0,600))}${desc.length>600?'…':''}</div>` : ''}`;
+  // If CH appends its block after our render, that's fine — it's supplementary data
 }
 
 /* ── fundInitFinancials: key ratios + FA + dividends with toggles ── */
@@ -2125,6 +2126,15 @@ window.addEventListener("load",()=>{
     if(typeof finnhubLoadAll === "function") finnhubLoadAll(initSym);
     if(typeof updateApiStatus  === "function") updateApiStatus();
     if(typeof updateFmpStatus  === "function") updateFmpStatus();
+    // Auto-load active Fundamentals tab on startup
+    setTimeout(() => {
+      const at = document.querySelector('#panel-fundamentals .tab-btn.active')?.dataset?.tab;
+      if (at === 'overview')   fundInit(initSym);
+      else if (at === 'financials') fundInitFinancials(initSym);
+      else if (at === 'earnings')   fundInitEarnings(initSym);
+      else if (at === 'valuation')  fundInitValuation(initSym);
+      else if (at === 'filings')    fundInitFilings(initSym);
+    }, 800);
   }));
 });
 
