@@ -153,7 +153,13 @@ async function fmpGetEarningsEstimates(symbol) {
 
 /* ── Insider Transactions ───────────────────────────────────────── */
 async function fmpGetInsiders(symbol) {
-  const data = await fmpFetch(`/v4/insider-trading`, symbol, { symbol, limit: 20 });
+  let data = await fmpFetch(`/v4/insider-trading`, symbol, { symbol, limit: 20 });
+  if (!data || !data.length) {
+    try {
+      const r = await fetch(`${FMP_STABLE}/insider-trading?symbol=${symbol}&limit=20&apikey=${getFmpKey()}`, { signal: AbortSignal.timeout(7000) });
+      data = r.ok ? await r.json() : null;
+    } catch(e) { data = null; }
+  }
   if (!data || !data.length) return null;
   return data.slice(0, 15).map(t => ({
     name:    t.reportingName || "—",
@@ -170,7 +176,13 @@ async function fmpGetInsiders(symbol) {
 
 /* ── Institutional Holders ─────────────────────────────────────── */
 async function fmpGetInstitutional(symbol) {
-  const data = await fmpFetch(`/v3/institutional-holder/${symbol}`, symbol);
+  let data = await fmpFetch(`/v3/institutional-holder/${symbol}`, symbol);
+  if (!data || !data.length) {
+    try {
+      const r = await fetch(`${FMP_STABLE}/institutional-holder?symbol=${symbol}&apikey=${getFmpKey()}`, { signal: AbortSignal.timeout(7000) });
+      data = r.ok ? await r.json() : null;
+    } catch(e) { data = null; }
+  }
   if (!data || !data.length) return null;
   const total = data.reduce((s, h) => s + (h.shares || 0), 0);
   return data.slice(0, 12).map(h => ({
