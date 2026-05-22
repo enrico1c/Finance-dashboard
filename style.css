@@ -375,15 +375,16 @@ h1 {
 }
 
 .panel-head h3 {
-  display: none;
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600; line-height: 1;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-secondary); white-space: nowrap;
+  flex: 1;
 }
 
-.panel-title-row { display:none; }
+.panel-title-row { display:flex; flex-direction:column; gap:2px; flex:1; }
 
-.mode-label {
-  font-family:var(--font-mono); font-size:9px;
-  letter-spacing:.08em; color:var(--text-muted);
-}
+.mode-label { display: none; }
 
 /* ─── PANEL ACTIONS ──────────────────────────────────────────────── */
 .panel-actions {
