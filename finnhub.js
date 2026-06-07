@@ -387,6 +387,9 @@ function fhRenderBRC(sym, upgrades) {
 
 /* ── Render: Ownership HDS tab ───────────────────────────────────── */
 function fhRenderOwnership(sym, insiders, institutional) {
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.ownership = { sym, insiders, institutional };
+
   const hds = document.getElementById("own-hds");
   if (!hds) return;
 

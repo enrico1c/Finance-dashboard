@@ -1,0 +1,213 @@
+/* ══════════════════════════════════════════════════════════════════
+   FINTERM — Terminal View · terminal.css
+   Dense, table-first professional workspace mode.
+   Built entirely on the existing dark-theme CSS variables defined
+   in style.css (:root) — no new palette is introduced.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Header toggle button ─────────────────────────────────────────── */
+.terminal-view-toggle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.terminal-view-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+}
+.terminal-view-toggle.active {
+  color: var(--bg-base);
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+/* ── Structural switch between dashboard and terminal workspace ──── */
+.app-shell.terminal-active #dashboardCanvas,
+.app-shell.terminal-active #layoutSidebar {
+  display: none !important;
+}
+.terminal-view.hidden { display: none !important; }
+
+/* ── Workspace grid ───────────────────────────────────────────────── */
+.terminal-view {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: min-content;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-base);
+  overflow-y: auto;
+  font-family: var(--font-mono);
+}
+
+/* Window placement — dense multi-column grid on desktop */
+.tv-window { grid-column: span 4; }
+.tv-window.tv-span-6  { grid-column: span 6; }
+.tv-window.tv-span-8  { grid-column: span 8; }
+.tv-window.tv-span-12 { grid-column: span 12; }
+
+@media (max-width: 1280px) {
+  .tv-window,
+  .tv-window.tv-span-6,
+  .tv-window.tv-span-8  { grid-column: span 6; }
+}
+@media (max-width: 880px) {
+  .terminal-view { grid-template-columns: 1fr; }
+  .tv-window,
+  .tv-window.tv-span-6,
+  .tv-window.tv-span-8,
+  .tv-window.tv-span-12 { grid-column: span 1; }
+}
+
+/* ── Terminal window (panel frame) ────────────────────────────────── */
+.tv-window {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  min-height: 0;
+}
+.tv-window-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tv-window-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.tv-window-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tv-window-tab {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  cursor: default;
+}
+.tv-window-tab.active {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+}
+.tv-window-actions {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: .03em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.tv-window-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  min-height: 0;
+  max-height: 360px;
+}
+.tv-window-body.tv-tall { max-height: 540px; }
+
+/* ── Dense data table ─────────────────────────────────────────────── */
+.tv-table-wrap { overflow-x: auto; }
+.tv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.tv-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-bright);
+  white-space: nowrap;
+}
+.tv-table thead th.tv-num { text-align: right; }
+.tv-table tbody td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-align: left;
+}
+.tv-table tbody td.tv-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.tv-table tbody tr:hover td {
+  background: var(--bg-hover);
+}
+.tv-table .tv-ticker {
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: .03em;
+}
+.tv-table .tv-empty { color: var(--text-muted); }
+
+/* ── Color coding ─────────────────────────────────────────────────── */
+.tv-pos { color: var(--accent-green); }
+.tv-neg { color: var(--accent-red); }
+.tv-warn { color: #d29922; }
+.tv-neutral { color: var(--text-secondary); }
+
+/* ── Status / signal / risk tags ──────────────────────────────────── */
+.tv-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.tv-tag-pos     { color: var(--accent-green); background: color-mix(in srgb, var(--accent-green) 12%, transparent); }
+.tv-tag-neg     { color: var(--accent-red);   background: color-mix(in srgb, var(--accent-red) 12%, transparent); }
+.tv-tag-warn    { color: #d29922;             background: color-mix(in srgb, #d29922 12%, transparent); }
+.tv-tag-neutral { color: var(--text-secondary); background: var(--bg-surface); }
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.tv-window-empty {
+  padding: 14px 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: .03em;
+}

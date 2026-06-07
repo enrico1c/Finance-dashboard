@@ -264,7 +264,10 @@ async function refreshDBPrices() {
     try {
       const res  = await fetch(`https://financialmodelingprep.com/api/v3/quote/${tickers}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(8000)});
       const data = await res.json();
-      (Array.isArray(data) ? data : []).forEach(q => {
+      // FMP returns a JSON error object (not an array) on auth/legacy-endpoint failures —
+      // treat that as a failed request so we fall through to the Finnhub fallback below.
+      if (!res.ok || !Array.isArray(data) || !data.length) throw new Error(`FMP ${res.status}`);
+      data.forEach(q => {
         const sym = q.symbol?.toUpperCase();
         if (DB[sym] && q.price) {
           DB[sym].price     = q.price;
@@ -302,6 +305,31 @@ async function refreshDBPrices() {
   }
 }
 
+/* Finnhub per-symbol fallback for sectorDB prices (used when FMP is absent or failing) */
+async function _sectorDBFinnhubRefresh(symbols, reason) {
+  const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+  if (!fhKey) return;
+  // Stagger requests slightly to respect the 60/min free-tier rate limit
+  for (let i = 0; i < symbols.length; i++) {
+    const sym = symbols[i];
+    try {
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${fhKey}`, {signal:AbortSignal.timeout(4000)});
+      const q   = await res.json();
+      if (q?.c) {
+        Object.values(sectorDB).forEach(sector => {
+          const s = sector.stocks.find(st => st.ticker.replace(/.*:/,'').toUpperCase() === sym);
+          if (s) {
+            s.price  = q.c;
+            s.change = q.dp ?? s.change; // dp = daily change %
+          }
+        });
+      }
+    } catch(e) {}
+    if (i > 0 && i % 10 === 0) await new Promise(r => setTimeout(r, 1000));
+  }
+  console.info(`[sectorDB] Prices refreshed from Finnhub (${reason})`);
+}
+
 /* Also refresh sectorDB stock prices with live data */
 async function refreshSectorDBPrices() {
   const allTickers = [];
@@ -313,30 +341,7 @@ async function refreshSectorDBPrices() {
 
   const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
   if (!fmpKey) {
-    // Finnhub REST fallback: individual quotes (no key = free-tier 60/min)
-    const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
-    if (fhKey) {
-      // Stagger requests slightly to respect rate limit
-      for (let i = 0; i < unique.length; i++) {
-        const sym = unique[i];
-        try {
-          const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${fhKey}`, {signal:AbortSignal.timeout(4000)});
-          const q   = await res.json();
-          if (q?.c) {
-            Object.values(sectorDB).forEach(sector => {
-              const s = sector.stocks.find(st => st.ticker.replace(/.*:/,'').toUpperCase() === sym);
-              if (s) {
-                s.price  = q.c;
-                s.change = q.dp ?? s.change; // dp = daily change %
-              }
-            });
-          }
-        } catch(e) {}
-        // Brief pause every 10 tickers to stay within 60/min limit
-        if (i > 0 && i % 10 === 0) await new Promise(r => setTimeout(r, 1000));
-      }
-      console.info('[sectorDB] Prices refreshed from Finnhub (FMP key absent)');
-    }
+    await _sectorDBFinnhubRefresh(unique, 'FMP key absent');
     return;
   }
 
@@ -347,7 +352,10 @@ async function refreshSectorDBPrices() {
       // Use full quote for PE/PB/mktCap updates
       const res   = await fetch(`https://financialmodelingprep.com/api/v3/quote/${chunk.join(',')}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(8000)});
       const data  = await res.json();
-      (Array.isArray(data) ? data : []).forEach(q => {
+      // FMP returns a JSON error object (not an array) on auth/legacy-endpoint failures —
+      // treat that as a failed request so we fall through to the Finnhub fallback.
+      if (!res.ok || !Array.isArray(data)) throw new Error(`FMP ${res.status}`);
+      data.forEach(q => {
         const sym = q.symbol?.toUpperCase();
         Object.values(sectorDB).forEach(sector => {
           const s = sector.stocks.find(st => st.ticker.replace(/.*:/,'').toUpperCase() === sym);
@@ -366,7 +374,9 @@ async function refreshSectorDBPrices() {
       });
     }
     console.info('[sectorDB] Prices refreshed from FMP');
-  } catch(e) {}
+  } catch(e) {
+    await _sectorDBFinnhubRefresh(unique, 'FMP failed');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -931,6 +941,9 @@ function niSourceLinks(sym) {
 
 /* Central render function — ALL API providers call this */
 function renderNewsFeed(sym, articles, provider) {
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.news = { sym, articles, provider };
+
   const feed = document.getElementById("news-feed");
   if (!feed) return;
   if (!articles || !articles.length) return;
@@ -1060,6 +1073,7 @@ function reloadAllPanels(ticker){
   renderAnalysts(ticker);
   renderOwnership(ticker);
   renderComparables(ticker);
+  if (typeof terminalViewActive !== 'undefined' && terminalViewActive) renderTerminalView();
 }
 
 /* Auto-load geo-wars when geopolitical panel becomes visible */
@@ -1422,13 +1436,15 @@ function renderValuation(ticker) {
       // Trigger async live price refresh — will re-render valuation when done
       setTimeout(async () => {
         const fmpKey = (typeof getFmpKey === 'function') ? getFmpKey() : '';
+        let applied = false;
         if (fmpKey) {
           try {
             const res  = await fetch(`https://financialmodelingprep.com/api/v3/quote-short/${sym}?apikey=${fmpKey}`, {signal:AbortSignal.timeout(5000)});
             const data = await res.json();
             const q    = Array.isArray(data) ? data[0] : data;
-            if (q?.price) {
-              // Update sectorDB stock in place with live price
+            // FMP returns a JSON error object (not an array) on auth/legacy-endpoint
+            // failures — only treat it as success when res.ok and a price came back.
+            if (res.ok && q?.price) {
               for (const key in sectorDB) {
                 const s = sectorDB[key].stocks.find(st => st.ticker === ticker || st.ticker.endsWith(":"+ticker));
                 if (s) {
@@ -1437,20 +1453,37 @@ function renderValuation(ticker) {
                   s.mktCap = q.marketCap ? (q.marketCap >= 1e12 ? (q.marketCap/1e12).toFixed(2)+"T" : (q.marketCap/1e9).toFixed(1)+"B") : s.mktCap;
                 }
               }
-              // Re-render valuation with fresh price
-              if (typeof renderValuation === 'function') renderValuation(ticker);
+              applied = true;
             }
           } catch(e) {}
-        } else if (typeof fhGetLive === 'function') {
-          const fhQ = fhGetLive(sym)?.quote;
+        }
+
+        // FMP absent or failed — fall back to Finnhub (cache first, then a live call)
+        if (!applied) {
+          let fhQ = (typeof fhGetLive === 'function') ? fhGetLive(sym)?.quote : null;
+          if (!fhQ?.price) {
+            const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+            if (fhKey) {
+              try {
+                const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${fhKey}`, {signal:AbortSignal.timeout(5000)});
+                const q   = await res.json();
+                if (q?.c) fhQ = { price: q.c, changePct: q.dp };
+              } catch(e) {}
+            }
+          }
           if (fhQ?.price) {
             for (const key in sectorDB) {
               const s = sectorDB[key].stocks.find(st => st.ticker === ticker || st.ticker.endsWith(":"+ticker));
-              if (s) s.price = fhQ.price;
+              if (s) {
+                s.price = fhQ.price;
+                if (fhQ.changePct != null) s.change = fhQ.changePct;
+              }
             }
-            if (typeof renderValuation === 'function') renderValuation(ticker);
+            applied = true;
           }
         }
+
+        if (applied && typeof renderValuation === 'function') renderValuation(ticker);
       }, 200);
     }
   }

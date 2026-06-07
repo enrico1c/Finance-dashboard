@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FINTERM — Finance Dashboard</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="terminal.css" />
   <link rel="stylesheet" href="uars-widget.css" />
   <link rel="stylesheet" href="auth/login.css" />
   <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -123,6 +124,7 @@
 
       <!-- ── API sidebar toggle button ─────────────────────────── -->
       <span id="fh-ws-status" title="Finnhub WebSocket status" style="font-size:9px;font-weight:700;letter-spacing:.03em;cursor:default;margin-right:2px"></span>
+      <button id="terminalViewToggle" class="terminal-view-toggle" onclick="toggleTerminalView()" title="Switch to dense table-first terminal workspace">Terminal View</button>
       <button class="api-config-btn" onclick="toggleApiSidebar()" title="Configure API Keys">⚙ API</button>
 
       <button class="topbar-collapse-btn" id="topbarCollapseBtn" onclick="toggleTopbar()" title="Collapse">▲</button>
@@ -987,6 +989,12 @@
 
   </div><!-- /dashboardCanvas -->
 
+  <!-- ══ TERMINAL VIEW WORKSPACE ══════════════════════════════════
+       Alternate dense, table-first layout mode. Hidden by default;
+       populated by renderTerminalView() in terminal.js when toggled
+       on via the "Terminal View" button in the top bar.            -->
+  <div id="terminalView" class="terminal-view hidden"></div>
+
   <!-- Toast notification (used by api.js) -->
   <div id="apiToast" class="api-toast"></div>
 
@@ -1002,6 +1010,7 @@
 <!-- Scripts — config.js must load before api.js/fmp.js, after script.js -->
 <script src="config.js"></script>
 <script src="script.js?v=fund06"></script>
+<script src="terminal.js"></script>
 <script src="api.js?v=fund02"></script>
 <script src="fmp.js?v=fund02"></script>
 <script src="finnhub.js"></script>

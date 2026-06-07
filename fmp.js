@@ -737,20 +737,41 @@ async function fmpRefreshWatchlistPrices() {
   try {
     const tickers = currentWatchlistStocks.map(s => s.ticker.replace(/.*:/,"")).join(",");
     const quotes  = await fmpGetBatchQuote(tickers.split(","));
-    if (!quotes) return;
 
     let updated = false;
-    currentWatchlistStocks.forEach(s => {
-      const sym = s.ticker.replace(/.*:/,"").toUpperCase();
-      const q   = quotes[sym];
-      if (q) {
-        if (q.price     != null) s.price  = q.price;
-        if (q.changePct != null) s.change = q.changePct;
-        if (q.mktCap    != null) s.mktCap = fmtB(q.mktCap);
-        if (q.pe        != null) s.pe     = q.pe;
-        updated = true;
+    if (quotes) {
+      currentWatchlistStocks.forEach(s => {
+        const sym = s.ticker.replace(/.*:/,"").toUpperCase();
+        const q   = quotes[sym];
+        if (q) {
+          if (q.price     != null) s.price  = q.price;
+          if (q.changePct != null) s.change = q.changePct;
+          if (q.mktCap    != null) s.mktCap = fmtB(q.mktCap);
+          if (q.pe        != null) s.pe     = q.pe;
+          updated = true;
+        }
+      });
+    }
+
+    // FMP batch quote unavailable (legacy endpoint / quota / no key) — fall back
+    // to per-symbol Finnhub quotes so the watchlist still gets live prices.
+    if (!updated) {
+      const fhKey = (typeof getFinnhubKey === 'function') ? getFinnhubKey() : '';
+      if (fhKey) {
+        await Promise.allSettled(currentWatchlistStocks.map(async s => {
+          const sym = s.ticker.replace(/.*:/,"").toUpperCase();
+          try {
+            const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${fhKey}`, {signal:AbortSignal.timeout(5000)});
+            const q   = await res.json();
+            if (q?.c) {
+              s.price  = q.c;
+              s.change = q.dp;
+              updated  = true;
+            }
+          } catch(e) {}
+        }));
       }
-    });
+    }
 
     if (updated) {
       renderWatchlistRows();
