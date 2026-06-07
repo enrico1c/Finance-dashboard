@@ -188,6 +188,9 @@ async function fredLoadYieldCurve() {
       SPREAD_SERIES.map(s => fredLatest(s.id).then(v => ({ ...s, value: v ? parseFloat(v.value) : null, date: v?.date })))
     );
 
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.fredSpreads = results.filter(r=>r.status==='fulfilled').map(r=>r.value);
+
     let credHtml = `<div class="fred-section-head" style="margin-top:10px">📊 Credit Spreads &amp; Inflation Breakeven</div>
       <div class="fred-cs-grid">`;
     for (const r of results) {
@@ -246,6 +249,9 @@ async function fredLoadMacroIndicators() {
         }))
       )
     );
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.fredMacro = results.filter(r=>r.status==='fulfilled').map(r=>r.value);
 
     let html = `<div class="fred-section-head">🏛 FRED Macro Indicators</div>
     <div class="fred-macro-grid">`;

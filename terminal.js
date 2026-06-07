@@ -75,6 +75,185 @@ window.addEventListener('load', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════
+   FREE-FLOATING LAYOUT — independent parallel of the dashboard's
+   panelLayout / initDrag / initResize / bringToFront (script.js
+   ~1663-1905). Operates on disjoint DOM (#terminalView .tv-window
+   vs #dashboardCanvas .panel) and disjoint state — the two systems
+   never interact, so this carries zero regression risk to the
+   14 existing dashboard panels.
+   ══════════════════════════════════════════════════════════════════ */
+const _TV_LAYOUT_KEY = 'finterm_tv_layout';
+let tvLayout = {};
+function _tvLoadLayout() {
+  if (!_tvHasStorage) return {};
+  try {
+    const raw = localStorage.getItem(_TV_LAYOUT_KEY);
+    return raw ? (JSON.parse(raw) || {}) : {};
+  } catch (e) { return {}; }
+}
+function _tvSaveLayout() {
+  if (!_tvHasStorage) return;
+  try { localStorage.setItem(_TV_LAYOUT_KEY, JSON.stringify(tvLayout)); }
+  catch (e) { /* localStorage unavailable — fall back silently to in-memory state */ }
+}
+tvLayout = _tvLoadLayout();
+
+function _tvSlug(title) {
+  return String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'win';
+}
+
+/* Generic 3-column grid fill — terminal windows are generated dynamically
+   (count/identity vary with data), so unlike computeDefaultLayout's bespoke
+   per-panel percentages, this just lays out whatever ids are present.
+   Existing/persisted positions (tvLayout[id]) are preserved untouched. */
+function computeDefaultTvLayout(winIds) {
+  const root = document.getElementById('terminalView');
+  const W = (root && root.clientWidth) || window.innerWidth;
+  const G = 10, cols = 3;
+  const colW = Math.round((W - G * (cols + 1)) / cols);
+  const rowH = 360;
+  winIds.forEach((id, i) => {
+    if (tvLayout[id]) return;
+    const col = i % cols, row = Math.floor(i / cols);
+    tvLayout[id] = { x: G + col * (colW + G), y: G + row * (rowH + G), w: colW, h: rowH };
+  });
+}
+
+function applyTvWindowPosition(id) {
+  const el = document.querySelector(`.tv-window[data-tv-window="${id}"]`);
+  if (!el) return;
+  let l = tvLayout[id];
+  if (!l) {
+    const root = document.getElementById('terminalView');
+    const rw = (root && root.clientWidth)  || window.innerWidth;
+    const rh = (root && root.clientHeight) || window.innerHeight;
+    const w = Math.min(640, Math.round(rw * 0.40));
+    const h = Math.min(480, Math.round(rh * 0.55));
+    l = { x: Math.round((rw - w) / 2), y: Math.round((rh - h) / 2), w, h };
+    tvLayout[id] = l;
+  }
+  Object.assign(el.style, { left: l.x + 'px', top: l.y + 'px', width: l.w + 'px', height: l.h + 'px' });
+}
+
+const TV_SNAP = 8, TV_MIN_W = 240, TV_MIN_H = 120;
+let tvDragState = null, tvResizeState = null, tvZCounter = 10;
+function tvBringToFront(win) { win.style.zIndex = ++tvZCounter; }
+
+function tvInitDrag(win) {
+  const head = win.querySelector('.tv-window-header');
+  if (!head) return;
+  head.addEventListener('mousedown', e => {
+    if (e.target.closest('.tv-window-tab,button,input,select,textarea')) return;
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    const root = document.getElementById('terminalView');
+    const r = win.getBoundingClientRect(), c = root.getBoundingClientRect();
+    tvDragState = { win, startMouseX: e.clientX, startMouseY: e.clientY,
+      startX: r.left - c.left, startY: r.top - c.top };
+    win.classList.add('tv-dragging');
+    tvBringToFront(win);
+  });
+}
+document.addEventListener('mousemove', e => {
+  if (!tvDragState) return;
+  const root = document.getElementById('terminalView');
+  if (!root) return;
+  const c = root.getBoundingClientRect();
+  const ww = tvDragState.win.offsetWidth, wh = tvDragState.win.offsetHeight;
+  let x = tvDragState.startX + (e.clientX - tvDragState.startMouseX);
+  let y = tvDragState.startY + (e.clientY - tvDragState.startMouseY);
+  x = Math.round(x / TV_SNAP) * TV_SNAP;
+  y = Math.round(y / TV_SNAP) * TV_SNAP;
+  x = Math.max(-ww + 60, Math.min(x, c.width - 60));
+  y = Math.max(0, y);
+  tvDragState.win.style.left = x + 'px';
+  tvDragState.win.style.top  = y + 'px';
+  const id = tvDragState.win.dataset.tvWindow;
+  if (tvLayout[id]) { tvLayout[id].x = x; tvLayout[id].y = y; }
+});
+document.addEventListener('mouseup', () => {
+  document.body.style.userSelect = '';
+  if (!tvDragState) return;
+  tvDragState.win.classList.remove('tv-dragging');
+  _tvSaveLayout();
+  tvDragState = null;
+});
+
+function tvInitResize(win) {
+  win.querySelectorAll('.tv-resize-handle').forEach(h => {
+    h.addEventListener('mousedown', e => {
+      e.preventDefault(); e.stopPropagation();
+      document.body.style.userSelect = 'none';
+      const root = document.getElementById('terminalView');
+      const r = win.getBoundingClientRect(), c = root.getBoundingClientRect();
+      tvResizeState = { win, dir: h.dataset.dir, mouseX: e.clientX, mouseY: e.clientY,
+        startX: r.left - c.left, startY: r.top - c.top, startW: r.width, startH: r.height };
+      win.classList.add('tv-resizing');
+      tvBringToFront(win);
+    });
+  });
+}
+document.addEventListener('mousemove', e => {
+  if (!tvResizeState) return;
+  e.preventDefault();
+  const s = tvResizeState;
+  const dx = e.clientX - s.mouseX, dy = e.clientY - s.mouseY;
+  let x = s.startX, y = s.startY, w = s.startW, h = s.startH;
+
+  if (s.dir.includes('e')) w = Math.max(TV_MIN_W, s.startW + dx);
+  if (s.dir.includes('w')) { w = Math.max(TV_MIN_W, s.startW - dx); x = s.startX + s.startW - w; }
+  if (s.dir.includes('s')) h = Math.max(TV_MIN_H, s.startH + dy);
+  if (s.dir.includes('n')) { h = Math.max(TV_MIN_H, s.startH - dy); y = s.startY + s.startH - h; }
+
+  w = Math.round(w / TV_SNAP) * TV_SNAP;
+  h = Math.round(h / TV_SNAP) * TV_SNAP;
+  x = Math.round(x / TV_SNAP) * TV_SNAP;
+  y = Math.max(0, Math.round(y / TV_SNAP) * TV_SNAP);
+
+  Object.assign(s.win.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+
+  const id = s.win.dataset.tvWindow;
+  const tt = document.getElementById('tv-tooltip-' + id);
+  if (tt) tt.textContent = w + '×' + h;
+  if (tvLayout[id]) Object.assign(tvLayout[id], { x, y, w, h });
+});
+document.addEventListener('mouseup', () => {
+  document.body.style.userSelect = '';
+  if (!tvResizeState) return;
+  tvResizeState.win.classList.remove('tv-resizing');
+  _tvSaveLayout();
+  tvResizeState = null;
+});
+
+/* Re-render on breakpoint crossing so the free-layout ⇄ stacked-grid
+   switch (toggled in renderTerminalView via .tv-free-layout) takes effect. */
+let _tvResizeDebounce = null;
+window.addEventListener('resize', () => {
+  if (!terminalViewActive) return;
+  clearTimeout(_tvResizeDebounce);
+  _tvResizeDebounce = setTimeout(() => renderTerminalView(), 200);
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   INTERNAL TAB NAVIGATION — Geo-Risk WARS/RESOURCES/ROUTES,
+   Ownership HDS/MGMT/PSC-BO, News NEWS/INTEL, Fundamentals' 5 tabs,
+   Analysts' OVERVIEW/MODEL 1/2/3 — mirrors the dashboard's internal
+   panel tabs. Switching triggers a full renderTerminalView() —
+   consistent with the existing wholesale-innerHTML-replacement
+   architecture (table rendering is synchronous string concat, so the
+   cost of a full re-render is imperceptible).
+   ══════════════════════════════════════════════════════════════════ */
+const _tvActiveTab = {};
+function _tvGetActiveTab(winId, defaultKey) {
+  return _tvActiveTab[winId] || defaultKey;
+}
+function tvSwitchTab(winId, tabKey) {
+  _tvActiveTab[winId] = tabKey;
+  if (terminalViewActive) renderTerminalView();
+}
+window.tvSwitchTab = tvSwitchTab;
+
+/* ══════════════════════════════════════════════════════════════════
    REUSABLE BUILDING BLOCKS — TerminalWindow / TerminalTable
    ══════════════════════════════════════════════════════════════════ */
 
@@ -84,18 +263,25 @@ function tvWindow(title, opts) {
   opts = opts || {};
   const span    = opts.span || 4;
   const spanCls = span !== 4 ? ` tv-span-${span}` : '';
+  const id = opts.id || _tvSlug(title);
   const tabsHtml = (opts.tabs && opts.tabs.length)
     ? `<div class="tv-window-tabs">${opts.tabs.map(t =>
-        `<span class="tv-window-tab${t.active ? ' active' : ''}">${escapeHtml(t.label)}</span>`).join('')}</div>`
+        `<span class="tv-window-tab${t.active ? ' active' : ''}" data-tv-tab="${escapeHtml(t.key || '')}" onclick="tvSwitchTab('${id}','${t.key}')">${escapeHtml(t.label)}</span>`).join('')}</div>`
     : '';
   const actionsHtml = opts.actions ? `<span class="tv-window-actions">${escapeHtml(opts.actions)}</span>` : '';
-  return `<div class="tv-window${spanCls}">
+  return `<div class="tv-window${spanCls}" data-tv-window="${id}" id="tv-window-${id}">
     <div class="tv-window-header">
+      <div class="tv-drag-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <span class="tv-window-title">${escapeHtml(title)}</span>
       ${tabsHtml}
       ${actionsHtml}
     </div>
     <div class="tv-window-body${opts.tall ? ' tv-tall' : ''}">${opts.bodyHtml || ''}</div>
+    <div class="tv-resize-handle" data-dir="n"></div><div class="tv-resize-handle" data-dir="s"></div>
+    <div class="tv-resize-handle" data-dir="w"></div><div class="tv-resize-handle" data-dir="e"></div>
+    <div class="tv-resize-handle" data-dir="nw"></div><div class="tv-resize-handle" data-dir="ne"></div>
+    <div class="tv-resize-handle" data-dir="sw"></div><div class="tv-resize-handle" data-dir="se"></div>
+    <div class="tv-size-tooltip" id="tv-tooltip-${id}"></div>
   </div>`;
 }
 
@@ -238,6 +424,7 @@ function _tvFormatMetric(value, kind) {
   switch (kind) {
     case 'price':  return '$' + _tvNum(value);
     case 'pct':    return _tvPct(value);
+    case 'pctRaw': return Number(value).toFixed(2) + '%';
     case 'int':    return Number(value).toLocaleString('en-US');
     case 'cap':    return (typeof fmtB === 'function') ? fmtB(value) : ('$' + _tvNum(value, 0));
     case 'dec1':   return Number(value).toFixed(1);
@@ -292,10 +479,10 @@ function tvIntelligenceBlotter() {
   return tvTable(columns, rows);
 }
 
-/* MacroMonitorTable — only real, globally-reachable macro figures already
-   used elsewhere in the app (live VIX cache + Damodaran ERP constant).
-   FRED series caches are module-scoped (not globally reachable) so those
-   rows are intentionally omitted rather than shown as permanent N/A. */
+/* MacroMonitorTable — live VIX cache + Damodaran ERP constant, extended with
+   FRED macro indicators & credit spreads via the window._tvDataCache.fredMacro
+   / .fredSpreads stashes added in fred.js (module-scoped caches made reusable,
+   no re-fetch — same series the Macro-Intel panel already loaded). */
 function tvMacroMonitor() {
   const rows = [];
   const vix = window._vixLive;
@@ -316,13 +503,32 @@ function tvMacroMonitor() {
     change: null,
     status: erp != null ? 'REFERENCE' : null,
   });
+  (window._tvDataCache?.fredMacro || []).forEach(p => {
+    const chg = (p.latest != null && p.prev != null) ? (p.latest - p.prev) : null;
+    const pct = (p.prev && chg != null) ? (chg / Math.abs(p.prev) * 100) : null;
+    rows.push({
+      category: 'Macro (FRED)',
+      indicator: `${p.label}${p.unit ? ` (${p.unit})` : ''}`,
+      current: p.latest, previous: p.prev, change: pct, status: null,
+    });
+  });
+  (window._tvDataCache?.fredSpreads || []).forEach(p => {
+    const level = p.label === 'IG OAS' ? (p.value < 100 ? 'TIGHT' : 'WIDE')
+                : p.label === 'HY OAS' ? (p.value < 400 ? 'TIGHT' : 'WIDE')
+                : null;
+    rows.push({
+      category: 'Credit Spread',
+      indicator: `${p.label} — ${p.note}`,
+      current: p.value, previous: null, change: null, status: level,
+    });
+  });
   const columns = [
     { key: 'category',  label: 'Category' },
     { key: 'indicator', label: 'Indicator' },
     { key: 'current',   label: 'Current',  align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
     { key: 'previous',  label: 'Previous', align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
     { key: 'change',    label: 'Chg',      align: 'num', render: v => _tvPct(v) },
-    { key: 'status',    label: 'Status',   render: v => v ? _tvTag(v, v === 'ELEVATED' ? 'neg' : v === 'WATCH' ? 'warn' : v === 'NORMAL' ? 'pos' : 'neutral') : null },
+    { key: 'status',    label: 'Status',   render: v => v ? _tvTag(v, (v === 'ELEVATED' || v === 'WIDE') ? 'neg' : v === 'WATCH' ? 'warn' : (v === 'NORMAL' || v === 'TIGHT') ? 'pos' : 'neutral') : null },
   ];
   return tvTable(columns, rows);
 }
@@ -350,6 +556,65 @@ function tvRiskMatrix() {
     { key: 'assets',    label: 'Affected Assets' },
     { key: 'status',    label: 'Status' },
     { key: 'updated',   label: 'Since' },
+  ];
+  return tvTable(columns, rows);
+}
+
+const _GEO_RISK_RANK = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+function _tvRiskRank(level) { return _GEO_RISK_RANK[String(level || '').toUpperCase()] || 0; }
+
+/* GeoResources — reproduces wmGeoResources()'s flatten/dedupe-by-name logic
+   (worldmonitor.js ~3437) client-side from the same window._wmConflicts
+   array — same data, no new fetch, no stash needed. */
+function tvGeoResources() {
+  const items = window._wmConflicts || [];
+  const allRes = {};
+  items.forEach(c => {
+    (c.resources || c.commodities || []).forEach(r => {
+      const name = r.name || r.commodity || '';
+      if (!name) return;
+      const risk  = (r.risk || r.riskLevel || 'LOW').toUpperCase();
+      const cName = c.name || c.title || '';
+      if (!allRes[name] || _tvRiskRank(risk) > _tvRiskRank(allRes[name].risk)) {
+        allRes[name] = { name, risk, conflicts: [cName] };
+      } else {
+        allRes[name].conflicts.push(cName);
+      }
+    });
+  });
+  const rows = Object.values(allRes)
+    .sort((a, b) => _tvRiskRank(b.risk) - _tvRiskRank(a.risk))
+    .slice(0, 20)
+    .map(r => ({ commodity: r.name, risk: r.risk, conflicts: r.conflicts.filter(Boolean).slice(0, 3).join(', ') || null }));
+  const columns = [
+    { key: 'commodity', label: 'Commodity' },
+    { key: 'risk',      label: 'Risk', render: v => v ? _tvTag(v, (v === 'CRITICAL' || v === 'HIGH') ? 'neg' : v === 'MEDIUM' ? 'warn' : 'pos') : null },
+    { key: 'conflicts', label: 'Driving Conflicts' },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* GeoRoutes — same chokepoint objects rendered by wmGeoRoutes(),
+   exposed via the window._wmChokepoints stash added in worldmonitor.js */
+function tvGeoRoutes() {
+  const items = window._wmChokepoints || [];
+  const rows = items.slice(0, 20).map(c => ({
+    name: c.name,
+    region: c.region || c.location,
+    risk: (c.riskLevel || c.risk_level || c.status || '').toUpperCase() || null,
+    disruption: c.disruption_pct ?? c.disruptionPct ?? c.throughputReduction ?? null,
+    delay: c.avgDelayDays ?? c.delay_days ?? null,
+    traffic: c.dailyVessels ?? c.vessel_count ?? null,
+    commodities: (c.affectedCommodities || []).slice(0, 4).join(', ') || null,
+  }));
+  const columns = [
+    { key: 'name',        label: 'Chokepoint' },
+    { key: 'region',      label: 'Region' },
+    { key: 'risk',        label: 'Risk', render: v => v ? _tvTag(v, (v === 'CRITICAL' || v === 'HIGH') ? 'neg' : v === 'MEDIUM' ? 'warn' : 'pos') : null },
+    { key: 'disruption',  label: 'Disruption %', align: 'num', render: v => v != null ? Number(v).toFixed(0) + '%' : null },
+    { key: 'delay',       label: 'Delay (d)',    align: 'num', render: v => v != null ? '+' + Number(v).toFixed(0) : null },
+    { key: 'traffic',     label: 'Vessels/Day',  align: 'num', render: v => v != null ? Number(v).toLocaleString('en-US') : null },
+    { key: 'commodities', label: 'Affected Commodities' },
   ];
   return tvTable(columns, rows);
 }
@@ -418,9 +683,354 @@ function tvOwnershipTable() {
   return tvTable(columns, rows);
 }
 
+/* OwnershipMgmt — mirrors the #own-mgmt MGMT tab's primary source chain:
+   FMP executives (fmpGetLive(sym).mgmt — name/role/age/pay) when available,
+   else the Finnhub profile fallback fhRenderMgmt() shows (already global
+   via fhGetLive — no stash needed for either source). */
+function tvOwnershipMgmt(sym) {
+  const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+  const mgmt = fmpLive?.mgmt;
+  if (Array.isArray(mgmt) && mgmt.length) {
+    const rows = mgmt.slice(0, 15).map(m => ({ name: m.name, role: m.role, age: m.age, pay: m.pay }));
+    const columns = [
+      { key: 'name', label: 'Executive' },
+      { key: 'role', label: 'Title' },
+      { key: 'age',  label: 'Age', align: 'num', render: v => (v != null && v !== '—') ? v : null },
+      { key: 'pay',  label: 'Compensation', align: 'num' },
+    ];
+    return tvTable(columns, rows);
+  }
+  const profile = (typeof fhGetLive === 'function') ? fhGetLive(sym)?.profile : null;
+  const rows = [
+    { metric: 'Company',            value: profile?.name,     fmt: 'raw' },
+    { metric: 'Exchange',           value: profile?.exchange, fmt: 'raw' },
+    { metric: 'Country',            value: profile?.country,  fmt: 'raw' },
+    { metric: 'Sector / Industry',  value: profile?.sector,   fmt: 'raw' },
+    { metric: 'Market Cap',         value: profile?.mktCap,   fmt: 'cap' },
+    { metric: 'IPO Date',           value: profile?.ipo,      fmt: 'raw' },
+    { metric: 'Shares Outstanding', value: profile?.shareOut, fmt: 'int' },
+  ];
+  return tvTable(_tvMetricColumns(), rows);
+}
+
+const _CH_NATURE_LABELS = {
+  'ownership-of-shares-25-to-50-percent': '25–50% shares',
+  'ownership-of-shares-50-to-75-percent': '50–75% shares',
+  'ownership-of-shares-75-to-100-percent': '75–100% shares',
+  'voting-rights-25-to-50-percent': '25–50% votes',
+  'voting-rights-50-to-75-percent': '50–75% votes',
+  'voting-rights-75-to-100-percent': '75–100% votes',
+  'right-to-appoint-and-remove-directors': 'Appoint directors',
+  'significant-influence-or-control': 'Significant control',
+};
+/* OwnershipPSC — same Persons-with-Significant-Control records
+   _renderPSCSection() draws, exposed via the window._tvDataCache.companiesHouse stash */
+function tvOwnershipPSC() {
+  const cached = (window._tvDataCache && window._tvDataCache.companiesHouse) || {};
+  const items = cached.pscItems || [];
+  const rows = items.slice(0, 15).map(p => {
+    const kind = p.kind || '';
+    const dob = p.date_of_birth ? `${p.date_of_birth.year}-${String(p.date_of_birth.month).padStart(2, '0')}` : null;
+    return {
+      name: p.name || p.company_name,
+      type: kind.includes('corporate') ? 'Corporate Entity' : 'Individual',
+      nature: (p.natures_of_control || []).map(n => _CH_NATURE_LABELS[n] || n.replace(/-/g, ' ')).slice(0, 2).join(', ') || null,
+      nationality: p.nationality || p.country_of_residence,
+      notified: p.notified_on,
+      dob,
+    };
+  });
+  const columns = [
+    { key: 'name',        label: 'Person / Entity' },
+    { key: 'type',        label: 'Type', render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'nature',      label: 'Nature of Control' },
+    { key: 'nationality', label: 'Nationality' },
+    { key: 'notified',    label: 'Notified' },
+    { key: 'dob',         label: 'DoB (Y-M)' },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* GDELT seendate format is YYYYMMDDTHHMMSSZ; Federal Register uses ISO dates */
+function _tvDateSafe(raw) {
+  if (!raw) return null;
+  const m = String(raw).match(/^(\d{4})(\d{2})(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? String(raw).slice(0, 10) : d.toISOString().slice(0, 10);
+}
+
+/* NewsIntel — merges GDELT policy/disruption articles + Federal Register
+   notices, the same feeds intelLoadAll() renders into #intel-tab-*,
+   exposed via the window._tvDataCache.intel stash added in intel.js */
+function tvNewsIntel() {
+  const cached = (window._tvDataCache && window._tvDataCache.intel) || {};
+  const rows = [];
+  (cached.policyArticles || []).slice(0, 10).forEach(a => rows.push({
+    source: 'GDELT Policy', headline: a.title, origin: a.domain || a.sourcecountry,
+    date: _tvDateSafe(a.seendate || a.publishdate), type: null,
+  }));
+  (cached.dispArticles || []).slice(0, 10).forEach(a => rows.push({
+    source: 'GDELT Disruption', headline: a.title, origin: a.domain,
+    date: _tvDateSafe(a.seendate || a.publishdate), type: null,
+  }));
+  (cached.fedDocs || []).slice(0, 10).forEach(d => rows.push({
+    source: 'Federal Register', headline: d.title, origin: d.document_number,
+    date: _tvDateSafe(d.publication_date), type: d.type,
+  }));
+  rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const columns = [
+    { key: 'date',     label: 'Date' },
+    { key: 'source',   label: 'Source', render: v => _tvTag(v, 'neutral') },
+    { key: 'headline', label: 'Headline', render: v => v
+        ? `<span title="${escapeHtml(String(v))}">${escapeHtml(String(v).length > 80 ? String(v).slice(0, 77) + '…' : v)}</span>` : null },
+    { key: 'origin',   label: 'Origin / Doc #' },
+    { key: 'type',     label: 'Type', render: v => v ? _tvTag(v, v === 'RULE' ? 'neg' : v === 'PRULE' ? 'warn' : 'neutral') : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FUNDAMENTALS — entirely new window, 5 internal tabs. Every source
+   here is already globally reachable (avLiveCache / fhGetLive /
+   fmpGetLive / window._treasuryYields / window.DAMODARAN_ERP) except
+   segmentation (stash #5) and SEC filings (stash #6).
+   ══════════════════════════════════════════════════════════════════ */
+
+/* OVERVIEW — same ratio set the Fundamentals panel's overview tab shows */
+function tvFundOverview(sym) {
+  const fhLive  = (typeof fhGetLive  === 'function') ? fhGetLive(sym)  : null;
+  const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+  const ratios  = fmpLive?.ratios;
+  const profile = fhLive?.profile;
+  const cache   = (typeof avLiveCache !== 'undefined' && avLiveCache[sym]) || {};
+  const ov = cache.overview || {};
+  const rows = [
+    { metric: 'Sector / Industry', value: profile?.sector,         fmt: 'raw' },
+    { metric: 'P/E',               value: ratios?.pe ?? ov.pe,     fmt: 'dec1' },
+    { metric: 'P/B',               value: ratios?.pb,              fmt: 'dec2' },
+    { metric: 'EV/EBITDA',         value: ratios?.evEbitda,        fmt: 'dec1' },
+    { metric: 'ROE',               value: ratios?.roe,             fmt: 'pctRaw' },
+    { metric: 'Gross Margin',      value: ratios?.grossMgn,        fmt: 'pctRaw' },
+    { metric: 'Dividend Yield',    value: ratios?.divYield,        fmt: 'pctRaw' },
+    { metric: 'Debt / Equity',     value: ratios?.debtEq,          fmt: 'dec2' },
+    { metric: 'Beta',              value: ov.beta,                 fmt: 'dec2' },
+  ];
+  return tvTable(_tvMetricColumns(), rows);
+}
+
+/* FINANCIALS — same avLiveCache[sym].income annual series avRenderFA() shows */
+function tvFundFinancials(sym) {
+  const income = (typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.income) || [];
+  const moneyFmt = v => (v ? ((typeof fmtB === 'function') ? fmtB(v) : '$' + _tvNum(v, 0)) : null);
+  const rows = income.slice(0, 5).map(r => ({
+    year: r.year, revenue: r.revenue, grossProfit: r.grossProfit, ebit: r.ebit, netIncome: r.netIncome,
+  }));
+  const columns = [
+    { key: 'year',        label: 'FY' },
+    { key: 'revenue',     label: 'Revenue',      align: 'num', render: moneyFmt },
+    { key: 'grossProfit', label: 'Gross Profit', align: 'num', render: moneyFmt },
+    { key: 'ebit',        label: 'EBIT',         align: 'num', render: moneyFmt },
+    { key: 'netIncome',   label: 'Net Income',   align: 'num', render: moneyFmt },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* EARNINGS — same avLiveCache[sym].earnings.quarterly avRenderEarnings() shows,
+   falling back to fhGetLive(sym).earnings exactly as script.js does (~line 583) */
+function tvFundEarnings(sym) {
+  const avQ = (typeof avLiveCache !== 'undefined' && avLiveCache[sym]?.earnings?.quarterly) || [];
+  const fhE = ((typeof fhGetLive === 'function') ? fhGetLive(sym)?.earnings : null) || [];
+  const rows = avQ.length
+    ? avQ.slice(0, 8).map(q => ({ period: q.quarter, est: q.epsEst, actual: q.epsActual, surprise: q.surprisePct, reportDate: q.reportDate }))
+    : fhE.slice(0, 8).map(e => ({ period: e.period, est: e.epsEst, actual: e.epsActual, surprise: e.surprisePct, reportDate: e.period }));
+  const columns = [
+    { key: 'period',     label: 'Period' },
+    { key: 'est',        label: 'EPS Est',    align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
+    { key: 'actual',     label: 'EPS Actual', align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
+    { key: 'surprise',   label: 'Surprise %', align: 'num', render: v => _tvPct(v) },
+    { key: 'reportDate', label: 'Report Date' },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* Picks the largest segment from an FMP revenue-segmentation record array
+   (shape: [{ "<date>": { "<segment>": value, ... } }, ...] — same shape
+   fmpRenderSegmentation's renderSegBlock() decodes) */
+function _tvTopSegment(records) {
+  if (!Array.isArray(records) || !records.length) return null;
+  const latest = records[0];
+  const date = Object.keys(latest || {})[0];
+  const segs = latest && latest[date];
+  if (!segs || typeof segs !== 'object') return null;
+  const entries = Object.entries(segs).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+  if (!entries.length) return null;
+  const total = entries.reduce((s, [, v]) => s + (v || 0), 0);
+  const [name, val] = entries[0];
+  return { name, pct: total > 0 ? (val / total * 100) : null };
+}
+
+/* VALUATION — same WACC inputs script.js's WACC computation block uses
+   (window._treasuryYields['10Y'], window.DAMODARAN_ERP, fmpGetLive(sym).waccInputs
+   — confirmed live shapes at script.js ~735-764), plus segmentation (stash #5) */
+function tvFundValuation(sym) {
+  const fmpLive = (typeof fmpGetLive === 'function') ? fmpGetLive(sym) : null;
+  const waccInputs = fmpLive?.waccInputs;
+  const ratios = fmpLive?.ratios;
+  const ty  = (typeof window._treasuryYields !== 'undefined') ? window._treasuryYields : {};
+  const seg = (window._tvDataCache && window._tvDataCache.segmentation) || {};
+  const topProd = _tvTopSegment(seg.product);
+  const topGeo  = _tvTopSegment(seg.geo);
+  const rows = [
+    { metric: 'Risk-Free Rate (10Y UST)',        value: ty['10Y'],              fmt: 'pctRaw' },
+    { metric: 'Equity Risk Premium (Damodaran)', value: window.DAMODARAN_ERP,   fmt: 'pctRaw' },
+    { metric: 'Pre-Tax Cost of Debt',            value: waccInputs?.kdPct,      fmt: 'pctRaw' },
+    { metric: 'Effective Tax Rate',              value: waccInputs?.taxRatePct, fmt: 'pctRaw' },
+    { metric: 'Debt / Equity',                   value: ratios?.debtEq,         fmt: 'dec2' },
+    { metric: 'Top Revenue Segment',    value: topProd ? `${topProd.name} (${topProd.pct.toFixed(0)}%)` : null, fmt: 'raw' },
+    { metric: 'Top Geographic Segment', value: topGeo  ? `${topGeo.name} (${topGeo.pct.toFixed(0)}%)`  : null, fmt: 'raw' },
+  ];
+  return tvTable(_tvMetricColumns(), rows);
+}
+
+/* FILINGS — same annual/quarterly/material SEC filings fmpRenderFilings() lists,
+   exposed via the window._tvDataCache.filings stash added in fmp.js */
+function tvFundFilings(sym) {
+  const cached = (window._tvDataCache && window._tvDataCache.filings) || {};
+  const rows = [...(cached.annuals || []), ...(cached.quarters || []), ...(cached.material || [])]
+    .map(f => ({ form: f.form, entity: f.entity, filed: f.filed, period: f.period }))
+    .sort((a, b) => String(b.filed || '').localeCompare(String(a.filed || '')))
+    .slice(0, 15);
+  const columns = [
+    { key: 'form',   label: 'Form',   render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'entity', label: 'Entity' },
+    { key: 'filed',  label: 'Filed' },
+    { key: 'period', label: 'Period' },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ANALYSTS — entirely new window mirroring the UARS shell's actual
+   tabs (OVERVIEW / MODEL 1 / MODEL 2 / MODEL 3 — uars-widget.js
+   ~127-131), sourced via the window._tvDataCache.uars stash (#4)
+   ══════════════════════════════════════════════════════════════════ */
+function tvAnalystsOverview(sym) {
+  const cached = (window._tvDataCache && window._tvDataCache.uars) || {};
+  const r = cached.result || {};
+  const rows = [
+    { metric: 'Consensus Score',  value: r.consensus,              fmt: 'dec1' },
+    { metric: 'Rating',           value: r.rating?.label,          fmt: 'signal' },
+    { metric: 'Recommendation',   value: r.rating?.recommendation, fmt: 'signal' },
+    { metric: 'Confidence',       value: r.confidence,             fmt: 'raw' },
+    { metric: 'Macro Regime',     value: r.regime,                 fmt: 'raw' },
+    { metric: 'Model 1 Score',    value: r.m1,                     fmt: 'dec1' },
+    { metric: 'Model 2 Score',    value: r.m2,                     fmt: 'dec1' },
+    { metric: 'Model 3 Score',    value: r.m3CAS,                  fmt: 'dec1' },
+  ];
+  return tvTable(_tvMetricColumns(), rows);
+}
+/* MODEL 1/2/3 — mirrors _renderModel1/_renderModel2/_renderModel3's actual
+   formulas (uars-widget.js ~683-880): Model 1 = UScore (Q-multiplier ×
+   contribution, final = m1), Model 2 = UARS (regime Λ-multiplier from the
+   globally-exposed window.UARS.REGIME_MULT, final = m2), Model 3 = CAS
+   (AS → penalty waterfall P_liq·P_tail·P_dq·P_struct → CAS). All fields
+   come straight from the stashed result object — nothing fabricated. */
+function tvAnalystsModel(modelKey) {
+  const cached = (window._tvDataCache && window._tvDataCache.uars) || {};
+  const r = cached.result || {};
+
+  if (modelKey === 'model3') {
+    const pen = r.penalties || {};
+    const rows = [
+      { metric: 'Aggregate Score (AS)',           value: r.m3AS,     fmt: 'dec1' },
+      { metric: 'P_liq — Liquidity',               value: pen.liq,    fmt: 'dec2' },
+      { metric: 'P_tail — Tail Risk',              value: pen.tail,   fmt: 'dec2' },
+      { metric: 'P_dq — Data Quality',             value: pen.dq,     fmt: 'dec2' },
+      { metric: 'P_struct — Structural',           value: pen.struct, fmt: 'dec2' },
+      { metric: 'Composite Adjusted Score (CAS)',  value: r.m3CAS,    fmt: 'dec1' },
+    ];
+    return tvTable(_tvMetricColumns(), rows);
+  }
+
+  const useQ = modelKey === 'model1';
+  const REGIME_MULT = (window.UARS && window.UARS.REGIME_MULT) || {};
+  const regimeMults = REGIME_MULT[r.regime] || {};
+  const adjW = r.adjWeights || {};
+  const dims = Object.values(r.dimDetails || {});
+  const rows = dims.map(d => {
+    const adj  = adjW[d.id] ?? null;
+    const mult = useQ ? (r.qualityMults?.[d.id] ?? 1.0) : (regimeMults[d.id] ?? 1.0);
+    return {
+      dimension: d.label,
+      score: d.score,
+      baseWeight: d.baseWeight != null ? d.baseWeight * 100 : null,
+      adjWeight: adj != null ? adj * 100 : null,
+      mult,
+      contribution: (adj != null && d.score != null) ? adj * d.score * mult : null,
+    };
+  });
+  const columns = [
+    { key: 'dimension',    label: 'Dimension' },
+    { key: 'score',        label: 'Score',     align: 'num', render: v => v != null ? Math.round(v) : null },
+    { key: 'baseWeight',   label: 'Base Wt %', align: 'num', render: v => v != null ? v.toFixed(0) + '%' : null },
+    { key: 'adjWeight',    label: 'Adj Wt %',  align: 'num', render: v => v != null ? v.toFixed(0) + '%' : null },
+    { key: 'mult',         label: useQ ? 'Q Mult' : 'Λ Mult', align: 'num', render: v => v != null ? v.toFixed(2) : null },
+    { key: 'contribution', label: 'Contrib',   align: 'num', render: v => v != null ? v.toFixed(1) : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* COMPARABLES — entirely new window, peer table mirroring fhRenderComparables()
+   (current ticker + up to 10 peers sorted by mkt-cap proximity — same
+   fhGetLive(sym).peerData/.peerRatios/.profile/.quote, already global) */
+function tvComparables(sym) {
+  const fh = (typeof fhGetLive === 'function') ? fhGetLive(sym) : null;
+  const peerData   = fh?.peerData   || [];
+  const peerRatios = fh?.peerRatios || {};
+  const mainProfile = fh?.profile || {};
+  const mainQuote   = fh?.quote   || {};
+  const mainMktCap  = mainProfile.mktCap || null;
+  const sorted = [...peerData]
+    .sort((a, b) => mainMktCap ? Math.abs((a.mktCap || 0) - mainMktCap) - Math.abs((b.mktCap || 0) - mainMktCap) : 0)
+    .slice(0, 10);
+  const fmpMain = (typeof fmpGetLive === 'function') ? fmpGetLive(sym)?.ratios : null;
+  const rows = [
+    { ticker: sym, name: mainProfile.name || sym, mktCap: mainMktCap, sector: mainProfile.sector,
+      price: mainQuote.price, change: mainQuote.changePct ?? mainQuote.change, ratios: fmpMain },
+    ...sorted.map(p => ({ ticker: p.ticker, name: p.name, mktCap: p.mktCap, sector: p.sector,
+      price: p.price, change: p.change, ratios: peerRatios[String(p.ticker || '').toUpperCase()] || null })),
+  ];
+  const columns = [
+    { key: 'ticker',   label: 'Ticker',  render: v => _tvTicker(v) },
+    { key: 'name',     label: 'Company' },
+    { key: 'mktCap',   label: 'Mkt Cap', align: 'num', render: v => v != null ? ((typeof fmtB === 'function') ? fmtB(v) : ('$' + _tvNum(v, 0))) : null },
+    { key: 'sector',   label: 'Sector' },
+    { key: 'price',    label: 'Price',   align: 'num', render: v => v != null ? '$' + _tvNum(v) : null },
+    { key: 'change',   label: 'Chg %',   align: 'num', render: v => _tvPct(v) },
+    { key: 'pe',       label: 'P/E',     align: 'num', render: (_, row) => row.ratios?.pe != null ? Number(row.ratios.pe).toFixed(1) : null },
+    { key: 'pb',       label: 'P/B',     align: 'num', render: (_, row) => row.ratios?.pb != null ? Number(row.ratios.pb).toFixed(2) : null },
+    { key: 'roe',      label: 'ROE',     align: 'num', render: (_, row) => row.ratios?.roe != null ? Number(row.ratios.roe).toFixed(1) + '%' : null },
+    { key: 'divYield', label: 'Div Yld', align: 'num', render: (_, row) => row.ratios?.divYield != null ? Number(row.ratios.divYield).toFixed(2) + '%' : null },
+  ];
+  return tvTable(columns, rows);
+}
+
 /* ══════════════════════════════════════════════════════════════════
    ORCHESTRATOR — builds the workspace grid from the mappers above
    ══════════════════════════════════════════════════════════════════ */
+/* Builds a tabs[]/body pair for a tabbed window from {key,label,body()} defs,
+   reading/driving the active tab through _tvGetActiveTab/tvSwitchTab so the
+   selection survives the 15s auto-refresh re-render. */
+function _tvTabbed(winId, defaultKey, defs) {
+  const active = _tvGetActiveTab(winId, defaultKey);
+  const current = defs.find(d => d.key === active) || defs[0];
+  return {
+    tabs: defs.map(d => ({ key: d.key, label: d.label, active: d.key === active })),
+    body: current.body(),
+  };
+}
+
 function renderTerminalView() {
   const root = document.getElementById('terminalView');
   if (!root) return;
@@ -429,16 +1039,65 @@ function renderTerminalView() {
   const stamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   const watchCount = ((typeof currentWatchlistStocks !== 'undefined' && currentWatchlistStocks) || []).length;
   const alertCount = ((typeof whAlerts !== 'undefined' && whAlerts) || []).length;
+  const freeLayout = window.innerWidth >= 1024;
+
+  const news = _tvTabbed('news', 'news', [
+    { key: 'news',  label: 'NEWS',  body: () => tvIntelligenceBlotter() },
+    { key: 'intel', label: 'INTEL', body: () => tvNewsIntel() },
+  ]);
+  const geoRisk = _tvTabbed('geoRisk', 'wars', [
+    { key: 'wars',      label: 'WARS',      body: () => tvRiskMatrix() },
+    { key: 'resources', label: 'RESOURCES', body: () => tvGeoResources() },
+    { key: 'routes',    label: 'ROUTES',    body: () => tvGeoRoutes() },
+  ]);
+  const ownership = _tvTabbed('ownership', 'hds', [
+    { key: 'hds',   label: 'HDS',    body: () => tvOwnershipTable() },
+    { key: 'mgmt',  label: 'MGMT',   body: () => tvOwnershipMgmt(sym) },
+    { key: 'pscbo', label: 'PSC-BO', body: () => tvOwnershipPSC() },
+  ]);
+  const fundamentals = _tvTabbed('fundamentals', 'overview', [
+    { key: 'overview',   label: 'OVERVIEW',   body: () => tvFundOverview(sym) },
+    { key: 'financials', label: 'FINANCIALS', body: () => tvFundFinancials(sym) },
+    { key: 'earnings',   label: 'EARNINGS',   body: () => tvFundEarnings(sym) },
+    { key: 'valuation',  label: 'VALUATION',  body: () => tvFundValuation(sym) },
+    { key: 'filings',    label: 'FILINGS',    body: () => tvFundFilings(sym) },
+  ]);
+  const analysts = _tvTabbed('analysts', 'overview', [
+    { key: 'overview', label: 'OVERVIEW', body: () => tvAnalystsOverview(sym) },
+    { key: 'model1',   label: 'MODEL 1',  body: () => tvAnalystsModel('model1') },
+    { key: 'model2',   label: 'MODEL 2',  body: () => tvAnalystsModel('model2') },
+    { key: 'model3',   label: 'MODEL 3',  body: () => tvAnalystsModel('model3') },
+  ]);
+
+  const winIds = [
+    'marketMonitor', 'quoteMatrix', 'technicalIndicators', 'sectorMatrix',
+    'news', 'macroMonitor', 'geoRisk', 'alertsBlotter',
+    'ownership', 'fundamentals', 'analysts', 'comparables',
+  ];
+
+  root.classList.toggle('tv-free-layout', freeLayout);
+  if (freeLayout) computeDefaultTvLayout(winIds);
 
   root.innerHTML = [
-    tvWindow('Market Monitor',                { span: 8, tall: true, actions: `${watchCount} instruments · ${stamp}`,        bodyHtml: tvMarketOverview() }),
-    tvWindow(`Quote Matrix — ${sym || 'N/A'}`,            { span: 4, actions: `Last update ${stamp}`,                          bodyHtml: tvQuoteMatrix(sym) }),
-    tvWindow(`Technical Indicators — ${sym || 'N/A'}`,    { span: 4, actions: `Last update ${stamp}`,                          bodyHtml: tvTechnicalIndicators(sym) }),
-    tvWindow('Sector Matrix',                 { span: 4,             bodyHtml: tvSectorMatrix() }),
-    tvWindow('Intelligence Blotter',          { span: 4, tall: true, actions: stamp,                                          bodyHtml: tvIntelligenceBlotter() }),
-    tvWindow('Macro Monitor',                 { span: 4,             bodyHtml: tvMacroMonitor() }),
-    tvWindow('Risk Matrix',                   { span: 6, tall: true, bodyHtml: tvRiskMatrix() }),
-    tvWindow('Alerts Blotter',                { span: 6, tall: true, actions: `${alertCount} configured`,                     bodyHtml: tvAlertsBlotter() }),
-    tvWindow('Ownership',                     { span: 12,            bodyHtml: tvOwnershipTable() }),
+    tvWindow('Market Monitor',                 { id: 'marketMonitor',       span: 8,  tall: true, actions: `${watchCount} instruments · ${stamp}`, bodyHtml: tvMarketOverview() }),
+    tvWindow(`Quote Matrix — ${sym || 'N/A'}`,            { id: 'quoteMatrix',         span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvQuoteMatrix(sym) }),
+    tvWindow(`Technical Indicators — ${sym || 'N/A'}`,    { id: 'technicalIndicators', span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvTechnicalIndicators(sym) }),
+    tvWindow('Sector Matrix',                  { id: 'sectorMatrix',        span: 4,  bodyHtml: tvSectorMatrix() }),
+    tvWindow('News',                           { id: 'news',                span: 4,  tall: true, actions: stamp, tabs: news.tabs, bodyHtml: news.body }),
+    tvWindow('Macro Monitor',                  { id: 'macroMonitor',        span: 4,  bodyHtml: tvMacroMonitor() }),
+    tvWindow('Geo-Risk',                       { id: 'geoRisk',             span: 6,  tall: true, tabs: geoRisk.tabs, bodyHtml: geoRisk.body }),
+    tvWindow('Alerts Blotter',                 { id: 'alertsBlotter',       span: 6,  tall: true, actions: `${alertCount} configured`, bodyHtml: tvAlertsBlotter() }),
+    tvWindow('Ownership',                      { id: 'ownership',           span: 12, tabs: ownership.tabs, bodyHtml: ownership.body }),
+    tvWindow(`Fundamentals — ${sym || 'N/A'}`,  { id: 'fundamentals',        span: 8,  tall: true, tabs: fundamentals.tabs, bodyHtml: fundamentals.body }),
+    tvWindow(`Analysts — ${sym || 'N/A'}`,      { id: 'analysts',            span: 6,  tall: true, tabs: analysts.tabs, bodyHtml: analysts.body }),
+    tvWindow(`Comparables — ${sym || 'N/A'}`,   { id: 'comparables',         span: 12, bodyHtml: tvComparables(sym) }),
   ].join('');
+
+  if (freeLayout) {
+    winIds.forEach(id => {
+      applyTvWindowPosition(id);
+      const el = document.querySelector(`.tv-window[data-tv-window="${id}"]`);
+      if (el) { tvInitDrag(el); tvInitResize(el); }
+    });
+  }
 }

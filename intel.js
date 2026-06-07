@@ -254,6 +254,9 @@ async function intelLoadAll() {
     .sort((a,b) => new Date(b.publication_date||0) - new Date(a.publication_date||0))
     .slice(0,20);
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.intel = { policyArticles, dispArticles, fedDocs };
+
   if (fedDocs.length) {
     html += `<div class="news-list">`;
     for (const doc of fedDocs) {

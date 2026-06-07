@@ -3291,6 +3291,8 @@ async function wmGeoRoutes() {
       return;
     }
 
+    window._wmChokepoints = items;
+
     el.innerHTML = wmLiveBar('Strategic chokepoints & trade route disruption', `${items.length} monitored`) +
       items.map(c => {
         const risk       = c.riskLevel || c.risk_level || c.status || 'unknown';

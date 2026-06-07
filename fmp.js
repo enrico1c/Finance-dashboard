@@ -972,6 +972,9 @@ async function fmpLoadSecFilings(sym) {
     const material  = eightRes.status === 'fulfilled' ? eightRes.value : [];
     const ownership = proxy4Res.status === 'fulfilled' ? proxy4Res.value : [];
 
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.filings = { sym, annuals, quarters, material, ownership };
+
     // Deduplicate & sort by date
     const dedup = arr => {
       const seen = new Set();
@@ -1311,6 +1314,8 @@ async function fmpLoadSegmentation(sym) {
         fetch(`${FMP_STABLE}/revenue-product-segmentation?symbol=${sym}&period=annual&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null),
         fetch(`${FMP_STABLE}/revenue-geographic-segmentation?symbol=${sym}&period=annual&apikey=${key}`,{signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null),
       ]);
+      window._tvDataCache = window._tvDataCache || {};
+      window._tvDataCache.segmentation = { sym, product: prodRes, geo: geoRes };
       src = 'FMP';
       html += renderSegBlock("By Product / Segment", prodRes, src);
       html += renderSegBlock("By Geography", geoRes, src);

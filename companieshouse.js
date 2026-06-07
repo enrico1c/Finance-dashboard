@@ -663,6 +663,9 @@ window.chLoadForTicker = async function chLoadForTicker(ticker) {
     _chGetPSC(companyNumber),
   ]);
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.companiesHouse = { sym, companyNumber, profile, officers, pscItems };
+
   /* Step 3: render */
   if (profile) _renderDesBlock(profile);
   if (officers) _renderMgmtDirectors(officers);
