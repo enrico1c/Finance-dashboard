@@ -1372,22 +1372,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   </script>
 
-  <!-- PWA: Service Worker registration -->
+  <!-- PWA: Service Worker registration — auto-reloads exactly once when a
+       new Service Worker takes control (sw.js calls skipWaiting/clients.claim
+       on every deploy), so pushed updates apply on their own without anyone
+       needing to manually unregister the SW or hard-refresh. -->
   <script>
     if ('serviceWorker' in navigator) {
+      let _swRefreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (_swRefreshing) return;
+        _swRefreshing = true;
+        window.location.reload();
+      });
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
           console.info('[SW] Registered:', reg.scope);
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Show subtle update toast
-                if (typeof showApiToast === 'function')
-                  showApiToast('↻ Update available — reload to apply', 'info');
-              }
-            });
-          });
         }).catch(err => console.warn('[SW] Registration failed:', err));
       });
     }
