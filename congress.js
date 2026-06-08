@@ -39,6 +39,8 @@ async function _cgLoad() {
     fetch('./data/congress/members.json').then(r => r.json()),
   ]);
   _cgData = { dash, flags, members };
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.congress = _cgData;
   return _cgData;
 }
 

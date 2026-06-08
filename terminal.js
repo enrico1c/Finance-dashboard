@@ -254,6 +254,20 @@ function tvSwitchTab(winId, tabKey) {
 window.tvSwitchTab = tvSwitchTab;
 
 /* ══════════════════════════════════════════════════════════════════
+   PRICE CHART WINDOW — mounts the existing lightweight-charts widget
+   (lwchart.js mcInit/mcLoad, in its own 'tvMain' slot alongside the
+   dashboard's 'main'/'forex' instances) into Terminal View.
+   The widget binds live chart engines + a websocket/poll loop to its
+   DOM node, so — unlike the string-concat table windows — it cannot
+   be torn down and rebuilt every 15s. renderTerminalView() detaches
+   this window's element before replacing root.innerHTML and splices
+   it back into the freshly-rendered placeholder afterward, preserving
+   the live instance untouched across refreshes.
+   ══════════════════════════════════════════════════════════════════ */
+let _tvChartInited = false;
+let _tvChartSym = '';
+
+/* ══════════════════════════════════════════════════════════════════
    REUSABLE BUILDING BLOCKS — TerminalWindow / TerminalTable
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1016,6 +1030,181 @@ function tvComparables(sym) {
   return tvTable(columns, rows);
 }
 
+/* ── Alert Feed — Congress / NOAA / EONET (parity for the "Alert Feed" panel) */
+function tvAlertCongress() {
+  const cached = (window._tvDataCache && window._tvDataCache.congress) || null;
+  const trades = (cached && cached.dash && cached.dash.recentTrades) || [];
+  const rows = trades.slice(0, 30).map(t => ({
+    date: _tvDateSafe(t.tradeDate), ticker: t.ticker, company: t.companyName,
+    member: t.memberName, chamber: t.memberChamber,
+    type: t.tradeType, amount: t.amount && t.amount.label,
+  }));
+  const columns = [
+    { key: 'date',    label: 'Date' },
+    { key: 'ticker',  label: 'Ticker', render: v => _tvTicker(v) },
+    { key: 'company', label: 'Company' },
+    { key: 'member',  label: 'Member' },
+    { key: 'chamber', label: 'Chamber' },
+    { key: 'type',    label: 'Type', render: v => _tvTag(v, /purchase/i.test(v||'') ? 'pos' : /sale/i.test(v||'') ? 'neg' : 'neutral') },
+    { key: 'amount',  label: 'Amount' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvAlertNoaa() {
+  const features = (window._tvDataCache && window._tvDataCache.noaa) || [];
+  const rows = features.slice(0, 30).map(f => {
+    const p = f.properties || {};
+    return { severity: p.severity, event: p.event, area: p.areaDesc, urgency: p.urgency, sent: _tvTime(p.sent) };
+  });
+  const columns = [
+    { key: 'severity', label: 'Severity', render: v => v ? _tvTag(v, /extreme|severe/i.test(v) ? 'neg' : /moderate/i.test(v) ? 'warn' : 'neutral') : null },
+    { key: 'event',    label: 'Event' },
+    { key: 'area',     label: 'Area' },
+    { key: 'urgency',  label: 'Urgency' },
+    { key: 'sent',     label: 'Sent' },
+  ];
+  return tvTable(columns, rows);
+}
+
+const _TV_EONET_TYPES = { EQ:'Earthquake', TC:'Tropical Cyclone', FL:'Flood', VO:'Volcano', WF:'Wildfire', DR:'Drought', LS:'Landslide', OTHER:'Event' };
+
+function _tvEonetCountry(list) {
+  const c = Array.isArray(list) ? list[0] : null;
+  if (!c) return null;
+  return typeof c === 'object' ? (c.countryname || c.iso3 || null) : c;
+}
+
+function tvAlertEonet() {
+  const features = (window._tvDataCache && window._tvDataCache.eonet) || [];
+  const rows = features.slice(0, 30).map(f => {
+    const p = f.properties || {};
+    return {
+      type: _TV_EONET_TYPES[p.eventtype] || p.eventtype || 'Event',
+      event: p.name, alert: p.alertlevel || p.severity,
+      country: _tvEonetCountry(p.affectedcountries),
+      date: _tvDateSafe(p.fromdate),
+    };
+  });
+  const columns = [
+    { key: 'type',    label: 'Type' },
+    { key: 'event',   label: 'Event' },
+    { key: 'alert',   label: 'Alert', render: v => v ? _tvTag(v, /red|severe|extreme/i.test(v) ? 'neg' : /orange|moderate/i.test(v) ? 'warn' : 'neutral') : null },
+    { key: 'country', label: 'Country' },
+    { key: 'date',    label: 'Date' },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ── Supply Chain — Shipping / Minerals (Chokepoints reuses tvGeoRoutes) */
+function tvSupplyShipping() {
+  const routes = (window._tvDataCache && window._tvDataCache.shippingRates) || [];
+  const rows = routes.map(r => ({ route: r.route, rate: r.rate, unit: r.unit, note: r.note }));
+  const columns = [
+    { key: 'route', label: 'Route' },
+    { key: 'rate',  label: 'Rate', align: 'num', render: v => v != null ? '$' + _tvNum(v, 0) : null },
+    { key: 'unit',  label: 'Unit' },
+    { key: 'note',  label: 'Note' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvSupplyMinerals() {
+  const cached = (window._tvDataCache && window._tvDataCache.minerals) || null;
+  const minerals = (cached && cached.minerals) || [];
+  const sorted = [...minerals].sort((a, b) => (b.importReliance || 0) - (a.importReliance || 0));
+  const rows = sorted.slice(0, 30).map(m => ({
+    name: m.name, sym: m.symbol,
+    reliance: m.importReliance,
+    producers: Array.isArray(m.primaryProducers) ? m.primaryProducers.slice(0, 3).join(', ') : (m.primaryProducers || null),
+    source: m._live ? 'LIVE' : 'STATIC',
+  }));
+  const columns = [
+    { key: 'name',      label: 'Mineral' },
+    { key: 'sym',       label: 'Sym' },
+    { key: 'reliance',  label: 'US Import Reliance', align: 'num', render: v => v != null ? Number(v).toFixed(0) + '%' : null },
+    { key: 'producers', label: 'Top Producers' },
+    { key: 'source',    label: 'Source', render: v => _tvTag(v, v === 'LIVE' ? 'pos' : 'neutral') },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ── Portfolio P&L — summary metrics + positions table (parity for "Portfolio P&L") */
+function tvPortfolio() {
+  const cached = (window._tvDataCache && window._tvDataCache.portfolio) || null;
+  let html = '';
+  if (cached) {
+    const summaryRows = [
+      { metric: 'Portfolio Value', value: cached.totalVal,    fmt: 'cap' },
+      { metric: 'Total Cost Basis', value: cached.totalCost,  fmt: 'cap' },
+      { metric: 'Total P&L',       value: cached.totalPnl,    fmt: 'cap' },
+      { metric: 'Total P&L %',     value: cached.totalPnlPct, fmt: 'pct' },
+      { metric: 'Sharpe',          value: cached.sharpe,      fmt: 'dec2' },
+      { metric: 'Sortino',         value: cached.sortino,     fmt: 'dec2' },
+      { metric: 'Max Drawdown',    value: cached.maxDD,       fmt: 'pct' },
+      { metric: 'Annualized Vol',  value: cached.annVol,      fmt: 'pctRaw' },
+    ];
+    html += tvTable(_tvMetricColumns(), summaryRows);
+  }
+  const positions = (cached && cached.positions) || [];
+  const rows = positions.map(p => ({
+    ticker: p.sym || p.ticker, shares: p.shares, avgCost: p.costBasis, price: p.price,
+    value: p.curVal, pnl: p.pnl, pnlPct: p.pnlPct,
+  }));
+  const columns = [
+    { key: 'ticker',  label: 'Ticker', render: v => _tvTicker(v) },
+    { key: 'shares',  label: 'Shares', align: 'num' },
+    { key: 'avgCost', label: 'Avg Cost', align: 'num', render: v => v != null ? '$' + _tvNum(v) : null },
+    { key: 'price',   label: 'Price', align: 'num', render: v => v != null ? '$' + _tvNum(v) : null },
+    { key: 'value',   label: 'Value', align: 'num', render: v => v != null ? '$' + _tvNum(v, 0) : null },
+    { key: 'pnl',     label: 'P&L', align: 'num', render: v => v != null ? _tvTag((v >= 0 ? '+' : '') + '$' + _tvNum(v, 0), v >= 0 ? 'pos' : 'neg') : null },
+    { key: 'pnlPct',  label: 'P&L %', align: 'num', render: v => v != null ? _tvPct(v * 100) : null },
+  ];
+  return html + tvTable(columns, rows);
+}
+
+/* ── Stock Screener (mirrors screenerRenderResults columns) */
+function tvScreenerResults() {
+  const results = (window._tvDataCache && window._tvDataCache.screener) || [];
+  const rows = results.slice(0, 30).map(r => ({
+    ticker: r.symbol, name: r.name, sector: r.sector, price: r.price, mktCap: r.marketCap,
+    pe: r.pe, roe: r.roe, netMargin: r.netMargin, debtEq: r.debtEq, divYield: r.dividendYield,
+    fScore: r._piotroski, score: r._score,
+  }));
+  const columns = [
+    { key: 'ticker',    label: 'Ticker', render: v => _tvTicker(v) },
+    { key: 'name',      label: 'Company' },
+    { key: 'sector',    label: 'Sector' },
+    { key: 'price',     label: 'Price', align: 'num', render: v => v != null ? '$' + _tvNum(v) : null },
+    { key: 'mktCap',    label: 'Mkt Cap', align: 'num', render: v => v != null ? ((typeof fmtB === 'function') ? fmtB(v) : ('$' + _tvNum(v, 0))) : null },
+    { key: 'pe',        label: 'P/E', align: 'num', render: v => v != null ? Number(v).toFixed(1) : null },
+    { key: 'roe',       label: 'ROE', align: 'num', render: v => v != null ? _tvPct(v) : null },
+    { key: 'netMargin', label: 'Net Mgn', align: 'num', render: v => v != null ? _tvPct(v) : null },
+    { key: 'debtEq',    label: 'D/E', align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
+    { key: 'divYield',  label: 'Div %', align: 'num', render: v => v != null ? _tvPct(v) : null },
+    { key: 'fScore',    label: 'F-Score', align: 'num', render: v => v != null ? v + '/9' : null },
+    { key: 'score',     label: 'Score', align: 'num' },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ── Webhook Log — extends Alerts Blotter with the LOG tab (whLog is cross-script reachable) */
+function tvWebhookLog() {
+  const log = (typeof whLog !== 'undefined' && whLog) || [];
+  const rows = log.slice(0, 25).map(e => ({
+    time: _tvTime(e.time), ticker: e.ticker, condition: e.condition, value: e.value,
+    status: e.status,
+  }));
+  const columns = [
+    { key: 'time',      label: 'Time' },
+    { key: 'ticker',    label: 'Asset', render: v => _tvTicker(v) },
+    { key: 'condition', label: 'Trigger' },
+    { key: 'value',     label: 'Value', align: 'num' },
+    { key: 'status',    label: 'Status', render: v => _tvTag(String(v), /^(2|ok|sent|test)/i.test(String(v||'')) ? 'pos' : 'neg') },
+  ];
+  return tvTable(columns, rows);
+}
+
 /* ══════════════════════════════════════════════════════════════════
    ORCHESTRATOR — builds the workspace grid from the mappers above
    ══════════════════════════════════════════════════════════════════ */
@@ -1039,6 +1228,11 @@ function renderTerminalView() {
   const stamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   const watchCount = ((typeof currentWatchlistStocks !== 'undefined' && currentWatchlistStocks) || []).length;
   const alertCount = ((typeof whAlerts !== 'undefined' && whAlerts) || []).length;
+
+  /* Detach the live chart window before the innerHTML rebuild wipes it —
+     keeps its lightweight-charts instances/websocket alive in memory. */
+  const _tvChartWin = document.getElementById('tv-window-priceChart');
+  if (_tvChartWin) _tvChartWin.remove();
   const freeLayout = window.innerWidth >= 1024;
 
   const news = _tvTabbed('news', 'news', [
@@ -1068,17 +1262,32 @@ function renderTerminalView() {
     { key: 'model2',   label: 'MODEL 2',  body: () => tvAnalystsModel('model2') },
     { key: 'model3',   label: 'MODEL 3',  body: () => tvAnalystsModel('model3') },
   ]);
+  const alertFeed = _tvTabbed('alertFeed', 'congress', [
+    { key: 'congress', label: 'CONGRESS', body: () => tvAlertCongress() },
+    { key: 'noaa',     label: 'NOAA',     body: () => tvAlertNoaa() },
+    { key: 'eonet',    label: 'EONET',    body: () => tvAlertEonet() },
+  ]);
+  const supplyChain = _tvTabbed('supplyChain', 'choke', [
+    { key: 'choke',    label: 'CHOKE',    body: () => tvGeoRoutes() },
+    { key: 'shipping', label: 'SHIPPING', body: () => tvSupplyShipping() },
+    { key: 'minerals', label: 'MINERALS', body: () => tvSupplyMinerals() },
+  ]);
+  const alertsBlotter = _tvTabbed('alertsBlotter', 'alerts', [
+    { key: 'alerts', label: 'ALERTS', body: () => tvAlertsBlotter() },
+    { key: 'log',    label: 'LOG',    body: () => tvWebhookLog() },
+  ]);
 
   const winIds = [
-    'marketMonitor', 'quoteMatrix', 'technicalIndicators', 'sectorMatrix',
-    'news', 'macroMonitor', 'geoRisk', 'alertsBlotter',
-    'ownership', 'fundamentals', 'analysts', 'comparables',
+    'priceChart', 'marketMonitor', 'quoteMatrix', 'technicalIndicators', 'sectorMatrix',
+    'news', 'macroMonitor', 'geoRisk', 'alertsBlotter', 'alertFeed', 'supplyChain',
+    'ownership', 'fundamentals', 'analysts', 'comparables', 'portfolio', 'screener',
   ];
 
   root.classList.toggle('tv-free-layout', freeLayout);
   if (freeLayout) computeDefaultTvLayout(winIds);
 
   root.innerHTML = [
+    tvWindow(`Price Chart — ${sym || 'N/A'}`,   { id: 'priceChart',          span: 8,  tall: true, bodyHtml: '<div id="tvPriceChart" class="tv-chart-mount"></div>' }),
     tvWindow('Market Monitor',                 { id: 'marketMonitor',       span: 8,  tall: true, actions: `${watchCount} instruments · ${stamp}`, bodyHtml: tvMarketOverview() }),
     tvWindow(`Quote Matrix — ${sym || 'N/A'}`,            { id: 'quoteMatrix',         span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvQuoteMatrix(sym) }),
     tvWindow(`Technical Indicators — ${sym || 'N/A'}`,    { id: 'technicalIndicators', span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvTechnicalIndicators(sym) }),
@@ -1086,12 +1295,38 @@ function renderTerminalView() {
     tvWindow('News',                           { id: 'news',                span: 4,  tall: true, actions: stamp, tabs: news.tabs, bodyHtml: news.body }),
     tvWindow('Macro Monitor',                  { id: 'macroMonitor',        span: 4,  bodyHtml: tvMacroMonitor() }),
     tvWindow('Geo-Risk',                       { id: 'geoRisk',             span: 6,  tall: true, tabs: geoRisk.tabs, bodyHtml: geoRisk.body }),
-    tvWindow('Alerts Blotter',                 { id: 'alertsBlotter',       span: 6,  tall: true, actions: `${alertCount} configured`, bodyHtml: tvAlertsBlotter() }),
+    tvWindow('Alerts Blotter',                 { id: 'alertsBlotter',       span: 6,  tall: true, actions: `${alertCount} configured`, tabs: alertsBlotter.tabs, bodyHtml: alertsBlotter.body }),
+    tvWindow('Alert Feed',                     { id: 'alertFeed',           span: 6,  tall: true, tabs: alertFeed.tabs, bodyHtml: alertFeed.body }),
+    tvWindow('Supply Chain',                   { id: 'supplyChain',         span: 6,  tall: true, tabs: supplyChain.tabs, bodyHtml: supplyChain.body }),
     tvWindow('Ownership',                      { id: 'ownership',           span: 12, tabs: ownership.tabs, bodyHtml: ownership.body }),
     tvWindow(`Fundamentals — ${sym || 'N/A'}`,  { id: 'fundamentals',        span: 8,  tall: true, tabs: fundamentals.tabs, bodyHtml: fundamentals.body }),
     tvWindow(`Analysts — ${sym || 'N/A'}`,      { id: 'analysts',            span: 6,  tall: true, tabs: analysts.tabs, bodyHtml: analysts.body }),
     tvWindow(`Comparables — ${sym || 'N/A'}`,   { id: 'comparables',         span: 12, bodyHtml: tvComparables(sym) }),
+    tvWindow('Portfolio P&L',                  { id: 'portfolio',           span: 6,  tall: true, bodyHtml: tvPortfolio() }),
+    tvWindow('Stock Screener',                 { id: 'screener',            span: 12, bodyHtml: tvScreenerResults() }),
   ].join('');
+
+  /* Splice the live chart window back in (or initialise it on first render). */
+  const _tvChartSlot = document.getElementById('tv-window-priceChart');
+  if (_tvChartSlot) {
+    if (_tvChartWin) {
+      const chartTitleEl = _tvChartWin.querySelector('.tv-window-title');
+      if (chartTitleEl) chartTitleEl.textContent = `Price Chart — ${sym || 'N/A'}`;
+      /* Drop any free-floating left/top/width/height/z-index carried over from
+         a wider viewport — fresh windows get no inline style in stacked mode,
+         so the reattached node must match or it'll stay pinned at a fixed size. */
+      if (!freeLayout) _tvChartWin.removeAttribute('style');
+      _tvChartSlot.replaceWith(_tvChartWin);
+    } else if (typeof mcInit === 'function') {
+      mcInit(document.getElementById('tvPriceChart'), 'tvMain', () => mcLoad(sym, 'D', 'tvMain'));
+      _tvChartInited = true;
+      _tvChartSym = sym;
+    }
+  }
+  if (_tvChartInited && sym && sym !== _tvChartSym) {
+    _tvChartSym = sym;
+    if (typeof mcLoad === 'function') mcLoad(sym, 'D', 'tvMain');
+  }
 
   if (freeLayout) {
     winIds.forEach(id => {

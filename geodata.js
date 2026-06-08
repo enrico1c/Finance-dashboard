@@ -187,6 +187,8 @@ window.noaaLoadAlerts = async function() {
   if (!data?.features) { el.innerHTML = `<div class="no-data">// NOAA alerts unavailable.</div>`; return; }
 
   const features = data.features || [];
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.noaa = features;
   const sevColor = s => ({ Extreme: "#e55", Severe: "#f90", Moderate: "#fc6", Minor: "#8b8" })[s] || "#888";
 
   let html = `<div class="av-live-badge">● NOAA / NWS Active Alerts · USA · Live</div>`;
@@ -299,6 +301,11 @@ window.eonetLoadEvents = async function() {
         }
       }
     } catch(e) { console.warn("[EONET]", e.message); }
+  }
+
+  if (geojson?.features?.length) {
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.eonet = geojson.features;
   }
 
   if (!geojson || !geojson.features || !geojson.features.length) {

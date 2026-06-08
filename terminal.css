@@ -135,6 +135,12 @@
 }
 .tv-window-body.tv-tall { max-height: 540px; }
 
+/* ── Price-chart mount (hosts the existing lwchart.js widget) ─────── */
+.tv-chart-mount {
+  height: 100%;
+  min-height: 360px;
+}
+
 /* ── Dense data table ─────────────────────────────────────────────── */
 .tv-table-wrap { overflow-x: auto; }
 .tv-table {

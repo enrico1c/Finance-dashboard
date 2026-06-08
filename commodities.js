@@ -1068,6 +1068,9 @@ window.commRenderMinerals = async function(subTab = 'critical') {
 };
 
 function _renderMineralsGrid(el, tabBar, minerals, subTab) {
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.minerals = { subTab, minerals };
+
   const rmis   = commGetRMIS();
   const sortedMinerals = [...minerals].sort((a,b) => b.importReliance - a.importReliance);
 

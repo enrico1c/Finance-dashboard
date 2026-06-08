@@ -194,6 +194,9 @@ async function wmSupplyShipping() {
     { route: 'Santos → Hamburg',          rate: 1800, unit: '/FEU', note: 'South America trade lane, stable' },
   ];
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.shippingRates = routes;
+
   el.innerHTML = wmLiveBar('Global Shipping Rates', 'Indicative spot rates · Drewry/Freightos reference') +
     `<div style="padding:4px 10px 6px;font-size:11px;color:var(--text-muted)">
       Reference spot rates in USD per 40ft container (FEU). Actual rates vary by carrier and booking terms.

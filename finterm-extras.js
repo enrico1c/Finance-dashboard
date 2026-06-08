@@ -597,6 +597,12 @@ async function portRender() {
   const winLoss  = _portCalcWinLoss(txAll);
   const divs     = _portCalcDividends(txAll);
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.portfolio = {
+    positions: enriched, totalVal, totalCost, totalPnl, totalPnlPct,
+    sharpe, sortino, maxDD, annVol, winLoss, divs,
+  };
+
   const f2  = (v,d=2)=>v!=null?parseFloat(v).toFixed(d):'—';
   const fm  = v=>v!=null?_fmt(v):'—';
   const fclr= v=>v!=null?_clr(v):'';
@@ -1253,6 +1259,8 @@ async function screenerRunPreset(key) {
   results.forEach(r => { r._piotroski = _algoPiotroski(r); r._score = _algoScore(r); });
 
   _screenerResults = results;
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.screener = _screenerResults;
   const statusEl = document.getElementById('screener-status');
   if (statusEl) statusEl.textContent = `${results.length} results · ${preset.label}`;
   screenerRenderResults();
@@ -1367,6 +1375,8 @@ async function screenerRun() {
   arr.forEach(r => { r._piotroski = _algoPiotroski(r); r._score = _algoScore(r); });
 
   _screenerResults = arr;
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.screener = _screenerResults;
   if (status) status.textContent = `${arr.length} results · ${src}`;
   screenerRenderResults();
 }
