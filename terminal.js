@@ -44,6 +44,7 @@ function toggleTerminalView() {
     _tvStartRefresh();
   } else {
     _tvStopRefresh();
+    _tvChartsOpen = false;
   }
 }
 function _tvApplyMode() {
@@ -253,6 +254,16 @@ function tvSwitchTab(winId, tabKey) {
 }
 window.tvSwitchTab = tvSwitchTab;
 
+/* Charts gallery — opened via a dedicated floating button (rendered only
+   while Terminal View is active) rather than a regular grid window, so it
+   can never be hidden behind/under another window's free-floating position. */
+let _tvChartsOpen = false;
+function tvToggleCharts() {
+  _tvChartsOpen = !_tvChartsOpen;
+  if (terminalViewActive) renderTerminalView();
+}
+window.tvToggleCharts = tvToggleCharts;
+
 /* Maps each Terminal View window id to the dashboard's `.panel-toggle
    [data-panel]` id that shows/hides its normal-dashboard counterpart —
    lets the top bar / modules tray govern Terminal View visibility too.
@@ -263,7 +274,7 @@ window.tvSwitchTab = tvSwitchTab;
 const _TV_PANEL_MAP = {
   priceChart: 'chart', technicalIndicators: 'chart',
   marketMonitor: 'watchlist', quoteMatrix: 'watchlist', sectorMatrix: 'watchlist',
-  news: 'news', macroMonitor: 'macro', charts: 'macro', geoRisk: 'geopolitical',
+  news: 'news', macroMonitor: 'macro', geoRisk: 'geopolitical',
   alertsBlotter: 'webhooks', alertFeed: 'alert', supplyChain: 'supply',
   ownership: 'ownership', fundamentals: 'fundamentals',
   analysts: 'analysts', comparables: 'analysts',
@@ -1935,7 +1946,6 @@ function renderTerminalView() {
     { id: 'quoteMatrix',         html: tvWindow(`Quote Matrix — ${sym || 'N/A'}`,            { id: 'quoteMatrix',         span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvQuoteMatrix(sym) }) },
     { id: 'technicalIndicators', html: tvWindow(`Technical Indicators — ${sym || 'N/A'}`,    { id: 'technicalIndicators', span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvTechnicalIndicators(sym) }) },
     { id: 'sectorMatrix',        html: tvWindow('Sector Matrix',                  { id: 'sectorMatrix',        span: 4,  bodyHtml: tvSectorMatrix() }) },
-    { id: 'charts',              html: tvWindow('Charts',                         { id: 'charts',              span: 12, tall: true, actions: 'Macro Intel gallery', bodyHtml: tvCharts() }) },
     { id: 'news',                html: tvWindow('News',                           { id: 'news',                span: 4,  tall: true, actions: stamp, tabs: news.tabs, bodyHtml: news.body }) },
     { id: 'macroMonitor',        html: tvWindow('Macro Monitor',                  { id: 'macroMonitor',        span: 4,  tall: true, tabs: macroMonitor.tabs, bodyHtml: macroMonitor.body }) },
     { id: 'geoRisk',             html: tvWindow('Geo-Risk',                       { id: 'geoRisk',             span: 6,  tall: true, tabs: geoRisk.tabs, bodyHtml: geoRisk.body }) },
@@ -1956,7 +1966,22 @@ function renderTerminalView() {
   root.classList.toggle('tv-free-layout', freeLayout);
   if (freeLayout) computeDefaultTvLayout(winIds);
 
-  root.innerHTML = visibleDefs.map(w => w.html).join('');
+  /* Charts gallery — a fixed-position floating button + overlay (not a
+     .tv-window), rendered fresh on every call so it only ever exists while
+     Terminal View is active. Living outside the window grid means it can
+     never collide with / hide behind another window's free-floating position. */
+  const chartsFabHtml = `<button type="button" class="tv-charts-fab${_tvChartsOpen ? ' active' : ''}" onclick="tvToggleCharts()" title="Open the full Macro Intel chart gallery">📊 Charts</button>`;
+  const chartsOverlayHtml = _tvChartsOpen ? `<div class="tv-charts-overlay" onmousedown="if(event.target===this) tvToggleCharts()">
+    <div class="tv-charts-overlay-panel">
+      <div class="tv-charts-overlay-head">
+        <span class="tv-charts-overlay-title">Charts — Macro Intel Gallery</span>
+        <button type="button" class="tv-charts-overlay-close" onclick="tvToggleCharts()" title="Close">✕</button>
+      </div>
+      <div class="tv-charts-overlay-body">${tvCharts()}</div>
+    </div>
+  </div>` : '';
+
+  root.innerHTML = chartsFabHtml + chartsOverlayHtml + visibleDefs.map(w => w.html).join('');
 
   /* Splice the live chart window back in (or initialise it on first render).
      If the Chart panel was toggled off, there's no placeholder to splice into —
