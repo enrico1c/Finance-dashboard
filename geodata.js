@@ -103,6 +103,9 @@ window.meteoLoadSupplyWeather = async function() {
   );
   const results = await Promise.all(fetches);
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.supplyWeather = results.map(({loc,d}) => ({ name: loc.name, emoji: loc.emoji, current: d?.current || null }));
+
   const wmoDesc = code => {
     if (code <= 1) return "Clear";
     if (code <= 3) return "Partly cloudy";
@@ -386,6 +389,9 @@ window.femaLoadDisasters = async function() {
   const recs     = data.DisasterDeclarationsSummaries;
   const typeIcon = t => ({ DR:"🌪",EM:"⚡",FM:"🔥",FS:"🌊" })[t] || "⚠";
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.fema = recs;
+
   let html = `<div class="av-live-badge">● OpenFEMA · US Disaster Declarations · Live</div>`;
   html += `<table class="fmp-table">
     <thead><tr><th>Date</th><th>State</th><th>Type</th><th>Disaster</th><th>Programs</th></tr></thead>
@@ -450,6 +456,17 @@ window.gdacsLoadEvents = async function() {
 
   const alertColor = { Red:"#f85149", Orange:"#f0883e", Green:"#3fb950" };
   const typeIcon   = { EQ:"🌍", TC:"🌀", FL:"🌊", VO:"🌋", WF:"🔥", DR:"☀️", LS:"⛰️" };
+
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.gdacs = items.slice(0, 20).map(item => ({
+    title: get(item, "title") || "Event",
+    link: get(item, "link"),
+    pubDate: get(item, "pubDate"),
+    alertLevel: getNS(item, "alertlevel") || "Green",
+    eventType: (getNS(item, "eventtype") || "").toUpperCase(),
+    country: getNS(item, "country"),
+    severity: getNS(item, "severity"),
+  }));
 
   let html = `<div class="av-live-badge" style="margin-top:8px">● GDACS · Global Disasters · Live RSS</div>`;
   html += `<div style="overflow-y:auto;max-height:220px">`;

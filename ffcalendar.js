@@ -298,6 +298,10 @@ async function ffCalendarRender(containerId, week) {
   }
 
   _store[week] = data;
+
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.econCalendar = data;
+
   tbody.innerHTML = renderRows(filterEvents(data));
   loading.style.display = 'none';
   wrap.style.display = 'block';

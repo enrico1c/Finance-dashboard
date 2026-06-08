@@ -144,6 +144,9 @@ window.geoLoadTerror = async function() {
       seen.add(a.url); return true;
     }).sort((a, b) => (b.seendate || '').localeCompare(a.seendate || ''));
 
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.terror = unique;
+
     // Count by country for heatmap
     const countryCounts = {};
     unique.forEach(a => {
@@ -224,6 +227,9 @@ window.geoLoadCyber = async function() {
 
     const vulns = kevData?.vulnerabilities || [];
     const cyberArticles = cyberNews?.articles || [];
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.cyber = { vulns, cyberArticles };
 
     if (!vulns.length && !cyberArticles.length) {
       el.innerHTML = '<div class="no-data">// Could not load cyber data. Check network.</div>';

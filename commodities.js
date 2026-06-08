@@ -845,6 +845,9 @@ window.commRenderCOT = async function() {
     if (first?.[0]?.date) reportDate = first[0].date;
   }
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.cot = { cotData, reportDate, links: cotLinks };
+
   let html = `<div class="av-live-badge">● CFTC Commitments of Traders · ${_cEsc(reportDate)} · No API Key</div>`;
   html += `<div style="padding:6px 10px;font-size:10px;color:var(--text-muted);border-bottom:1px solid var(--border)">
     <strong>Source:</strong>
@@ -1275,6 +1278,9 @@ window.commRenderEnergy = async function() {
   addCard('Henry Hub Gas', '🔥', '/MMBtu',  'Stooq',   ngStooq)  || addCard('Henry Hub',  '🔥', '/MMBtu',  'EIA API', hhAPI);
   addCard('Brent Crude',   '🛢', '/bbl',    'EIA API', brentAPI);
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.energy = { priceCards, gie, entsog };
+
   let html = `<div class="av-live-badge">● Energy Intelligence · Stooq Futures · EIA API · ENTSOG · GIE</div>`;
 
   if (priceCards.length) {
@@ -1377,6 +1383,9 @@ window.commRenderIMFComm = async function(targetId = 'macro-comm') {
     }
   });
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.imfComm = grouped;
+
   let html = `<div class="av-live-badge">● Commodity Futures — Stooq Live · Energy · Metals · Agriculture · No API Key</div>
   <div style="overflow-y:auto;height:calc(100% - 30px);padding:6px">`;
 
@@ -1471,6 +1480,9 @@ window.commRenderAgri = async function() {
   const fert      = fertRes.status      === 'fulfilled' ? fertRes.value      : [];
   const fao       = faoRes.status       === 'fulfilled' ? faoRes.value       : [];
   const wbAgri    = wbAgriRes.status    === 'fulfilled' ? wbAgriRes.value    : [];
+
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.agri = { fao, wbAgri, sunflower, fert };
 
   let html = `<div class="av-live-badge">● Agriculture Intelligence · EU Agri-food + FAO FPI + World Bank · No API Key</div>
   <div style="overflow-y:auto;height:calc(100% - 30px);padding:6px">`;

@@ -696,6 +696,9 @@ async function wmMacroRisk() {
     { flag:'🇫🇷', name:'France',        tier:'low',      score:8,  note:'stable'                   },
   ].sort((a,b)=>b.score-a.score);
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.macroRisk = { fredData, countries: COUNTRIES };
+
   const TIERS = [
     { key:'critical', label:'🔴 Critical Risk',  col:'#f85149' },
     { key:'high',     label:'🟠 High Risk',       col:'#f0883e' },
@@ -781,6 +784,9 @@ async function wmMacroPredictions() {
         url:      m.url || null,
       }))
       .sort((a,b) => (b.volume||0) - (a.volume||0));
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.predictions = markets;
 
     if (!markets.length) { el.innerHTML = wmEmpty('No prediction market data'); return; }
 
@@ -883,6 +889,12 @@ async function wmGeoIntel() {
       if (rssText.startsWith('"')) { try { rssText = JSON.parse(rssText); } catch(e) {} }
       const doc   = new DOMParser().parseFromString(rssText, 'text/xml');
       const items = [...doc.querySelectorAll('item')].slice(0, 10);
+      window._tvDataCache = window._tvDataCache || {};
+      window._tvDataCache.geoIntel = { hotspots: HOTSPOTS, headlines: items.map(item => ({
+        title: item.querySelector('title')?.textContent || '',
+        link: item.querySelector('link')?.textContent || '',
+        pubDate: item.querySelector('pubDate')?.textContent || '',
+      })) };
       if (items.length) {
         html += `<div class="wm-section-head">📰 Bloomberg — Latest Intelligence</div>`;
         html += items.map(item => {
@@ -934,6 +946,9 @@ async function wmGeoSignals() {
       return { title, link, pubDate, desc, sev, cat };
     });
 
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.geoSignals = signals;
+
     const ts = signals[0]?.pubDate ? wmRelTime(new Date(signals[0].pubDate).getTime()) : '';
     el.innerHTML = wmLiveBar('Intelligence Signals — Bloomberg Markets', ts) +
       signals.map(s => {
@@ -979,6 +994,9 @@ async function wmGeoQuakes() {
       }))
       .sort((a,b) => b.mag - a.mag)
       .slice(0, 20);
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.quakes = quakes;
 
     let html = wmLiveBar('Seismic Activity — USGS M4.5+ past 7 days', `${features.length} events`);
     html += `<div class="wm-section-head">🏔 Significant Earthquakes (M4.5+, sorted by magnitude)</div>`;
@@ -1031,6 +1049,9 @@ async function wmSupplyFlights() {
     ];
     const inR = (a, r) => a.lat >= r.lat[0] && a.lat <= r.lat[1] && a.lon >= r.lon[0] && a.lon <= r.lon[1];
     const regionCounts = REGIONS.map(r => ({ ...r, count: airborne.filter(a => inR(a, r)).length }));
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.flights = { total: airborne.length, regionCounts };
 
     el.innerHTML = wmLiveBar('Military Air Activity — ADSB.fi Open Data', `${airborne.length} sorties airborne`) +
       `<div class="wm-flight-grid">` +
@@ -2100,6 +2121,9 @@ function wmGeoGpsJam() {
     { severity:'low',      region:'Western China (Xinjiang)',           description:'GPS signal anomalies in restricted areas' },
   ];
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.gpsJam = zones;
+
   let html = wmLiveBar('GPS Jamming Zones — OSINT Curated', `${zones.length} active zones`) +
     `<div style="padding:4px 10px 8px;font-size:11px;color:var(--text-muted)">
       Active GPS/GNSS jamming & spoofing zones based on open-source intelligence. Sources: aviation authorities, maritime AIS anomalies, OSINT researchers.
@@ -2157,6 +2181,9 @@ async function wmGeoMilOps() {
       if (!groups[g]) groups[g] = [];
       groups[g].push(a);
     }
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.milOps = { groups, total: airborne.length };
 
     let html = wmLiveBar('Military Flight Activity — ADSB.fi Live', `${airborne.length} sorties tracked`);
     html += '<div class="wm-milops-list">';
@@ -2277,6 +2304,9 @@ async function wmMacroEtfFlows() {
   }
 
   if (!items.length) { el.innerHTML = wmEmpty('No ETF data available. Add FMP API key for full ETF flow data.'); return; }
+
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.etfFlows = items;
 
   // Sort each category by chgPct desc
   const catOrder = ['🏛 Broad Market','📊 Sector','🏦 Fixed Income','🔶 Alternatives','🌍 International'];
@@ -2798,6 +2828,9 @@ async function wmMacroCrypto() {
     const fg      = fearGreed.status==='fulfilled' ? fearGreed.value : null;
     const defiD   = defi.status==='fulfilled'    ? defi.value : null;
     const btc     = btcStats.status==='fulfilled' ? btcStats.value : null;
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.crypto = { coins: coins.slice(0,20), gdata, fearGreed: fg, trending: (trend?.coins||[]).map(c=>c.item).slice(0,8) };
 
     /* ── Sub-tab bar ─────────────────────────────────────────────── */
     let html = `<div class="cg-subtab-bar">

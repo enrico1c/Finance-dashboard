@@ -2056,6 +2056,12 @@ function setupChecklist(){
       document.querySelectorAll(`.panel-toggle[data-panel="${panel}"]`)
         .forEach(el => { if(el !== this) el.checked = this.checked; });
       this.checked ? showPanel(panel) : hidePanel(panel);
+      // Terminal View has its own window grid driven by the same toggles —
+      // re-render it immediately so show/hide feels instant there too,
+      // instead of waiting for its 15s auto-refresh cycle.
+      if (typeof terminalViewActive !== "undefined" && terminalViewActive && typeof renderTerminalView === "function") {
+        renderTerminalView();
+      }
     });
   });
 }

@@ -253,6 +253,29 @@ function tvSwitchTab(winId, tabKey) {
 }
 window.tvSwitchTab = tvSwitchTab;
 
+/* Maps each Terminal View window id to the dashboard's `.panel-toggle
+   [data-panel]` id that shows/hides its normal-dashboard counterpart —
+   lets the top bar / modules tray govern Terminal View visibility too.
+   Several TV windows derive from the same dashboard panel (e.g. the
+   watchlist feeds Market Monitor, Quote Matrix and Sector Matrix; the
+   Analysts panel hosts both the UARS tabs and the Comparables view).
+   'notes' has no Terminal View equivalent, so it maps nothing. */
+const _TV_PANEL_MAP = {
+  priceChart: 'chart', technicalIndicators: 'chart',
+  marketMonitor: 'watchlist', quoteMatrix: 'watchlist', sectorMatrix: 'watchlist',
+  news: 'news', macroMonitor: 'macro', geoRisk: 'geopolitical',
+  alertsBlotter: 'webhooks', alertFeed: 'alert', supplyChain: 'supply',
+  ownership: 'ownership', fundamentals: 'fundamentals',
+  analysts: 'analysts', comparables: 'analysts',
+  portfolio: 'portfolio', screener: 'screener',
+};
+function _tvPanelVisible(winId) {
+  const panelId = _TV_PANEL_MAP[winId];
+  if (!panelId) return true;
+  const cb = document.querySelector(`.panel-toggle[data-panel="${panelId}"]`);
+  return !cb || cb.checked;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    PRICE CHART WINDOW — mounts the existing lightweight-charts widget
    (lwchart.js mcInit/mcLoad, in its own 'tvMain' slot alongside the
@@ -1206,6 +1229,377 @@ function tvWebhookLog() {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   GEO-RISK — 8 additional tabs for full parity with panel-geopolitical
+   (INTEL/SIGNALS/QUAKES/GPS JAM/MIL·OPS/FEMA/TERROR/CYBER), each reading
+   the window._tvDataCache.<key> stash added to its source render fn.
+   ══════════════════════════════════════════════════════════════════ */
+function tvGeoIntel() {
+  const cached = (window._tvDataCache && window._tvDataCache.geoIntel) || {};
+  const rows = [];
+  (cached.hotspots || []).slice(0, 12).forEach(h => rows.push({
+    source: 'Instability Index', item: `${h.flag || ''} ${h.iso2 || ''}`.trim() || null,
+    detail: h.score != null ? `Risk score ${h.score}` : null, date: null,
+  }));
+  (cached.headlines || []).slice(0, 10).forEach(h => rows.push({
+    source: 'Bloomberg', item: h.title, detail: h.link ? 'Headline' : null,
+    date: _tvDateSafe(h.pubDate),
+  }));
+  const columns = [
+    { key: 'source', label: 'Source', render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'item',   label: 'Item / Headline' },
+    { key: 'detail', label: 'Detail' },
+    { key: 'date',   label: 'Date' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvGeoSignals() {
+  const signals = (window._tvDataCache && window._tvDataCache.geoSignals) || [];
+  const rows = signals.slice(0, 25).map(s => ({
+    date: _tvDateSafe(s.pubDate), severity: (s.sev || '').toUpperCase() || null,
+    category: s.cat, headline: s.title,
+  }));
+  const columns = [
+    { key: 'date',     label: 'Date' },
+    { key: 'severity', label: 'Severity', render: v => v ? _tvTag(v, /high|critical/i.test(v) ? 'neg' : /med/i.test(v) ? 'warn' : 'pos') : null },
+    { key: 'category', label: 'Category', render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'headline', label: 'Headline', render: v => v
+        ? `<span title="${escapeHtml(String(v))}">${escapeHtml(String(v).length > 80 ? String(v).slice(0, 77) + '…' : v)}</span>` : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvGeoQuakes() {
+  const quakes = (window._tvDataCache && window._tvDataCache.quakes) || [];
+  const rows = quakes.map(q => ({ mag: q.mag, place: q.place, depth: q.depth, time: _tvTime(q.time) }));
+  const columns = [
+    { key: 'mag',   label: 'Mag', align: 'num', render: v => v != null ? _tvTag(Number(v).toFixed(1), Number(v) >= 6 ? 'neg' : Number(v) >= 5 ? 'warn' : 'neutral') : null },
+    { key: 'place', label: 'Location' },
+    { key: 'depth', label: 'Depth (km)', align: 'num', render: v => v != null ? Number(v).toFixed(1) : null },
+    { key: 'time',  label: 'Time' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvGeoGpsJam() {
+  const zones = (window._tvDataCache && window._tvDataCache.gpsJam) || [];
+  const rows = zones.map(z => ({
+    severity: (z.severity || '').toUpperCase() || null, region: z.region, description: z.description,
+  }));
+  const columns = [
+    { key: 'severity',    label: 'Severity', render: v => v ? _tvTag(v, v === 'HIGH' ? 'neg' : v === 'MEDIUM' ? 'warn' : 'pos') : null },
+    { key: 'region',      label: 'Region' },
+    { key: 'description', label: 'Description' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvGeoMilOps() {
+  const cached = (window._tvDataCache && window._tvDataCache.milOps) || {};
+  const groups = cached.groups || {};
+  const rows = [];
+  Object.entries(groups).forEach(([type, flights]) => {
+    (flights || []).slice(0, 12).forEach(a => rows.push({
+      type, callsign: (a.flight || a.r || '').trim() || null, desc: a.desc || a.t || null,
+      altitude: typeof a.alt_baro === 'number' ? a.alt_baro : null,
+      speed: a.gs != null ? Math.round(a.gs) : null,
+    }));
+  });
+  const columns = [
+    { key: 'type',     label: 'Class', render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'callsign', label: 'Callsign' },
+    { key: 'desc',     label: 'Aircraft' },
+    { key: 'altitude', label: 'Alt (ft)', align: 'num', render: v => v != null ? _tvNum(v, 0) : null },
+    { key: 'speed',    label: 'Spd (kts)', align: 'num', render: v => v != null ? _tvNum(v, 0) : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* FEMA tab in the dashboard merges OpenFEMA US declarations + GDACS global
+   disasters into one view (see geo-fema-content / geo-gdacs-content) — same here */
+function tvGeoFema() {
+  const recs  = (window._tvDataCache && window._tvDataCache.fema)  || [];
+  const gdacs = (window._tvDataCache && window._tvDataCache.gdacs) || [];
+  const rows = [];
+  recs.slice(0, 20).forEach(r => rows.push({
+    source: 'OpenFEMA', date: _tvDateSafe(r.declarationDate), region: r.state,
+    type: r.disasterType, event: r.declarationTitle, alert: null,
+  }));
+  gdacs.slice(0, 20).forEach(g => rows.push({
+    source: 'GDACS', date: _tvDateSafe(g.pubDate), region: g.country,
+    type: g.eventType, event: g.title, alert: g.alertLevel,
+  }));
+  rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const columns = [
+    { key: 'source', label: 'Source', render: v => _tvTag(v, 'neutral') },
+    { key: 'date',   label: 'Date' },
+    { key: 'region', label: 'Region / State' },
+    { key: 'type',   label: 'Type' },
+    { key: 'event',  label: 'Event', render: v => v
+        ? `<span title="${escapeHtml(String(v))}">${escapeHtml(String(v).length > 60 ? String(v).slice(0, 57) + '…' : v)}</span>` : null },
+    { key: 'alert',  label: 'Alert', render: v => v ? _tvTag(v, /red/i.test(v) ? 'neg' : /orange/i.test(v) ? 'warn' : 'pos') : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvGeoTerror() {
+  const articles = (window._tvDataCache && window._tvDataCache.terror) || [];
+  const rows = articles.slice(0, 25).map(a => ({
+    date: _tvDateSafe(a.seendate), category: a.cat, country: a.sourcecountry,
+    headline: a.title, source: a.domain,
+  }));
+  const columns = [
+    { key: 'date',     label: 'Date' },
+    { key: 'category', label: 'Category', render: v => v ? _tvTag(v, v === 'TERROR' ? 'neg' : 'neutral') : null },
+    { key: 'country',  label: 'Country' },
+    { key: 'headline', label: 'Headline', render: v => v
+        ? `<span title="${escapeHtml(String(v))}">${escapeHtml(String(v).length > 80 ? String(v).slice(0, 77) + '…' : v)}</span>` : null },
+    { key: 'source',   label: 'Source Domain' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvGeoCyber() {
+  const cached = (window._tvDataCache && window._tvDataCache.cyber) || {};
+  const vulns = cached.vulns || [];
+  const articles = cached.cyberArticles || [];
+  const rows = [];
+  [...vulns].sort((a, b) => (b.dateAdded || '').localeCompare(a.dateAdded || '')).slice(0, 18).forEach(v => rows.push({
+    type: 'KEV', date: _tvDateSafe(v.dateAdded), item: `${v.vendorProject || ''} ${v.product || ''}`.trim() || v.cveID,
+    detail: v.vulnerabilityName, ransomware: v.knownRansomwareCampaignUse === 'Known' ? 'YES' : null,
+  }));
+  articles.slice(0, 12).forEach(a => rows.push({
+    type: 'NEWS', date: _tvDateSafe(a.seendate), item: a.domain, detail: a.title, ransomware: null,
+  }));
+  const columns = [
+    { key: 'type',       label: 'Type', render: v => _tvTag(v, v === 'KEV' ? 'warn' : 'neutral') },
+    { key: 'date',       label: 'Date' },
+    { key: 'item',       label: 'Vendor / Source' },
+    { key: 'detail',     label: 'Detail', render: v => v
+        ? `<span title="${escapeHtml(String(v))}">${escapeHtml(String(v).length > 70 ? String(v).slice(0, 67) + '…' : v)}</span>` : null },
+    { key: 'ransomware', label: 'Ransomware', render: v => v ? _tvTag(v, 'neg') : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SUPPLY CHAIN — 5 additional tabs for parity with panel-supply
+   (FLIGHTS/ENERGY/WEATHER/AGRI/COT)
+   ══════════════════════════════════════════════════════════════════ */
+function tvSupplyFlights() {
+  const cached = (window._tvDataCache && window._tvDataCache.flights) || {};
+  const rows = (cached.regionCounts || []).map(r => ({
+    region: `${r.emoji || ''} ${r.name || ''}`.trim() || null, count: r.count,
+  }));
+  const columns = [
+    { key: 'region', label: 'Region' },
+    { key: 'count',  label: 'Sorties Tracked', align: 'num', render: v => v != null ? _tvNum(v, 0) : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvSupplyEnergy() {
+  const cached = (window._tvDataCache && window._tvDataCache.energy) || {};
+  const rows = (cached.priceCards || []).map(c => ({
+    name: `${c.icon || ''} ${c.name || ''}`.trim() || null, price: c.val, unit: c.unit,
+    chg: c.chg, source: c.src,
+  }));
+  const columns = [
+    { key: 'name',   label: 'Benchmark' },
+    { key: 'price',  label: 'Price' },
+    { key: 'unit',   label: 'Unit' },
+    { key: 'chg',    label: 'Chg', align: 'num', render: v => (v != null && v !== 0) ? _tvPct(v) : null },
+    { key: 'source', label: 'Source', render: v => v ? _tvTag(v, 'neutral') : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvSupplyWeather() {
+  const locs = (window._tvDataCache && window._tvDataCache.supplyWeather) || [];
+  const rows = locs.map(l => {
+    const c = l.current || {};
+    return {
+      location: `${l.emoji || ''} ${l.name || ''}`.trim() || null,
+      temp: c.temperature_2m, precip: c.precipitation, wind: c.wind_speed_10m,
+    };
+  });
+  const columns = [
+    { key: 'location', label: 'Location' },
+    { key: 'temp',     label: 'Temp (°C)',   align: 'num', render: v => v != null ? Number(v).toFixed(1) : null },
+    { key: 'precip',   label: 'Precip (mm)', align: 'num', render: v => v != null ? Number(v).toFixed(1) : null },
+    { key: 'wind',     label: 'Wind (km/h)', align: 'num', render: v => v != null ? Number(v).toFixed(1) : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvSupplyAgri() {
+  const cached = (window._tvDataCache && window._tvDataCache.agri) || {};
+  const rows = [];
+  (cached.fao || []).forEach(d => rows.push({
+    source: 'FAO FPI', name: d.name, value: typeof d.value === 'number' ? d.value.toFixed(1) : d.value,
+    change: d.change ? parseFloat(String(d.change).replace(/[^0-9.\-]/g, '')) : null, date: d.date,
+  }));
+  (cached.wbAgri || []).forEach(c => rows.push({
+    source: 'World Bank', name: c.name, value: c.latest != null ? Number(c.latest).toFixed(2) : null,
+    change: (c.prev && c.latest) ? ((c.latest - c.prev) / c.prev * 100) : null, date: c.date,
+  }));
+  const columns = [
+    { key: 'source', label: 'Source', render: v => _tvTag(v, 'neutral') },
+    { key: 'name',   label: 'Indicator' },
+    { key: 'value',  label: 'Value', align: 'num' },
+    { key: 'change', label: 'Chg', align: 'num', render: v => v != null ? _tvPct(v) : null },
+    { key: 'date',   label: 'Date' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvSupplyCOT() {
+  const cached = (window._tvDataCache && window._tvDataCache.cot) || {};
+  const cotData = cached.cotData || {};
+  const rows = Object.entries(cached.links || {}).map(([name, code]) => {
+    const latest = cotData?.[code]?.[0];
+    const net = latest ? latest.longAll - latest.shortAll : null;
+    return { contract: name, net, openInterest: latest ? latest.openInterest : null, date: latest ? latest.date : null };
+  });
+  const columns = [
+    { key: 'contract',     label: 'Contract' },
+    { key: 'net',          label: 'Net Spec Position', align: 'num', render: v => v != null ? _tvTag((v > 0 ? '+' : '') + _tvNum(v, 0), v > 0 ? 'pos' : v < 0 ? 'neg' : 'neutral') : null },
+    { key: 'openInterest', label: 'Open Interest', align: 'num', render: v => v != null ? _tvNum(v, 0) : null },
+    { key: 'date',         label: 'Report Date' },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MACRO MONITOR — 6 additional tabs + a dedicated YIELD view, for
+   full parity with panel-macro (SIGNALS/COMMODITIES/RISK/PREDICTIONS/
+   YIELD/ECON CAL/CRYPTO/FLOWS). The existing flat tvMacroMonitor()
+   becomes the SIGNALS tab unchanged.
+   ══════════════════════════════════════════════════════════════════ */
+function tvMacroYield() {
+  const yields = window._treasuryYields || {};
+  const order = ['1M','3M','6M','1Y','2Y','3Y','5Y','7Y','10Y','20Y','30Y'];
+  const rows = order.filter(k => yields[k] != null).map(k => ({ tenor: k, value: yields[k], note: 'Treasury yield' }));
+  (window._tvDataCache?.fredSpreads || []).forEach(p => rows.push({ tenor: p.label, value: p.value, note: p.note }));
+  const columns = [
+    { key: 'tenor', label: 'Tenor / Spread' },
+    { key: 'value', label: 'Value (%)', align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
+    { key: 'note',  label: 'Note' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvMacroCommodities() {
+  const grouped = (window._tvDataCache && window._tvDataCache.imfComm) || {};
+  const catLabels = { index: 'Indices', energy: 'Energy', metals: 'Metals', agri: 'Agriculture', fertilizers: 'Fertilizers' };
+  const rows = [];
+  Object.entries(grouped).forEach(([cat, items]) => {
+    (items || []).forEach(d => {
+      const v = d.latest ?? d.value;
+      const chg = (d.prev && v) ? ((v - d.prev) / d.prev * 100) : null;
+      rows.push({ category: catLabels[cat] || cat, name: d.name, value: v, change: chg, unit: d.unit, date: d.date });
+    });
+  });
+  const columns = [
+    { key: 'category', label: 'Category', render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'name',     label: 'Commodity' },
+    { key: 'value',    label: 'Value', align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
+    { key: 'change',   label: 'Chg', align: 'num', render: v => v != null ? _tvPct(v) : null },
+    { key: 'unit',     label: 'Unit' },
+    { key: 'date',     label: 'Date' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvMacroRiskTab() {
+  const cached = (window._tvDataCache && window._tvDataCache.macroRisk) || {};
+  const rows = [];
+  (cached.fredData || []).forEach(f => {
+    const chg = (f.value != null && f.prev != null) ? (f.value - f.prev) : null;
+    rows.push({ category: 'Market Risk (FRED)', name: f.label, value: f.value, change: chg, note: f.unit });
+  });
+  (cached.countries || []).slice(0, 20).forEach(c => rows.push({
+    category: 'Country Risk', name: `${c.flag || ''} ${c.name || ''}`.trim() || null,
+    value: c.score, change: null, note: `${(c.tier || '').toUpperCase()}${c.note ? ' · ' + c.note : ''}`,
+  }));
+  const columns = [
+    { key: 'category', label: 'Category', render: v => _tvTag(v, 'neutral') },
+    { key: 'name',     label: 'Indicator / Country' },
+    { key: 'value',    label: 'Value / Score', align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
+    { key: 'change',   label: 'Chg', align: 'num', render: v => v != null ? Number(v).toFixed(2) : null },
+    { key: 'note',     label: 'Unit / Tier · Note' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvMacroPredictions() {
+  const markets = (window._tvDataCache && window._tvDataCache.predictions) || [];
+  const rows = markets.slice(0, 25).map(m => ({
+    question: m.question, probability: m.prob, volume: m.volume, category: m.category, end: _tvDateSafe(m.endDate),
+  }));
+  const columns = [
+    { key: 'question',    label: 'Market Question', render: v => v
+        ? `<span title="${escapeHtml(String(v))}">${escapeHtml(String(v).length > 70 ? String(v).slice(0, 67) + '…' : v)}</span>` : null },
+    { key: 'probability', label: 'Prob.', align: 'num', render: v => v != null ? Number(v).toFixed(0) + '%' : null },
+    { key: 'volume',      label: 'Volume', align: 'num', render: v => v != null ? '$' + _tvNum(v, 0) : null },
+    { key: 'category',    label: 'Category', render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'end',         label: 'Closes' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvEconCalendar() {
+  const events = (window._tvDataCache && window._tvDataCache.econCalendar) || [];
+  const rows = events.slice(0, 40).map(ev => ({
+    date: _tvTime(ev.date), country: ev.country, impact: ev.impact,
+    title: ev.title || ev.name, actual: ev.actual, forecast: ev.forecast, previous: ev.previous,
+  }));
+  const columns = [
+    { key: 'date',     label: 'Time' },
+    { key: 'country',  label: 'Currency' },
+    { key: 'impact',   label: 'Impact', render: v => v ? _tvTag(v, /high/i.test(v) ? 'neg' : /medium/i.test(v) ? 'warn' : 'neutral') : null },
+    { key: 'title',    label: 'Event' },
+    { key: 'actual',   label: 'Actual',   align: 'num' },
+    { key: 'forecast', label: 'Forecast', align: 'num' },
+    { key: 'previous', label: 'Previous', align: 'num' },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvMacroCrypto() {
+  const cached = (window._tvDataCache && window._tvDataCache.crypto) || {};
+  const rows = (cached.coins || []).slice(0, 20).map(c => ({
+    rank: c.market_cap_rank, sym: (c.symbol || '').toUpperCase(), name: c.name,
+    price: c.current_price, chg24h: c.price_change_percentage_24h, mktCap: c.market_cap,
+  }));
+  const columns = [
+    { key: 'rank',   label: '#', align: 'num' },
+    { key: 'sym',    label: 'Sym', render: v => _tvTicker(v) },
+    { key: 'name',   label: 'Name' },
+    { key: 'price',  label: 'Price', align: 'num', render: v => v != null ? '$' + _tvNum(v, v < 1 ? 4 : 2) : null },
+    { key: 'chg24h', label: '24h %', align: 'num', render: v => v != null ? _tvPct(v) : null },
+    { key: 'mktCap', label: 'Mkt Cap', align: 'num', render: v => v != null ? '$' + _tvNum(v, 0) : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+function tvMacroEtfFlows() {
+  const items = (window._tvDataCache && window._tvDataCache.etfFlows) || [];
+  const rows = items.slice(0, 30).map(f => ({
+    sym: f.sym, name: f.name, category: f.cat, price: f.price, chg: f.chgPct, volume: f.volume,
+  }));
+  const columns = [
+    { key: 'sym',      label: 'Sym', render: v => _tvTicker(v) },
+    { key: 'name',     label: 'Name' },
+    { key: 'category', label: 'Category', render: v => v ? _tvTag(v, 'neutral') : null },
+    { key: 'price',    label: 'Price', align: 'num', render: v => v != null ? '$' + Number(v).toFixed(2) : null },
+    { key: 'chg',      label: 'Chg %', align: 'num', render: v => v != null ? _tvPct(v) : null },
+    { key: 'volume',   label: 'Volume', align: 'num', render: v => v != null ? _tvNum(v, 0) : null },
+  ];
+  return tvTable(columns, rows);
+}
+
+/* ══════════════════════════════════════════════════════════════════
    ORCHESTRATOR — builds the workspace grid from the mappers above
    ══════════════════════════════════════════════════════════════════ */
 /* Builds a tabs[]/body pair for a tabbed window from {key,label,body()} defs,
@@ -1243,6 +1637,14 @@ function renderTerminalView() {
     { key: 'wars',      label: 'WARS',      body: () => tvRiskMatrix() },
     { key: 'resources', label: 'RESOURCES', body: () => tvGeoResources() },
     { key: 'routes',    label: 'ROUTES',    body: () => tvGeoRoutes() },
+    { key: 'intel',     label: 'INTEL',     body: () => tvGeoIntel() },
+    { key: 'signals',   label: 'SIGNALS',   body: () => tvGeoSignals() },
+    { key: 'quakes',    label: 'QUAKES',    body: () => tvGeoQuakes() },
+    { key: 'gpsjam',    label: 'GPS JAM',   body: () => tvGeoGpsJam() },
+    { key: 'milops',    label: 'MIL·OPS',   body: () => tvGeoMilOps() },
+    { key: 'fema',      label: 'FEMA',      body: () => tvGeoFema() },
+    { key: 'terror',    label: 'TERROR',    body: () => tvGeoTerror() },
+    { key: 'cyber',     label: 'CYBER',     body: () => tvGeoCyber() },
   ]);
   const ownership = _tvTabbed('ownership', 'hds', [
     { key: 'hds',   label: 'HDS',    body: () => tvOwnershipTable() },
@@ -1271,43 +1673,69 @@ function renderTerminalView() {
     { key: 'choke',    label: 'CHOKE',    body: () => tvGeoRoutes() },
     { key: 'shipping', label: 'SHIPPING', body: () => tvSupplyShipping() },
     { key: 'minerals', label: 'MINERALS', body: () => tvSupplyMinerals() },
+    { key: 'flights',  label: 'FLIGHTS',  body: () => tvSupplyFlights() },
+    { key: 'energy',   label: 'ENERGY',   body: () => tvSupplyEnergy() },
+    { key: 'weather',  label: 'WEATHER',  body: () => tvSupplyWeather() },
+    { key: 'agri',     label: 'AGRI',     body: () => tvSupplyAgri() },
+    { key: 'cot',      label: 'COT',      body: () => tvSupplyCOT() },
+  ]);
+  const macroMonitor = _tvTabbed('macroMonitor', 'signals', [
+    { key: 'signals',     label: 'SIGNALS',     body: () => tvMacroMonitor() },
+    { key: 'commodities', label: 'COMMODITIES', body: () => tvMacroCommodities() },
+    { key: 'risk',        label: 'RISK',        body: () => tvMacroRiskTab() },
+    { key: 'predictions', label: 'PREDICTIONS', body: () => tvMacroPredictions() },
+    { key: 'yield',       label: 'YIELD',       body: () => tvMacroYield() },
+    { key: 'econcal',     label: 'ECON CAL',    body: () => tvEconCalendar() },
+    { key: 'crypto',      label: 'CRYPTO',      body: () => tvMacroCrypto() },
+    { key: 'flows',       label: 'FLOWS',       body: () => tvMacroEtfFlows() },
   ]);
   const alertsBlotter = _tvTabbed('alertsBlotter', 'alerts', [
     { key: 'alerts', label: 'ALERTS', body: () => tvAlertsBlotter() },
     { key: 'log',    label: 'LOG',    body: () => tvWebhookLog() },
   ]);
 
-  const winIds = [
-    'priceChart', 'marketMonitor', 'quoteMatrix', 'technicalIndicators', 'sectorMatrix',
-    'news', 'macroMonitor', 'geoRisk', 'alertsBlotter', 'alertFeed', 'supplyChain',
-    'ownership', 'fundamentals', 'analysts', 'comparables', 'portfolio', 'screener',
+  /* Every window is paired with its id so the list can be filtered by
+     _tvPanelVisible() — the top bar / modules tray's .panel-toggle
+     checkboxes now govern which Terminal View windows render, exactly
+     like they govern the normal dashboard's panels. */
+  const windowDefs = [
+    { id: 'priceChart',          html: tvWindow(`Price Chart — ${sym || 'N/A'}`,   { id: 'priceChart',          span: 8,  tall: true, bodyHtml: '<div id="tvPriceChart" class="tv-chart-mount"></div>' }) },
+    { id: 'marketMonitor',       html: tvWindow('Market Monitor',                 { id: 'marketMonitor',       span: 8,  tall: true, actions: `${watchCount} instruments · ${stamp}`, bodyHtml: tvMarketOverview() }) },
+    { id: 'quoteMatrix',         html: tvWindow(`Quote Matrix — ${sym || 'N/A'}`,            { id: 'quoteMatrix',         span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvQuoteMatrix(sym) }) },
+    { id: 'technicalIndicators', html: tvWindow(`Technical Indicators — ${sym || 'N/A'}`,    { id: 'technicalIndicators', span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvTechnicalIndicators(sym) }) },
+    { id: 'sectorMatrix',        html: tvWindow('Sector Matrix',                  { id: 'sectorMatrix',        span: 4,  bodyHtml: tvSectorMatrix() }) },
+    { id: 'news',                html: tvWindow('News',                           { id: 'news',                span: 4,  tall: true, actions: stamp, tabs: news.tabs, bodyHtml: news.body }) },
+    { id: 'macroMonitor',        html: tvWindow('Macro Monitor',                  { id: 'macroMonitor',        span: 4,  tall: true, tabs: macroMonitor.tabs, bodyHtml: macroMonitor.body }) },
+    { id: 'geoRisk',             html: tvWindow('Geo-Risk',                       { id: 'geoRisk',             span: 6,  tall: true, tabs: geoRisk.tabs, bodyHtml: geoRisk.body }) },
+    { id: 'alertsBlotter',       html: tvWindow('Alerts Blotter',                 { id: 'alertsBlotter',       span: 6,  tall: true, actions: `${alertCount} configured`, tabs: alertsBlotter.tabs, bodyHtml: alertsBlotter.body }) },
+    { id: 'alertFeed',           html: tvWindow('Alert Feed',                     { id: 'alertFeed',           span: 6,  tall: true, tabs: alertFeed.tabs, bodyHtml: alertFeed.body }) },
+    { id: 'supplyChain',         html: tvWindow('Supply Chain',                   { id: 'supplyChain',         span: 6,  tall: true, tabs: supplyChain.tabs, bodyHtml: supplyChain.body }) },
+    { id: 'ownership',           html: tvWindow('Ownership',                      { id: 'ownership',           span: 12, tabs: ownership.tabs, bodyHtml: ownership.body }) },
+    { id: 'fundamentals',        html: tvWindow(`Fundamentals — ${sym || 'N/A'}`,  { id: 'fundamentals',        span: 8,  tall: true, tabs: fundamentals.tabs, bodyHtml: fundamentals.body }) },
+    { id: 'analysts',            html: tvWindow(`Analysts — ${sym || 'N/A'}`,      { id: 'analysts',            span: 6,  tall: true, tabs: analysts.tabs, bodyHtml: analysts.body }) },
+    { id: 'comparables',         html: tvWindow(`Comparables — ${sym || 'N/A'}`,   { id: 'comparables',         span: 12, bodyHtml: tvComparables(sym) }) },
+    { id: 'portfolio',           html: tvWindow('Portfolio P&L',                  { id: 'portfolio',           span: 6,  tall: true, bodyHtml: tvPortfolio() }) },
+    { id: 'screener',            html: tvWindow('Stock Screener',                 { id: 'screener',            span: 12, bodyHtml: tvScreenerResults() }) },
   ];
+
+  const visibleDefs = windowDefs.filter(w => _tvPanelVisible(w.id));
+  const winIds = visibleDefs.map(w => w.id);
 
   root.classList.toggle('tv-free-layout', freeLayout);
   if (freeLayout) computeDefaultTvLayout(winIds);
 
-  root.innerHTML = [
-    tvWindow(`Price Chart — ${sym || 'N/A'}`,   { id: 'priceChart',          span: 8,  tall: true, bodyHtml: '<div id="tvPriceChart" class="tv-chart-mount"></div>' }),
-    tvWindow('Market Monitor',                 { id: 'marketMonitor',       span: 8,  tall: true, actions: `${watchCount} instruments · ${stamp}`, bodyHtml: tvMarketOverview() }),
-    tvWindow(`Quote Matrix — ${sym || 'N/A'}`,            { id: 'quoteMatrix',         span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvQuoteMatrix(sym) }),
-    tvWindow(`Technical Indicators — ${sym || 'N/A'}`,    { id: 'technicalIndicators', span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvTechnicalIndicators(sym) }),
-    tvWindow('Sector Matrix',                  { id: 'sectorMatrix',        span: 4,  bodyHtml: tvSectorMatrix() }),
-    tvWindow('News',                           { id: 'news',                span: 4,  tall: true, actions: stamp, tabs: news.tabs, bodyHtml: news.body }),
-    tvWindow('Macro Monitor',                  { id: 'macroMonitor',        span: 4,  bodyHtml: tvMacroMonitor() }),
-    tvWindow('Geo-Risk',                       { id: 'geoRisk',             span: 6,  tall: true, tabs: geoRisk.tabs, bodyHtml: geoRisk.body }),
-    tvWindow('Alerts Blotter',                 { id: 'alertsBlotter',       span: 6,  tall: true, actions: `${alertCount} configured`, tabs: alertsBlotter.tabs, bodyHtml: alertsBlotter.body }),
-    tvWindow('Alert Feed',                     { id: 'alertFeed',           span: 6,  tall: true, tabs: alertFeed.tabs, bodyHtml: alertFeed.body }),
-    tvWindow('Supply Chain',                   { id: 'supplyChain',         span: 6,  tall: true, tabs: supplyChain.tabs, bodyHtml: supplyChain.body }),
-    tvWindow('Ownership',                      { id: 'ownership',           span: 12, tabs: ownership.tabs, bodyHtml: ownership.body }),
-    tvWindow(`Fundamentals — ${sym || 'N/A'}`,  { id: 'fundamentals',        span: 8,  tall: true, tabs: fundamentals.tabs, bodyHtml: fundamentals.body }),
-    tvWindow(`Analysts — ${sym || 'N/A'}`,      { id: 'analysts',            span: 6,  tall: true, tabs: analysts.tabs, bodyHtml: analysts.body }),
-    tvWindow(`Comparables — ${sym || 'N/A'}`,   { id: 'comparables',         span: 12, bodyHtml: tvComparables(sym) }),
-    tvWindow('Portfolio P&L',                  { id: 'portfolio',           span: 6,  tall: true, bodyHtml: tvPortfolio() }),
-    tvWindow('Stock Screener',                 { id: 'screener',            span: 12, bodyHtml: tvScreenerResults() }),
-  ].join('');
+  root.innerHTML = visibleDefs.map(w => w.html).join('');
 
-  /* Splice the live chart window back in (or initialise it on first render). */
+  /* Splice the live chart window back in (or initialise it on first render).
+     If the Chart panel was toggled off, there's no placeholder to splice into —
+     tear the detached instance down now rather than leaving its websocket/poll
+     loop running in an orphaned node. */
   const _tvChartSlot = document.getElementById('tv-window-priceChart');
+  if (!_tvChartSlot && _tvChartWin && _tvChartInited && typeof mcDestroy === 'function') {
+    mcDestroy('tvMain');
+    _tvChartInited = false;
+    _tvChartSym = '';
+  }
   if (_tvChartSlot) {
     if (_tvChartWin) {
       const chartTitleEl = _tvChartWin.querySelector('.tv-window-title');
