@@ -1159,6 +1159,11 @@ function renderGeoWars() {
   const box = document.getElementById("georisk-wars-content");
   if (!box) return;
 
+  // Static fallback path — stash so Terminal View's WARS/RESOURCES tabs
+  // (which read window._wmConflicts) have data even when the live
+  // WorldMonitor bootstrap is unavailable and wmGeoWars() defers here.
+  window._wmConflicts = window._wmConflicts || GEORISK_CONFLICTS;
+
   box.innerHTML = `
     <div class="geo-live-bar">
       <span class="geo-live-dot"></span>
