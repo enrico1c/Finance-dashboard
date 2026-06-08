@@ -248,11 +248,13 @@ async function blsEnrichEconTab() {
     let html = `<div class="section-head" style="margin-top:14px">📦 BLS Producer & Consumer Price Indices — Commodity-Linked</div>`;
     html += `<div class="av-note" style="margin-bottom:6px">BLS API v1 (no key required). PPI tracks prices received by producers — leading indicator for CPI. Monthly.</div>`;
     html += `<div class="commodity-price-grid">`;
+    const _tvCommSparks = [];
 
     BLS_SERIES.forEach((s,i) => {
       const r = results[i];
       if (r.status !== 'fulfilled' || !r.value?.length) return;
       const obs = r.value;
+      _tvCommSparks.push({ label: s.label, vals: obs.slice(-12).map(d=>parseFloat(d.value)) });
       const last = obs[obs.length-1];
       const prev = obs.length>1 ? obs[obs.length-2] : null;
       const val  = parseFloat(last?.value);
@@ -272,6 +274,8 @@ async function blsEnrichEconTab() {
         <div class="commodity-price-spark">${_posSparkline(obs.slice(-12).map(d=>parseFloat(d.value)), chg>=0?'#3fb950':'#f85149')}</div>
       </div>`;
     });
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.commoditySparklines = _tvCommSparks;
     html += `</div>`;
     html += `<div class="av-note" style="margin-top:4px">Source: <a href="https://www.bls.gov/ppi/" target="_blank" rel="noopener" style="color:var(--accent)">Bureau of Labor Statistics PPI</a> · No API key required (v1)</div>`;
 

@@ -1665,10 +1665,12 @@ async function bondsLoadSpreads() {
       { id:'BAMLH0A0HYM2', label:'HY OAS', color:'#f85149' },
     ];
     html += `<div class="bonds-sparks-row">`;
+    const _tvBondSparks = [];
     sparkSeries.forEach(s => {
       const hist = map[s.id]?.history || [];
       if (hist.length < 3) return;
       const vals = hist.map(o=>parseFloat(o.value)).filter(v=>!isNaN(v));
+      _tvBondSparks.push({ label: s.label, color: s.color, vals });
       const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||0.01;
       const pts = vals.map((v,i) => `${(i/(vals.length-1)*180).toFixed(0)},${(26-(v-mn)/rng*24).toFixed(0)}`).join(' ');
       html += `<div class="bonds-spark-cell">
@@ -1679,6 +1681,8 @@ async function bondsLoadSpreads() {
         <div class="bonds-spark-range" style="font-size:8px;color:var(--text-muted)">${(mn*100).toFixed(0)}–${(mx*100).toFixed(0)}bps (30 obs)</div>
       </div>`;
     });
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.bondSparklines = _tvBondSparks;
     html += `</div>`;
   }
 

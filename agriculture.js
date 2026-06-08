@@ -151,6 +151,8 @@ async function agricultureLoadAll() {
 
   /* ── Sunflower Oil (IMF) ─────────────────────────────────────────── */
   if (sunflower?.length) {
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.agriSparkline = { label: 'Sunflower Oil ($/mt)', vals: sunflower.slice(-12).map(d=>d.value) };
     const last = sunflower[sunflower.length-1];
     const prev = sunflower.length>1 ? sunflower[sunflower.length-2] : null;
     const chg  = prev ? last.value-prev.value : null;

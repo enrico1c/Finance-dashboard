@@ -311,3 +311,112 @@
   z-index: 3;
 }
 .tv-window.tv-resizing .tv-size-tooltip { display: block; }
+
+/* ══════════════════════════════════════════════════════════════════
+   CHART GALLERY — the "Charts" window's grid of native SVG mini-charts
+   (sparklines, gauges, yield curve, bar rankings, OHLC), grouped into
+   labeled sections mirroring the Macro Intel tabs they're sourced from.
+   ══════════════════════════════════════════════════════════════════ */
+.tv-chart-section + .tv-chart-section { margin-top: 14px; }
+.tv-chart-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 10px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.tv-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  padding: 0 10px;
+}
+.tv-chart-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  padding: 8px 10px;
+  min-width: 0;
+}
+.tv-chart-card-wide { grid-column: 1 / -1; }
+.tv-chart-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.tv-chart-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tv-chart-card-meta {
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tv-chart-card-body { line-height: 0; }
+.tv-chart-card-body svg { display: block; width: 100%; height: auto; }
+
+/* ── Sparklines / yield curve / candles ───────────────────────────── */
+.tv-spark, .tv-yieldcurve, .tv-candles { height: 38px; }
+.tv-yieldcurve, .tv-candles { height: 96px; }
+.tv-chart-axis {
+  font-size: 6px;
+  font-family: var(--font-mono);
+  fill: var(--text-muted);
+}
+.tv-yieldcurve + .tv-tag { margin-top: 4px; display: inline-block; }
+
+/* ── Semicircle gauge ──────────────────────────────────────────────── */
+.tv-gauge { height: 56px; }
+.tv-gauge-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  fill: currentColor;
+}
+
+/* ── Horizontal bar ranking ────────────────────────────────────────── */
+.tv-bar-ranking { display: flex; flex-direction: column; gap: 5px; }
+.tv-bar-row {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) minmax(70px, 2fr) 52px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+}
+.tv-bar-label {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tv-bar-track {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.tv-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: .55;
+}
+.tv-bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

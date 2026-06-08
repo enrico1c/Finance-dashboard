@@ -461,6 +461,8 @@ async function wmMacroSignals() {
         }
       }
 
+      window._tvDataCache = window._tvDataCache || {};
+      window._tvDataCache.macroSignals = signals.filter(s => s.vals?.length > 1);
       if (!signals.length) html += wmEmpty('No signal data available');
       el.innerHTML = html;
     } catch(e) {
@@ -499,6 +501,8 @@ async function wmMacroSignals() {
     }
 
     const all  = Object.values(groups).flat();
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.macroSignals = all.filter(s => s.vals?.length > 1);
     if (!all.length) {
       el.innerHTML = wmError('FRED API returned no indicators — key may be invalid or rate-limited. Add a valid FRED key in ⚙ API settings.');
       return;
@@ -3064,6 +3068,8 @@ async function wmMacroCrypto() {
       _fetchBinanceKlines('BTCUSDT','1d',60).then(candles => {
         const wrap = document.getElementById('cg-btc-chart');
         if (!wrap || !candles?.length) return;
+        window._tvDataCache = window._tvDataCache || {};
+        window._tvDataCache.btcCandles = candles;
         const W=wrap.clientWidth||360, H=100, PL=4, PR=4, PT=6, PB=14;
         const cw=W-PL-PR, ch=H-PT-PB;
         const mn=Math.min(...candles.map(c=>c.l)), mx=Math.max(...candles.map(c=>c.h)), rng=mx-mn||1;

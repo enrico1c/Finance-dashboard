@@ -165,6 +165,8 @@ async function fredLoadYieldCurve() {
   // ── 1. US Treasury Direct (no key needed) ────────────────────
   const treasuryData = await fredLoadTreasuryDirect();
   if (treasuryData?.yields?.length) {
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.yieldCurve = { yields: treasuryData.yields, date: treasuryData.date, src: treasuryData.src };
     _fredRenderYieldCurve(el, treasuryData.yields, treasuryData.date, treasuryData.src);
   } else {
     el.innerHTML = ''; // clear spinner — subsequent sections will fill the element
@@ -302,6 +304,9 @@ async function fredSparkRow(seriesIds, labels) {
     const obs = r.value.reverse(); // oldest→newest
     const vals = obs.map(o => parseFloat(o.value)).filter(v => !isNaN(v));
     if (!vals.length) return;
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.fredEconSparklines = window._tvDataCache.fredEconSparklines || [];
+    window._tvDataCache.fredEconSparklines[i] = { label: labels[i], vals };
     const mx = Math.max(...vals), mn = Math.min(...vals), range = mx - mn || 1;
     const W = 100, H = 36;
     const xStep = W / (vals.length - 1 || 1);

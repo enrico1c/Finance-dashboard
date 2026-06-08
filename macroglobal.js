@@ -364,6 +364,9 @@ window.macroLoadGlobal = async function() {
       };
     });
 
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.gdpRanking = rows.filter(r => r.gdp_growth != null);
+
     el.dataset.mgLoaded = '1';
     el.innerHTML = `
       <div class="av-live-badge">● World Bank · IMF WEO · ${new Date().getFullYear()} data · No API key required</div>
@@ -478,6 +481,9 @@ window.macroLoadPMI = async function() {
       code, ...meta,
       ...(parsed[code] || {}),
     })).filter(i => i.value != null).sort((a,b) => b.value - a.value);
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.cliGauges = items;
 
     el.dataset.mgLoaded = '1';
 

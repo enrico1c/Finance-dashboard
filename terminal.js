@@ -263,7 +263,7 @@ window.tvSwitchTab = tvSwitchTab;
 const _TV_PANEL_MAP = {
   priceChart: 'chart', technicalIndicators: 'chart',
   marketMonitor: 'watchlist', quoteMatrix: 'watchlist', sectorMatrix: 'watchlist',
-  news: 'news', macroMonitor: 'macro', geoRisk: 'geopolitical',
+  news: 'news', macroMonitor: 'macro', charts: 'macro', geoRisk: 'geopolitical',
   alertsBlotter: 'webhooks', alertFeed: 'alert', supplyChain: 'supply',
   ownership: 'ownership', fundamentals: 'fundamentals',
   analysts: 'analysts', comparables: 'analysts',
@@ -514,6 +514,237 @@ function tvIntelligenceBlotter() {
     { key: 'sentiment', label: 'Sentiment',render: v => v ? _tvTag(v, /bull/i.test(v) ? 'pos' : /bear/i.test(v) ? 'neg' : 'neutral') : null },
   ];
   return tvTable(columns, rows);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CHART GALLERY — shared SVG generators + the tvCharts() mapper that
+   reproduces every distinct visualization from Macro Intel's tabs
+   natively in terminal styling. Each helper draws straight from the
+   underlying numeric series stashed in window._tvDataCache (cache-
+   stash pattern, no new fetches) — charts are redrawn with these
+   shared primitives rather than reusing the source widgets' SVG HTML,
+   so the whole gallery shares one visual language (currentColor +
+   tv-pos/tv-neg semantics, matching the rest of the Terminal View).
+   ══════════════════════════════════════════════════════════════════ */
+
+/** Line + optional area-fill sparkline from a flat numeric series.
+ *  opts.cls picks a semantic color class (defaults to first→last
+ *  direction); opts.color overrides with an explicit hex/CSS color. */
+function _tvSparkSVG(values, opts) {
+  opts = opts || {};
+  const vals = (values || []).map(Number).filter(v => !Number.isNaN(v));
+  if (vals.length < 2) return '';
+  const w = opts.w || 180, h = opts.h || 38;
+  const min = Math.min(...vals), max = Math.max(...vals), rng = (max - min) || 1;
+  const stepX = w / (vals.length - 1);
+  const toY = v => (h - 3 - ((v - min) / rng) * (h - 6)).toFixed(1);
+  const pts = vals.map((v, i) => `${(i * stepX).toFixed(1)},${toY(v)}`);
+  const cls = opts.color ? '' : (opts.cls || (vals[vals.length - 1] >= vals[0] ? 'tv-pos' : 'tv-neg'));
+  const style = opts.color ? ` style="color:${escapeHtml(String(opts.color))}"` : '';
+  const area = opts.area === false ? '' :
+    `<polygon points="0,${h} ${pts.join(' ')} ${w},${h}" fill="currentColor" opacity="0.10"/>`;
+  return `<svg class="tv-spark${cls ? ' ' + cls : ''}"${style} viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${area}<polyline points="${pts.join(' ')}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+}
+
+/** Semicircle gauge: pct is a 0-100 fill amount; valueText (any label,
+ *  e.g. the raw index value) is drawn at the arc's center. */
+function _tvGaugeSVG(pct, opts) {
+  opts = opts || {};
+  const v = Math.max(0, Math.min(100, Number(pct) || 0));
+  const cls = opts.cls || (v >= 60 ? 'tv-pos' : v <= 40 ? 'tv-neg' : 'tv-warn');
+  const r = 40, cx = 50, cy = 48, arc = Math.PI * r;
+  return `<svg class="tv-gauge ${cls}" viewBox="0 0 100 56">
+    <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="var(--border-bright)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(v / 100 * arc).toFixed(1)} ${arc.toFixed(1)}"/>
+    <text x="50" y="44" text-anchor="middle" class="tv-gauge-value">${escapeHtml(String(opts.valueText ?? Math.round(v)))}</text>
+  </svg>`;
+}
+
+/** Treasury yield curve: filled area + line across maturities, mirroring
+ *  _fredRenderYieldCurve's {label, value} series, redrawn in tv- styling. */
+function _tvYieldCurveSVG(yields) {
+  const ys = (yields || []).filter(y => y && typeof y.value === 'number');
+  if (ys.length < 2) return '';
+  const w = 320, h = 90, pl = 30, pr = 8, pt = 10, pb = 16;
+  const cw = w - pl - pr, ch = h - pt - pb;
+  const vals = ys.map(y => y.value);
+  const min = Math.min(...vals), max = Math.max(...vals), rng = (max - min) || 0.5;
+  const toX = i => (pl + i / (ys.length - 1) * cw).toFixed(1);
+  const toY = v => (pt + ch - (v - min) / rng * ch).toFixed(1);
+  const pts = ys.map((y, i) => `${toX(i)},${toY(y.value)}`);
+  const inverted = vals[0] > vals[vals.length - 1];
+  const cls = inverted ? 'tv-neg' : 'tv-pos';
+  return `<svg class="tv-yieldcurve ${cls}" viewBox="0 0 ${w} ${h}">
+    <polygon points="${toX(0)},${pt + ch} ${pts.join(' ')} ${toX(ys.length - 1)},${pt + ch}" fill="currentColor" opacity="0.10"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+    ${ys.map((y, i) => i % Math.ceil(ys.length / 6) === 0
+      ? `<text x="${toX(i)}" y="${h - 4}" class="tv-chart-axis" text-anchor="middle">${escapeHtml(String(y.label))}</text>` : '').join('')}
+    <text x="${pl - 3}" y="${toY(max)}" class="tv-chart-axis" text-anchor="end" dominant-baseline="central">${max.toFixed(2)}</text>
+    <text x="${pl - 3}" y="${toY(min)}" class="tv-chart-axis" text-anchor="end" dominant-baseline="central">${min.toFixed(2)}</text>
+  </svg>${inverted ? '<span class="tv-tag tv-tag-neg">⚠ INVERTED</span>' : ''}`;
+}
+
+/** Horizontal bar ranking — rows: [{label, value, display}], bars scale
+ *  to [opts.min, opts.max] (defaults to the data's own range); opts.mid
+ *  sets the pos/neg color threshold (e.g. 0 for growth %, 50 for prob%). */
+function _tvBarRanking(rows, opts) {
+  opts = opts || {};
+  const items = (rows || []).filter(r => r && r.value != null);
+  if (!items.length) return '';
+  const vals = items.map(r => Number(r.value));
+  const min = opts.min ?? Math.min(0, ...vals);
+  const max = opts.max ?? Math.max(...vals);
+  const rng = (max - min) || 1;
+  const mid = opts.mid ?? 0;
+  return `<div class="tv-bar-ranking">${items.map(r => {
+    const pct = Math.max(0, Math.min(100, (Number(r.value) - min) / rng * 100));
+    const cls = Number(r.value) >= mid ? 'tv-pos' : 'tv-neg';
+    return `<div class="tv-bar-row">
+      <span class="tv-bar-label" title="${escapeHtml(String(r.label))}">${escapeHtml(String(r.label))}</span>
+      <span class="tv-bar-track"><span class="tv-bar-fill ${cls}" style="width:${pct.toFixed(1)}%"></span></span>
+      <span class="tv-bar-value ${cls}">${escapeHtml(String(r.display ?? r.value))}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+/** Compact OHLC bar chart (high-low stem + open/close ticks) —
+ *  candles: [{t,o,h,l,c}], oldest→newest, last 40 shown. */
+function _tvCandleSVG(candles) {
+  const cs = (candles || []).filter(c => c && c.h != null && c.l != null).slice(-40);
+  if (cs.length < 2) return '';
+  const w = 320, h = 100, pt = 6, pb = 6, ch = h - pt - pb;
+  const hi = Math.max(...cs.map(c => c.h)), lo = Math.min(...cs.map(c => c.l)), rng = (hi - lo) || 1;
+  const toY = v => (pt + ch - (v - lo) / rng * ch).toFixed(1);
+  const stepX = w / cs.length;
+  return `<svg class="tv-candles" viewBox="0 0 ${w} ${h}">${cs.map((c, i) => {
+    const x = (i + 0.5) * stepX, tick = stepX * 0.3;
+    const cls = c.c >= c.o ? 'tv-pos' : 'tv-neg';
+    return `<g class="${cls}">
+      <line x1="${x.toFixed(1)}" y1="${toY(c.h)}" x2="${x.toFixed(1)}" y2="${toY(c.l)}" stroke="currentColor" stroke-width="1"/>
+      <line x1="${(x - tick).toFixed(1)}" y1="${toY(c.o)}" x2="${x.toFixed(1)}" y2="${toY(c.o)}" stroke="currentColor" stroke-width="1.6"/>
+      <line x1="${x.toFixed(1)}" y1="${toY(c.c)}" x2="${(x + tick).toFixed(1)}" y2="${toY(c.c)}" stroke="currentColor" stroke-width="1.6"/>
+    </g>`;
+  }).join('')}</svg>`;
+}
+
+/** Bordered card wrapping a single chart with a label/meta header —
+ *  the gallery's atomic unit; returns '' when the chart body is empty
+ *  so callers can .filter(Boolean) cards with insufficient data. */
+function _tvChartCard(label, meta, chartHtml, variant) {
+  if (!chartHtml) return '';
+  return `<div class="tv-chart-card${variant ? ` tv-chart-card-${variant}` : ''}">
+    <div class="tv-chart-card-head">
+      <span class="tv-chart-card-label" title="${escapeHtml(String(label))}">${escapeHtml(String(label))}</span>
+      ${meta != null ? `<span class="tv-chart-card-meta">${meta}</span>` : ''}
+    </div>
+    <div class="tv-chart-card-body">${chartHtml}</div>
+  </div>`;
+}
+
+/* Charts — exhaustive gallery reproducing every distinct chart/graph
+   that appears across Macro Intel's tabs (signals, yield curve, FRED
+   indicators, commodities, bonds, crypto, predictions, global growth,
+   leading indicators, energy, agriculture), assembled purely from the
+   window._tvDataCache stashes added alongside each source's render
+   function — populates lazily as each Macro Intel tab is opened once. */
+function tvCharts() {
+  const c = window._tvDataCache || {};
+  const sections = [];
+
+  if (c.macroSignals?.length) {
+    sections.push({ title: 'Macro Signals', cards: c.macroSignals.slice(0, 12).map(s =>
+      _tvChartCard(s.label, s.chgPct != null ? _tvPct(s.chgPct) : null,
+        _tvSparkSVG(s.vals, { area: false }))) });
+  }
+
+  if (c.yieldCurve?.yields?.length) {
+    sections.push({ title: 'Yield Curve', cards: [
+      _tvChartCard(`Treasury Yield Curve${c.yieldCurve.date ? ' · ' + c.yieldCurve.date : ''}`,
+        c.yieldCurve.src ? escapeHtml(String(c.yieldCurve.src)) : null,
+        _tvYieldCurveSVG(c.yieldCurve.yields), 'wide') ] });
+  }
+
+  if (c.fredEconSparklines?.some(Boolean)) {
+    sections.push({ title: 'Economic Indicators', cards: c.fredEconSparklines.filter(Boolean).map(s =>
+      _tvChartCard(s.label, null, _tvSparkSVG(s.vals, { area: false }))) });
+  }
+
+  if (c.commoditySparklines?.length) {
+    sections.push({ title: 'Commodities', cards: c.commoditySparklines.map(s =>
+      _tvChartCard(s.label, null, _tvSparkSVG(s.vals, { area: false }))) });
+  }
+
+  if (c.bondSparklines?.length) {
+    sections.push({ title: 'Bond Spreads', cards: c.bondSparklines.map(s =>
+      _tvChartCard(s.label, null, _tvSparkSVG(s.vals, s.color ? { color: s.color, area: false } : { area: false }))) });
+  }
+
+  if (c.crypto?.coins?.length || c.crypto?.fearGreed?.current) {
+    sections.push({ title: 'Crypto', cards: [
+      ...(c.crypto.coins || []).slice(0, 8).map(coin => _tvChartCard(
+        (coin.symbol || '').toUpperCase(),
+        coin.price_change_percentage_24h != null ? _tvPct(coin.price_change_percentage_24h) : null,
+        _tvSparkSVG(coin.sparkline_in_7d?.price, { area: false }))),
+      ...(c.crypto.fearGreed?.current ? [_tvChartCard('Fear & Greed Index',
+        c.crypto.fearGreed.current.value_classification ? escapeHtml(String(c.crypto.fearGreed.current.value_classification)) : null,
+        _tvGaugeSVG(c.crypto.fearGreed.current.value, { valueText: c.crypto.fearGreed.current.value }))] : []),
+    ] });
+  }
+
+  if (c.btcCandles?.length) {
+    sections.push({ title: 'Crypto OHLC', cards: [
+      _tvChartCard('BTC/USDT · Daily', `${c.btcCandles.length}d`, _tvCandleSVG(c.btcCandles), 'wide') ] });
+  }
+
+  if (c.predictions?.length) {
+    sections.push({ title: 'Prediction Markets', cards: [
+      _tvChartCard('Implied Probability', `${c.predictions.length} markets`,
+        _tvBarRanking(c.predictions.slice(0, 12).map(m => ({
+          label: (m.question || '').length > 64 ? m.question.slice(0, 61) + '…' : m.question,
+          value: m.prob, display: m.prob != null ? `${m.prob}%` : 'N/A',
+        })), { min: 0, max: 100, mid: 50 }), 'wide') ] });
+  }
+
+  if (c.gdpRanking?.length) {
+    sections.push({ title: 'Global Growth', cards: [
+      _tvChartCard('GDP Growth % — World Bank · IMF', `${c.gdpRanking.length} economies`,
+        _tvBarRanking(c.gdpRanking.map(r => ({
+          label: r.name, value: r.gdp_growth,
+          display: r.gdp_growth != null ? `${r.gdp_growth >= 0 ? '+' : ''}${r.gdp_growth.toFixed(1)}%` : 'N/A',
+        })), { mid: 0 }), 'wide') ] });
+  }
+
+  if (c.cliGauges?.length) {
+    sections.push({ title: 'Leading Indicators (CLI)', cards: c.cliGauges.slice(0, 12).map(item =>
+      _tvChartCard(item.name || item.code || '',
+        typeof item.value === 'number' ? item.value.toFixed(2) : null,
+        _tvGaugeSVG(Math.max(0, Math.min(100, (item.value - 97) / 6 * 100)),
+          { valueText: typeof item.value === 'number' ? item.value.toFixed(1) : '—',
+            cls: item.value >= 100 ? 'tv-pos' : 'tv-neg' }))) });
+  }
+
+  if (c.energySparklines?.cards?.length || c.energySparklines?.gasStorage) {
+    const e = c.energySparklines;
+    sections.push({ title: 'Energy', cards: [
+      ...(e.cards || []).map(s => _tvChartCard(s.label, null,
+        _tvSparkSVG(s.vals, s.color ? { color: s.color, area: false } : { area: false }))),
+      ...(e.gasStorage ? [_tvChartCard(e.gasStorage.label, null, _tvSparkSVG(e.gasStorage.vals, { area: false }))] : []),
+    ] });
+  }
+
+  if (c.agriSparkline?.vals?.length) {
+    sections.push({ title: 'Agriculture', cards: [
+      _tvChartCard(c.agriSparkline.label, null, _tvSparkSVG(c.agriSparkline.vals, { area: false })) ] });
+  }
+
+  const built = sections.map(sec => ({ ...sec, cards: sec.cards.filter(Boolean) })).filter(sec => sec.cards.length);
+  if (!built.length) {
+    return `<div class="tv-window-empty">// No chart data cached yet — open the corresponding Macro Intel tabs (Signals, Yield, Econ, Commodities, Bonds, Crypto, Predictions, Global, PMI, Energy, Agri…) to populate the gallery.</div>`;
+  }
+  return built.map(sec => `<div class="tv-chart-section">
+    <div class="tv-chart-section-title">${escapeHtml(sec.title)}</div>
+    <div class="tv-chart-grid">${sec.cards.join('')}</div>
+  </div>`).join('');
 }
 
 /* MacroMonitorTable — live VIX cache + Damodaran ERP constant, extended with
@@ -1704,6 +1935,7 @@ function renderTerminalView() {
     { id: 'quoteMatrix',         html: tvWindow(`Quote Matrix — ${sym || 'N/A'}`,            { id: 'quoteMatrix',         span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvQuoteMatrix(sym) }) },
     { id: 'technicalIndicators', html: tvWindow(`Technical Indicators — ${sym || 'N/A'}`,    { id: 'technicalIndicators', span: 4,  actions: `Last update ${stamp}`, bodyHtml: tvTechnicalIndicators(sym) }) },
     { id: 'sectorMatrix',        html: tvWindow('Sector Matrix',                  { id: 'sectorMatrix',        span: 4,  bodyHtml: tvSectorMatrix() }) },
+    { id: 'charts',              html: tvWindow('Charts',                         { id: 'charts',              span: 12, tall: true, actions: 'Macro Intel gallery', bodyHtml: tvCharts() }) },
     { id: 'news',                html: tvWindow('News',                           { id: 'news',                span: 4,  tall: true, actions: stamp, tabs: news.tabs, bodyHtml: news.body }) },
     { id: 'macroMonitor',        html: tvWindow('Macro Monitor',                  { id: 'macroMonitor',        span: 4,  tall: true, tabs: macroMonitor.tabs, bodyHtml: macroMonitor.body }) },
     { id: 'geoRisk',             html: tvWindow('Geo-Risk',                       { id: 'geoRisk',             span: 6,  tall: true, tabs: geoRisk.tabs, bodyHtml: geoRisk.body }) },

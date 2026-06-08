@@ -335,6 +335,12 @@ async function energyRender() {
 
   let html = '';
 
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.energySparklines = {
+    cards: eiaCards.filter(c => c.d?.history?.length > 1).map(c => ({ label: c.s.label, color: c.s.color, vals: c.d.history })),
+    gasStorage: gasStorage?.history?.length > 1 ? { label: 'Nat Gas Storage (Bcf)', vals: gasStorage.history } : null,
+  };
+
   /* ── US Benchmark Prices ─────────────────────────────────────── */
   html += _enLiveBar('US Energy Benchmarks', 'EIA API v2 · Daily JSON · Key via backend proxy');
   html += `<div class="en-price-grid">`;
