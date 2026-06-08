@@ -2001,12 +2001,6 @@ function changeTicker(){
   // Update quote-qr price element for WS patches
   const qrPrice = document.querySelector("#quote-qr .wl-price, #quote-qr span[data-live]");
   if (qrPrice) qrPrice.dataset.ticker = sym;
-  // Reset comparables comp tab
-  const compComp = document.getElementById("comp-comp");
-  if(compComp) { compComp.innerHTML = ""; compComp.dataset.loaded = ""; }
-  const activeCompTab = document.querySelector("#panel-comparables .tab-btn.active");
-  if(activeCompTab?.dataset.tab === "comp" && typeof yfLoadComparison === "function") yfLoadComparison(sym);
-  if(activeCompTab?.dataset.tab === "rv"   && typeof yfLoadPeers      === "function") yfLoadPeers(sym);
 }
 
 async function searchTopicNews(){
@@ -2728,7 +2722,6 @@ const PANEL_META = {
   news:          { label:'News',         icon:'📰' },
   analysts:      { label:'Analysts',     icon:'🔬' },
   ownership:     { label:'Ownership',    icon:'🏛'  },
-  comparables:   { label:'Comparables',  icon:'⚖️'  },
   notes:         { label:'Notes',        icon:'📝' },
   watchlist:     { label:'Watchlist',    icon:'👁'  },
   geopolitical:  { label:'Geo·Risk',     icon:'🌍' },
@@ -2773,23 +2766,23 @@ function toggleLayoutSidebar() {
 const LAYOUT_PRESETS = {
   focus: {
     show: ['chart','fundamentals','news','analysts'],
-    hide: ['ownership','comparables','notes','watchlist','geopolitical','supply','alert','macro','intel','webhooks'],
+    hide: ['ownership','notes','watchlist','geopolitical','supply','alert','macro','intel','webhooks'],
   },
   grid: {
-    show: ['chart','fundamentals','news','analysts','ownership','comparables','watchlist','macro'],
+    show: ['chart','fundamentals','news','analysts','ownership','watchlist','macro'],
     hide: ['notes','geopolitical','supply','alert','intel','webhooks'],
   },
   research: {
-    show: ['fundamentals','analysts','comparables','ownership','watchlist','news'],
+    show: ['fundamentals','analysts','ownership','watchlist','news'],
     hide: ['chart','notes','geopolitical','supply','alert','macro','intel','webhooks'],
   },
   monitor: {
     show: ['geopolitical','intel','macro','alert','supply','news'],
-    hide: ['chart','fundamentals','analysts','ownership','comparables','notes','watchlist','webhooks'],
+    hide: ['chart','fundamentals','analysts','ownership','notes','watchlist','webhooks'],
   },
   trading: {
     show: ['chart','watchlist','analysts','webhooks','news','fundamentals'],
-    hide: ['ownership','comparables','notes','geopolitical','supply','alert','macro','intel'],
+    hide: ['ownership','notes','geopolitical','supply','alert','macro','intel'],
   },
 };
 
