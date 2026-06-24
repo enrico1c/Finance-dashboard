@@ -1,0 +1,518 @@
+/* ══════════════════════════════════════════════════════════════════
+   FINTERM — Terminal View · terminal.css
+   Dense, table-first professional workspace mode.
+   Built entirely on the existing dark-theme CSS variables defined
+   in style.css (:root) — no new palette is introduced.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Header toggle button ─────────────────────────────────────────── */
+.terminal-view-toggle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.terminal-view-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+}
+.terminal-view-toggle.active {
+  color: var(--bg-base);
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+/* ── Structural switch between dashboard and terminal workspace ──── */
+.app-shell.terminal-active #dashboardCanvas,
+.app-shell.terminal-active #layoutSidebar {
+  display: none !important;
+}
+.terminal-view.hidden { display: none !important; }
+
+/* ── Workspace grid ───────────────────────────────────────────────── */
+.terminal-view {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: min-content;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-base);
+  overflow-y: auto;
+  font-family: var(--font-mono);
+}
+
+/* Window placement — dense multi-column grid on desktop */
+.tv-window { grid-column: span 4; }
+.tv-window.tv-span-6  { grid-column: span 6; }
+.tv-window.tv-span-8  { grid-column: span 8; }
+.tv-window.tv-span-12 { grid-column: span 12; }
+
+@media (max-width: 1280px) {
+  .tv-window,
+  .tv-window.tv-span-6,
+  .tv-window.tv-span-8  { grid-column: span 6; }
+}
+@media (max-width: 880px) {
+  .terminal-view { grid-template-columns: 1fr; }
+  .tv-window,
+  .tv-window.tv-span-6,
+  .tv-window.tv-span-8,
+  .tv-window.tv-span-12 { grid-column: span 1; }
+}
+
+/* ── Terminal window (panel frame) ────────────────────────────────── */
+.tv-window {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  min-height: 0;
+}
+.tv-window-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tv-window-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.tv-window-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tv-window-tab {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  cursor: pointer;
+}
+.tv-window-tab.active {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+}
+.tv-window-actions {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: .03em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.tv-window-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  min-height: 0;
+  max-height: 360px;
+}
+.tv-window-body.tv-tall { max-height: 540px; }
+
+/* ── Price-chart mount (hosts the existing lwchart.js widget) ─────── */
+.tv-chart-mount {
+  height: 100%;
+  min-height: 360px;
+}
+
+/* ── Dense data table ─────────────────────────────────────────────── */
+.tv-table-wrap { overflow-x: auto; }
+.tv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.tv-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-bright);
+  white-space: nowrap;
+}
+.tv-table thead th.tv-num { text-align: right; }
+.tv-table tbody td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-align: left;
+}
+.tv-table tbody td.tv-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.tv-table tbody tr:hover td {
+  background: var(--bg-hover);
+}
+.tv-table .tv-ticker {
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: .03em;
+}
+.tv-table .tv-empty { color: var(--text-muted); }
+
+/* ── Color coding ─────────────────────────────────────────────────── */
+.tv-pos { color: var(--accent-green); }
+.tv-neg { color: var(--accent-red); }
+.tv-warn { color: #d29922; }
+.tv-neutral { color: var(--text-secondary); }
+
+/* ── Status / signal / risk tags ──────────────────────────────────── */
+.tv-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.tv-tag-pos     { color: var(--accent-green); background: color-mix(in srgb, var(--accent-green) 12%, transparent); }
+.tv-tag-neg     { color: var(--accent-red);   background: color-mix(in srgb, var(--accent-red) 12%, transparent); }
+.tv-tag-warn    { color: #d29922;             background: color-mix(in srgb, #d29922 12%, transparent); }
+.tv-tag-neutral { color: var(--text-secondary); background: var(--bg-surface); }
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.tv-window-empty {
+  padding: 14px 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: .03em;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FREE-FLOATING LAYOUT — toggled by JS (.tv-free-layout) once the
+   viewport is wide enough to support drag/resize. Below the breakpoint
+   the grid-stack rules above remain in full effect, untouched.
+   ══════════════════════════════════════════════════════════════════ */
+@media (min-width: 1024px) {
+  .terminal-view.tv-free-layout {
+    display: block;
+    position: relative;
+    overflow: auto;
+  }
+  .tv-free-layout .tv-window {
+    position: absolute;
+    grid-column: unset;
+  }
+  .tv-free-layout .tv-window-body,
+  .tv-free-layout .tv-window-body.tv-tall {
+    max-height: none;
+  }
+}
+
+/* ── Drag grip (header handle) ────────────────────────────────────── */
+.tv-drag-grip {
+  display: none;
+  flex-shrink: 0;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  width: 10px;
+  height: 14px;
+  cursor: grab;
+}
+.tv-free-layout .tv-drag-grip { display: grid; }
+.tv-drag-grip span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.tv-free-layout .tv-window-header { cursor: grab; }
+.tv-window.tv-dragging,
+.tv-window.tv-dragging .tv-window-header,
+.tv-window.tv-dragging .tv-drag-grip { cursor: grabbing; }
+.tv-window.tv-dragging {
+  border-color: var(--accent-green);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .45);
+  opacity: .92;
+}
+
+/* ── Resize handles ───────────────────────────────────────────────── */
+.tv-resize-handle {
+  display: none;
+  position: absolute;
+  z-index: 2;
+}
+.tv-free-layout .tv-resize-handle { display: block; }
+.tv-resize-handle[data-dir="n"],
+.tv-resize-handle[data-dir="s"] { left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.tv-resize-handle[data-dir="n"] { top: -3px; }
+.tv-resize-handle[data-dir="s"] { bottom: -3px; }
+.tv-resize-handle[data-dir="e"],
+.tv-resize-handle[data-dir="w"] { top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.tv-resize-handle[data-dir="e"] { right: -3px; }
+.tv-resize-handle[data-dir="w"] { left: -3px; }
+.tv-resize-handle[data-dir="ne"],
+.tv-resize-handle[data-dir="nw"],
+.tv-resize-handle[data-dir="se"],
+.tv-resize-handle[data-dir="sw"] { width: 12px; height: 12px; }
+.tv-resize-handle[data-dir="ne"] { top: -4px; right: -4px; cursor: nesw-resize; }
+.tv-resize-handle[data-dir="nw"] { top: -4px; left: -4px;  cursor: nwse-resize; }
+.tv-resize-handle[data-dir="se"] { bottom: -4px; right: -4px; cursor: nwse-resize; }
+.tv-resize-handle[data-dir="sw"] { bottom: -4px; left: -4px;  cursor: nesw-resize; }
+.tv-window.tv-resizing {
+  border-color: var(--accent-green);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .45);
+}
+
+/* ── Live size tooltip (shown while resizing) ─────────────────────── */
+.tv-size-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--bg-base);
+  background: var(--accent-green);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  pointer-events: none;
+  z-index: 3;
+}
+.tv-window.tv-resizing .tv-size-tooltip { display: block; }
+
+/* ══════════════════════════════════════════════════════════════════
+   CHART GALLERY — the "Charts" window's grid of native SVG mini-charts
+   (sparklines, gauges, yield curve, bar rankings, OHLC), grouped into
+   labeled sections mirroring the Macro Intel tabs they're sourced from.
+   ══════════════════════════════════════════════════════════════════ */
+.tv-chart-section + .tv-chart-section { margin-top: 14px; }
+.tv-chart-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 10px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.tv-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  padding: 0 10px;
+}
+.tv-chart-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  padding: 8px 10px;
+  min-width: 0;
+}
+.tv-chart-card-wide { grid-column: 1 / -1; }
+.tv-chart-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.tv-chart-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tv-chart-card-meta {
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tv-chart-card-body { line-height: 0; }
+.tv-chart-card-body svg { display: block; width: 100%; height: auto; }
+
+/* ── Sparklines / yield curve / candles ───────────────────────────── */
+.tv-spark, .tv-yieldcurve, .tv-candles { height: 38px; }
+.tv-yieldcurve, .tv-candles { height: 96px; }
+.tv-chart-axis {
+  font-size: 6px;
+  font-family: var(--font-mono);
+  fill: var(--text-muted);
+}
+.tv-yieldcurve + .tv-tag { margin-top: 4px; display: inline-block; }
+
+/* ── Semicircle gauge ──────────────────────────────────────────────── */
+.tv-gauge { height: 56px; }
+.tv-gauge-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  fill: currentColor;
+}
+
+/* ── Horizontal bar ranking ────────────────────────────────────────── */
+.tv-bar-ranking { display: flex; flex-direction: column; gap: 5px; }
+.tv-bar-row {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) minmax(70px, 2fr) 52px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+}
+.tv-bar-label {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tv-bar-track {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.tv-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: .55;
+}
+.tv-bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Floating "Charts" launcher + overlay ─────────────────────────────
+   Lives outside the window grid (position: fixed → not a grid item, so it
+   never collides with or hides behind a free-floating .tv-window). Only
+   ever present in the DOM while Terminal View is rendered. */
+.tv-charts-fab {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  z-index: 900;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .4);
+  transition: var(--transition);
+}
+.tv-charts-fab:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-bright);
+  background: var(--bg-hover);
+}
+.tv-charts-fab.active {
+  color: var(--bg-base);
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+}
+.tv-charts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(5, 9, 16, .82);
+}
+.tv-charts-overlay-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(1320px, 100%);
+  max-height: 90vh;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 20px 64px rgba(0, 0, 0, .55);
+  overflow: hidden;
+}
+.tv-charts-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+.tv-charts-overlay-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.tv-charts-overlay-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.tv-charts-overlay-close:hover {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+}
+.tv-charts-overlay-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 12px 0;
+}

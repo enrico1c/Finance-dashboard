@@ -66,10 +66,22 @@ function fredEsc(s) {
 function fredSpinner() {
   return '<div class="av-loading"><span class="av-spinner"></span>Loading FRED data…</div>';
 }
-function fredNoKey() {
-  return `<div class="no-data">// FRED key not configured.<br>
-    // <a href="#" onclick="openApiConfig('fred');return false" style="color:var(--accent)">
-    Add your free FRED key →</a></div>`;
+function fredNoKey(context) {
+  const noKeyMsg = {
+    'yield': 'Treasury Direct (no key) loaded above. FRED key unlocks historical yield data.',
+    'econ':  'Credit spreads, Fed Funds, CPI series require a free FRED key.',
+    'bonds': 'IG/HY spreads (BAML series) require a free FRED key.',
+  };
+  const note = context && noKeyMsg[context] ? `<br><span style="color:var(--text-muted);font-size:10px">${noKeyMsg[context]}</span>` : '';
+  return `<div class="no-data" style="padding:12px">
+    // FRED key not configured.${note}<br><br>
+    // <a href="#" onclick="if(typeof toggleApiSidebar==='function')toggleApiSidebar();return false"
+       style="color:var(--accent);font-weight:700">⚙ Configure free FRED key →</a>
+    &nbsp;·&nbsp;
+    <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank"
+       rel="noopener" style="color:var(--text-muted);font-size:10px">Get free key</a><br><br>
+    // No-key data still available: US Treasury yield curve (Treasury Direct)
+  </div>`;
 }
 function fredError(msg) {
   return `<div class="no-data">// FRED error: ${fredEsc(msg)}</div>`;
@@ -153,12 +165,16 @@ async function fredLoadYieldCurve() {
   // ── 1. US Treasury Direct (no key needed) ────────────────────
   const treasuryData = await fredLoadTreasuryDirect();
   if (treasuryData?.yields?.length) {
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.yieldCurve = { yields: treasuryData.yields, date: treasuryData.date, src: treasuryData.src };
     _fredRenderYieldCurve(el, treasuryData.yields, treasuryData.date, treasuryData.src);
+  } else {
+    el.innerHTML = ''; // clear spinner — subsequent sections will fill the element
   }
 
   // ── 2. FRED credit spreads (BAMLC0A0CM, BAMLH0A0HYM2, T10YIE) ─
   if (!getFredKey()) {
-    if (!treasuryData?.yields?.length) el.innerHTML = fredNoKey();
+    el.innerHTML = fredNoKey('yield');
     return;
   }
 
@@ -173,6 +189,9 @@ async function fredLoadYieldCurve() {
     const results = await Promise.allSettled(
       SPREAD_SERIES.map(s => fredLatest(s.id).then(v => ({ ...s, value: v ? parseFloat(v.value) : null, date: v?.date })))
     );
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.fredSpreads = results.filter(r=>r.status==='fulfilled').map(r=>r.value);
 
     let credHtml = `<div class="fred-section-head" style="margin-top:10px">📊 Credit Spreads &amp; Inflation Breakeven</div>
       <div class="fred-cs-grid">`;
@@ -219,7 +238,7 @@ const FRED_MACRO_SERIES = [
 async function fredLoadMacroIndicators() {
   const el = document.getElementById('macro-econ');
   if (!el) return;
-  if (!getFredKey()) { el.innerHTML = fredNoKey(); return; }
+  if (!getFredKey()) { el.innerHTML = fredNoKey('econ'); return; }
   el.innerHTML = fredSpinner();
   try {
     const results = await Promise.allSettled(
@@ -232,6 +251,9 @@ async function fredLoadMacroIndicators() {
         }))
       )
     );
+
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.fredMacro = results.filter(r=>r.status==='fulfilled').map(r=>r.value);
 
     let html = `<div class="fred-section-head">🏛 FRED Macro Indicators</div>
     <div class="fred-macro-grid">`;
@@ -282,6 +304,9 @@ async function fredSparkRow(seriesIds, labels) {
     const obs = r.value.reverse(); // oldest→newest
     const vals = obs.map(o => parseFloat(o.value)).filter(v => !isNaN(v));
     if (!vals.length) return;
+    window._tvDataCache = window._tvDataCache || {};
+    window._tvDataCache.fredEconSparklines = window._tvDataCache.fredEconSparklines || [];
+    window._tvDataCache.fredEconSparklines[i] = { label: labels[i], vals };
     const mx = Math.max(...vals), mn = Math.min(...vals), range = mx - mn || 1;
     const W = 100, H = 36;
     const xStep = W / (vals.length - 1 || 1);

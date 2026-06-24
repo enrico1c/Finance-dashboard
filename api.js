@@ -50,12 +50,12 @@ function cacheGet(fn, symbol) {
     const { ts, data } = JSON.parse(raw);
     if (Date.now() - ts > CACHE_TTL) { sessionStorage.removeItem(cacheKey(fn, symbol)); return null; }
     return data;
-  } catch { return null; }
+  } catch(e) { return null; }
 }
 
 function cacheSet(fn, symbol, data) {
   try { sessionStorage.setItem(cacheKey(fn, symbol), JSON.stringify({ ts: Date.now(), data })); }
-  catch { /* storage full — ignore */ }
+  catch(e) { /* storage full — ignore */ }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -500,7 +500,9 @@ function avRenderEarnings(sym, earn) {
 function avRenderFA(sym, income, balance, cashflow) {
   const fa = document.getElementById("fund-fa");
   if (!fa) return;
-  fa.dataset.loaded = "av"; // Mark as loaded by AV so EDGAR doesn't overwrite
+  // Only mark as loaded if there's actual data to show
+  const hasData = income?.length || balance?.length || cashflow?.length;
+  if (hasData) fa.dataset.loaded = "av";
 
   let html = `<div class="av-live-badge">● Financial Statements · Alpha Vantage</div>`;
 
@@ -617,7 +619,7 @@ function avRenderWACC(sym, ov) {
     ${mRow("Pre-Tax Cost of Debt",  kd+"%")}
     ${mRow("Tax Rate (assumed)",    taxRate+"%")}
     ${mRow("Equity Weight",         eW+"%")}
-    ${mRow("Debt Weight",           dW + "% " + (fmpDebtEq != null ? '<span style="font-size:9px;opacity:.6">(FMP D/E)</span>' : '<span style="font-size:9px;opacity:.6">(est.)</span>'))}
+    ${mRowHtml("Debt Weight",           dW + "% " + (fmpDebtEq != null ? '<span style="font-size:9px;opacity:.6">(FMP D/E)</span>' : '<span style="font-size:9px;opacity:.6">(est.)</span>'))}
     <div class="metric wacc-result"><span>→ WACC</span><span>${wacc}%</span></div>
     ${sHead("DCF Sensitivity")}
     ${mRow("Terminal Growth Rate",  tg+"%")}

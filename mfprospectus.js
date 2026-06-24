@@ -139,7 +139,7 @@ async function _getCIK(sym) {
     const json=await res.json();
     const cik=json?.hits?.hits?.[0]?._id?.split(":")[0];
     if (cik) {const p=cik.padStart(10,"0");_CIK_CACHE.set(bare,p);return p;}
-  } catch{}
+  } catch(e) {}
   return null;
 }
 
@@ -201,7 +201,7 @@ function _parseProspectus(xmlText) {
     if (parseErr) {
       doc = parser.parseFromString(xmlText,"text/html");
     }
-  } catch { return null; }
+  } catch(e) { return null; }
 
   /* Helper: get text content of first matching tag (with/without namespace) */
   const getText = (tag) => {

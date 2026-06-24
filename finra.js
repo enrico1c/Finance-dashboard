@@ -115,11 +115,10 @@ async function _fetchSSVFile(dateStr) {
   const cached   = _cacheGet(cacheKey, SSV_TTL);
   if (cached !== null) return cached;
 
-  const url      = `${FINRA_CDN}CNMSshvol${dateStr}.txt`;
-  const proxied  = PROXY + encodeURIComponent(url);
+  const url  = `${FINRA_CDN}CNMSshvol${dateStr}.txt`;
 
   try {
-    const res  = await fetch(proxied, { signal: AbortSignal.timeout(12000) });
+    const res  = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) return null;
     const text = await res.text();
     if (!text || text.length < 100) return null;

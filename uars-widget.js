@@ -280,6 +280,9 @@ async function _score(ticker, assetClass, RA = 50, rawData, penalties, qualityMu
 ══════════════════════════════════════════════════════════════════ */
 
 function _renderAll(result, sym) {
+  window._tvDataCache = window._tvDataCache || {};
+  window._tvDataCache.uars = { sym, result };
+
   _renderOverview(result, sym);
   /* Model tabs render on demand when tab is clicked (or already active) */
   if (_uarsActiveTab !== 'overview') {

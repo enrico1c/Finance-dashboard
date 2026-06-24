@@ -1,0 +1,643 @@
+[
+  {
+    "id": "P000197",
+    "slug": "pelosi-nancy",
+    "name": "Nancy Pelosi",
+    "firstName": "Nancy",
+    "lastName": "Pelosi",
+    "party": "Democrat",
+    "chamber": "House",
+    "state": "CA",
+    "district": "9",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/P000197.jpg",
+    "officialUrl": "https://www.congress.gov/member/nancy-pelosi/P000197",
+    "committees": [
+      {
+        "id": "HSEC",
+        "name": "House Energy and Commerce Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Energy",
+          "Healthcare",
+          "Telecom / Media",
+          "Technology"
+        ]
+      },
+      {
+        "id": "HSWM",
+        "name": "House Ways and Means Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Banking / Financial Services",
+          "Judiciary / Regulation"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Technology",
+      "Banking / Financial Services"
+    ],
+    "tradeCount": 51,
+    "flaggedTradeCount": 39,
+    "totalValueMin": 3279051,
+    "totalValueMax": 7485000,
+    "performanceBadge": "Watchlist",
+    "estimatedReturn1y": 19.66,
+    "estimatedReturn3y": 53.83,
+    "estimatedReturn5y": 82.81,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-04-01",
+    "isActive": true
+  },
+  {
+    "id": "B001289",
+    "slug": "brooks-mo",
+    "name": "Mo Brooks",
+    "firstName": "Mo",
+    "lastName": "Brooks",
+    "party": "Republican",
+    "chamber": "House",
+    "state": "AL",
+    "district": "8",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/B001289.jpg",
+    "officialUrl": "https://www.congress.gov/member/mo-brooks/B001289",
+    "committees": [
+      {
+        "id": "HSAS",
+        "name": "House Armed Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Defense"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Defense",
+      "Industrial / Manufacturing"
+    ],
+    "tradeCount": 47,
+    "flaggedTradeCount": 11,
+    "totalValueMin": 4350047,
+    "totalValueMax": 15450000,
+    "performanceBadge": "High Outperformance",
+    "estimatedReturn1y": 72.47,
+    "estimatedReturn3y": 86.92,
+    "estimatedReturn5y": 111.77,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-03-08",
+    "isActive": true
+  },
+  {
+    "id": "B000574",
+    "slug": "blumenauer-earl",
+    "name": "Earl Blumenauer",
+    "firstName": "Earl",
+    "lastName": "Blumenauer",
+    "party": "Democrat",
+    "chamber": "House",
+    "state": "OR",
+    "district": "4",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/B000574.jpg",
+    "officialUrl": "https://www.congress.gov/member/earl-blumenauer/B000574",
+    "committees": [
+      {
+        "id": "HSTI",
+        "name": "House Transportation and Infrastructure Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Transportation",
+          "Environment / Climate"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Environment / Climate",
+      "Transportation"
+    ],
+    "tradeCount": 50,
+    "flaggedTradeCount": 4,
+    "totalValueMin": 3788050,
+    "totalValueMax": 11470000,
+    "performanceBadge": "Strong Estimated Gains",
+    "estimatedReturn1y": 36.01,
+    "estimatedReturn3y": 76.86,
+    "estimatedReturn5y": 13.47,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-04-01",
+    "isActive": true
+  },
+  {
+    "id": "C001075",
+    "slug": "cassidy-bill",
+    "name": "Bill Cassidy",
+    "firstName": "Bill",
+    "lastName": "Cassidy",
+    "party": "Republican",
+    "chamber": "Senate",
+    "state": "LA",
+    "district": null,
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/C001075.jpg",
+    "officialUrl": "https://www.congress.gov/member/bill-cassidy/C001075",
+    "committees": [
+      {
+        "id": "SSHR",
+        "name": "Senate HELP Committee",
+        "role": "Ranking Member",
+        "policy_areas": [
+          "Healthcare",
+          "Education",
+          "Pharmaceuticals"
+        ]
+      },
+      {
+        "id": "SSAS",
+        "name": "Senate Armed Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Defense"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Healthcare",
+      "Pharmaceuticals",
+      "Energy"
+    ],
+    "tradeCount": 49,
+    "flaggedTradeCount": 29,
+    "totalValueMin": 2899049,
+    "totalValueMax": 6560000,
+    "performanceBadge": "High Outperformance",
+    "estimatedReturn1y": 68.84,
+    "estimatedReturn3y": 118.95,
+    "estimatedReturn5y": 110.64,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-04-01",
+    "isActive": true
+  },
+  {
+    "id": "L000577",
+    "slug": "lee-mike",
+    "name": "Mike Lee",
+    "firstName": "Mike",
+    "lastName": "Lee",
+    "party": "Republican",
+    "chamber": "Senate",
+    "state": "UT",
+    "district": null,
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/L000577.jpg",
+    "officialUrl": "https://www.congress.gov/member/mike-lee/L000577",
+    "committees": [
+      {
+        "id": "SSSF",
+        "name": "Senate Banking, Housing, and Urban Affairs",
+        "role": "Ranking Member",
+        "policy_areas": [
+          "Banking / Financial Services",
+          "Real Estate / Housing"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Judiciary / Regulation",
+      "Banking / Financial Services"
+    ],
+    "tradeCount": 53,
+    "flaggedTradeCount": 12,
+    "totalValueMin": 4400053,
+    "totalValueMax": 12625000,
+    "performanceBadge": "Strong Estimated Gains",
+    "estimatedReturn1y": 35.48,
+    "estimatedReturn3y": 66.51,
+    "estimatedReturn5y": 98.66,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-03-26",
+    "isActive": true
+  },
+  {
+    "id": "W000817",
+    "slug": "warren-elizabeth",
+    "name": "Elizabeth Warren",
+    "firstName": "Elizabeth",
+    "lastName": "Warren",
+    "party": "Democrat",
+    "chamber": "Senate",
+    "state": "MA",
+    "district": null,
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/W000817.jpg",
+    "officialUrl": "https://www.congress.gov/member/elizabeth-warren/W000817",
+    "committees": [
+      {
+        "id": "SSSF",
+        "name": "Senate Banking, Housing, and Urban Affairs",
+        "role": "Chair",
+        "policy_areas": [
+          "Banking / Financial Services",
+          "Real Estate / Housing"
+        ]
+      },
+      {
+        "id": "SSBU",
+        "name": "Senate Budget Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Banking / Financial Services"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Banking / Financial Services",
+      "Consumer / Retail"
+    ],
+    "tradeCount": 53,
+    "flaggedTradeCount": 14,
+    "totalValueMin": 6328053,
+    "totalValueMax": 19495000,
+    "performanceBadge": "Strong Estimated Gains",
+    "estimatedReturn1y": 37.86,
+    "estimatedReturn3y": 92.05,
+    "estimatedReturn5y": 151.86,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-02-04",
+    "isActive": true
+  },
+  {
+    "id": "S001196",
+    "slug": "slotkin-elissa",
+    "name": "Elissa Slotkin",
+    "firstName": "Elissa",
+    "lastName": "Slotkin",
+    "party": "Democrat",
+    "chamber": "House",
+    "state": "MI",
+    "district": "7",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/S001196.jpg",
+    "officialUrl": "https://www.congress.gov/member/elissa-slotkin/S001196",
+    "committees": [
+      {
+        "id": "HSAS",
+        "name": "House Armed Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Defense"
+        ]
+      },
+      {
+        "id": "HSEC",
+        "name": "House Energy and Commerce Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Energy",
+          "Healthcare",
+          "Telecom / Media",
+          "Technology"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Defense",
+      "Technology"
+    ],
+    "tradeCount": 45,
+    "flaggedTradeCount": 35,
+    "totalValueMin": 4965045,
+    "totalValueMax": 13475000,
+    "performanceBadge": "Underperforming",
+    "estimatedReturn1y": 2.91,
+    "estimatedReturn3y": 67.09,
+    "estimatedReturn5y": 146.84,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-04-01",
+    "isActive": true
+  },
+  {
+    "id": "G000596",
+    "slug": "taylor-greene-marjorie",
+    "name": "Marjorie Taylor Greene",
+    "firstName": "Marjorie",
+    "lastName": "Taylor Greene",
+    "party": "Republican",
+    "chamber": "House",
+    "state": "GA",
+    "district": "17",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/G000596.jpg",
+    "officialUrl": "https://www.congress.gov/member/marjorie-taylor-greene/G000596",
+    "committees": [
+      {
+        "id": "HSAS",
+        "name": "House Armed Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Defense"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Defense",
+      "Consumer / Retail"
+    ],
+    "tradeCount": 60,
+    "flaggedTradeCount": 11,
+    "totalValueMin": 3743060,
+    "totalValueMax": 8420000,
+    "performanceBadge": "Underperforming",
+    "estimatedReturn1y": 8.91,
+    "estimatedReturn3y": 48.35,
+    "estimatedReturn5y": 134.42,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-04-01",
+    "isActive": true
+  },
+  {
+    "id": "S000250",
+    "slug": "sessions-pete",
+    "name": "Pete Sessions",
+    "firstName": "Pete",
+    "lastName": "Sessions",
+    "party": "Republican",
+    "chamber": "House",
+    "state": "TX",
+    "district": "1",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/S000250.jpg",
+    "officialUrl": "https://www.congress.gov/member/pete-sessions/S000250",
+    "committees": [
+      {
+        "id": "HSSF",
+        "name": "House Financial Services Committee",
+        "role": "Ranking Member",
+        "policy_areas": [
+          "Banking / Financial Services"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Banking / Financial Services",
+      "Real Estate / Housing"
+    ],
+    "tradeCount": 51,
+    "flaggedTradeCount": 6,
+    "totalValueMin": 3732051,
+    "totalValueMax": 11255000,
+    "performanceBadge": "Watchlist",
+    "estimatedReturn1y": 13.68,
+    "estimatedReturn3y": 78.72,
+    "estimatedReturn5y": 89.16,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-03-26",
+    "isActive": true
+  },
+  {
+    "id": "K000394",
+    "slug": "kim-andy",
+    "name": "Andy Kim",
+    "firstName": "Andy",
+    "lastName": "Kim",
+    "party": "Democrat",
+    "chamber": "Senate",
+    "state": "NJ",
+    "district": null,
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/K000394.jpg",
+    "officialUrl": "https://www.congress.gov/member/andy-kim/K000394",
+    "committees": [
+      {
+        "id": "SSAS",
+        "name": "Senate Armed Services Committee",
+        "role": "Ranking Member",
+        "policy_areas": [
+          "Defense"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Defense",
+      "Technology"
+    ],
+    "tradeCount": 60,
+    "flaggedTradeCount": 27,
+    "totalValueMin": 3433060,
+    "totalValueMax": 10770000,
+    "performanceBadge": "Watchlist",
+    "estimatedReturn1y": 15.23,
+    "estimatedReturn3y": 90.67,
+    "estimatedReturn5y": 147.13,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-03-22",
+    "isActive": true
+  },
+  {
+    "id": "C001103",
+    "slug": "scott-austin",
+    "name": "Austin Scott",
+    "firstName": "Austin",
+    "lastName": "Scott",
+    "party": "Republican",
+    "chamber": "House",
+    "state": "GA",
+    "district": "14",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/C001103.jpg",
+    "officialUrl": "https://www.congress.gov/member/austin-scott/C001103",
+    "committees": [
+      {
+        "id": "HSAS",
+        "name": "House Armed Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Defense"
+        ]
+      },
+      {
+        "id": "HSAG",
+        "name": "House Agriculture Committee",
+        "role": "Ranking Member",
+        "policy_areas": [
+          "Agriculture"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Agriculture",
+      "Defense"
+    ],
+    "tradeCount": 65,
+    "flaggedTradeCount": 17,
+    "totalValueMin": 5279065,
+    "totalValueMax": 14635000,
+    "performanceBadge": "Underperforming",
+    "estimatedReturn1y": 5.42,
+    "estimatedReturn3y": 56.2,
+    "estimatedReturn5y": 119.83,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-04-01",
+    "isActive": true
+  },
+  {
+    "id": "D000620",
+    "slug": "delaney-john",
+    "name": "John Delaney",
+    "firstName": "John",
+    "lastName": "Delaney",
+    "party": "Democrat",
+    "chamber": "House",
+    "state": "MD",
+    "district": "15",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/D000620.jpg",
+    "officialUrl": "https://www.congress.gov/member/john-delaney/D000620",
+    "committees": [
+      {
+        "id": "HSSF",
+        "name": "House Financial Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Banking / Financial Services"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Banking / Financial Services",
+      "Healthcare"
+    ],
+    "tradeCount": 53,
+    "flaggedTradeCount": 22,
+    "totalValueMin": 4435053,
+    "totalValueMax": 15550000,
+    "performanceBadge": "Strong Estimated Gains",
+    "estimatedReturn1y": 33.11,
+    "estimatedReturn3y": 54.88,
+    "estimatedReturn5y": 55.54,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-04-01",
+    "isActive": true
+  },
+  {
+    "id": "B001296",
+    "slug": "boyle-brendan",
+    "name": "Brendan Boyle",
+    "firstName": "Brendan",
+    "lastName": "Boyle",
+    "party": "Democrat",
+    "chamber": "House",
+    "state": "PA",
+    "district": "1",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/B001296.jpg",
+    "officialUrl": "https://www.congress.gov/member/brendan-boyle/B001296",
+    "committees": [
+      {
+        "id": "HSWM",
+        "name": "House Ways and Means Committee",
+        "role": "Ranking Member",
+        "policy_areas": [
+          "Banking / Financial Services",
+          "Judiciary / Regulation"
+        ]
+      },
+      {
+        "id": "HSSF",
+        "name": "House Financial Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Banking / Financial Services"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Banking / Financial Services",
+      "Education"
+    ],
+    "tradeCount": 68,
+    "flaggedTradeCount": 9,
+    "totalValueMin": 5187068,
+    "totalValueMax": 14580000,
+    "performanceBadge": "High Outperformance",
+    "estimatedReturn1y": 38.71,
+    "estimatedReturn3y": 59.59,
+    "estimatedReturn5y": 158.26,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-03-18",
+    "isActive": true
+  },
+  {
+    "id": "C001127",
+    "slug": "chavez-deremer-lori",
+    "name": "Lori Chavez-DeRemer",
+    "firstName": "Lori",
+    "lastName": "Chavez-DeRemer",
+    "party": "Republican",
+    "chamber": "House",
+    "state": "OR",
+    "district": "14",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/C001127.jpg",
+    "officialUrl": "https://www.congress.gov/member/lori-chavez-deremer/C001127",
+    "committees": [
+      {
+        "id": "HSAG",
+        "name": "House Agriculture Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Agriculture"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Healthcare",
+      "Agriculture"
+    ],
+    "tradeCount": 50,
+    "flaggedTradeCount": 9,
+    "totalValueMin": 3338050,
+    "totalValueMax": 10395000,
+    "performanceBadge": "Watchlist",
+    "estimatedReturn1y": 11.38,
+    "estimatedReturn3y": 56.66,
+    "estimatedReturn5y": 82.82,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-03-26",
+    "isActive": true
+  },
+  {
+    "id": "T000478",
+    "slug": "tenney-claudia",
+    "name": "Claudia Tenney",
+    "firstName": "Claudia",
+    "lastName": "Tenney",
+    "party": "Republican",
+    "chamber": "House",
+    "state": "NY",
+    "district": "5",
+    "photoUrl": "https://theunitedstates.io/images/congress/225x275/T000478.jpg",
+    "officialUrl": "https://www.congress.gov/member/claudia-tenney/T000478",
+    "committees": [
+      {
+        "id": "HSSF",
+        "name": "House Financial Services Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Banking / Financial Services"
+        ]
+      },
+      {
+        "id": "HSWM",
+        "name": "House Ways and Means Committee",
+        "role": "Member",
+        "policy_areas": [
+          "Banking / Financial Services",
+          "Judiciary / Regulation"
+        ]
+      }
+    ],
+    "policyAreas": [
+      "Banking / Financial Services",
+      "Industrial / Manufacturing"
+    ],
+    "tradeCount": 45,
+    "flaggedTradeCount": 10,
+    "totalValueMin": 4887045,
+    "totalValueMax": 16455000,
+    "performanceBadge": "Strong Estimated Gains",
+    "estimatedReturn1y": 28.37,
+    "estimatedReturn3y": 77.28,
+    "estimatedReturn5y": 68.19,
+    "performanceConfidence": "high",
+    "lastDisclosureDate": "2026-03-18",
+    "isActive": true
+  }
+]
